@@ -251,6 +251,50 @@ const resources = {
             "description": "There are no published exams available at the moment. Please check back later."
           }
         },
+        "exam": {
+          "question": "Question {{current}} of {{total}}",
+          "questionNavigator": "Question Navigator",
+          "card": {
+            "marks": "{{count}} marks",
+            "explanation": "Explanation"
+          },
+          "shortcuts": {
+            "trigger": "Shortcuts",
+            "title": "Keyboard Shortcuts",
+            "next": "Next question",
+            "prev": "Previous question",
+            "select": "Select option",
+            "submit": "Submit exam"
+          },
+          "loading": "Loading exam...",
+          "loadingFailed": "Failed to load exam",
+          "startFailed": "Failed to start exam",
+          "submitted": "Exam submitted!",
+          "submittedDesc": "Your exam has been submitted successfully.",
+          "submitFailed": "Failed to submit exam",
+          "timeUp": {
+            "title": "Time’s up",
+            "description": "Your answers are being submitted automatically."
+          },
+          "startDialog": {
+            "duration": "Duration: {{minutes}} minutes",
+            "questions": "Questions: {{count}}",
+            "timer": "The timer will start as soon as you begin",
+            "passwordRequired": "Password required to start",
+            "warning": "Do not refresh or leave this page",
+            "cancel": "Cancel",
+            "start": "Start Exam"
+          },
+          "passwordDialog": {
+            "title": "Enter Exam Password",
+            "description": "Enter the exam password to begin",
+            "label": "Exam Password",
+            "placeholder": "Enter exam password",
+            "cancel": "Cancel",
+            "submit": "Start Exam",
+            "incorrect": "Incorrect password. Please try again."
+          }
+        },
         "results": {
           "title": "My Results",
           "subtitle": "View your exam performance",
@@ -1389,6 +1433,50 @@ const resources = {
           "empty": {
             "title": "ምንም ፈተና የለም",
             "description": "በአሁኑ ጊዜ ምንም የታተሙ ፈተናዎች የሉም። እባክዎ በኋላ ተመልሰው ያረጋግጡ።"
+          }
+        },
+        "exam": {
+          "question": "ጥያቄ {{current}} ከ {{total}} ውስጥ",
+          "questionNavigator": "ጥያቄ አመራር",
+          "card": {
+            "marks": "{{count}} ነጥብ",
+            "explanation": "ማብራሪያ"
+          },
+          "shortcuts": {
+            "trigger": "አቋራጮች",
+            "title": "የኪቦርድ አቋራጮች",
+            "next": "ቀጣይ ጥያቄ",
+            "prev": "የቀድሞ ጥያቄ",
+            "select": "አማራጭ ምረጥ",
+            "submit": "ፈተና አስገባ"
+          },
+          "loading": "ፈተናው በመጫን ላይ...",
+          "loadingFailed": "ፈተናውን መጫን አልተቻለም",
+          "startFailed": "ፈተናውን መጀመር አልተቻለም",
+          "submitted": "ፈተናው ተረክቧል!",
+          "submittedDesc": "ፈተናዎ በተሳካ ሁኔታ ተረክቧል።",
+          "submitFailed": "ፈተና ማስገባት አልተቻለም",
+          "timeUp": {
+            "title": "ጊዜው ተለፏል",
+            "description": "መልሶችዎ በራስ-ሰር በመስጠት ላይ ነው።"
+          },
+          "startDialog": {
+            "duration": "ቆይታ: {{minutes}} ደቂቃ",
+            "questions": "ጥያቄዎች: {{count}}",
+            "timer": "እርስዎ ከጀመሩ ጊዜው ይጀምራል",
+            "passwordRequired": "ለመጀመር የይለፍ ቃል ያስፈልጋል",
+            "warning": "ይህን ገጽ አታዘጋጁ ወይም አትተዉት",
+            "cancel": "ሰርዝ",
+            "start": "ፈተና ጀምር"
+          },
+          "passwordDialog": {
+            "title": "የፈተና የይለፍ ቃል አስገባ",
+            "description": "ፈተናውን ለመጀመር የይለፍ ቃሉን አስገቡ",
+            "label": "የፈተና የይለፍ ቃል",
+            "placeholder": "የፈተና የይለፍ ቃል አስገቡ",
+            "cancel": "ሰርዝ",
+            "submit": "ፈተና ጀምር",
+            "incorrect": "የይለፍ ቃል የተሳሳተ ነው። እባክዎ ደግመው ይሞክሩ።"
           }
         },
         "results": {

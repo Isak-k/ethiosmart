@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { Check, X } from "lucide-react";
+import { Check, X, Lightbulb } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 interface QuestionCardProps {
@@ -108,9 +108,18 @@ export function QuestionCard({
       </div>
 
       {showExplanation && (
-        <div className="mt-4 ml-14 p-4 bg-muted/50 rounded-lg border border-muted animate-fade-in">
-          <p className="font-semibold text-sm mb-1">{t("student.exam.card.explanation")}</p>
-          <p className="text-sm text-muted-foreground">{explanation}</p>
+        <div className="mt-4 ml-14 rounded-xl border bg-gradient-to-br from-muted/60 to-background shadow-sm animate-fade-in overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-2 border-b bg-muted/70">
+            <div className="h-6 w-6 rounded-md bg-primary/10 text-primary flex items-center justify-center">
+              <Lightbulb className="h-3.5 w-3.5" />
+            </div>
+            <p className="text-sm font-medium">{t("student.exam.card.explanation")}</p>
+          </div>
+          <div className="p-4">
+            <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">
+              {explanation}
+            </p>
+          </div>
         </div>
       )}
     </div>
