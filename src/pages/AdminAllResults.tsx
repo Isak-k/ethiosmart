@@ -64,7 +64,7 @@ const ITEMS_PER_PAGE = 10;
 const AdminAllResults = () => {
   const { toast } = useToast();
   const { t } = useTranslation();
-  const { canEdit, canDelete } = useSectionPermissions();
+  const { canEdit, canDelete, canView } = useSectionPermissions();
   const [results, setResults] = useState<ResultWithDetails[]>([]);
   const [filteredResults, setFilteredResults] = useState<ResultWithDetails[]>([]);
   const [exams, setExams] = useState<ExamOption[]>([]);
@@ -428,11 +428,13 @@ const AdminAllResults = () => {
                             )}
                             <TableCell>
                               <div className="flex items-center gap-2">
-                                <Button variant="ghost" size="icon" asChild title={t("common.view")}>
-                                  <Link to={`/dashboard/exams/${result.examId}/results`}>
-                                    <Eye className="h-4 w-4" />
-                                  </Link>
-                                </Button>
+                                {canView('allResults') && (
+                                  <Button variant="ghost" size="icon" asChild title={t("common.view")}>
+                                    <Link to={`/dashboard/exams/${result.examId}/results`}>
+                                      <Eye className="h-4 w-4" />
+                                    </Link>
+                                  </Button>
+                                )}
                                 {canDelete('manageExams') && (
                                   <Button
                                     variant="ghost"
