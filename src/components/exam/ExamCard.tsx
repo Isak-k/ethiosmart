@@ -182,7 +182,7 @@ export function ExamCard({ exam, isAdmin = false, hasAttempted = false, onDelete
               )}
             </Link>
           </Button>
-        )}
+        ) : null}}
       </CardContent>
     </Card>
   );
