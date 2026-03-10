@@ -479,6 +479,9 @@ export async function createExaminerAccount(email: string, password: string, nam
     const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
     const user = userCredential.user;
 
+    // Import RESTRICTED_PERMISSIONS to initialize new examiners with no permissions
+    const { RESTRICTED_PERMISSIONS } = await import('@/types/permissions');
+
     // Create user profile in Firestore (using main app's db instance)
     const userProfile = {
       userId: user.uid,
@@ -486,6 +489,7 @@ export async function createExaminerAccount(email: string, password: string, nam
       fullName: name,
       avatarUrl: null,
       role: 'admin', // Examiner
+      permissions: RESTRICTED_PERMISSIONS, // Initialize with restricted permissions (deny by default)
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now()
     };

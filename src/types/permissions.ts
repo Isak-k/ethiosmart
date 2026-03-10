@@ -67,6 +67,34 @@ export const DEFAULT_PERMISSIONS: UserPermissions = {
   enableDisableExaminers: false,
 };
 
+// Restricted permissions for newly created examiners (deny by default)
+export const RESTRICTED_PERMISSIONS: UserPermissions = {
+  viewDashboard: false,
+  viewAnalytics: false,
+  createExams: false,
+  editOwnExams: false,
+  editAllExams: false,
+  deleteOwnExams: false,
+  deleteAllExams: false,
+  publishExams: false,
+  viewAllExams: false,
+  viewStudents: false,
+  addStudents: false,
+  editStudents: false,
+  deleteStudents: false,
+  manageDepartments: false,
+  viewAllResults: false,
+  viewOwnResults: false,
+  exportResults: false,
+  viewLeaderboard: false,
+  manageLeaderboard: false,
+  viewExaminers: false,
+  addExaminers: false,
+  editExaminerPermissions: false,
+  deleteExaminers: false,
+  enableDisableExaminers: false,
+};
+
 export const FULL_ADMIN_PERMISSIONS: UserPermissions = {
   viewDashboard: true,
   viewAnalytics: true,

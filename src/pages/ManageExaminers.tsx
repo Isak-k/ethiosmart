@@ -21,6 +21,9 @@ import {
 } from "@/lib/firebase-admin-protected";
 import { UserProfile } from "@/integrations/firebase/types";
 import { useSectionPermissions } from "@/hooks/useSectionPermissions";
+import { db } from "@/integrations/firebase/client";
+import { doc, updateDoc, Timestamp } from "firebase/firestore";
+import { UserPermissions, RESTRICTED_PERMISSIONS, PERMISSION_GROUPS, PERMISSION_LABELS, PermissionKey } from "@/types/permissions";
 
 export default function ManageExaminers() {
   const { role, user, profile } = useAuth();
@@ -47,16 +50,7 @@ export default function ManageExaminers() {
   // Permissions management
   const [permissionsOpen, setPermissionsOpen] = useState(false);
   const [managingExaminer, setManagingExaminer] = useState<UserProfile | null>(null);
-  const [permissions, setPermissions] = useState({
-    dashboard: { view: true, edit: false, delete: false },
-    manageExams: { view: true, edit: true, delete: true },
-    allResults: { view: true, edit: false, delete: false },
-    students: { view: true, edit: true, delete: true },
-    analytics: { view: true, edit: false, delete: false },
-    leaderboard: { view: true, edit: true, delete: false },
-    examiners: { view: false, edit: false, delete: false },
-    departments: { view: true, edit: true, delete: true },
-  });
+  const [permissions, setPermissions] = useState<UserPermissions>(RESTRICTED_PERMISSIONS);
   const [savingPermissions, setSavingPermissions] = useState(false);
 
   // Form state
@@ -203,6 +197,11 @@ export default function ManageExaminers() {
     }
   };
 
+  const handleDeleteClick = (examiner: UserProfile) => {
+    setDeletingExaminer(examiner);
+    setDeleteOpen(true);
+  };
+
   const handleDeleteConfirm = async () => {
     if (!deletingExaminer) return;
     setDeleting(true);
@@ -249,16 +248,7 @@ export default function ManageExaminers() {
   const handleManagePermissions = (examiner: UserProfile) => {
     setManagingExaminer(examiner);
     // Load existing permissions from examiner profile
-    const existingPerms = (examiner as any).sectionPermissions || {
-      dashboard: { view: true, edit: false, delete: false },
-      manageExams: { view: true, edit: true, delete: true },
-      allResults: { view: true, edit: false, delete: false },
-      students: { view: true, edit: true, delete: true },
-      analytics: { view: true, edit: false, delete: false },
-      leaderboard: { view: true, edit: true, delete: false },
-      examiners: { view: false, edit: false, delete: false },
-      departments: { view: true, edit: true, delete: true },
-    };
+    const existingPerms = (examiner as any).permissions as UserPermissions || RESTRICTED_PERMISSIONS;
     setPermissions(existingPerms);
     setPermissionsOpen(true);
   };
@@ -269,7 +259,7 @@ export default function ManageExaminers() {
     try {
       const userRef = doc(db, 'users', managingExaminer.userId);
       await updateDoc(userRef, {
-        sectionPermissions: permissions,
+        permissions: permissions,
         updatedAt: Timestamp.now(),
       });
       toast({
@@ -290,13 +280,10 @@ export default function ManageExaminers() {
     }
   };
 
-  const togglePermission = (section: string, type: 'view' | 'edit' | 'delete') => {
+  const togglePermission = (permissionKey: PermissionKey) => {
     setPermissions(prev => ({
       ...prev,
-      [section]: {
-        ...prev[section as keyof typeof prev],
-        [type]: !prev[section as keyof typeof prev][type]
-      }
+      [permissionKey]: !prev[permissionKey]
     }));
   };
 
@@ -589,65 +576,32 @@ export default function ManageExaminers() {
                   Manage Permissions
                 </DialogTitle>
                 <DialogDescription className="text-base">
-                  Control what {managingExaminer?.fullName} can do in each section
+                  Control what {managingExaminer?.fullName} can do
                 </DialogDescription>
               </DialogHeader>
               
               <div className="space-y-6 py-4">
-                {Object.entries({
-                  dashboard: 'Dashboard',
-                  manageExams: 'Manage Exams',
-                  allResults: 'All Results',
-                  students: 'Students',
-                  analytics: 'Analytics',
-                  leaderboard: 'Leaderboard Admin',
-                  examiners: 'Examiners',
-                  departments: 'Departments',
-                }).map(([key, label]) => (
-                  <div key={key} className="border rounded-xl p-4 bg-gray-50 dark:bg-gray-900/50">
+                {Object.entries(PERMISSION_GROUPS).map(([groupName, permissionKeys]) => (
+                  <div key={groupName} className="border rounded-xl p-4 bg-gray-50 dark:bg-gray-900/50">
                     <h3 className="font-semibold text-lg mb-3 text-cyan-900 dark:text-cyan-100">
-                      {label}
+                      {groupName}
                     </h3>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`${key}-view`}
-                          checked={permissions[key as keyof typeof permissions].view}
-                          onCheckedChange={() => togglePermission(key, 'view')}
-                        />
-                        <Label
-                          htmlFor={`${key}-view`}
-                          className="text-sm font-normal cursor-pointer"
-                        >
-                          View
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`${key}-edit`}
-                          checked={permissions[key as keyof typeof permissions].edit}
-                          onCheckedChange={() => togglePermission(key, 'edit')}
-                        />
-                        <Label
-                          htmlFor={`${key}-edit`}
-                          className="text-sm font-normal cursor-pointer"
-                        >
-                          Edit/Update
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`${key}-delete`}
-                          checked={permissions[key as keyof typeof permissions].delete}
-                          onCheckedChange={() => togglePermission(key, 'delete')}
-                        />
-                        <Label
-                          htmlFor={`${key}-delete`}
-                          className="text-sm font-normal cursor-pointer"
-                        >
-                          Delete
-                        </Label>
-                      </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {permissionKeys.map((permKey) => (
+                        <div key={permKey} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`perm-${permKey}`}
+                            checked={permissions[permKey] === true}
+                            onCheckedChange={() => togglePermission(permKey)}
+                          />
+                          <Label
+                            htmlFor={`perm-${permKey}`}
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            {PERMISSION_LABELS[permKey]}
+                          </Label>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}
