@@ -4,7 +4,7 @@
  */
 
 import { UserProfile } from '@/integrations/firebase/types';
-import { UserPermissions, PermissionKey } from '@/types/permissions';
+import { UserPermissions, PermissionKey, SUPER_ADMIN_EMAIL } from '@/types/permissions';
 
 export interface PermissionCheckResult {
   allowed: boolean;
@@ -26,7 +26,12 @@ export function checkUserPermission(
     return { allowed: false, reason: 'User account is disabled' };
   }
 
-  // Super admin has all permissions
+  // Super admin has all permissions (check by email)
+  if (user.email === SUPER_ADMIN_EMAIL) {
+    return { allowed: true };
+  }
+
+  // Super admin has all permissions (check by role for backward compatibility)
   if (user.role === 'superadmin') {
     return { allowed: true };
   }
@@ -65,7 +70,12 @@ export function checkUserAnyPermission(
     return { allowed: false, reason: 'User account is disabled' };
   }
 
-  // Super admin has all permissions
+  // Super admin has all permissions (check by email)
+  if (user.email === SUPER_ADMIN_EMAIL) {
+    return { allowed: true };
+  }
+
+  // Super admin has all permissions (check by role for backward compatibility)
   if (user.role === 'superadmin') {
     return { allowed: true };
   }
@@ -102,7 +112,12 @@ export function checkUserAllPermissions(
     return { allowed: false, reason: 'User account is disabled' };
   }
 
-  // Super admin has all permissions
+  // Super admin has all permissions (check by email)
+  if (user.email === SUPER_ADMIN_EMAIL) {
+    return { allowed: true };
+  }
+
+  // Super admin has all permissions (check by role for backward compatibility)
   if (user.role === 'superadmin') {
     return { allowed: true };
   }
