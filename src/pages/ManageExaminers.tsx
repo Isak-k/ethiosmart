@@ -12,14 +12,18 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Plus, Trash2, Pencil, ShieldAlert, ShieldCheck, Ban, CheckCircle, Settings } from "lucide-react";
-import { getExaminers, createExaminerAccount, deleteExaminer, updateExaminer, toggleExaminerStatus, isSuperAdmin } from "@/lib/firebase-admin";
+import { getExaminers, isSuperAdmin } from "@/lib/firebase-admin";
+import { 
+  createExaminerAccountProtected, 
+  deleteExaminerProtected, 
+  updateExaminerProtected, 
+  toggleExaminerStatusProtected 
+} from "@/lib/firebase-admin-protected";
 import { UserProfile } from "@/integrations/firebase/types";
-import { doc, updateDoc, Timestamp } from 'firebase/firestore';
-import { db } from '@/integrations/firebase/client';
 import { useSectionPermissions } from "@/hooks/useSectionPermissions";
 
 export default function ManageExaminers() {
-  const { role, user } = useAuth();
+  const { role, user, profile } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { canView, canEdit, canDelete } = useSectionPermissions();
@@ -93,7 +97,19 @@ export default function ManageExaminers() {
     e.preventDefault();
     setCreating(true);
     try {
-      await createExaminerAccount(newEmail, newPassword, newName);
+      // Convert profile to UserProfile format for permission check
+      const currentUser = profile ? {
+        userId: profile.id,
+        email: profile.email,
+        fullName: profile.full_name,
+        avatarUrl: profile.avatar_url,
+        role: profile.role as any,
+        permissions: (profile as any).permissions,
+        createdAt: new Date() as any,
+        updatedAt: new Date() as any,
+      } : null;
+
+      await createExaminerAccountProtected(currentUser, newEmail, newPassword, newName);
       toast({
         title: "Success",
         description: "Examiner account created successfully",
@@ -126,7 +142,18 @@ export default function ManageExaminers() {
     if (!editingExaminer) return;
     setUpdating(true);
     try {
-      await updateExaminer(editingExaminer.userId, { 
+      const currentUser = profile ? {
+        userId: profile.id,
+        email: profile.email,
+        fullName: profile.full_name,
+        avatarUrl: profile.avatar_url,
+        role: profile.role as any,
+        permissions: (profile as any).permissions,
+        createdAt: new Date() as any,
+        updatedAt: new Date() as any,
+      } : null;
+
+      await updateExaminerProtected(currentUser, editingExaminer.userId, { 
         fullName: editName,
         email: editEmail 
       });
@@ -139,7 +166,7 @@ export default function ManageExaminers() {
     } catch (error: any) {
       toast({
         title: "Error",
-        description: "Failed to update examiner",
+        description: error.message || "Failed to update examiner",
         variant: "destructive",
       });
     } finally {
@@ -150,31 +177,48 @@ export default function ManageExaminers() {
   const handleToggleStatus = async (examiner: UserProfile) => {
     const newStatus = !examiner.disabled;
     try {
-      await toggleExaminerStatus(examiner.userId, newStatus);
+      const currentUser = profile ? {
+        userId: profile.id,
+        email: profile.email,
+        fullName: profile.full_name,
+        avatarUrl: profile.avatar_url,
+        role: profile.role as any,
+        permissions: (profile as any).permissions,
+        createdAt: new Date() as any,
+        updatedAt: new Date() as any,
+      } : null;
+
+      await toggleExaminerStatusProtected(currentUser, examiner.userId, newStatus);
       toast({
         title: "Success",
         description: `Examiner ${newStatus ? 'disabled' : 'enabled'} successfully`,
       });
       fetchExaminers();
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Failed to update examiner status",
+        description: error.message || "Failed to update examiner status",
         variant: "destructive",
       });
     }
-  };
-
-  const handleDeleteClick = (examiner: UserProfile) => {
-    setDeletingExaminer(examiner);
-    setDeleteOpen(true);
   };
 
   const handleDeleteConfirm = async () => {
     if (!deletingExaminer) return;
     setDeleting(true);
     try {
-      await deleteExaminer(deletingExaminer.userId);
+      const currentUser = profile ? {
+        userId: profile.id,
+        email: profile.email,
+        fullName: profile.full_name,
+        avatarUrl: profile.avatar_url,
+        role: profile.role as any,
+        permissions: (profile as any).permissions,
+        createdAt: new Date() as any,
+        updatedAt: new Date() as any,
+      } : null;
+
+      await deleteExaminerProtected(currentUser, deletingExaminer.userId);
       toast({
         title: "Success",
         description: "Examiner deleted successfully",

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePermissions } from '@/contexts/PermissionsContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -37,6 +38,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/integrations/firebase/client';
 import { UserProfile } from '@/integrations/firebase/types';
+import { deleteExaminerProtected } from '@/lib/firebase-admin-protected';
 import { 
   UserPermissions, 
   PERMISSION_GROUPS, 
@@ -48,6 +50,7 @@ import {
 export default function SuperAdmin() {
   const navigate = useNavigate();
   const { isSuperAdmin } = usePermissions();
+  const { profile } = useAuth();
   const { toast } = useToast();
   const [examiners, setExaminers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -196,8 +199,18 @@ export default function SuperAdmin() {
     if (!confirm(`Are you sure you want to delete ${user.fullName}?`)) return;
 
     try {
-      const userRef = doc(db, 'users', user.userId);
-      await deleteDoc(userRef);
+      const currentUser = profile ? {
+        userId: profile.id,
+        email: profile.email,
+        fullName: profile.full_name,
+        avatarUrl: profile.avatar_url,
+        role: profile.role as any,
+        permissions: (profile as any).permissions,
+        createdAt: new Date() as any,
+        updatedAt: new Date() as any,
+      } : null;
+
+      await deleteExaminerProtected(currentUser, user.userId);
 
       toast({
         title: 'Success',
@@ -205,11 +218,11 @@ export default function SuperAdmin() {
       });
 
       loadExaminers();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting examiner:', error);
       toast({
         title: 'Error',
-        description: 'Failed to delete examiner',
+        description: error.message || 'Failed to delete examiner',
         variant: 'destructive',
       });
     }
