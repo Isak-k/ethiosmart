@@ -10,6 +10,7 @@ export interface UserPermissions {
   deleteExams: boolean;
   publishExams: boolean;
   viewAllExams: boolean;
+  disableExams: boolean;
   
   // Results & Grading
   viewAllResults: boolean;
@@ -20,6 +21,7 @@ export interface UserPermissions {
   addStudents: boolean;
   editStudents: boolean;
   deleteStudents: boolean;
+  disableStudents: boolean;
   
   // Departments (Full CRUD)
   viewDepartments: boolean;
@@ -48,10 +50,12 @@ export const DEFAULT_PERMISSIONS: UserPermissions = {
   deleteExams: true,
   publishExams: true,
   viewAllExams: true,
+  disableExams: false,
   viewStudents: true,
   addStudents: false,
   editStudents: false,
   deleteStudents: false,
+  disableStudents: false,
   viewDepartments: true,
   createDepartments: false,
   editDepartments: false,
@@ -75,10 +79,12 @@ export const RESTRICTED_PERMISSIONS: UserPermissions = {
   deleteExams: false,
   publishExams: false,
   viewAllExams: false,
+  disableExams: false,
   viewStudents: false,
   addStudents: false,
   editStudents: false,
   deleteStudents: false,
+  disableStudents: false,
   viewDepartments: false,
   createDepartments: false,
   editDepartments: false,
@@ -101,10 +107,12 @@ export const FULL_ADMIN_PERMISSIONS: UserPermissions = {
   deleteExams: true,
   publishExams: true,
   viewAllExams: true,
+  disableExams: false,
   viewStudents: true,
   addStudents: true,
   editStudents: true,
   deleteStudents: true,
+  disableStudents: false,
   viewDepartments: true,
   createDepartments: true,
   editDepartments: true,
@@ -122,6 +130,8 @@ export const FULL_ADMIN_PERMISSIONS: UserPermissions = {
 
 export const SUPER_ADMIN_PERMISSIONS: UserPermissions = {
   ...FULL_ADMIN_PERMISSIONS,
+  disableExams: true,
+  disableStudents: true,
   viewExaminers: true,
   addExaminers: true,
   editExaminerPermissions: true,
@@ -136,10 +146,12 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   deleteExams: 'Delete Exams',
   publishExams: 'Publish/Unpublish Exams',
   viewAllExams: 'View All Exams',
+  disableExams: 'Disable/Enable Exams',
   viewStudents: 'View Students',
   addStudents: 'Add Students',
   editStudents: 'Edit Students',
   deleteStudents: 'Delete Students',
+  disableStudents: 'Disable/Enable Students',
   viewDepartments: 'View Departments',
   createDepartments: 'Create Departments',
   editDepartments: 'Edit Departments',
@@ -163,12 +175,14 @@ export const PERMISSION_GROUPS = {
     'deleteExams',
     'publishExams',
     'viewAllExams',
+    'disableExams',
   ] as PermissionKey[],
   'Student Management': [
     'viewStudents',
     'addStudents',
     'editStudents',
     'deleteStudents',
+    'disableStudents',
   ] as PermissionKey[],
   'Departments': [
     'viewDepartments',

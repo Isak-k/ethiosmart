@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { getAllStudents, StudentWithStats, toggleStudentStatus, deleteStudent, createStudent } from "@/lib/firebase-admin";
-import { deleteStudentProtected, updateStudentProtected, addStudentProtected } from "@/lib/firebase-admin-protected";
+import { deleteStudentProtected, updateStudentProtected, addStudentProtected, disableStudentProtected } from "@/lib/firebase-admin-protected";
 import { getDepartments } from "@/lib/departments";
 import { Department } from "@/integrations/firebase/types";
 import { doc, updateDoc } from "firebase/firestore";
@@ -449,24 +449,25 @@ const AdminStudents = () => {
                       Edit Details
                     </Button>
                   )}
-                  <Button 
-                    variant="outline" 
-                    className={selectedStudent.disabled ? "text-green-600 hover:text-green-700 hover:bg-green-50" : "text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50"}
-                    onClick={() => {
-                      handleToggleStatus(selectedStudent);
-                      // Update the local selectedStudent state to reflect the change immediately in the UI
-                      setSelectedStudent({
-                        ...selectedStudent,
-                        disabled: !selectedStudent.disabled
-                      });
-                    }}
-                  >
-                    {selectedStudent.disabled ? (
-                      <><CheckCircle className="h-4 w-4 mr-2" /> Enable Access</>
-                    ) : (
-                      <><Ban className="h-4 w-4 mr-2" /> Disable Access</>
-                    )}
-                  </Button>
+                  {canEdit('students') && (
+                    <Button 
+                      variant="outline" 
+                      className={selectedStudent.disabled ? "text-green-600 hover:text-green-700 hover:bg-green-50" : "text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50"}
+                      onClick={() => {
+                        handleToggleStatus(selectedStudent);
+                        setSelectedStudent({
+                          ...selectedStudent,
+                          disabled: !selectedStudent.disabled
+                        });
+                      }}
+                    >
+                      {selectedStudent.disabled ? (
+                        <><CheckCircle className="h-4 w-4 mr-2" /> Enable Access</>
+                      ) : (
+                        <><Ban className="h-4 w-4 mr-2" /> Disable Access</>
+                      )}
+                    </Button>
+                  )}
                 </div>
                 {canDelete('students') && (
                   <Button 

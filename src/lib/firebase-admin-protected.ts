@@ -364,16 +364,45 @@ export async function manageLeaderboardProtected(
 }
 
 /**
- * Manage departments with permission check
- * Requires: editDepartments or deleteDepartments permission
+ * Disable/Enable exam with permission check
+ * Requires: disableExams permission
  */
-export async function manageDepartmentsProtected(
+export async function disableExamProtected(
   currentUser: UserProfile | null | undefined,
-  departmentData: any
+  examId: string,
+  disabled: boolean
 ) {
-  enforcePermission(currentUser, 'editDepartments');
+  enforcePermission(currentUser, 'disableExams');
 
-  // This function just validates permission
-  // The actual update logic is handled by the caller
-  return departmentData;
+  try {
+    await updateDoc(doc(db, "exams", examId), {
+      disabled,
+      updatedAt: Timestamp.now()
+    });
+  } catch (error) {
+    console.error("Error disabling exam:", error);
+    throw error;
+  }
+}
+
+/**
+ * Disable/Enable student with permission check
+ * Requires: disableStudents permission
+ */
+export async function disableStudentProtected(
+  currentUser: UserProfile | null | undefined,
+  studentId: string,
+  disabled: boolean
+) {
+  enforcePermission(currentUser, 'disableStudents');
+
+  try {
+    await updateDoc(doc(db, "users", studentId), {
+      disabled,
+      updatedAt: Timestamp.now()
+    });
+  } catch (error) {
+    console.error("Error disabling student:", error);
+    throw error;
+  }
 }

@@ -263,7 +263,7 @@ export default function ManageExaminers() {
         dashboard:   { view: p.viewDashboard === true, edit: false, delete: false },
         manageExams: { 
           view:  true,
-          edit:  (p.createExams || p.editExams || p.publishExams) === true,
+          edit:  (p.createExams || p.editExams || p.publishExams || p.disableExams) === true,
           delete:(p.deleteExams) === true
         },
         allResults:  { 
@@ -273,7 +273,7 @@ export default function ManageExaminers() {
         },
         students:    { 
           view:  true,
-          edit:  (p.addStudents || p.editStudents) === true,
+          edit:  (p.addStudents || p.editStudents || p.disableStudents) === true,
           delete:(p.deleteStudents) === true
         },
         analytics:   { view: false, edit: false, delete: false },
