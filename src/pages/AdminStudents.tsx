@@ -287,10 +287,12 @@ const AdminStudents = () => {
             />
           </div>
           <div className="flex gap-2 w-full sm:w-auto">
-            <Button onClick={() => setCreateDialogOpen(true)} className="flex-1 sm:flex-none">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Student
-            </Button>
+            {canEdit('students') && (
+              <Button onClick={() => setCreateDialogOpen(true)} className="flex-1 sm:flex-none">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Student
+              </Button>
+            )}
             <Button 
               variant="outline" 
               onClick={() => { setFeedbackOpen(true); fetchFeedback(); }} 

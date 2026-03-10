@@ -11,11 +11,13 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Plus, Trash2, Building, Pencil } from "lucide-react";
 import { getDepartments, createDepartment, deleteDepartment, updateDepartment } from "@/lib/departments";
 import { Department } from "@/integrations/firebase/types";
+import { useSectionPermissions } from "@/hooks/useSectionPermissions";
 
 export default function ManageDepartments() {
   const { role, profile } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { canEdit, canDelete } = useSectionPermissions();
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
@@ -152,10 +154,12 @@ export default function ManageDepartments() {
           </div>
           <Dialog open={createOpen} onOpenChange={setCreateOpen}>
             <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Department
-              </Button>
+              {canEdit('departments') && (
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Department
+                </Button>
+              )}
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
@@ -235,24 +239,28 @@ export default function ManageDepartments() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            setEditingDept(dept);
-                            setEditName(dept.name);
-                            setEditOpen(true);
-                          }}
-                        >
-                          <Pencil className="h-4 w-4 text-muted-foreground hover:text-primary" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(dept.id)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                        {canEdit('departments') && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setEditingDept(dept);
+                              setEditName(dept.name);
+                              setEditOpen(true);
+                            }}
+                          >
+                            <Pencil className="h-4 w-4 text-muted-foreground hover:text-primary" />
+                          </Button>
+                        )}
+                        {canDelete('departments') && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDelete(dept.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
