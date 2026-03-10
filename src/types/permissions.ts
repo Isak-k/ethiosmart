@@ -29,6 +29,11 @@ export interface UserPermissions {
   editDepartments: boolean;
   deleteDepartments: boolean;
   
+  // Feedback
+  viewFeedback: boolean;
+  replyFeedback: boolean;
+  deleteFeedback: boolean;
+  
   // Leaderboard
   viewLeaderboard: boolean;
   manageLeaderboard: boolean;
@@ -62,6 +67,9 @@ export const DEFAULT_PERMISSIONS: UserPermissions = {
   deleteDepartments: false,
   viewAllResults: false,
   exportResults: true,
+  viewFeedback: false,
+  replyFeedback: false,
+  deleteFeedback: false,
   viewLeaderboard: true,
   manageLeaderboard: false,
   viewExaminers: false,
@@ -91,6 +99,9 @@ export const RESTRICTED_PERMISSIONS: UserPermissions = {
   deleteDepartments: false,
   viewAllResults: false,
   exportResults: false,
+  viewFeedback: false,
+  replyFeedback: false,
+  deleteFeedback: false,
   viewLeaderboard: false,
   manageLeaderboard: false,
   viewExaminers: false,
@@ -119,6 +130,9 @@ export const FULL_ADMIN_PERMISSIONS: UserPermissions = {
   deleteDepartments: true,
   viewAllResults: true,
   exportResults: true,
+  viewFeedback: false,
+  replyFeedback: false,
+  deleteFeedback: false,
   viewLeaderboard: true,
   manageLeaderboard: true,
   viewExaminers: false,
@@ -132,6 +146,9 @@ export const SUPER_ADMIN_PERMISSIONS: UserPermissions = {
   ...FULL_ADMIN_PERMISSIONS,
   disableExams: true,
   disableStudents: true,
+  viewFeedback: true,
+  replyFeedback: true,
+  deleteFeedback: true,
   viewExaminers: true,
   addExaminers: true,
   editExaminerPermissions: true,
@@ -158,6 +175,9 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   deleteDepartments: 'Delete Departments',
   viewAllResults: 'View All Results',
   exportResults: 'Export Results',
+  viewFeedback: 'View Feedback',
+  replyFeedback: 'Reply to Feedback',
+  deleteFeedback: 'Delete Feedback',
   viewLeaderboard: 'View Leaderboard',
   manageLeaderboard: 'Manage Leaderboard',
   viewExaminers: 'View Examiners',
@@ -193,6 +213,11 @@ export const PERMISSION_GROUPS = {
   'Results & Grading': [
     'viewAllResults',
     'exportResults',
+  ] as PermissionKey[],
+  'Feedback': [
+    'viewFeedback',
+    'replyFeedback',
+    'deleteFeedback',
   ] as PermissionKey[],
   'Leaderboard': ['viewLeaderboard', 'manageLeaderboard'] as PermissionKey[],
   'Examiner Management': [

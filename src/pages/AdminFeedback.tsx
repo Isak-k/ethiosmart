@@ -8,9 +8,11 @@ import { useToast } from "@/components/ui/use-toast";
 import { MessageSquare, Send, Trash2 } from "lucide-react";
 import { collection, getDocs, query, orderBy, limit, addDoc, Timestamp, deleteDoc, doc } from "firebase/firestore";
 import { db } from "@/integrations/firebase/client";
+import { useSectionPermissions } from "@/hooks/useSectionPermissions";
 
 export default function AdminFeedback() {
   const { toast } = useToast();
+  const { canEdit, canDelete } = useSectionPermissions();
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState<Array<any>>([]);
   const [selected, setSelected] = useState<any | null>(null);
@@ -92,6 +94,25 @@ export default function AdminFeedback() {
 
   return (
     <DashboardLayout>
+      {!canEdit('students') ? (
+        <div className="space-y-6 animate-fade-in max-w-6xl">
+          <div className="flex items-start sm:items-center justify-between">
+            <div>
+              <h1 className="text-2xl lg:text-3xl font-display font-bold">Feedback</h1>
+              <p className="text-muted-foreground mt-1">Review student messages and reply</p>
+            </div>
+          </div>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center py-12">
+                <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="font-medium mb-2">Permission Denied</h3>
+                <p className="text-muted-foreground text-sm">You don't have permission to view feedback.</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
       <div className="space-y-6 animate-fade-in max-w-6xl">
         <div className="flex items-start sm:items-center justify-between">
           <div>
@@ -132,17 +153,19 @@ export default function AdminFeedback() {
                         <div className="text-sm line-clamp-2">{m.message}</div>
                         <div className="text-xs text-muted-foreground mt-1">{m.createdAt?.toDate?.().toLocaleString?.() || ""}</div>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteMessage(m.id);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {canDelete('students') && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteMessage(m.id);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </button>
                 ))
@@ -200,13 +223,16 @@ export default function AdminFeedback() {
                       onChange={(e) => setReply(e.target.value)}
                       placeholder="Write a reply to the student..."
                       rows={4}
+                      disabled={!canEdit('students')}
                     />
-                    <div className="flex justify-end">
-                      <Button onClick={sendReply} disabled={sending || !reply.trim()}>
-                        <Send className="h-4 w-4 mr-2" />
-                        Send Reply
-                      </Button>
-                    </div>
+                    {canEdit('students') && (
+                      <div className="flex justify-end">
+                        <Button onClick={sendReply} disabled={sending || !reply.trim()}>
+                          <Send className="h-4 w-4 mr-2" />
+                          Send Reply
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </>
               ) : (
@@ -215,7 +241,7 @@ export default function AdminFeedback() {
             </CardContent>
           </Card>
         </div>
-      </div>
+      )}
     </DashboardLayout>
   );
 }
