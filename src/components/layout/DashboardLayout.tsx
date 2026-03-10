@@ -83,7 +83,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   ];
 
   const adminLinks = allAdminLinks.filter(link => 
-    !link.section || canView(link.section as any)
+    !link.section || hasPermission(link.section as any)
   );
 
   const links = role === "admin" ? adminLinks : studentLinks;
