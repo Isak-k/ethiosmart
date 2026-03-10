@@ -20,15 +20,15 @@ interface SectionPermission {
 }
 
 const DEFAULT_PERMISSIONS: Record<SectionName, SectionPermission> = {
-  // Deny-by-default for edits/deletes; allow viewing pages
-  dashboard:   { view: true, edit: false, delete: false },
-  manageExams: { view: true, edit: false, delete: false },
-  allResults:  { view: true, edit: false, delete: false },
-  students:    { view: true, edit: false, delete: false },
-  analytics:   { view: true, edit: false, delete: false },
-  leaderboard: { view: true, edit: false, delete: false },
-  examiners:   { view: true, edit: false, delete: false },
-  departments: { view: true, edit: false, delete: false },
+  // Deny-by-default for all permissions - users must be explicitly granted access
+  dashboard:   { view: false, edit: false, delete: false },
+  manageExams: { view: false, edit: false, delete: false },
+  allResults:  { view: false, edit: false, delete: false },
+  students:    { view: false, edit: false, delete: false },
+  analytics:   { view: false, edit: false, delete: false },
+  leaderboard: { view: false, edit: false, delete: false },
+  examiners:   { view: false, edit: false, delete: false },
+  departments: { view: false, edit: false, delete: false },
 };
 
 export function useSectionPermissions() {
