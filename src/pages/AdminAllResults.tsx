@@ -52,6 +52,7 @@ import {
 import { formatTimeSpent, exportAllResultsToCSV, exportAllResultsToPDF, ExamResultData } from "@/lib/export-utils";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
+import { useSectionPermissions } from "@/hooks/useSectionPermissions";
 
 interface ExamOption {
   id: string;
@@ -63,6 +64,7 @@ const ITEMS_PER_PAGE = 10;
 const AdminAllResults = () => {
   const { toast } = useToast();
   const { t } = useTranslation();
+  const { canEdit } = useSectionPermissions();
   const [results, setResults] = useState<ResultWithDetails[]>([]);
   const [filteredResults, setFilteredResults] = useState<ResultWithDetails[]>([]);
   const [exams, setExams] = useState<ExamOption[]>([]);
@@ -244,22 +246,24 @@ const AdminAllResults = () => {
               {t("admin.results.subtitle")}
             </p>
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="w-full sm:w-auto">
-                <Download className="h-4 w-4 mr-2" />
-                {t("admin.results.export.button")}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleExport("csv")}>
-                {t("admin.results.export.csv")}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport("pdf")}>
-                {t("admin.results.export.pdf")}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {canEdit('allResults') && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="w-full sm:w-auto">
+                  <Download className="h-4 w-4 mr-2" />
+                  {t("admin.results.export.button")}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleExport("csv")}>
+                  {t("admin.results.export.csv")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport("pdf")}>
+                  {t("admin.results.export.pdf")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
 
         {/* Summary Cards */}
@@ -370,7 +374,9 @@ const AdminAllResults = () => {
                         <TableHead className="text-center">{t("admin.results.table.percentage")}</TableHead>
                         <TableHead>{t("admin.results.table.submitted")}</TableHead>
                         <TableHead>{t("admin.results.table.timeSpent")}</TableHead>
-                        <TableHead className="text-center">{t("admin.results.table.status")}</TableHead>
+                        {canEdit('allResults') && (
+                          <TableHead className="text-center">{t("admin.results.table.status")}</TableHead>
+                        )}
                         <TableHead></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -407,17 +413,19 @@ const AdminAllResults = () => {
                             <TableCell>
                               {formatTimeSpent(result.timeSpentSeconds || 0)}
                             </TableCell>
-                            <TableCell className="text-center">
-                              {result.resultsPublished ? (
-                                <Badge variant="outline" className="badge-success">
-                                  {t("admin.results.status.published")}
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline" className="text-muted-foreground">
-                                  {t("admin.results.status.hidden")}
-                                </Badge>
-                              )}
-                            </TableCell>
+                            {canEdit('allResults') && (
+                              <TableCell className="text-center">
+                                {result.resultsPublished ? (
+                                  <Badge variant="outline" className="badge-success">
+                                    {t("admin.results.status.published")}
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-muted-foreground">
+                                    {t("admin.results.status.hidden")}
+                                  </Badge>
+                                )}
+                              </TableCell>
+                            )}
                             <TableCell>
                               <div className="flex items-center gap-2">
                                 <Button variant="ghost" size="icon" asChild title={t("common.view")}>
