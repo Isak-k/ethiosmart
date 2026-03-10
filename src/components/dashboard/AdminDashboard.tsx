@@ -115,14 +115,6 @@ export function AdminDashboard() {
             {t("dashboard.adminSubtitle")}
           </p>
         </div>
-        {canEdit('manageExams') && (
-          <Button asChild className="btn-primary w-full sm:w-auto">
-            <Link to="/dashboard/exams/new">
-              <Plus className="h-4 w-4 mr-2" />
-              {t("dashboard.createExam")}
-            </Link>
-          </Button>
-        )}
       </div>
 
       {Object.keys(errors).length > 0 && (
@@ -192,11 +184,6 @@ export function AdminDashboard() {
             <TrendingUp className="h-5 w-5 text-primary" />
             {t("dashboard.recentActivity")}
           </h2>
-          {canEdit('manageExams') && (
-            <Button variant="ghost" size="sm" asChild className="text-primary hover:text-primary/80">
-              <Link to="/dashboard/admin/exams">{t("common.viewAll")}</Link>
-            </Button>
-          )}
         </div>
 
         {loading ? (
