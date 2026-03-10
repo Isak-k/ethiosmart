@@ -71,20 +71,20 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   ];
 
   const allAdminLinks = [
-    { href: "/dashboard", label: t("dashboard.menu.dashboard"), icon: LayoutDashboard, section: 'dashboard' },
-    { href: "/dashboard/admin/exams", label: t("dashboard.menu.manageExams"), icon: FileText, section: 'manageExams' },
-    { href: "/dashboard/all-results", label: t("dashboard.menu.allResults"), icon: Trophy, section: 'allResults' },
-    { href: "/dashboard/students", label: t("dashboard.menu.students"), icon: Users, section: 'students' },
-    { href: "/dashboard/feedback", label: "Feedback", icon: MessageSquare },
-    { href: "/dashboard/analytics", label: t("dashboard.menu.analytics"), icon: BarChart3, section: 'analytics' },
+    { href: "/dashboard", label: t("dashboard.menu.dashboard"), icon: LayoutDashboard, permission: 'viewDashboard' },
+    { href: "/dashboard/admin/exams", label: t("dashboard.menu.manageExams"), icon: FileText, permission: 'viewAllExams' },
+    { href: "/dashboard/all-results", label: t("dashboard.menu.allResults"), icon: Trophy, permission: 'viewAllResults' },
+    { href: "/dashboard/students", label: t("dashboard.menu.students"), icon: Users, permission: 'viewStudents' },
+    { href: "/dashboard/feedback", label: "Feedback", icon: MessageSquare, permission: 'viewStudents' },
+    { href: "/dashboard/analytics", label: t("dashboard.menu.analytics"), icon: BarChart3, permission: 'viewAnalytics' },
     { href: "/dashboard/ai-assistant", label: t("aiAssistant.title", "AI Study Assistant"), icon: Brain },
-    { href: "/dashboard/leaderboard-admin", label: "Leaderboard Admin", icon: Trophy, section: 'leaderboard' },
-    { href: "/dashboard/departments", label: t("dashboard.menu.departments"), icon: Building, section: 'departments' },
-    ...(isSuperAdmin ? [{ href: "/dashboard/super-admin", label: "Super Admin", icon: Shield, section: 'examiners' }] : []),
+    { href: "/dashboard/leaderboard-admin", label: "Leaderboard Admin", icon: Trophy, permission: 'viewLeaderboard' },
+    { href: "/dashboard/departments", label: t("dashboard.menu.departments"), icon: Building, permission: 'manageDepartments' },
+    ...(isSuperAdmin ? [{ href: "/dashboard/super-admin", label: "Super Admin", icon: Shield, permission: 'viewExaminers' }] : []),
   ];
 
   const adminLinks = allAdminLinks.filter(link => 
-    !link.section || canView(link.section as any)
+    !link.permission || hasPermission(link.permission as any)
   );
 
   const links = role === "admin" ? adminLinks : studentLinks;
