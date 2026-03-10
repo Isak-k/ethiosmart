@@ -257,9 +257,47 @@ export default function ManageExaminers() {
     if (!managingExaminer) return;
     setSavingPermissions(true);
     try {
+      // Map granular permissions → sectionPermissions (for button visibility)
+      const p = permissions;
+      const sectionPermissions = {
+        dashboard:   { view: p.viewDashboard === true, edit: false, delete: false },
+        manageExams: { 
+          view:  true,
+          edit:  (p.createExams || p.editOwnExams || p.editAllExams || p.publishExams) === true,
+          delete:(p.deleteOwnExams || p.deleteAllExams) === true
+        },
+        allResults:  { 
+          view:  true,
+          edit:  false,
+          delete:false
+        },
+        students:    { 
+          view:  true,
+          edit:  (p.addStudents || p.editStudents || p.manageDepartments) === true,
+          delete:(p.deleteStudents) === true
+        },
+        analytics:   { view: p.viewAnalytics === true, edit: false, delete: false },
+        leaderboard: { 
+          view:  true,
+          edit:  p.manageLeaderboard === true,
+          delete:p.manageLeaderboard === true
+        },
+        examiners:   { 
+          view:  p.viewExaminers === true,
+          edit:  (p.editExaminerPermissions || p.enableDisableExaminers) === true,
+          delete:p.deleteExaminers === true
+        },
+        departments: { 
+          view:  true,
+          edit:  p.manageDepartments === true,
+          delete:p.manageDepartments === true
+        },
+      };
+
       const userRef = doc(db, 'users', managingExaminer.userId);
       await updateDoc(userRef, {
         permissions: permissions,
+        sectionPermissions,
         updatedAt: Timestamp.now(),
       });
       toast({
