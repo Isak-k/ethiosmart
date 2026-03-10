@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { getExam, updateExam } from "@/lib/firebase-exams";
-import { getExamAttempts } from "@/lib/firebase-attempts";
+import { getExamAttempts, deleteAttempt } from "@/lib/firebase-attempts";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,6 +33,7 @@ import {
   Eye,
   EyeOff,
   Trophy,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -70,6 +71,7 @@ const ExamResults = () => {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (examId && user) {
@@ -221,6 +223,24 @@ const ExamResults = () => {
     }
   };
 
+  const handleDeleteResult = async (attemptId: string) => {
+    if (!window.confirm("Are you sure you want to delete this result? This action cannot be undone.")) {
+      return;
+    }
+
+    setDeletingId(attemptId);
+    try {
+      await deleteAttempt(attemptId);
+      setAttempts(attempts.filter((a) => a.id !== attemptId));
+      toast.success("Result deleted successfully");
+    } catch (error) {
+      console.error("Error deleting result:", error);
+      toast.error("Failed to delete result");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   if (loading) {
     return (
       <DashboardLayout>
@@ -362,6 +382,7 @@ const ExamResults = () => {
                       <TableHead className="text-center">Percentage</TableHead>
                       <TableHead>Submitted</TableHead>
                       <TableHead>Time Spent</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -402,6 +423,22 @@ const ExamResults = () => {
                           </TableCell>
                           <TableCell>
                             {formatTimeSpent(attempt.timeSpentSeconds || 0)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full"
+                              onClick={() => handleDeleteResult(attempt.id)}
+                              disabled={deletingId === attempt.id}
+                              title="Delete result"
+                            >
+                              {deletingId === attempt.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                            </Button>
                           </TableCell>
                         </TableRow>
                       );

@@ -18,6 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useSectionPermissions } from "@/hooks/useSectionPermissions";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Plus, FileText, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -35,9 +36,10 @@ interface ExamWithStats {
 }
 
 const AdminExams = () => {
-  const { role, user } = useAuth();
+  const { user } = useAuth();
   const { t } = useTranslation();
   const { toast } = useToast();
+  const { canEdit } = useSectionPermissions();
   const [exams, setExams] = useState<ExamWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("all");
@@ -49,14 +51,8 @@ const AdminExams = () => {
     try {
       if (!user) return; // Wait for user
 
-      let examsData;
-      if (role === 'admin') {
-        examsData = await getAllExams();
-      } else {
-        // If not admin, show exams created by this user
-        examsData = await getExamsByCreator(user.uid);
-      }
-
+      const examsData = await getAllExams();
+      
       const examsWithStats = await Promise.all(
         examsData.map(async (exam) => {
           let attempts = [];
@@ -86,7 +82,7 @@ const AdminExams = () => {
     } finally {
       setLoading(false);
     }
-  }, [role, user]);
+  }, [user]);
 
   useEffect(() => {
     fetchExams();
@@ -150,18 +146,20 @@ const AdminExams = () => {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl lg:text-3xl font-display font-bold">
-              {role === 'admin' ? t("admin.exams.title") : t("admin.exams.titleMy")}
+              {t("admin.exams.title")}
             </h1>
             <p className="text-muted-foreground mt-1">
-              {role === 'admin' ? t("admin.exams.subtitle") : t("admin.exams.subtitleMy")}
+              {t("admin.exams.subtitle")}
             </p>
           </div>
-          <Button asChild className="btn-primary w-full sm:w-auto">
-            <Link to="/dashboard/exams/new">
-              <Plus className="h-4 w-4 mr-2" />
-              {t("admin.exams.create")}
-            </Link>
-          </Button>
+          {canEdit('manageExams') && (
+            <Button asChild className="btn-primary w-full sm:w-auto">
+              <Link to="/dashboard/exams/new">
+                <Plus className="h-4 w-4 mr-2" />
+                {t("admin.exams.create")}
+              </Link>
+            </Button>
+          )}
         </div>
 
         <Tabs value={tab} onValueChange={setTab}>
@@ -213,7 +211,7 @@ const AdminExams = () => {
                     ? t("admin.exams.empty.description")
                     : `${t("admin.exams.empty.title")} (${tab})`}
                 </p>
-                {tab === "all" && (
+                {tab === "all" && canEdit('manageExams') && (
                   <Button asChild className="btn-primary">
                     <Link to="/dashboard/exams/new">
                       <Plus className="h-4 w-4 mr-2" />

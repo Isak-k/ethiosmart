@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { getAllExamResults, ResultWithDetails } from "@/lib/firebase-admin";
+import { deleteAttempt } from "@/lib/firebase-attempts";
 import { db } from "@/integrations/firebase/client";
 import { collection, getDocs } from "firebase/firestore";
 import {
@@ -46,6 +47,7 @@ import {
   FileText,
   Eye,
   Download,
+  Trash2,
 } from "lucide-react";
 import { formatTimeSpent, exportAllResultsToCSV, exportAllResultsToPDF, ExamResultData } from "@/lib/export-utils";
 import { useToast } from "@/hooks/use-toast";
@@ -68,6 +70,7 @@ const AdminAllResults = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedExam, setSelectedExam] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchAllResults();
@@ -105,6 +108,31 @@ const AdminAllResults = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteResult = async (attemptId: string) => {
+    if (!window.confirm("Are you sure you want to delete this result? This action cannot be undone.")) {
+      return;
+    }
+
+    setDeletingId(attemptId);
+    try {
+      await deleteAttempt(attemptId);
+      setResults(results.filter((r) => r.id !== attemptId));
+      toast({
+        title: "Result deleted",
+        description: "The student result has been removed successfully.",
+      });
+    } catch (error: any) {
+      console.error("Error deleting result:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete result",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -391,11 +419,27 @@ const AdminAllResults = () => {
                               )}
                             </TableCell>
                             <TableCell>
-                              <Button variant="ghost" size="sm" asChild>
-                                <Link to={`/dashboard/exams/${result.examId}/results`}>
-                                  <Eye className="h-4 w-4" />
-                                </Link>
-                              </Button>
+                              <div className="flex items-center gap-2">
+                                <Button variant="ghost" size="icon" asChild title={t("common.view")}>
+                                  <Link to={`/dashboard/exams/${result.examId}/results`}>
+                                    <Eye className="h-4 w-4" />
+                                  </Link>
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full"
+                                  onClick={() => handleDeleteResult(result.id)}
+                                  disabled={deletingId === result.id}
+                                  title={t("common.delete")}
+                                >
+                                  {deletingId === result.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         );

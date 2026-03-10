@@ -12,7 +12,8 @@ import {
   Timestamp,
   serverTimestamp,
   getDocFromCache,
-  getDocsFromCache
+  getDocsFromCache,
+  deleteDoc
 } from 'firebase/firestore';
 import { db } from '@/integrations/firebase/client';
 import { ExamAttempt, Answer, Question } from '@/integrations/firebase/types';
@@ -207,4 +208,9 @@ export async function calculateScore(attemptId: string, questions: Question[]): 
   }
   
   return { totalScore, maxScore };
+}
+
+export async function deleteAttempt(attemptId: string) {
+  const docRef = doc(db, 'examAttempts', attemptId);
+  await deleteDoc(docRef);
 }

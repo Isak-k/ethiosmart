@@ -111,23 +111,23 @@ export default function SuperAdmin() {
       const sectionPermissions = {
         dashboard:   { view: p.viewDashboard === true, edit: false, delete: false },
         manageExams: { 
-          view:  (p.viewAllExams || p.createExams || p.editOwnExams || p.editAllExams || p.deleteOwnExams || p.deleteAllExams || p.publishExams) === true,
+          view:  true, // Always allow viewing the section if they are an admin
           edit:  (p.createExams || p.editOwnExams || p.editAllExams || p.publishExams) === true,
           delete:(p.deleteOwnExams || p.deleteAllExams) === true
         },
         allResults:  { 
-          view:  (p.viewAllResults || p.viewOwnResults) === true,
+          view:  true, // Always allow viewing the section if they are an admin
           edit:  false,
           delete:false
         },
         students:    { 
-          view:  p.viewStudents === true,
+          view:  true, // Always allow viewing the section if they are an admin
           edit:  (p.addStudents || p.editStudents || p.manageDepartments) === true,
           delete:(p.deleteStudents) === true
         },
         analytics:   { view: p.viewAnalytics === true, edit: false, delete: false },
         leaderboard: { 
-          view:  (p.viewLeaderboard || p.manageLeaderboard) === true,
+          view:  true, // Always allow viewing the section if they are an admin
           edit:  p.manageLeaderboard === true,
           delete:p.manageLeaderboard === true
         },
