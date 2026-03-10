@@ -113,7 +113,7 @@ export default function AdminFeedback() {
           </Card>
         </div>
       ) : (
-      <div className="space-y-6 animate-fade-in max-w-6xl">
+        <div className="space-y-6 animate-fade-in max-w-6xl">
         <div className="flex items-start sm:items-center justify-between">
           <div>
             <h1 className="text-2xl lg:text-3xl font-display font-bold">Feedback</h1>
@@ -245,3 +245,4 @@ export default function AdminFeedback() {
     </DashboardLayout>
   );
 }
+
