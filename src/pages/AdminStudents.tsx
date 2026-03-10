@@ -293,14 +293,6 @@ const AdminStudents = () => {
                 Add Student
               </Button>
             )}
-            <Button 
-              variant="outline" 
-              onClick={() => { setFeedbackOpen(true); fetchFeedback(); }} 
-              className="flex-1 sm:flex-none"
-            >
-              <MessageSquare className="h-4 w-4 mr-2" />
-              Feedback Inbox
-            </Button>
           </div>
         </div>
 
