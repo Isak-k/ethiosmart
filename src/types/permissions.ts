@@ -3,28 +3,29 @@
 export interface UserPermissions {
   // Dashboard & Navigation
   viewDashboard: boolean;
-  viewAnalytics: boolean;
   
-  // Exam Management
+  // Exam Management (Full CRUD)
   createExams: boolean;
-  editOwnExams: boolean;
-  editAllExams: boolean;
-  deleteOwnExams: boolean;
-  deleteAllExams: boolean;
+  editExams: boolean;
+  deleteExams: boolean;
   publishExams: boolean;
   viewAllExams: boolean;
   
-  // Student Management
+  // Results & Grading
+  viewAllResults: boolean;
+  exportResults: boolean;
+  
+  // Student Management (Full CRUD)
   viewStudents: boolean;
   addStudents: boolean;
   editStudents: boolean;
   deleteStudents: boolean;
-  manageDepartments: boolean;
   
-  // Results & Grading
-  viewAllResults: boolean;
-  viewOwnResults: boolean;
-  exportResults: boolean;
+  // Departments (Full CRUD)
+  viewDepartments: boolean;
+  createDepartments: boolean;
+  editDepartments: boolean;
+  deleteDepartments: boolean;
   
   // Leaderboard
   viewLeaderboard: boolean;
@@ -42,21 +43,20 @@ export type PermissionKey = keyof UserPermissions;
 
 export const DEFAULT_PERMISSIONS: UserPermissions = {
   viewDashboard: true,
-  viewAnalytics: false,
   createExams: true,
-  editOwnExams: true,
-  editAllExams: false,
-  deleteOwnExams: true,
-  deleteAllExams: false,
+  editExams: true,
+  deleteExams: true,
   publishExams: true,
   viewAllExams: true,
   viewStudents: true,
   addStudents: false,
   editStudents: false,
   deleteStudents: false,
-  manageDepartments: false,
+  viewDepartments: true,
+  createDepartments: false,
+  editDepartments: false,
+  deleteDepartments: false,
   viewAllResults: false,
-  viewOwnResults: true,
   exportResults: true,
   viewLeaderboard: true,
   manageLeaderboard: false,
@@ -70,21 +70,20 @@ export const DEFAULT_PERMISSIONS: UserPermissions = {
 // Restricted permissions for newly created examiners (deny by default)
 export const RESTRICTED_PERMISSIONS: UserPermissions = {
   viewDashboard: false,
-  viewAnalytics: false,
   createExams: false,
-  editOwnExams: false,
-  editAllExams: false,
-  deleteOwnExams: false,
-  deleteAllExams: false,
+  editExams: false,
+  deleteExams: false,
   publishExams: false,
   viewAllExams: false,
   viewStudents: false,
   addStudents: false,
   editStudents: false,
   deleteStudents: false,
-  manageDepartments: false,
+  viewDepartments: false,
+  createDepartments: false,
+  editDepartments: false,
+  deleteDepartments: false,
   viewAllResults: false,
-  viewOwnResults: false,
   exportResults: false,
   viewLeaderboard: false,
   manageLeaderboard: false,
@@ -97,25 +96,24 @@ export const RESTRICTED_PERMISSIONS: UserPermissions = {
 
 export const FULL_ADMIN_PERMISSIONS: UserPermissions = {
   viewDashboard: true,
-  viewAnalytics: true,
   createExams: true,
-  editOwnExams: true,
-  editAllExams: true,
-  deleteOwnExams: true,
-  deleteAllExams: true,
+  editExams: true,
+  deleteExams: true,
   publishExams: true,
   viewAllExams: true,
   viewStudents: true,
   addStudents: true,
   editStudents: true,
   deleteStudents: true,
-  manageDepartments: true,
+  viewDepartments: true,
+  createDepartments: true,
+  editDepartments: true,
+  deleteDepartments: true,
   viewAllResults: true,
-  viewOwnResults: true,
   exportResults: true,
   viewLeaderboard: true,
   manageLeaderboard: true,
-  viewExaminers: false, // Only super admin
+  viewExaminers: false,
   addExaminers: false,
   editExaminerPermissions: false,
   deleteExaminers: false,
@@ -133,21 +131,20 @@ export const SUPER_ADMIN_PERMISSIONS: UserPermissions = {
 
 export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   viewDashboard: 'View Dashboard',
-  viewAnalytics: 'View Analytics',
   createExams: 'Create Exams',
-  editOwnExams: 'Edit Own Exams',
-  editAllExams: 'Edit All Exams',
-  deleteOwnExams: 'Delete Own Exams',
-  deleteAllExams: 'Delete All Exams',
+  editExams: 'Edit Exams',
+  deleteExams: 'Delete Exams',
   publishExams: 'Publish/Unpublish Exams',
   viewAllExams: 'View All Exams',
   viewStudents: 'View Students',
   addStudents: 'Add Students',
   editStudents: 'Edit Students',
   deleteStudents: 'Delete Students',
-  manageDepartments: 'Manage Departments',
+  viewDepartments: 'View Departments',
+  createDepartments: 'Create Departments',
+  editDepartments: 'Edit Departments',
+  deleteDepartments: 'Delete Departments',
   viewAllResults: 'View All Results',
-  viewOwnResults: 'View Own Results',
   exportResults: 'Export Results',
   viewLeaderboard: 'View Leaderboard',
   manageLeaderboard: 'Manage Leaderboard',
@@ -159,13 +156,11 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
 };
 
 export const PERMISSION_GROUPS = {
-  'Dashboard & Navigation': ['viewDashboard', 'viewAnalytics'] as PermissionKey[],
+  'Dashboard & Navigation': ['viewDashboard'] as PermissionKey[],
   'Exam Management': [
     'createExams',
-    'editOwnExams',
-    'editAllExams',
-    'deleteOwnExams',
-    'deleteAllExams',
+    'editExams',
+    'deleteExams',
     'publishExams',
     'viewAllExams',
   ] as PermissionKey[],
@@ -174,11 +169,15 @@ export const PERMISSION_GROUPS = {
     'addStudents',
     'editStudents',
     'deleteStudents',
-    'manageDepartments',
+  ] as PermissionKey[],
+  'Departments': [
+    'viewDepartments',
+    'createDepartments',
+    'editDepartments',
+    'deleteDepartments',
   ] as PermissionKey[],
   'Results & Grading': [
     'viewAllResults',
-    'viewOwnResults',
     'exportResults',
   ] as PermissionKey[],
   'Leaderboard': ['viewLeaderboard', 'manageLeaderboard'] as PermissionKey[],

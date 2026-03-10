@@ -115,8 +115,8 @@ export default function SuperAdmin() {
         dashboard:   { view: p.viewDashboard === true, edit: false, delete: false },
         manageExams: { 
           view:  true, // Always allow viewing the section if they are an admin
-          edit:  (p.createExams || p.editOwnExams || p.editAllExams || p.publishExams) === true,
-          delete:(p.deleteOwnExams || p.deleteAllExams) === true
+          edit:  (p.createExams || p.editExams || p.publishExams) === true,
+          delete:(p.deleteExams) === true
         },
         allResults:  { 
           view:  true, // Always allow viewing the section if they are an admin
@@ -125,10 +125,10 @@ export default function SuperAdmin() {
         },
         students:    { 
           view:  true, // Always allow viewing the section if they are an admin
-          edit:  (p.addStudents || p.editStudents || p.manageDepartments) === true,
+          edit:  (p.addStudents || p.editStudents) === true,
           delete:(p.deleteStudents) === true
         },
-        analytics:   { view: p.viewAnalytics === true, edit: false, delete: false },
+        analytics:   { view: false, edit: false, delete: false },
         leaderboard: { 
           view:  true, // Always allow viewing the section if they are an admin
           edit:  p.manageLeaderboard === true,
@@ -141,8 +141,8 @@ export default function SuperAdmin() {
         },
         departments: { 
           view:  true,
-          edit:  p.manageDepartments === true,
-          delete:p.manageDepartments === true
+          edit:  p.editDepartments === true,
+          delete:p.deleteDepartments === true
         },
       };
 

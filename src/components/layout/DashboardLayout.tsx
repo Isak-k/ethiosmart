@@ -76,10 +76,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     { href: "/dashboard/all-results", label: t("dashboard.menu.allResults"), icon: Trophy, permission: 'viewAllResults' },
     { href: "/dashboard/students", label: t("dashboard.menu.students"), icon: Users, permission: 'viewStudents' },
     { href: "/dashboard/feedback", label: "Feedback", icon: MessageSquare, permission: 'viewStudents' },
-    { href: "/dashboard/analytics", label: t("dashboard.menu.analytics"), icon: BarChart3, permission: 'viewAnalytics' },
     { href: "/dashboard/ai-assistant", label: t("aiAssistant.title", "AI Study Assistant"), icon: Brain },
     { href: "/dashboard/leaderboard-admin", label: "Leaderboard Admin", icon: Trophy, permission: 'viewLeaderboard' },
-    { href: "/dashboard/departments", label: t("dashboard.menu.departments"), icon: Building, permission: 'manageDepartments' },
+    { href: "/dashboard/departments", label: t("dashboard.menu.departments"), icon: Building, permission: 'viewDepartments' },
     ...(isSuperAdmin ? [{ href: "/dashboard/super-admin", label: "Super Admin", icon: Shield, permission: 'viewExaminers' }] : []),
   ];
 

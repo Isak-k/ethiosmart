@@ -157,7 +157,7 @@ export async function getExaminersProtected(): Promise<UserProfile[]> {
 
 /**
  * Delete exam with permission check
- * Requires: deleteOwnExams (for own exams) or deleteAllExams (for all exams)
+ * Requires: deleteExams permission
  */
 export async function deleteExamProtected(
   currentUser: UserProfile | null | undefined,
@@ -180,16 +180,8 @@ export async function deleteExamProtected(
     return;
   }
 
-  // Regular admin needs specific permissions
-  const userPerms = currentUser.permissions as any || {};
-  
-  // Check if deleting own exam
-  if (examCreatorId === currentUser.userId) {
-    enforcePermission(currentUser, 'deleteOwnExams');
-  } else {
-    // Deleting someone else's exam
-    enforcePermission(currentUser, 'deleteAllExams');
-  }
+  // Regular admin needs deleteExams permission
+  enforcePermission(currentUser, 'deleteExams');
 
   try {
     await deleteDoc(doc(db, "exams", examId));
@@ -201,7 +193,7 @@ export async function deleteExamProtected(
 
 /**
  * Update exam with permission check
- * Requires: editOwnExams (for own exams) or editAllExams (for all exams)
+ * Requires: editExams permission
  */
 export async function updateExamProtected(
   currentUser: UserProfile | null | undefined,
@@ -228,16 +220,8 @@ export async function updateExamProtected(
     return;
   }
 
-  // Regular admin needs specific permissions
-  const userPerms = currentUser.permissions as any || {};
-  
-  // Check if editing own exam
-  if (examCreatorId === currentUser.userId) {
-    enforcePermission(currentUser, 'editOwnExams');
-  } else {
-    // Editing someone else's exam
-    enforcePermission(currentUser, 'editAllExams');
-  }
+  // Regular admin needs editExams permission
+  enforcePermission(currentUser, 'editExams');
 
   try {
     await updateDoc(doc(db, "exams", examId), {
@@ -381,13 +365,13 @@ export async function manageLeaderboardProtected(
 
 /**
  * Manage departments with permission check
- * Requires: manageDepartments permission
+ * Requires: editDepartments or deleteDepartments permission
  */
 export async function manageDepartmentsProtected(
   currentUser: UserProfile | null | undefined,
   departmentData: any
 ) {
-  enforcePermission(currentUser, 'manageDepartments');
+  enforcePermission(currentUser, 'editDepartments');
 
   // This function just validates permission
   // The actual update logic is handled by the caller
