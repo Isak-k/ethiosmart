@@ -16,6 +16,7 @@ import {
   Timestamp
 } from "firebase/firestore";
 import { UserProfile } from "@/integrations/firebase/types";
+import { UserPermissions, SUPER_ADMIN_EMAIL } from "@/types/permissions";
 import { initializeApp, getApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword, signOut, setPersistence, inMemoryPersistence } from "firebase/auth";
 import { enforcePermission } from "./permission-middleware";
@@ -415,8 +416,50 @@ export async function deleteAttemptProtected(
   currentUser: UserProfile | null | undefined,
   attemptId: string
 ) {
-  // Enforce permission
-  enforcePermission(currentUser, 'deleteExams');
+  // Check if user is authenticated
+  if (!currentUser) {
+    throw new Error('User not authenticated');
+  }
+
+  // Check if user is disabled
+  if (currentUser.disabled === true) {
+    throw new Error('User account is disabled');
+  }
+
+  // Super admin has all permissions (check by email)
+  if (currentUser.email === SUPER_ADMIN_EMAIL) {
+    try {
+      const docRef = doc(db, 'examAttempts', attemptId);
+      await deleteDoc(docRef);
+    } catch (error) {
+      console.error("Error deleting attempt:", error);
+      throw error;
+    }
+    return;
+  }
+
+  // Super admin has all permissions (check by role for backward compatibility)
+  if (currentUser.role === 'superadmin') {
+    try {
+      const docRef = doc(db, 'examAttempts', attemptId);
+      await deleteDoc(docRef);
+    } catch (error) {
+      console.error("Error deleting attempt:", error);
+      throw error;
+    }
+    return;
+  }
+
+  // Only admins can delete
+  if (currentUser.role !== 'admin') {
+    throw new Error('User is not an admin');
+  }
+
+  // Check if user has the permission
+  const userPermissions = currentUser.permissions as UserPermissions | undefined;
+  if (!userPermissions || userPermissions.deleteExams !== true) {
+    throw new Error('User lacks permission to delete exams');
+  }
 
   try {
     const docRef = doc(db, 'examAttempts', attemptId);

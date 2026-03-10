@@ -6,9 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { getAllExamResults, ResultWithDetails } from "@/lib/firebase-admin";
-import { deleteAttempt } from "@/lib/firebase-attempts";
+import { deleteAttemptProtected } from "@/lib/firebase-admin-protected";
 import { db } from "@/integrations/firebase/client";
 import { collection, getDocs } from "firebase/firestore";
+import { useAuth } from "@/contexts/AuthContext";
+import { useGranularPermissions } from "@/hooks/useGranularPermissions";
 import {
   Table,
   TableBody,
@@ -65,6 +67,8 @@ const AdminAllResults = () => {
   const { toast } = useToast();
   const { t } = useTranslation();
   const { canEdit, canDelete, canView } = useSectionPermissions();
+  const { canViewExamResults, canDeleteExams } = useGranularPermissions();
+  const { profile } = useAuth();
   const [results, setResults] = useState<ResultWithDetails[]>([]);
   const [filteredResults, setFilteredResults] = useState<ResultWithDetails[]>([]);
   const [exams, setExams] = useState<ExamOption[]>([]);
@@ -120,7 +124,19 @@ const AdminAllResults = () => {
 
     setDeletingId(attemptId);
     try {
-      await deleteAttempt(attemptId);
+      // Convert profile to UserProfile format for permission check
+      const userProfile = profile ? {
+        userId: profile.id,
+        email: profile.email,
+        fullName: profile.full_name,
+        avatarUrl: profile.avatar_url,
+        role: profile.role as any,
+        permissions: (profile as any).permissions,
+        createdAt: new Date() as any,
+        updatedAt: new Date() as any,
+      } : null;
+
+      await deleteAttemptProtected(userProfile, attemptId);
       setResults(results.filter((r) => r.id !== attemptId));
       toast({
         title: "Result deleted",
@@ -428,14 +444,14 @@ const AdminAllResults = () => {
                             )}
                             <TableCell>
                               <div className="flex items-center gap-2">
-                                {canView('allResults') && (
+                                {canViewExamResults() && (
                                   <Button variant="ghost" size="icon" asChild title={t("common.view")}>
                                     <Link to={`/dashboard/exams/${result.examId}/results`}>
                                       <Eye className="h-4 w-4" />
                                     </Link>
                                   </Button>
                                 )}
-                                {canDelete('manageExams') && (
+                                {canDeleteExams() && (
                                   <Button
                                     variant="ghost"
                                     size="icon"
