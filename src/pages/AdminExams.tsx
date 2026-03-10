@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { getAllExams, getExamsByCreator, deleteExam } from "@/lib/firebase-exams";
 import { getExamAttempts } from "@/lib/firebase-attempts";
+import { deleteExamProtected } from "@/lib/firebase-admin-protected";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ExamCard } from "@/components/exam/ExamCard";
 import { Button } from "@/components/ui/button";
@@ -114,10 +115,23 @@ const AdminExams = () => {
   };
 
   const handleDeleteConfirm = async () => {
-    if (!examToDelete) return;
+    if (!examToDelete || !user) return;
 
     try {
-      await deleteExam(examToDelete.id);
+      // Convert user to UserProfile format for permission check
+      const currentUser = {
+        userId: user.uid,
+        email: user.email || '',
+        fullName: user.displayName || '',
+        avatarUrl: user.photoURL || null,
+        role: 'admin' as any,
+        permissions: (user as any).permissions,
+        createdAt: new Date() as any,
+        updatedAt: new Date() as any,
+      };
+
+      // Use protected delete function with permission check
+      await deleteExamProtected(currentUser, examToDelete.id);
       
       toast({
         title: "Exam deleted",

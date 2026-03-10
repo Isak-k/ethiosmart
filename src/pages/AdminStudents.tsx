@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { getAllStudents, StudentWithStats, toggleStudentStatus, deleteStudent, createStudent } from "@/lib/firebase-admin";
+import { deleteStudentProtected, updateStudentProtected, addStudentProtected } from "@/lib/firebase-admin-protected";
 import { getDepartments } from "@/lib/departments";
 import { Department } from "@/integrations/firebase/types";
 import { doc, updateDoc } from "firebase/firestore";
@@ -34,9 +35,11 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Search, Users, Edit, Trash2, Ban, CheckCircle, Plus, MessageSquare, Send } from "lucide-react";
 import { useSectionPermissions } from "@/hooks/useSectionPermissions";
 import { collection, getDocs, orderBy, query, limit, addDoc, Timestamp } from "firebase/firestore";
-import { db } from "@/integrations/firebase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { Textarea } from "@/components/ui/textarea";
 
 const AdminStudents = () => {
+  const { user } = useAuth();
   const { toast } = useToast();
   const { canEdit, canDelete } = useSectionPermissions();
   const [students, setStudents] = useState<StudentWithStats[]>([]);
@@ -146,11 +149,23 @@ const AdminStudents = () => {
   };
 
   const handleSaveEdit = async () => {
-    if (!selectedStudent) return;
+    if (!selectedStudent || !user) return;
 
     try {
-      const userRef = doc(db, "users", selectedStudent.userId);
-      await updateDoc(userRef, {
+      // Convert user to UserProfile format for permission check
+      const currentUser = {
+        userId: user.uid,
+        email: user.email || '',
+        fullName: user.displayName || '',
+        avatarUrl: user.photoURL || null,
+        role: 'admin' as any,
+        permissions: (user as any).permissions,
+        createdAt: new Date() as any,
+        updatedAt: new Date() as any,
+      };
+
+      // Use protected update function with permission check
+      await updateStudentProtected(currentUser, selectedStudent.userId, {
         fullName: editForm.fullName,
         email: editForm.email,
         departmentId: editForm.departmentId || null
@@ -202,10 +217,23 @@ const AdminStudents = () => {
   };
 
   const handleDeleteConfirm = async () => {
-    if (!selectedStudent) return;
+    if (!selectedStudent || !user) return;
 
     try {
-      await deleteStudent(selectedStudent.userId);
+      // Convert user to UserProfile format for permission check
+      const currentUser = {
+        userId: user.uid,
+        email: user.email || '',
+        fullName: user.displayName || '',
+        avatarUrl: user.photoURL || null,
+        role: 'admin' as any,
+        permissions: (user as any).permissions,
+        createdAt: new Date() as any,
+        updatedAt: new Date() as any,
+      };
+
+      // Use protected delete function with permission check
+      await deleteStudentProtected(currentUser, selectedStudent.userId);
       
       toast({
         title: "Student deleted",

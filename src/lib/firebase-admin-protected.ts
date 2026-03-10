@@ -154,3 +154,242 @@ export async function getExaminersProtected(): Promise<UserProfile[]> {
     throw error;
   }
 }
+
+/**
+ * Delete exam with permission check
+ * Requires: deleteOwnExams (for own exams) or deleteAllExams (for all exams)
+ */
+export async function deleteExamProtected(
+  currentUser: UserProfile | null | undefined,
+  examId: string,
+  examCreatorId?: string
+) {
+  // Check if user has permission to delete exams
+  if (!currentUser) {
+    throw new Error('Permission denied: User not authenticated');
+  }
+
+  // Super admin can delete any exam
+  if (currentUser.role === 'superadmin') {
+    try {
+      await deleteDoc(doc(db, "exams", examId));
+    } catch (error) {
+      console.error("Error deleting exam:", error);
+      throw error;
+    }
+    return;
+  }
+
+  // Regular admin needs specific permissions
+  const userPerms = currentUser.permissions as any || {};
+  
+  // Check if deleting own exam
+  if (examCreatorId === currentUser.userId) {
+    enforcePermission(currentUser, 'deleteOwnExams');
+  } else {
+    // Deleting someone else's exam
+    enforcePermission(currentUser, 'deleteAllExams');
+  }
+
+  try {
+    await deleteDoc(doc(db, "exams", examId));
+  } catch (error) {
+    console.error("Error deleting exam:", error);
+    throw error;
+  }
+}
+
+/**
+ * Update exam with permission check
+ * Requires: editOwnExams (for own exams) or editAllExams (for all exams)
+ */
+export async function updateExamProtected(
+  currentUser: UserProfile | null | undefined,
+  examId: string,
+  updates: any,
+  examCreatorId?: string
+) {
+  // Check if user has permission to edit exams
+  if (!currentUser) {
+    throw new Error('Permission denied: User not authenticated');
+  }
+
+  // Super admin can edit any exam
+  if (currentUser.role === 'superadmin') {
+    try {
+      await updateDoc(doc(db, "exams", examId), {
+        ...updates,
+        updatedAt: Timestamp.now()
+      });
+    } catch (error) {
+      console.error("Error updating exam:", error);
+      throw error;
+    }
+    return;
+  }
+
+  // Regular admin needs specific permissions
+  const userPerms = currentUser.permissions as any || {};
+  
+  // Check if editing own exam
+  if (examCreatorId === currentUser.userId) {
+    enforcePermission(currentUser, 'editOwnExams');
+  } else {
+    // Editing someone else's exam
+    enforcePermission(currentUser, 'editAllExams');
+  }
+
+  try {
+    await updateDoc(doc(db, "exams", examId), {
+      ...updates,
+      updatedAt: Timestamp.now()
+    });
+  } catch (error) {
+    console.error("Error updating exam:", error);
+    throw error;
+  }
+}
+
+/**
+ * Publish/Unpublish exam with permission check
+ * Requires: publishExams permission
+ */
+export async function publishExamProtected(
+  currentUser: UserProfile | null | undefined,
+  examId: string,
+  isPublished: boolean
+) {
+  enforcePermission(currentUser, 'publishExams');
+
+  try {
+    await updateDoc(doc(db, "exams", examId), {
+      isPublished,
+      updatedAt: Timestamp.now()
+    });
+  } catch (error) {
+    console.error("Error publishing exam:", error);
+    throw error;
+  }
+}
+
+/**
+ * Delete student with permission check
+ * Requires: deleteStudents permission
+ */
+export async function deleteStudentProtected(
+  currentUser: UserProfile | null | undefined,
+  studentId: string
+) {
+  enforcePermission(currentUser, 'deleteStudents');
+
+  try {
+    await deleteDoc(doc(db, "users", studentId));
+  } catch (error) {
+    console.error("Error deleting student:", error);
+    throw error;
+  }
+}
+
+/**
+ * Update student with permission check
+ * Requires: editStudents permission
+ */
+export async function updateStudentProtected(
+  currentUser: UserProfile | null | undefined,
+  studentId: string,
+  updates: any
+) {
+  enforcePermission(currentUser, 'editStudents');
+
+  try {
+    await updateDoc(doc(db, "users", studentId), {
+      ...updates,
+      updatedAt: Timestamp.now()
+    });
+  } catch (error) {
+    console.error("Error updating student:", error);
+    throw error;
+  }
+}
+
+/**
+ * Add student with permission check
+ * Requires: addStudents permission
+ */
+export async function addStudentProtected(
+  currentUser: UserProfile | null | undefined,
+  studentData: any
+) {
+  enforcePermission(currentUser, 'addStudents');
+
+  try {
+    const userRef = doc(db, "users", studentData.userId);
+    await setDoc(userRef, {
+      ...studentData,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now()
+    });
+  } catch (error) {
+    console.error("Error adding student:", error);
+    throw error;
+  }
+}
+
+/**
+ * Export results with permission check
+ * Requires: exportResults permission
+ */
+export async function exportResultsProtected(
+  currentUser: UserProfile | null | undefined,
+  resultsData: any
+) {
+  enforcePermission(currentUser, 'exportResults');
+
+  // This function just validates permission
+  // The actual export logic is handled by the caller
+  return resultsData;
+}
+
+/**
+ * View all results with permission check
+ * Requires: viewAllResults permission
+ */
+export async function viewAllResultsProtected(
+  currentUser: UserProfile | null | undefined
+) {
+  enforcePermission(currentUser, 'viewAllResults');
+
+  // This function just validates permission
+  // The actual fetch logic is handled by the caller
+  return true;
+}
+
+/**
+ * Manage leaderboard with permission check
+ * Requires: manageLeaderboard permission
+ */
+export async function manageLeaderboardProtected(
+  currentUser: UserProfile | null | undefined,
+  leaderboardData: any
+) {
+  enforcePermission(currentUser, 'manageLeaderboard');
+
+  // This function just validates permission
+  // The actual update logic is handled by the caller
+  return leaderboardData;
+}
+
+/**
+ * Manage departments with permission check
+ * Requires: manageDepartments permission
+ */
+export async function manageDepartmentsProtected(
+  currentUser: UserProfile | null | undefined,
+  departmentData: any
+) {
+  enforcePermission(currentUser, 'manageDepartments');
+
+  // This function just validates permission
+  // The actual update logic is handled by the caller
+  return departmentData;
+}
