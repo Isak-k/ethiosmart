@@ -68,7 +68,7 @@ const AdminAllResults = () => {
   const { t } = useTranslation();
   const { canEdit, canDelete, canView } = useSectionPermissions();
   const { canViewExamResults, canDeleteResults } = useGranularPermissions();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const [results, setResults] = useState<ResultWithDetails[]>([]);
   const [filteredResults, setFilteredResults] = useState<ResultWithDetails[]>([]);
   const [exams, setExams] = useState<ExamOption[]>([]);
@@ -126,10 +126,10 @@ const AdminAllResults = () => {
     try {
       // Convert profile to UserProfile format for permission check
       const userProfile = profile ? {
-        userId: profile.id,
-        email: profile.email,
-        fullName: profile.full_name,
-        avatarUrl: profile.avatar_url,
+        userId: profile.id || user?.uid || '',
+        email: user?.email || profile.email || '',
+        fullName: profile.full_name || '',
+        avatarUrl: profile.avatar_url || null,
         role: profile.role as any,
         permissions: (profile as any).permissions,
         createdAt: new Date() as any,
@@ -137,8 +137,8 @@ const AdminAllResults = () => {
       } : null;
 
       console.log('handleDeleteResult - userProfile:', userProfile);
+      console.log('handleDeleteResult - user.email:', user?.email);
       console.log('handleDeleteResult - profile.email:', profile?.email);
-      console.log('handleDeleteResult - profile.permissions:', (profile as any)?.permissions);
 
       await deleteAttemptProtected(userProfile, attemptId);
       setResults(results.filter((r) => r.id !== attemptId));

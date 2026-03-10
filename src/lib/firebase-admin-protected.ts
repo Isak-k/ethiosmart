@@ -421,45 +421,33 @@ export async function deleteAttemptProtected(
     throw new Error('User not authenticated');
   }
 
-  console.log('deleteAttemptProtected - User email:', currentUser.email);
-  console.log('deleteAttemptProtected - SUPER_ADMIN_EMAIL:', SUPER_ADMIN_EMAIL);
-  console.log('deleteAttemptProtected - User role:', currentUser.role);
-  console.log('deleteAttemptProtected - User permissions:', currentUser.permissions);
-
   // Check if user is disabled
   if (currentUser.disabled === true) {
     throw new Error('User account is disabled');
   }
 
-  // Super admin has all permissions (check by email) - EXACT MATCH
-  const isSuperAdmin = currentUser.email && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
-  console.log('Is Super Admin (email check):', isSuperAdmin, 'Email:', currentUser.email, 'Expected:', SUPER_ADMIN_EMAIL);
-  
-  if (isSuperAdmin) {
-    console.log('User is Super Admin by email - allowing delete');
+  // Super admin has all permissions (check by email)
+  if (currentUser.email === SUPER_ADMIN_EMAIL) {
     try {
       const docRef = doc(db, 'examAttempts', attemptId);
       await deleteDoc(docRef);
-      console.log('Successfully deleted attempt:', attemptId);
+      return;
     } catch (error) {
       console.error("Error deleting attempt:", error);
       throw error;
     }
-    return;
   }
 
   // Super admin has all permissions (check by role for backward compatibility)
   if (currentUser.role === 'superadmin') {
-    console.log('User is Super Admin by role - allowing delete');
     try {
       const docRef = doc(db, 'examAttempts', attemptId);
       await deleteDoc(docRef);
-      console.log('Successfully deleted attempt:', attemptId);
+      return;
     } catch (error) {
       console.error("Error deleting attempt:", error);
       throw error;
     }
-    return;
   }
 
   // Only admins can delete
@@ -469,7 +457,6 @@ export async function deleteAttemptProtected(
 
   // Check if user has the permission
   const userPermissions = currentUser.permissions as UserPermissions | undefined;
-  console.log('Checking deleteResults permission:', userPermissions?.deleteResults);
   
   if (!userPermissions || userPermissions.deleteResults !== true) {
     throw new Error('User lacks permission to delete results');
@@ -478,7 +465,6 @@ export async function deleteAttemptProtected(
   try {
     const docRef = doc(db, 'examAttempts', attemptId);
     await deleteDoc(docRef);
-    console.log('Successfully deleted attempt:', attemptId);
   } catch (error) {
     console.error("Error deleting attempt:", error);
     throw error;
