@@ -406,3 +406,23 @@ export async function disableStudentProtected(
     throw error;
   }
 }
+
+/**
+ * Delete exam attempt with permission check
+ * Requires: deleteExams permission (since results are tied to exams)
+ */
+export async function deleteAttemptProtected(
+  currentUser: UserProfile | null | undefined,
+  attemptId: string
+) {
+  // Enforce permission
+  enforcePermission(currentUser, 'deleteExams');
+
+  try {
+    const docRef = doc(db, 'examAttempts', attemptId);
+    await deleteDoc(docRef);
+  } catch (error) {
+    console.error("Error deleting attempt:", error);
+    throw error;
+  }
+}

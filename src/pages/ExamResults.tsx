@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { getExam, updateExam } from "@/lib/firebase-exams";
-import { getExamAttempts, deleteAttempt } from "@/lib/firebase-attempts";
+import { getExamAttempts } from "@/lib/firebase-attempts";
+import { deleteAttemptProtected } from "@/lib/firebase-admin-protected";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -43,6 +44,7 @@ import {
   type ExamResultData,
   type ExamSummary,
 } from "@/lib/export-utils";
+import { useSectionPermissions } from "@/hooks/useSectionPermissions";
 
 interface AttemptWithStudent {
   id: string;
@@ -64,8 +66,9 @@ interface ExamInfo {
 
 const ExamResults = () => {
   const { examId } = useParams<{ examId: string }>();
-  const { role, user } = useAuth();
+  const { role, user, profile } = useAuth();
   const navigate = useNavigate();
+  const { canDelete } = useSectionPermissions();
   const [exam, setExam] = useState<ExamInfo | null>(null);
   const [attempts, setAttempts] = useState<AttemptWithStudent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -224,13 +227,29 @@ const ExamResults = () => {
   };
 
   const handleDeleteResult = async (attemptId: string) => {
+    if (!canDelete('manageExams')) {
+      toast.error("You don't have permission to delete results");
+      return;
+    }
+
     if (!window.confirm("Are you sure you want to delete this result? This action cannot be undone.")) {
       return;
     }
 
     setDeletingId(attemptId);
     try {
-      await deleteAttempt(attemptId);
+      const currentUser = profile ? {
+        userId: profile.id,
+        email: profile.email,
+        fullName: profile.full_name,
+        avatarUrl: profile.avatar_url,
+        role: profile.role as any,
+        permissions: (profile as any).permissions,
+        createdAt: new Date() as any,
+        updatedAt: new Date() as any,
+      } : null;
+
+      await deleteAttemptProtected(currentUser, attemptId);
       setAttempts(attempts.filter((a) => a.id !== attemptId));
       toast.success("Result deleted successfully");
     } catch (error) {
@@ -425,20 +444,22 @@ const ExamResults = () => {
                             {formatTimeSpent(attempt.timeSpentSeconds || 0)}
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full"
-                              onClick={() => handleDeleteResult(attempt.id)}
-                              disabled={deletingId === attempt.id}
-                              title="Delete result"
-                            >
-                              {deletingId === attempt.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Trash2 className="h-4 w-4" />
-                              )}
-                            </Button>
+                            {canDelete('manageExams') && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full"
+                                onClick={() => handleDeleteResult(attempt.id)}
+                                disabled={deletingId === attempt.id}
+                                title="Delete result"
+                              >
+                                {deletingId === attempt.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                              </Button>
+                            )}
                           </TableCell>
                         </TableRow>
                       );
