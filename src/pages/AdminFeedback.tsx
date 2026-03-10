@@ -12,7 +12,7 @@ import { useSectionPermissions } from "@/hooks/useSectionPermissions";
 
 export default function AdminFeedback() {
   const { toast } = useToast();
-  const { canEdit, canDelete } = useSectionPermissions();
+  const { canView, canEdit, canDelete } = useSectionPermissions();
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState<Array<any>>([]);
   const [selected, setSelected] = useState<any | null>(null);
@@ -94,7 +94,7 @@ export default function AdminFeedback() {
 
   return (
     <DashboardLayout>
-      {!canEdit('students') ? (
+      {!canView('students') ? (
         <div className="space-y-6 animate-fade-in max-w-6xl">
           <div className="flex items-start sm:items-center justify-between">
             <div>
@@ -114,13 +114,13 @@ export default function AdminFeedback() {
         </div>
       ) : (
         <div className="space-y-6 animate-fade-in max-w-6xl">
-        <div className="flex items-start sm:items-center justify-between">
-          <div>
-            <h1 className="text-2xl lg:text-3xl font-display font-bold">Feedback</h1>
-            <p className="text-muted-foreground mt-1">Review student messages and reply</p>
+          <div className="flex items-start sm:items-center justify-between">
+            <div>
+              <h1 className="text-2xl lg:text-3xl font-display font-bold">Feedback</h1>
+              <p className="text-muted-foreground mt-1">Review student messages and reply</p>
+            </div>
+            <Button variant="outline" onClick={fetchFeedback}>Refresh</Button>
           </div>
-          <Button variant="outline" onClick={fetchFeedback}>Refresh</Button>
-        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="md:col-span-1">
@@ -240,6 +240,7 @@ export default function AdminFeedback() {
               )}
             </CardContent>
           </Card>
+        </div>
         </div>
       )}
     </DashboardLayout>
