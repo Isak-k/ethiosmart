@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { useSectionPermissions } from "@/hooks/useSectionPermissions";
 
 interface ExamWithStats {
   id: string;
@@ -31,6 +32,7 @@ interface DashboardStats {
 export function AdminDashboard() {
   const { profile } = useAuth();
   const { t } = useTranslation();
+  const { canEdit } = useSectionPermissions();
   const [stats, setStats] = useState<DashboardStats>({
     totalExams: 0,
     totalStudents: 0,
@@ -113,12 +115,14 @@ export function AdminDashboard() {
             {t("dashboard.adminSubtitle")}
           </p>
         </div>
-        <Button asChild className="btn-primary w-full sm:w-auto">
-          <Link to="/dashboard/exams/new">
-            <Plus className="h-4 w-4 mr-2" />
-            {t("dashboard.createExam")}
-          </Link>
-        </Button>
+        {canEdit('manageExams') && (
+          <Button asChild className="btn-primary w-full sm:w-auto">
+            <Link to="/dashboard/exams/new">
+              <Plus className="h-4 w-4 mr-2" />
+              {t("dashboard.createExam")}
+            </Link>
+          </Button>
+        )}
       </div>
 
       {Object.keys(errors).length > 0 && (
@@ -188,9 +192,11 @@ export function AdminDashboard() {
             <TrendingUp className="h-5 w-5 text-primary" />
             {t("dashboard.recentActivity")}
           </h2>
-          <Button variant="ghost" size="sm" asChild className="text-primary hover:text-primary/80">
-            <Link to="/dashboard/admin/exams">{t("common.viewAll")}</Link>
-          </Button>
+          {canEdit('manageExams') && (
+            <Button variant="ghost" size="sm" asChild className="text-primary hover:text-primary/80">
+              <Link to="/dashboard/admin/exams">{t("common.viewAll")}</Link>
+            </Button>
+          )}
         </div>
 
         {loading ? (
@@ -221,12 +227,14 @@ export function AdminDashboard() {
             <p className="text-muted-foreground text-sm max-w-[250px] mx-auto mb-4">
               {t("dashboard.createFirstExam")}
             </p>
-            <Button asChild variant="outline" size="sm">
-              <Link to="/dashboard/exams/new">
-                <Plus className="h-3 w-3 mr-2" />
-                {t("dashboard.createExam")}
-              </Link>
-            </Button>
+            {canEdit('manageExams') && (
+              <Button asChild variant="outline" size="sm">
+                <Link to="/dashboard/exams/new">
+                  <Plus className="h-3 w-3 mr-2" />
+                  {t("dashboard.createExam")}
+                </Link>
+              </Button>
+            )}
           </div>
         )}
       </div>

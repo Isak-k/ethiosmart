@@ -34,6 +34,9 @@ export interface UserPermissions {
   replyFeedback: boolean;
   deleteFeedback: boolean;
   
+  // AI Study Assistant
+  viewAIAssistant: boolean;
+  
   // Leaderboard
   viewLeaderboard: boolean;
   manageLeaderboard: boolean;
@@ -70,6 +73,7 @@ export const DEFAULT_PERMISSIONS: UserPermissions = {
   viewFeedback: false,
   replyFeedback: false,
   deleteFeedback: false,
+  viewAIAssistant: false,
   viewLeaderboard: true,
   manageLeaderboard: false,
   viewExaminers: false,
@@ -102,6 +106,7 @@ export const RESTRICTED_PERMISSIONS: UserPermissions = {
   viewFeedback: false,
   replyFeedback: false,
   deleteFeedback: false,
+  viewAIAssistant: false,
   viewLeaderboard: false,
   manageLeaderboard: false,
   viewExaminers: false,
@@ -133,6 +138,7 @@ export const FULL_ADMIN_PERMISSIONS: UserPermissions = {
   viewFeedback: false,
   replyFeedback: false,
   deleteFeedback: false,
+  viewAIAssistant: false,
   viewLeaderboard: true,
   manageLeaderboard: true,
   viewExaminers: false,
@@ -149,6 +155,7 @@ export const SUPER_ADMIN_PERMISSIONS: UserPermissions = {
   viewFeedback: true,
   replyFeedback: true,
   deleteFeedback: true,
+  viewAIAssistant: true,
   viewExaminers: true,
   addExaminers: true,
   editExaminerPermissions: true,
@@ -178,6 +185,7 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   viewFeedback: 'View Feedback',
   replyFeedback: 'Reply to Feedback',
   deleteFeedback: 'Delete Feedback',
+  viewAIAssistant: 'View AI Study Assistant',
   viewLeaderboard: 'View Leaderboard',
   manageLeaderboard: 'Manage Leaderboard',
   viewExaminers: 'View Examiners',
@@ -218,6 +226,9 @@ export const PERMISSION_GROUPS = {
     'viewFeedback',
     'replyFeedback',
     'deleteFeedback',
+  ] as PermissionKey[],
+  'AI Study Assistant': [
+    'viewAIAssistant',
   ] as PermissionKey[],
   'Leaderboard': ['viewLeaderboard', 'manageLeaderboard'] as PermissionKey[],
   'Examiner Management': [

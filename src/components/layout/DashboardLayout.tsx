@@ -67,7 +67,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     { href: "/dashboard/exams", label: t("dashboard.menu.availableExams"), icon: ClipboardList },
     { href: "/dashboard/results", label: t("dashboard.menu.myResults"), icon: Trophy },
     { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
-    { href: "/dashboard/ai-assistant", label: t("aiAssistant.title", "AI Study Assistant"), icon: Brain },
+    { href: "/dashboard/ai-assistant", label: t("aiAssistant.title", "AI Study Assistant"), icon: Brain, permission: 'viewAIAssistant' },
   ];
 
   const allAdminLinks = [
@@ -76,7 +76,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     { href: "/dashboard/all-results", label: t("dashboard.menu.allResults"), icon: Trophy, permission: 'viewAllResults' },
     { href: "/dashboard/students", label: t("dashboard.menu.students"), icon: Users, permission: 'viewStudents' },
     { href: "/dashboard/feedback", label: "Feedback", icon: MessageSquare, permission: 'viewStudents' },
-    { href: "/dashboard/ai-assistant", label: t("aiAssistant.title", "AI Study Assistant"), icon: Brain },
+    { href: "/dashboard/ai-assistant", label: t("aiAssistant.title", "AI Study Assistant"), icon: Brain, permission: 'viewAIAssistant' },
     { href: "/dashboard/leaderboard-admin", label: "Leaderboard Admin", icon: Trophy, permission: 'viewLeaderboard' },
     { href: "/dashboard/departments", label: t("dashboard.menu.departments"), icon: Building, permission: 'viewDepartments' },
     ...(isSuperAdmin ? [{ href: "/dashboard/super-admin", label: "Super Admin", icon: Shield, permission: 'viewExaminers' }] : []),
