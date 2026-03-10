@@ -61,20 +61,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     navigate("/");
   };
 
-  // Show ALL admin menu items - permissions control buttons within pages, not sidebar visibility
-  const adminLinks = [
-    { href: "/dashboard", label: t("dashboard.menu.dashboard"), icon: LayoutDashboard },
-    { href: "/dashboard/admin/exams", label: t("dashboard.menu.manageExams"), icon: FileText },
-    { href: "/dashboard/all-results", label: t("dashboard.menu.allResults"), icon: Trophy },
-    { href: "/dashboard/students", label: t("dashboard.menu.students"), icon: Users },
-    { href: "/dashboard/feedback", label: "Feedback", icon: MessageSquare },
-    { href: "/dashboard/analytics", label: t("dashboard.menu.analytics"), icon: BarChart3 },
-    { href: "/dashboard/ai-assistant", label: t("aiAssistant.title", "AI Study Assistant"), icon: Brain },
-    { href: "/dashboard/leaderboard-admin", label: "Leaderboard Admin", icon: Trophy },
-    { href: "/dashboard/departments", label: t("dashboard.menu.departments"), icon: Building },
-    ...(isSuperAdmin ? [{ href: "/dashboard/super-admin", label: "Super Admin", icon: Shield }] : []),
-  ];
-
   const studentLinks = [
     { href: "/dashboard", label: t("dashboard.menu.dashboard"), icon: LayoutDashboard },
     { href: "/dashboard/exams", label: t("dashboard.menu.availableExams"), icon: ClipboardList },
