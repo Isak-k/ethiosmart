@@ -25,9 +25,10 @@ interface ExamCardProps {
   isAdmin?: boolean;
   hasAttempted?: boolean;
   onDelete?: (examId: string) => void;
+  hideActions?: boolean;
 }
 
-export function ExamCard({ exam, isAdmin = false, hasAttempted = false, onDelete }: ExamCardProps) {
+export function ExamCard({ exam, isAdmin = false, hasAttempted = false, onDelete, hideActions = false }: ExamCardProps) {
   const { t, i18n } = useTranslation();
   const { canEdit, canDelete } = useSectionPermissions();
   const { toast } = useToast();
@@ -128,7 +129,7 @@ export function ExamCard({ exam, isAdmin = false, hasAttempted = false, onDelete
         )}
 
         {/* Actions */}
-        {isAdmin ? (
+        {!hideActions && isAdmin ? (
           <div className="flex gap-2">
             {canEdit('manageExams') && (
               <Button asChild variant="outline" className="flex-1 rounded-xl border-cyan-300 hover:bg-cyan-50">
@@ -155,7 +156,7 @@ export function ExamCard({ exam, isAdmin = false, hasAttempted = false, onDelete
               </Button>
             )}
           </div>
-        ) : (
+        ) : !hideActions && !isAdmin ? (
           <Button
             asChild
             className={`w-full rounded-xl ${

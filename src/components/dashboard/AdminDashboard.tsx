@@ -202,6 +202,7 @@ export function AdminDashboard() {
                 key={exam.id}
                 exam={exam}
                 isAdmin={true}
+                hideActions={true}
               />
             ))}
           </div>
