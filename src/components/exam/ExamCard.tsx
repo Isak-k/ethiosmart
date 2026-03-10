@@ -30,7 +30,7 @@ interface ExamCardProps {
 
 export function ExamCard({ exam, isAdmin = false, hasAttempted = false, onDelete, hideActions = false }: ExamCardProps) {
   const { t, i18n } = useTranslation();
-  const { canEdit, canDelete } = useSectionPermissions();
+  const { canEdit, canDelete, canView } = useSectionPermissions();
   const { toast } = useToast();
   
   const isActive =
@@ -139,12 +139,14 @@ export function ExamCard({ exam, isAdmin = false, hasAttempted = false, onDelete
                 </Link>
               </Button>
             )}
-            <Button asChild className="flex-1 rounded-xl bg-cyan-500 hover:bg-cyan-600">
-              <Link to={`/dashboard/exams/${exam.id}/results`}>
-                <BarChart3 className="h-4 w-4 mr-2" />
-                {t("exam.action.results")}
-              </Link>
-            </Button>
+            {canView('allResults') && (
+              <Button asChild className="flex-1 rounded-xl bg-cyan-500 hover:bg-cyan-600">
+                <Link to={`/dashboard/exams/${exam.id}/results`}>
+                  <BarChart3 className="h-4 w-4 mr-2" />
+                  {t("exam.action.results")}
+                </Link>
+              </Button>
+            )}
             {onDelete && canDelete('manageExams') && (
               <Button 
                 variant="outline" 
