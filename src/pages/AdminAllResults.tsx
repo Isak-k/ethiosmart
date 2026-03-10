@@ -64,7 +64,7 @@ const ITEMS_PER_PAGE = 10;
 const AdminAllResults = () => {
   const { toast } = useToast();
   const { t } = useTranslation();
-  const { canEdit } = useSectionPermissions();
+  const { canEdit, canDelete } = useSectionPermissions();
   const [results, setResults] = useState<ResultWithDetails[]>([]);
   const [filteredResults, setFilteredResults] = useState<ResultWithDetails[]>([]);
   const [exams, setExams] = useState<ExamOption[]>([]);
@@ -433,20 +433,22 @@ const AdminAllResults = () => {
                                     <Eye className="h-4 w-4" />
                                   </Link>
                                 </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full"
-                                  onClick={() => handleDeleteResult(result.id)}
-                                  disabled={deletingId === result.id}
-                                  title={t("common.delete")}
-                                >
-                                  {deletingId === result.id ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                  ) : (
-                                    <Trash2 className="h-4 w-4" />
-                                  )}
-                                </Button>
+                                {canDelete('manageExams') && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full"
+                                    onClick={() => handleDeleteResult(result.id)}
+                                    disabled={deletingId === result.id}
+                                    title={t("common.delete")}
+                                  >
+                                    {deletingId === result.id ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <Trash2 className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                )}
                               </div>
                             </TableCell>
                           </TableRow>
