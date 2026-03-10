@@ -421,6 +421,11 @@ export async function deleteAttemptProtected(
     throw new Error('User not authenticated');
   }
 
+  console.log('deleteAttemptProtected - User email:', currentUser.email);
+  console.log('deleteAttemptProtected - SUPER_ADMIN_EMAIL:', SUPER_ADMIN_EMAIL);
+  console.log('deleteAttemptProtected - User role:', currentUser.role);
+  console.log('deleteAttemptProtected - User permissions:', currentUser.permissions);
+
   // Check if user is disabled
   if (currentUser.disabled === true) {
     throw new Error('User account is disabled');
@@ -428,6 +433,7 @@ export async function deleteAttemptProtected(
 
   // Super admin has all permissions (check by email)
   if (currentUser.email === SUPER_ADMIN_EMAIL) {
+    console.log('User is Super Admin by email');
     try {
       const docRef = doc(db, 'examAttempts', attemptId);
       await deleteDoc(docRef);
@@ -440,6 +446,7 @@ export async function deleteAttemptProtected(
 
   // Super admin has all permissions (check by role for backward compatibility)
   if (currentUser.role === 'superadmin') {
+    console.log('User is Super Admin by role');
     try {
       const docRef = doc(db, 'examAttempts', attemptId);
       await deleteDoc(docRef);
@@ -457,6 +464,8 @@ export async function deleteAttemptProtected(
 
   // Check if user has the permission
   const userPermissions = currentUser.permissions as UserPermissions | undefined;
+  console.log('Checking deleteExams permission:', userPermissions?.deleteExams);
+  
   if (!userPermissions || userPermissions.deleteExams !== true) {
     throw new Error('User lacks permission to delete exams');
   }

@@ -136,6 +136,10 @@ const AdminAllResults = () => {
         updatedAt: new Date() as any,
       } : null;
 
+      console.log('handleDeleteResult - userProfile:', userProfile);
+      console.log('handleDeleteResult - profile.email:', profile?.email);
+      console.log('handleDeleteResult - profile.permissions:', (profile as any)?.permissions);
+
       await deleteAttemptProtected(userProfile, attemptId);
       setResults(results.filter((r) => r.id !== attemptId));
       toast({
