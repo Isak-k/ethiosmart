@@ -431,12 +431,16 @@ export async function deleteAttemptProtected(
     throw new Error('User account is disabled');
   }
 
-  // Super admin has all permissions (check by email)
-  if (currentUser.email === SUPER_ADMIN_EMAIL) {
-    console.log('User is Super Admin by email');
+  // Super admin has all permissions (check by email) - EXACT MATCH
+  const isSuperAdmin = currentUser.email && currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
+  console.log('Is Super Admin (email check):', isSuperAdmin, 'Email:', currentUser.email, 'Expected:', SUPER_ADMIN_EMAIL);
+  
+  if (isSuperAdmin) {
+    console.log('User is Super Admin by email - allowing delete');
     try {
       const docRef = doc(db, 'examAttempts', attemptId);
       await deleteDoc(docRef);
+      console.log('Successfully deleted attempt:', attemptId);
     } catch (error) {
       console.error("Error deleting attempt:", error);
       throw error;
@@ -446,10 +450,11 @@ export async function deleteAttemptProtected(
 
   // Super admin has all permissions (check by role for backward compatibility)
   if (currentUser.role === 'superadmin') {
-    console.log('User is Super Admin by role');
+    console.log('User is Super Admin by role - allowing delete');
     try {
       const docRef = doc(db, 'examAttempts', attemptId);
       await deleteDoc(docRef);
+      console.log('Successfully deleted attempt:', attemptId);
     } catch (error) {
       console.error("Error deleting attempt:", error);
       throw error;
@@ -473,6 +478,7 @@ export async function deleteAttemptProtected(
   try {
     const docRef = doc(db, 'examAttempts', attemptId);
     await deleteDoc(docRef);
+    console.log('Successfully deleted attempt:', attemptId);
   } catch (error) {
     console.error("Error deleting attempt:", error);
     throw error;
