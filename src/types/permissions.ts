@@ -14,8 +14,9 @@ export interface UserPermissions {
   
   // Results & Grading
   viewAllResults: boolean;
-  exportResults: boolean;
   viewExamResults: boolean;
+  deleteResults: boolean;
+  exportResults: boolean;
   
   // Student Management (Full CRUD)
   viewStudents: boolean;
@@ -70,8 +71,9 @@ export const DEFAULT_PERMISSIONS: UserPermissions = {
   editDepartments: false,
   deleteDepartments: false,
   viewAllResults: false,
-  exportResults: true,
   viewExamResults: false,
+  deleteResults: false,
+  exportResults: true,
   viewFeedback: false,
   replyFeedback: false,
   deleteFeedback: false,
@@ -104,8 +106,9 @@ export const RESTRICTED_PERMISSIONS: UserPermissions = {
   editDepartments: false,
   deleteDepartments: false,
   viewAllResults: false,
-  exportResults: false,
   viewExamResults: false,
+  deleteResults: false,
+  exportResults: false,
   viewFeedback: false,
   replyFeedback: false,
   deleteFeedback: false,
@@ -137,8 +140,9 @@ export const FULL_ADMIN_PERMISSIONS: UserPermissions = {
   editDepartments: true,
   deleteDepartments: true,
   viewAllResults: true,
-  exportResults: true,
   viewExamResults: false,
+  deleteResults: false,
+  exportResults: true,
   viewFeedback: false,
   replyFeedback: false,
   deleteFeedback: false,
@@ -166,6 +170,7 @@ export const SUPER_ADMIN_PERMISSIONS: UserPermissions = {
   deleteExaminers: true,
   enableDisableExaminers: true,
   viewExamResults: true,
+  deleteResults: true,
 };
 
 export const PERMISSION_LABELS: Record<PermissionKey, string> = {
@@ -186,8 +191,9 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   editDepartments: 'Edit Departments',
   deleteDepartments: 'Delete Departments',
   viewAllResults: 'View All Results',
-  exportResults: 'Export Results',
   viewExamResults: 'View Exam Results',
+  deleteResults: 'Delete Results',
+  exportResults: 'Export Results',
   viewFeedback: 'View Feedback',
   replyFeedback: 'Reply to Feedback',
   deleteFeedback: 'Delete Feedback',
@@ -226,8 +232,9 @@ export const PERMISSION_GROUPS = {
   ] as PermissionKey[],
   'Results & Grading': [
     'viewAllResults',
-    'exportResults',
     'viewExamResults',
+    'deleteResults',
+    'exportResults',
   ] as PermissionKey[],
   'Feedback': [
     'viewFeedback',

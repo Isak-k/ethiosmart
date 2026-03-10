@@ -464,10 +464,10 @@ export async function deleteAttemptProtected(
 
   // Check if user has the permission
   const userPermissions = currentUser.permissions as UserPermissions | undefined;
-  console.log('Checking deleteExams permission:', userPermissions?.deleteExams);
+  console.log('Checking deleteResults permission:', userPermissions?.deleteResults);
   
-  if (!userPermissions || userPermissions.deleteExams !== true) {
-    throw new Error('User lacks permission to delete exams');
+  if (!userPermissions || userPermissions.deleteResults !== true) {
+    throw new Error('User lacks permission to delete results');
   }
 
   try {

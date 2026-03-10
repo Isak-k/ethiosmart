@@ -67,7 +67,7 @@ const AdminAllResults = () => {
   const { toast } = useToast();
   const { t } = useTranslation();
   const { canEdit, canDelete, canView } = useSectionPermissions();
-  const { canViewExamResults, canDeleteExams } = useGranularPermissions();
+  const { canViewExamResults, canDeleteResults } = useGranularPermissions();
   const { profile } = useAuth();
   const [results, setResults] = useState<ResultWithDetails[]>([]);
   const [filteredResults, setFilteredResults] = useState<ResultWithDetails[]>([]);
@@ -455,7 +455,7 @@ const AdminAllResults = () => {
                                     </Link>
                                   </Button>
                                 )}
-                                {canDeleteExams() && (
+                                {canDeleteResults() && (
                                   <Button
                                     variant="ghost"
                                     size="icon"

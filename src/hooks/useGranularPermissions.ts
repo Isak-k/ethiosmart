@@ -3,7 +3,7 @@ import { PermissionKey, SUPER_ADMIN_EMAIL } from '@/types/permissions';
 import { UserPermissions } from '@/types/permissions';
 
 /**
- * Hook for checking granular permissions (viewExamResults, deleteExams, etc.)
+ * Hook for checking granular permissions (viewExamResults, deleteResults, etc.)
  * These permissions are managed by Super Admin and can be granted/revoked per examiner
  */
 export function useGranularPermissions() {
@@ -28,6 +28,13 @@ export function useGranularPermissions() {
   };
 
   /**
+   * Check if user can view all results
+   */
+  const canViewAllResults = (): boolean => {
+    return hasPermission('viewAllResults');
+  };
+
+  /**
    * Check if user can view exam results
    */
   const canViewExamResults = (): boolean => {
@@ -35,17 +42,17 @@ export function useGranularPermissions() {
   };
 
   /**
+   * Check if user can delete results
+   */
+  const canDeleteResults = (): boolean => {
+    return hasPermission('deleteResults');
+  };
+
+  /**
    * Check if user can delete exams
    */
   const canDeleteExams = (): boolean => {
     return hasPermission('deleteExams');
-  };
-
-  /**
-   * Check if user can view all results
-   */
-  const canViewAllResults = (): boolean => {
-    return hasPermission('viewAllResults');
   };
 
   /**
@@ -71,9 +78,10 @@ export function useGranularPermissions() {
 
   return {
     hasPermission,
-    canViewExamResults,
-    canDeleteExams,
     canViewAllResults,
+    canViewExamResults,
+    canDeleteResults,
+    canDeleteExams,
     canExportResults,
     canViewFeedback,
     canViewAIAssistant,
