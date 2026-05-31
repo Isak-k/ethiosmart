@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
-import { Loader2, ChevronLeft, ChevronRight, Send, AlertTriangle, CheckCircle, AlertCircle } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, Send, AlertTriangle, CheckCircle, AlertCircle, Flag, Check } from "lucide-react";
 
 interface Question {
   questionId: string;
@@ -71,6 +71,7 @@ const TakeExam = () => {
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [enteredPassword, setEnteredPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const [flaggedQuestions, setFlaggedQuestions] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const checkExistingAttempt = async () => {
@@ -372,6 +373,18 @@ const TakeExam = () => {
     }
   }, [questions, currentIndex, handleSelectOption]);
 
+  const toggleFlag = useCallback((questionId: string) => {
+    setFlaggedQuestions(prev => {
+      const newFlags = new Set(prev);
+      if (newFlags.has(questionId)) {
+        newFlags.delete(questionId);
+      } else {
+        newFlags.add(questionId);
+      }
+      return newFlags;
+    });
+  }, []);
+
   // Enable keyboard navigation
   useExamKeyboardNavigation({
     onNext: handleNext,
@@ -577,75 +590,189 @@ const TakeExam = () => {
 
       {/* Question Content */}
       {currentQuestion && startedAt && (
-        <main className="w-full px-0 py-4 sm:container sm:mx-auto sm:max-w-4xl sm:px-4 sm:py-8">
-          <QuestionCard
-            questionNumber={currentIndex + 1}
-            questionText={currentQuestion.questionText}
-            options={currentQuestion.options}
-            selectedOption={answers.get(currentQuestion.questionId) ?? null}
-            correctOption={currentQuestion.correctOptionIndex}
-            feedbackType={currentQuestion.feedbackType}
-            isSubmitted={false}
-            onSelectOption={(index) => handleSelectOption(currentQuestion.questionId, index)}
-            marks={currentQuestion.marks}
-            explanation={currentQuestion.explanation}
-          />
+        <main className="w-full px-0 py-4 sm:container sm:mx-auto sm:px-4 sm:py-8">
+          <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
+            {/* Left: Question Area */}
+            <div className="flex-1 min-w-0">
+              <QuestionCard
+                questionNumber={currentIndex + 1}
+                questionText={currentQuestion.questionText}
+                options={currentQuestion.options}
+                selectedOption={answers.get(currentQuestion.questionId) ?? null}
+                correctOption={currentQuestion.correctOptionIndex}
+                feedbackType={currentQuestion.feedbackType}
+                isSubmitted={false}
+                onSelectOption={(index) => handleSelectOption(currentQuestion.questionId, index)}
+                marks={currentQuestion.marks}
+                explanation={currentQuestion.explanation}
+              />
 
-          {/* Navigation */}
-          <div className="mt-6 flex items-center justify-between px-3 sm:mt-8 sm:px-0">
-            <Button
-              variant="outline"
-              onClick={() => setCurrentIndex((i) => i - 1)}
-              disabled={currentIndex === 0}
-              className="bg-white hover:bg-gray-50 text-gray-700 border-gray-300 shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105 disabled:transform-none disabled:opacity-50"
-            >
-              <ChevronLeft className="h-4 w-4 mr-2" />
-              Previous
-            </Button>
+              {/* Flag Button for Current Question */}
+              <div className="mt-4 px-3 sm:px-0">
+                <Button
+                  variant="outline"
+                  onClick={() => toggleFlag(currentQuestion.questionId)}
+                  className={`flex items-center gap-2 transition-all duration-200 ${
+                    flaggedQuestions.has(currentQuestion.questionId)
+                      ? "bg-red-50 border-red-200 text-red-700 hover:bg-red-100"
+                      : "bg-white hover:bg-gray-50 text-gray-700 border-gray-300"
+                  }`}
+                >
+                  <Flag className={`h-4 w-4 ${flaggedQuestions.has(currentQuestion.questionId) ? "fill-red-500 text-red-500" : ""}`} />
+                  {flaggedQuestions.has(currentQuestion.questionId) ? "Remove Flag" : "Flag for Review"}
+                </Button>
+              </div>
 
-            {currentIndex === questions.length - 1 ? (
-              <Button
-                onClick={() => setShowSubmitDialog(true)}
-                className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
-              >
-                <Send className="h-4 w-4 mr-2" />
-                Submit Exam
-              </Button>
-            ) : (
-              <Button
-                onClick={() => setCurrentIndex((i) => i + 1)}
-                className="bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-600 hover:to-teal-600 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
-              >
-                Next
-                <ChevronRight className="h-4 w-4 ml-2" />
-              </Button>
-            )}
-          </div>
+              {/* Navigation */}
+              <div className="mt-6 flex items-center justify-between px-3 sm:mt-8 sm:px-0">
+                <Button
+                  variant="outline"
+                  onClick={() => setCurrentIndex((i) => i - 1)}
+                  disabled={currentIndex === 0}
+                  className="bg-white hover:bg-gray-50 text-gray-700 border-gray-300 shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105 disabled:transform-none disabled:opacity-50"
+                >
+                  <ChevronLeft className="h-4 w-4 mr-2" />
+                  Previous
+                </Button>
 
-          {/* Question Navigator */}
-          <div className="mx-3 mt-6 rounded-xl border bg-card p-4 sm:mx-0 sm:mt-8">
-            <p className="text-sm font-medium mb-3">{t("student.exam.questionNavigator")}</p>
-            <div className="flex flex-wrap gap-2">
-              {questions.map((q, idx) => {
-                const isAnswered = answers.has(q.questionId);
-                const isCurrent = idx === currentIndex;
-
-                return (
-                  <button
-                    key={q.questionId}
-                    onClick={() => setCurrentIndex(idx)}
-                    className={`h-9 w-9 rounded-lg text-sm font-medium transition-all duration-200 transform hover:scale-110 ${
-                      isCurrent
-                        ? "bg-gradient-to-r from-cyan-500 to-teal-500 text-white shadow-lg"
-                        : isAnswered
-                        ? "bg-gradient-to-r from-green-400 to-emerald-400 text-white shadow-md hover:shadow-lg"
-                        : "bg-gray-100 hover:bg-gray-200 text-gray-700 shadow-sm hover:shadow-md"
-                    }`}
+                {currentIndex === questions.length - 1 ? (
+                  <Button
+                    onClick={() => setShowSubmitDialog(true)}
+                    className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
                   >
-                    {idx + 1}
-                  </button>
-                );
-              })}
+                    <Send className="h-4 w-4 mr-2" />
+                    Submit Exam
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() => setCurrentIndex((i) => i + 1)}
+                    className="bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-600 hover:to-teal-600 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4 ml-2" />
+                  </Button>
+                )}
+              </div>
+
+              {/* Mobile Question Navigator (only visible on small screens) */}
+              <div className="mt-6 lg:hidden mx-3 rounded-xl border bg-card p-4 sm:mx-0">
+                <p className="text-sm font-medium mb-3">{t("student.exam.questionNavigator")}</p>
+                <div className="grid grid-cols-5 gap-2">
+                  {questions.map((q, idx) => {
+                    const isAnswered = answers.has(q.questionId);
+                    const isCurrent = idx === currentIndex;
+                    const isFlagged = flaggedQuestions.has(q.questionId);
+
+                    return (
+                      <div
+                        key={q.questionId}
+                        className="flex items-center justify-center"
+                      >
+                        <button
+                          onClick={() => setCurrentIndex(idx)}
+                          className={`h-10 w-10 rounded-full text-xs font-medium transition-all duration-200 transform hover:scale-110 relative flex items-center justify-center ${
+                            isCurrent
+                              ? "bg-gradient-to-r from-cyan-500 to-teal-500 text-white shadow-lg"
+                              : isAnswered
+                              ? "bg-gradient-to-r from-green-400 to-emerald-400 text-white shadow-md hover:shadow-lg"
+                              : "bg-gray-100 hover:bg-gray-200 text-gray-700 shadow-sm hover:shadow-md"
+                          }`}
+                        >
+                          {isAnswered ? (
+                            <Check className="w-3 h-3" />
+                          ) : (
+                            idx + 1
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleFlag(q.questionId);
+                            }}
+                            className={`absolute -top-1 -right-1 p-0.5 transition-all duration-200 ${
+                              isFlagged
+                                ? "bg-red-500 rounded-full"
+                                : "text-gray-400 hover:text-gray-600"
+                            }`}
+                            title={isFlagged ? "Remove flag" : "Flag for review"}
+                          >
+                            <Flag className={`w-2.5 h-2.5 ${isFlagged ? "text-white fill-white" : "text-gray-600 fill-gray-600"}`} />
+                          </button>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Question Navigator (desktop only) */}
+            <div className="hidden lg:block w-48 flex-shrink-0">
+              <div className="sticky top-24 rounded-xl border bg-card shadow-sm p-3">
+                <p className="text-xs font-medium mb-2">{t("student.exam.questionNavigator")}</p>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {questions.map((q, idx) => {
+                    const isAnswered = answers.has(q.questionId);
+                    const isCurrent = idx === currentIndex;
+                    const isFlagged = flaggedQuestions.has(q.questionId);
+
+                    return (
+                      <div
+                        key={q.questionId}
+                        className="flex items-center justify-center"
+                      >
+                        <button
+                          onClick={() => setCurrentIndex(idx)}
+                          className={`h-8 w-8 rounded-full text-xs font-medium transition-all duration-200 transform hover:scale-110 relative flex items-center justify-center ${
+                            isCurrent
+                              ? "bg-gradient-to-r from-cyan-500 to-teal-500 text-white shadow-md"
+                              : isAnswered
+                              ? "bg-gradient-to-r from-green-400 to-emerald-400 text-white shadow-sm hover:shadow-md"
+                              : "bg-gray-100 hover:bg-gray-200 text-gray-700 shadow-sm hover:shadow-md"
+                          }`}
+                        >
+                          {isAnswered ? (
+                            <Check className="w-2.5 h-2.5" />
+                          ) : (
+                            idx + 1
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleFlag(q.questionId);
+                            }}
+                            className={`absolute -top-0.5 -right-0.5 p-0.5 transition-all duration-200 ${
+                              isFlagged
+                                ? "bg-red-500 rounded-full"
+                                : "text-gray-400 hover:text-gray-600"
+                            }`}
+                            title={isFlagged ? "Remove flag" : "Flag for review"}
+                          >
+                            <Flag className={`w-2 h-2 ${isFlagged ? "text-white fill-white" : "text-gray-600 fill-gray-600"}`} />
+                          </button>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="mt-3 space-y-1.5 text-[10px]">
+                  <div className="flex items-center gap-1">
+                    <div className="w-2.5 h-2.5 rounded-full bg-gradient-to-r from-green-400 to-emerald-400"></div>
+                    <span className="text-gray-600">Answered</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2.5 h-2.5 rounded-full bg-gray-100 border border-gray-200"></div>
+                    <span className="text-gray-600">Unanswered</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2.5 h-2.5 rounded-full bg-gradient-to-r from-cyan-500 to-teal-500"></div>
+                    <span className="text-gray-600">Current</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
+                    <span className="text-gray-600">Flagged</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </main>
