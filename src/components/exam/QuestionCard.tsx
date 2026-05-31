@@ -30,9 +30,9 @@ export function QuestionCard({
   isPracticeExam,
 }: QuestionCardProps) {
   const { t } = useTranslation();
-  // For practice exams, always show feedback and explanations
+  // For practice exams, show feedback after student selects an option
   const showFeedback = (isPracticeExam || feedbackType === "instant") && selectedOption !== null;
-  const showResults = isSubmitted || isPracticeExam; // Show results for practice exams
+  const showResults = isSubmitted; // Only show results after submission
   const showExplanation = (showFeedback || showResults) && explanation;
 
   const getOptionClass = (index: number) => {
