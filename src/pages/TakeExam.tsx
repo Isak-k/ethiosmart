@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { getExam, getQuestions } from "@/lib/firebase-exams";
 import { createAttempt, saveAnswer, submitAttempt, getAttempt, getAnswers, getStudentAttempts } from "@/lib/firebase-attempts";
-import { getOfflineExam, getOfflineQuestions, getOfflineAttemptsByExam, getOfflineAttempt, getOfflineAnswers, saveOfflineAttempt, saveOfflineAnswer } from "@/lib/offline-storage";
+import { getOfflineExam, getOfflineQuestions, getOfflineAttemptsByExam, getOfflineAttempt, getOfflineAnswers, saveOfflineAttempt, saveOfflineAnswer, initOfflineDB } from "@/lib/offline-storage";
 import { QuestionCard } from "@/components/exam/QuestionCard";
 import { ExamTimer } from "@/components/exam/ExamTimer";
 import { KeyboardShortcutsHelp } from "@/components/exam/KeyboardShortcutsHelp";
@@ -96,6 +96,9 @@ const TakeExam = () => {
       if (!user || !id) return;
   
       try {
+        // Initialize offline DB first
+        await initOfflineDB();
+        
         let examData: Exam | null = null;
         let questionsData: Question[] = [];
         let isOffline = false;
@@ -345,39 +348,10 @@ const TakeExam = () => {
       
       // For practice exams, always create offline attempt
       if (isPracticeExam) {
-        attemptId = `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        const offlineAttempt = {
-          attemptId,
-          examId: exam.examId,
-          studentId: user.uid,
-          examTitle: exam.title,
-          studentName: user.displayName || user.email || 'Student',
-          studentEmail: user.email || '',
-          startedAt: new Date(),
-          submittedAt: null,
-          isSubmitted: false,
-          timeSpentSeconds: null,
-          totalScore: null,
-          maxScore: null,
-          createdAt: new Date()
-        };
-        await saveOfflineAttempt(offlineAttempt);
-        setIsOfflineMode(true);
-      } else {
-        // For normal exams, try Firebase first
         try {
-          const profile = await import("@/lib/auth").then(m => m.getUserProfile(user.uid));
+          // Ensure offline DB is initialized
+          await initOfflineDB();
           
-          attemptId = await createAttempt(
-            exam.examId,
-            user.uid,
-            exam.title,
-            profile?.full_name || user.email || 'Student',
-            user.email || ''
-          );
-        } catch (error) {
-          console.warn("Failed to create attempt on Firebase, creating offline attempt:", error);
-          // Create offline attempt
           attemptId = `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
           const offlineAttempt = {
             attemptId,
@@ -396,6 +370,50 @@ const TakeExam = () => {
           };
           await saveOfflineAttempt(offlineAttempt);
           setIsOfflineMode(true);
+        } catch (error) {
+          console.error("Error creating offline attempt:", error);
+          throw new Error("Failed to initialize offline storage for practice exam");
+        }
+      } else {
+        // For normal exams, try Firebase first
+        try {
+          const profile = await import("@/lib/auth").then(m => m.getUserProfile(user.uid));
+          
+          attemptId = await createAttempt(
+            exam.examId,
+            user.uid,
+            exam.title,
+            profile?.full_name || user.email || 'Student',
+            user.email || ''
+          );
+        } catch (error) {
+          console.warn("Failed to create attempt on Firebase, creating offline attempt:", error);
+          // Create offline attempt
+          try {
+            await initOfflineDB();
+            
+            attemptId = `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const offlineAttempt = {
+              attemptId,
+              examId: exam.examId,
+              studentId: user.uid,
+              examTitle: exam.title,
+              studentName: user.displayName || user.email || 'Student',
+              studentEmail: user.email || '',
+              startedAt: new Date(),
+              submittedAt: null,
+              isSubmitted: false,
+              timeSpentSeconds: null,
+              totalScore: null,
+              maxScore: null,
+              createdAt: new Date()
+            };
+            await saveOfflineAttempt(offlineAttempt);
+            setIsOfflineMode(true);
+          } catch (offlineError) {
+            console.error("Error creating offline attempt:", offlineError);
+            throw offlineError;
+          }
         }
       }
 
