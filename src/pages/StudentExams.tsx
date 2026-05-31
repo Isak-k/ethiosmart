@@ -25,6 +25,8 @@ interface ExamData {
   is_published: boolean;
   question_count?: number;
   allow_offline_download?: boolean;
+  max_attempts?: number;
+  attempt_count?: number;
 }
 
 const StudentExams = () => {
@@ -75,6 +77,13 @@ const StudentExams = () => {
       const attempts = await getStudentAttempts(user.uid);
       console.log(`✓ Found ${attempts.length} attempts`);
 
+      // Count attempts per exam
+      const attemptsByExam = new Map<string, number>();
+      attempts.forEach(attempt => {
+        const count = attemptsByExam.get(attempt.examId) || 0;
+        attemptsByExam.set(attempt.examId, count + 1);
+      });
+
       const mappedExams = examsData.map(exam => ({
         id: exam.examId,
         title: exam.title,
@@ -84,7 +93,9 @@ const StudentExams = () => {
         end_time: exam.endTime?.toDate().toISOString() || null,
         is_published: exam.isPublished,
         question_count: exam.questionCount,
-        allow_offline_download: exam.allowOfflineDownload || false
+        allow_offline_download: exam.allowOfflineDownload || false,
+        max_attempts: exam.maxAttempts || 1,
+        attempt_count: attemptsByExam.get(exam.examId) || 0
       }));
 
       setAttemptedExamIds(new Set(attempts.map((a) => a.examId)));

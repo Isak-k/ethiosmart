@@ -24,6 +24,7 @@ interface ExamCardProps {
     is_published: boolean;
     question_count?: number;
     attempt_count?: number;
+    max_attempts?: number;
   };
   isAdmin?: boolean;
   hasAttempted?: boolean;
@@ -121,6 +122,14 @@ export function ExamCard({ exam, isAdmin = false, hasAttempted = false, onDelete
               <span className="font-medium">{exam.question_count} {t("exam.info.questions")}</span>
             </div>
           )}
+          {!isAdmin && exam.max_attempts !== undefined && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground bg-orange-50 dark:bg-orange-950/20 p-3 rounded-xl">
+              <Users className="h-4 w-4 text-orange-600" />
+              <span className="font-medium">
+                {exam.attempt_count || 0}/{exam.max_attempts} {t("exam.info.attempts")}
+              </span>
+            </div>
+          )}
           {exam.start_time && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground bg-purple-50 dark:bg-purple-950/20 p-3 rounded-xl col-span-2">
               <Calendar className="h-4 w-4 text-purple-600" />
@@ -205,9 +214,18 @@ export function ExamCard({ exam, isAdmin = false, hasAttempted = false, onDelete
                   {t("exam.action.start")}
                 </Link>
               </Button>
+            ) : isActive && exam.max_attempts && exam.attempt_count && exam.attempt_count < exam.max_attempts ? (
+              <Button asChild className="w-full rounded-xl bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-600 hover:to-teal-600 text-white shadow-md">
+                <Link to={`/exam/${exam.id}`}>
+                  <Play className="h-4 w-4 mr-2" />
+                  {t("exam.action.retake")}
+                </Link>
+              </Button>
             ) : (
               <Button disabled className="w-full rounded-xl" variant="outline">
-                {hasAttempted ? (
+                {exam.max_attempts && exam.attempt_count && exam.attempt_count >= exam.max_attempts ? (
+                  `${t("exam.status.maxAttemptsReached")} (${exam.attempt_count}/${exam.max_attempts})`
+                ) : hasAttempted ? (
                   t("exam.status.alreadyAttempted")
                 ) : isUpcoming ? (
                   t("exam.status.notAvailable")
