@@ -130,9 +130,9 @@ export function ExamCard({ exam, isAdmin = false, hasAttempted = false, onDelete
 
         {/* Actions */}
         {!hideActions && isAdmin ? (
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             {canEdit('manageExams') && (
-              <Button asChild variant="outline" className="flex-1 rounded-xl border-cyan-300 hover:bg-cyan-50">
+              <Button asChild variant="outline" className="flex-1 min-w-fit rounded-xl border-cyan-300 hover:bg-cyan-50 dark:border-cyan-700 dark:hover:bg-cyan-950/30">
                 <Link to={`/dashboard/exams/${exam.id}/edit`}>
                   <Edit2 className="h-4 w-4 mr-2" />
                   {t("exam.action.edit")}
@@ -140,7 +140,7 @@ export function ExamCard({ exam, isAdmin = false, hasAttempted = false, onDelete
               </Button>
             )}
             {canView('allResults') && (
-              <Button asChild className="flex-1 rounded-xl bg-cyan-500 hover:bg-cyan-600">
+              <Button asChild className="flex-1 min-w-fit rounded-xl bg-cyan-500 hover:bg-cyan-600 dark:bg-cyan-600 dark:hover:bg-cyan-700">
                 <Link to={`/dashboard/exams/${exam.id}/results`}>
                   <BarChart3 className="h-4 w-4 mr-2" />
                   {t("exam.action.results")}
@@ -151,7 +151,7 @@ export function ExamCard({ exam, isAdmin = false, hasAttempted = false, onDelete
               <Button 
                 variant="outline" 
                 size="icon"
-                className="rounded-xl border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700"
+                className="rounded-xl border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950/30"
                 onClick={handleDelete}
               >
                 <Trash2 className="h-4 w-4" />
@@ -159,17 +159,15 @@ export function ExamCard({ exam, isAdmin = false, hasAttempted = false, onDelete
             )}
           </div>
         ) : !hideActions && !isAdmin ? (
-          <Button
-            asChild
-            className={`w-full rounded-xl ${
-              isActive && !hasAttempted 
-                ? "bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-600 hover:to-teal-600 text-white shadow-md" 
-                : ""
-            }`}
-            disabled={!isActive || hasAttempted}
-            variant={!isActive || hasAttempted ? "outline" : "default"}
-          >
-            <Link to={`/exam/${exam.id}`}>
+          isActive && !hasAttempted ? (
+            <Button asChild className="w-full rounded-xl bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-600 hover:to-teal-600 text-white shadow-md">
+              <Link to={`/exam/${exam.id}`}>
+                <Play className="h-4 w-4 mr-2" />
+                {t("exam.action.start")}
+              </Link>
+            </Button>
+          ) : (
+            <Button disabled className="w-full rounded-xl" variant="outline">
               {hasAttempted ? (
                 t("exam.status.alreadyAttempted")
               ) : isUpcoming ? (
@@ -177,13 +175,10 @@ export function ExamCard({ exam, isAdmin = false, hasAttempted = false, onDelete
               ) : isPast ? (
                 t("exam.status.ended")
               ) : (
-                <>
-                  <Play className="h-4 w-4 mr-2" />
-                  {t("exam.action.start")}
-                </>
+                t("exam.action.start")
               )}
-            </Link>
-          </Button>
+            </Button>
+          )
         ) : null}
       </CardContent>
     </Card>

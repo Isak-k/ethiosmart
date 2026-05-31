@@ -43,6 +43,7 @@ const AdminExams = () => {
   const { canEdit } = useSectionPermissions();
   const [exams, setExams] = useState<ExamWithStats[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -50,6 +51,7 @@ const AdminExams = () => {
 
   const fetchExams = useCallback(async () => {
     try {
+      setError(null);
       if (!user) return; // Wait for user
 
       const examsData = await getAllExams();
@@ -78,12 +80,19 @@ const AdminExams = () => {
       );
 
       setExams(examsWithStats);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching exams:", error);
+      const errorMessage = error?.message || "Failed to load exams. Please try again.";
+      setError(errorMessage);
+      toast({
+        title: "Error loading exams",
+        description: errorMessage,
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, toast]);
 
   useEffect(() => {
     fetchExams();
@@ -199,6 +208,23 @@ const AdminExams = () => {
               />
             </div>
           </div>
+
+          {error && (
+            <div className="mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-destructive">Error loading exams</p>
+                <p className="text-sm text-destructive/80 mt-1">{error}</p>
+              </div>
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={() => fetchExams()}
+                className="whitespace-nowrap"
+              >
+                Retry
+              </Button>
+            </div>
+          )}
 
           <TabsContent value={tab} className="mt-6">
             {loading ? (

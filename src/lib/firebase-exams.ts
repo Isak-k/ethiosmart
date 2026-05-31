@@ -184,14 +184,33 @@ export async function getAllExams(): Promise<Exam[]> {
     orderBy('createdAt', 'desc')
   );
   
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => {
-    const data = doc.data();
-    return {
-      examId: data.examId || doc.id, // Use examId from data, fallback to doc.id
-      ...data
-    } as Exam;
-  });
+  try {
+    // Try regular fetch (uses cache automatically)
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        examId: data.examId || doc.id,
+        ...data
+      } as Exam;
+    });
+  } catch (error) {
+    console.warn('Error fetching all exams, trying cache:', error);
+    try {
+      // Fallback to cache-only
+      const cachedSnapshot = await getDocsFromCache(q);
+      return cachedSnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          examId: data.examId || doc.id,
+          ...data
+        } as Exam;
+      });
+    } catch (cacheError) {
+      console.error('Cache fetch failed:', cacheError);
+      return [];
+    }
+  }
 }
 
 export async function getPublishedExams(studentDepartmentId?: string): Promise<Exam[]> {

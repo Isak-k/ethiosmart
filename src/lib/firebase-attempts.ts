@@ -129,18 +129,40 @@ export async function getExamAttempts(examId: string): Promise<ExamAttempt[]> {
     // orderBy('createdAt', 'desc') // Removed to avoid composite index requirement
   );
   
-  const querySnapshot = await getDocs(q);
-  const attempts = querySnapshot.docs.map(doc => ({
-    attemptId: doc.id,
-    ...doc.data()
-  })) as ExamAttempt[];
+  try {
+    // Try regular fetch (uses cache automatically)
+    const querySnapshot = await getDocs(q);
+    const attempts = querySnapshot.docs.map(doc => ({
+      attemptId: doc.id,
+      ...doc.data()
+    })) as ExamAttempt[];
 
-  // Client-side sort
-  return attempts.sort((a, b) => {
-    const timeA = a.createdAt?.seconds || 0;
-    const timeB = b.createdAt?.seconds || 0;
-    return timeB - timeA;
-  });
+    // Client-side sort
+    return attempts.sort((a, b) => {
+      const timeA = a.createdAt?.seconds || 0;
+      const timeB = b.createdAt?.seconds || 0;
+      return timeB - timeA;
+    });
+  } catch (error) {
+    console.warn('Error fetching exam attempts, trying cache:', error);
+    try {
+      // Fallback to cache-only
+      const cachedSnapshot = await getDocsFromCache(q);
+      const attempts = cachedSnapshot.docs.map(doc => ({
+        attemptId: doc.id,
+        ...doc.data()
+      })) as ExamAttempt[];
+
+      return attempts.sort((a, b) => {
+        const timeA = a.createdAt?.seconds || 0;
+        const timeB = b.createdAt?.seconds || 0;
+        return timeB - timeA;
+      });
+    } catch (cacheError) {
+      console.error('Cache fetch failed:', cacheError);
+      return [];
+    }
+  }
 }
 
 export async function getAttemptCount(studentId: string, examId: string): Promise<number> {
