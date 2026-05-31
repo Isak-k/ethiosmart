@@ -541,6 +541,18 @@ const EditExam = () => {
                 />
               </div>
               <div className="space-y-2">
+                <Label>{t("admin.exams.form.maxAttempts")}</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={exam.maxAttempts}
+                  onChange={(e) =>
+                    setExam({ ...exam, maxAttempts: parseInt(e.target.value) || 1 })
+                  }
+                  className="input-focus"
+                />
+              </div>
+              <div className="space-y-2">
                 <Label>{t("admin.exams.form.startTime")}</Label>
                 <Input
                   type="datetime-local"
