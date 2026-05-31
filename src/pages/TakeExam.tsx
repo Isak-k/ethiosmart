@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { getExam, getQuestions } from "@/lib/firebase-exams";
 import { createAttempt, saveAnswer, submitAttempt, getAttempt, getAnswers, getStudentAttempts } from "@/lib/firebase-attempts";
+import { getOfflineExam, getOfflineQuestions, getOfflineAttemptsByExam, getOfflineAttempt, getOfflineAnswers, saveOfflineAttempt, saveOfflineAnswer } from "@/lib/offline-storage";
 import { QuestionCard } from "@/components/exam/QuestionCard";
 import { ExamTimer } from "@/components/exam/ExamTimer";
 import { KeyboardShortcutsHelp } from "@/components/exam/KeyboardShortcutsHelp";
@@ -23,7 +24,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
-import { Loader2, ChevronLeft, ChevronRight, Send, AlertTriangle, CheckCircle, AlertCircle, Flag, Check } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, Send, AlertTriangle, CheckCircle, AlertCircle, Flag, Check, Wifi, WifiOff } from "lucide-react";
 
 interface Question {
   questionId: string;
@@ -72,18 +73,53 @@ const TakeExam = () => {
   const [enteredPassword, setEnteredPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [flaggedQuestions, setFlaggedQuestions] = useState<Set<string>>(new Set());
+  const [isOfflineMode, setIsOfflineMode] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   useEffect(() => {
     const checkExistingAttempt = async () => {
       if (!user || !id) return;
   
       try {
-        // Fetch exam details
-        const examData = await getExam(id);
+        let examData: Exam | null = null;
+        let questionsData: Question[] = [];
+        let isOffline = false;
+
+        // Try to fetch from Firebase first
+        try {
+          examData = await getExam(id);
+          questionsData = await getQuestions(id);
+        } catch (error) {
+          console.warn("Firebase fetch failed, trying offline storage:", error);
+          // Fall back to offline storage
+          const offlineExam = await getOfflineExam(id);
+          const offlineQuestions = await getOfflineQuestions(id);
+          
+          if (offlineExam && offlineQuestions.length > 0) {
+            examData = offlineExam as any;
+            questionsData = offlineQuestions;
+            isOffline = true;
+            setIsOfflineMode(true);
+          }
+        }
   
         if (!examData) {
           toast({
             title: "Exam not found",
+            description: "This exam is not available. Make sure you downloaded it for offline use.",
             variant: "destructive",
           });
           navigate("/dashboard");
@@ -93,7 +129,17 @@ const TakeExam = () => {
         setExam(examData);
   
         // Check for existing attempts
-        const attempts = await getStudentAttempts(user.uid, id);
+        let attempts: any[] = [];
+        try {
+          attempts = await getStudentAttempts(user.uid, id);
+        } catch (error) {
+          console.warn("Could not fetch attempts from Firebase, trying offline:", error);
+          // Try offline attempts
+          attempts = await getOfflineAttemptsByExam(id, user.uid);
+          isOffline = true;
+          setIsOfflineMode(true);
+        }
+
         const incompleteAttempt = attempts.find(a => !a.isSubmitted);
         const submittedCount = attempts.filter(a => a.isSubmitted).length;
   
@@ -104,17 +150,17 @@ const TakeExam = () => {
             description: `You have already taken this exam ${submittedCount} times.`,
             variant: "destructive",
           });
-          navigate("/dashboard/results"); // Redirect to results instead of dashboard
+          navigate("/dashboard/results");
           return;
         }
   
         if (incompleteAttempt) {
           setAttemptId(incompleteAttempt.attemptId);
-          setStartedAt(incompleteAttempt.startedAt.toDate());
+          setStartedAt(incompleteAttempt.startedAt?.toDate?.() || new Date(incompleteAttempt.startedAt));
           setShowStartDialog(false);
-          await loadQuestions(examData, incompleteAttempt.attemptId);
+          await loadQuestions(examData, incompleteAttempt.attemptId, questionsData, isOffline);
         } else {
-          await loadQuestions(examData);
+          await loadQuestions(examData, undefined, questionsData, isOffline);
         }
   
         setLoading(false);
@@ -164,42 +210,32 @@ const TakeExam = () => {
     };
   };
 
-  const loadQuestions = async (examData: Exam, attemptIdParam?: string) => {
-    let questionsData: Question[] = [];
-    try {
-      questionsData = await getQuestions(examData.examId);
-    } catch (e: any) {
-      console.error("Failed to load questions:", e);
-      toast({
-        title: t("student.exam.loadingFailed"),
-        description: e?.message || "Could not load questions",
-        variant: "destructive",
-      });
-      return;
+  const loadQuestions = async (examData: Exam, attemptIdParam?: string, preloadedQuestions?: Question[], isOffline?: boolean) => {
+    let questionsData: Question[] = preloadedQuestions || [];
+    
+    if (!preloadedQuestions) {
+      try {
+        questionsData = await getQuestions(examData.examId);
+      } catch (e: any) {
+        console.warn("Failed to load questions from Firebase, trying offline:", e);
+        try {
+          questionsData = await getOfflineQuestions(examData.examId);
+          setIsOfflineMode(true);
+        } catch (offlineError) {
+          console.error("Failed to load questions:", offlineError);
+          toast({
+            title: t("student.exam.loadingFailed"),
+            description: "Could not load questions",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
     }
-
-    // Use attemptIdParam or a temporary seed if not yet started (preview)
-    // Actually, if we haven't started, we don't have an attemptId.
-    // But we need to show questions? No, we only show questions AFTER start.
-    // Wait, loadQuestions is called with attemptIdParam only if resuming.
-    // If starting new, we call loadQuestions(examData) without attemptId.
-    // BUT, we only show questions after `startExam` creates the attempt and calls `loadQuestions` again?
-    // Let's check `startExam`. It calls `loadQuestions(exam, attemptId)`.
-    // So we ALWAYS have an attemptId when we actually show the questions.
-    // The initial `loadQuestions(examData)` (line 96) is suspicious.
-    // Ah, line 96 runs if NO incomplete attempt exists. It loads questions to `setQuestions`.
-    // But at this point `showStartDialog` is true. The user can't see questions yet.
-    // So the shuffle doesn't matter yet?
-    // WRONG. If we shuffle here with a random seed, and then start exam and shuffle with `attemptId`,
-    // the order might change if we don't reload.
-    // `startExam` calls `loadQuestions` again (line 193). So it RE-SHUFFLES.
-    // So the initial load is just to get question count?
-    // Yes, for the dialog: "Questions: {questions.length}".
-    // So we can skip shuffling in the initial load or just do a dummy shuffle.
 
     if (questionsData) {
       let processedQuestions = questionsData;
-      const seed = attemptIdParam || "preview"; // Use consistent seed for preview
+      const seed = attemptIdParam || "preview";
 
       if (examData.shuffleQuestions) {
         processedQuestions = shuffleArray(processedQuestions, seed);
@@ -207,7 +243,6 @@ const TakeExam = () => {
 
       if (examData.shuffleOptions) {
         processedQuestions = processedQuestions.map((q) => {
-          // Combine question ID and attempt ID for unique per-question seed
           const questionSeed = `${seed}-${q.questionId}`;
           const shuffled = shuffleWithCorrectIndex(q.options, q.correctOptionIndex, questionSeed);
           return {
@@ -222,7 +257,18 @@ const TakeExam = () => {
 
       // Load existing answers if resuming
       if (attemptIdParam) {
-        const existingAnswers = await getAnswers(attemptIdParam);
+        let existingAnswers: any[] = [];
+        try {
+          existingAnswers = await getAnswers(attemptIdParam);
+        } catch (error) {
+          console.warn("Failed to load answers from Firebase, trying offline:", error);
+          try {
+            existingAnswers = await getOfflineAnswers(attemptIdParam);
+            setIsOfflineMode(true);
+          } catch (offlineError) {
+            console.error("Failed to load answers:", offlineError);
+          }
+        }
 
         if (existingAnswers) {
           const answersMap = new Map<string, number>();
@@ -255,15 +301,40 @@ const TakeExam = () => {
     }
 
     try {
-      const profile = await import("@/lib/auth").then(m => m.getUserProfile(user.uid));
+      let attemptId: string;
       
-      const attemptId = await createAttempt(
-        exam.examId,
-        user.uid,
-        exam.title,
-        profile?.full_name || user.email || 'Student',
-        user.email || ''
-      );
+      try {
+        const profile = await import("@/lib/auth").then(m => m.getUserProfile(user.uid));
+        
+        attemptId = await createAttempt(
+          exam.examId,
+          user.uid,
+          exam.title,
+          profile?.full_name || user.email || 'Student',
+          user.email || ''
+        );
+      } catch (error) {
+        console.warn("Failed to create attempt on Firebase, creating offline attempt:", error);
+        // Create offline attempt
+        attemptId = `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const offlineAttempt = {
+          attemptId,
+          examId: exam.examId,
+          studentId: user.uid,
+          examTitle: exam.title,
+          studentName: user.displayName || user.email || 'Student',
+          studentEmail: user.email || '',
+          startedAt: new Date(),
+          submittedAt: null,
+          isSubmitted: false,
+          timeSpentSeconds: null,
+          totalScore: null,
+          maxScore: null,
+          createdAt: new Date()
+        };
+        await saveOfflineAttempt(offlineAttempt);
+        setIsOfflineMode(true);
+      }
 
       setAttemptId(attemptId);
       setStartedAt(new Date());
@@ -301,7 +372,18 @@ const TakeExam = () => {
         answeredAt: null
       });
     } catch (error) {
-      console.error("Error saving answer:", error);
+      console.warn("Failed to save answer to Firebase, saving offline:", error);
+      try {
+        await saveOfflineAnswer(attemptId, questionId, {
+          selectedOptionIndex: optionIndex,
+          isCorrect,
+          timeSpentSeconds: null,
+          answeredAt: null
+        });
+        setIsOfflineMode(true);
+      } catch (offlineError) {
+        console.error("Error saving answer:", offlineError);
+      }
     }
   }, [attemptId, answers, questions]);
 

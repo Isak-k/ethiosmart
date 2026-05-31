@@ -5,6 +5,8 @@ const DB_VERSION = 1;
 const EXAMS_STORE = 'exams';
 const QUESTIONS_STORE = 'questions';
 const METADATA_STORE = 'metadata';
+const ATTEMPTS_STORE = 'attempts';
+const ANSWERS_STORE = 'answers';
 
 interface OfflineExam extends Exam {
   downloadedAt: number;
@@ -49,6 +51,15 @@ export async function initOfflineDB(): Promise<IDBDatabase> {
       }
       if (!database.objectStoreNames.contains(METADATA_STORE)) {
         database.createObjectStore(METADATA_STORE, { keyPath: 'examId' });
+      }
+      if (!database.objectStoreNames.contains(ATTEMPTS_STORE)) {
+        const attemptStore = database.createObjectStore(ATTEMPTS_STORE, { keyPath: 'attemptId' });
+        attemptStore.createIndex('examId', 'examId', { unique: false });
+        attemptStore.createIndex('studentId', 'studentId', { unique: false });
+      }
+      if (!database.objectStoreNames.contains(ANSWERS_STORE)) {
+        const answerStore = database.createObjectStore(ANSWERS_STORE, { keyPath: ['attemptId', 'questionId'] });
+        answerStore.createIndex('attemptId', 'attemptId', { unique: false });
       }
     };
   });
@@ -246,5 +257,78 @@ export async function getOfflineStorageSize(): Promise<number> {
     };
 
     transaction.onerror = () => reject(transaction.error);
+  });
+}
+
+// Attempt and Answer Management
+export async function saveOfflineAttempt(attempt: any): Promise<void> {
+  const database = await initOfflineDB();
+  const transaction = database.transaction([ATTEMPTS_STORE], 'readwrite');
+
+  return new Promise((resolve, reject) => {
+    const store = transaction.objectStore(ATTEMPTS_STORE);
+    const request = store.put(attempt);
+
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function getOfflineAttempt(attemptId: string): Promise<any | null> {
+  const database = await initOfflineDB();
+  const transaction = database.transaction([ATTEMPTS_STORE], 'readonly');
+
+  return new Promise((resolve, reject) => {
+    const store = transaction.objectStore(ATTEMPTS_STORE);
+    const request = store.get(attemptId);
+
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function getOfflineAttemptsByExam(examId: string, studentId: string): Promise<any[]> {
+  const database = await initOfflineDB();
+  const transaction = database.transaction([ATTEMPTS_STORE], 'readonly');
+
+  return new Promise((resolve, reject) => {
+    const store = transaction.objectStore(ATTEMPTS_STORE);
+    const index = store.index('examId');
+    const range = IDBKeyRange.only(examId);
+    const request = index.getAll(range);
+
+    request.onsuccess = () => {
+      const attempts = request.result.filter((a: any) => a.studentId === studentId);
+      resolve(attempts);
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function saveOfflineAnswer(attemptId: string, questionId: string, answer: any): Promise<void> {
+  const database = await initOfflineDB();
+  const transaction = database.transaction([ANSWERS_STORE], 'readwrite');
+
+  return new Promise((resolve, reject) => {
+    const store = transaction.objectStore(ANSWERS_STORE);
+    const request = store.put({ ...answer, attemptId, questionId });
+
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function getOfflineAnswers(attemptId: string): Promise<any[]> {
+  const database = await initOfflineDB();
+  const transaction = database.transaction([ANSWERS_STORE], 'readonly');
+
+  return new Promise((resolve, reject) => {
+    const store = transaction.objectStore(ANSWERS_STORE);
+    const index = store.index('attemptId');
+    const range = IDBKeyRange.only(attemptId);
+    const request = index.getAll(range);
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
   });
 }
