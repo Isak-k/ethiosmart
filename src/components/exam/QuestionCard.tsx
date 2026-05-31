@@ -53,20 +53,20 @@ export function QuestionCard({
   };
 
   return (
-    <div className="bg-card rounded-xl border p-6 space-y-6 animate-fade-in">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex gap-4">
-          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-display font-semibold shrink-0">
+    <div className="animate-fade-in space-y-5 border-y bg-card px-3 py-5 sm:space-y-6 sm:rounded-xl sm:border sm:p-6">
+      <div className="flex items-start justify-between gap-3 sm:gap-4">
+        <div className="flex gap-3 sm:gap-4">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-display font-semibold">
             {questionNumber}
           </div>
           <div className="space-y-1">
-            <p className="text-lg font-medium leading-relaxed">{questionText}</p>
+            <p className="text-base font-medium leading-relaxed sm:text-lg">{questionText}</p>
             <p className="text-sm text-muted-foreground">{t("student.exam.card.marks", { count: marks })}</p>
           </div>
         </div>
       </div>
 
-      <div className="space-y-3 pl-14">
+      <div className="space-y-3 sm:pl-14">
         {options.map((option, index) => {
           const isSelected = selectedOption === index;
           const isCorrect = index === correctOption;
@@ -79,7 +79,7 @@ export function QuestionCard({
               onClick={() => !isSubmitted && !showFeedback && onSelectOption(index)}
               disabled={isSubmitted || showFeedback}
               className={cn(
-                "w-full flex items-center gap-4 p-4 rounded-lg text-left transition-all border",
+                "flex w-full items-center gap-3 rounded-lg border p-4 text-left transition-all sm:gap-4",
                 getOptionClass(index),
                 (isSubmitted || showFeedback) && "cursor-default"
               )}
@@ -108,7 +108,7 @@ export function QuestionCard({
       </div>
 
       {showExplanation && (
-        <div className="mt-4 ml-14 rounded-xl border bg-gradient-to-br from-muted/60 to-background shadow-sm animate-fade-in overflow-hidden">
+        <div className="mt-4 overflow-hidden rounded-xl border bg-gradient-to-br from-muted/60 to-background shadow-sm animate-fade-in sm:ml-14">
           <div className="flex items-center gap-2 px-4 py-2 border-b bg-muted/70">
             <div className="h-6 w-6 rounded-md bg-primary/10 text-primary flex items-center justify-center">
               <Lightbulb className="h-3.5 w-3.5" />

@@ -551,7 +551,7 @@ const TakeExam = () => {
       {/* Exam Header */}
       {startedAt && (
         <header className="sticky top-0 z-50 bg-card/95 backdrop-blur-sm border-b">
-          <div className="container mx-auto px-4 py-3">
+          <div className="w-full px-3 py-3 sm:container sm:mx-auto sm:px-4">
             <div className="flex items-center justify-between gap-4">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3">
@@ -577,7 +577,7 @@ const TakeExam = () => {
 
       {/* Question Content */}
       {currentQuestion && startedAt && (
-        <main className="container mx-auto px-4 py-8 max-w-3xl">
+        <main className="w-full px-0 py-4 sm:container sm:mx-auto sm:max-w-4xl sm:px-4 sm:py-8">
           <QuestionCard
             questionNumber={currentIndex + 1}
             questionText={currentQuestion.questionText}
@@ -592,7 +592,7 @@ const TakeExam = () => {
           />
 
           {/* Navigation */}
-          <div className="flex items-center justify-between mt-8">
+          <div className="mt-6 flex items-center justify-between px-3 sm:mt-8 sm:px-0">
             <Button
               variant="outline"
               onClick={() => setCurrentIndex((i) => i - 1)}
@@ -623,7 +623,7 @@ const TakeExam = () => {
           </div>
 
           {/* Question Navigator */}
-          <div className="mt-8 p-4 bg-card rounded-xl border">
+          <div className="mx-3 mt-6 rounded-xl border bg-card p-4 sm:mx-0 sm:mt-8">
             <p className="text-sm font-medium mb-3">{t("student.exam.questionNavigator")}</p>
             <div className="flex flex-wrap gap-2">
               {questions.map((q, idx) => {
