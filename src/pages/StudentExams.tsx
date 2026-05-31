@@ -4,6 +4,7 @@ import { getPublishedExams } from "@/lib/firebase-exams";
 import { getStudentAttempts } from "@/lib/firebase-attempts";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ExamCard } from "@/components/exam/ExamCard";
+import { OfflineExamsSection } from "@/components/exam/OfflineExamsSection";
 import { Loader2, ClipboardList, Send, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,6 +34,7 @@ const StudentExams = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -40,6 +42,19 @@ const StudentExams = () => {
       fetchExams();
     }
   }, [user, profile]);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   const fetchExams = async () => {
     if (!user) {
@@ -152,15 +167,26 @@ const StudentExams = () => {
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : filteredExams.length > 0 ? (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredExams.map((exam) => (
-              <ExamCard
-                key={exam.id}
-                exam={exam}
-                hasAttempted={attemptedExamIds.has(exam.id)}
-              />
-            ))}
-          </div>
+          <>
+            {/* Offline Exams Section */}
+            <OfflineExamsSection departmentId={profile?.departmentId} isOnline={isOnline} />
+
+            {/* Available Exams */}
+            <div className="space-y-4">
+              <h2 className="text-lg font-semibold">{t("student.exams.available") || "Available Exams"}</h2>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredExams.map((exam) => (
+                  <ExamCard
+                    key={exam.id}
+                    exam={exam}
+                    hasAttempted={attemptedExamIds.has(exam.id)}
+                    showOfflineDownload={true}
+                    departmentId={profile?.departmentId}
+                  />
+                ))}
+              </div>
+            </div>
+          </>
         ) : exams.length > 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">

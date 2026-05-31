@@ -1,14 +1,17 @@
 import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ExamCountdown } from "./ExamCountdown";
+import { OfflineDownloadButton } from "./OfflineDownloadButton";
 import { Clock, Calendar, FileQuestion, Users, Play, Edit2, BarChart3, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { useTranslation } from "react-i18next";
 import { getDateLocale } from "@/lib/utils";
 import { useSectionPermissions } from "@/hooks/useSectionPermissions";
 import { useToast } from "@/hooks/use-toast";
+import { useOfflineDownload } from "@/hooks/useOfflineDownload";
 
 interface ExamCardProps {
   exam: {
@@ -26,12 +29,22 @@ interface ExamCardProps {
   hasAttempted?: boolean;
   onDelete?: (examId: string) => void;
   hideActions?: boolean;
+  showOfflineDownload?: boolean;
+  departmentId?: string;
 }
 
-export function ExamCard({ exam, isAdmin = false, hasAttempted = false, onDelete, hideActions = false }: ExamCardProps) {
+export function ExamCard({ exam, isAdmin = false, hasAttempted = false, onDelete, hideActions = false, showOfflineDownload = false, departmentId }: ExamCardProps) {
   const { t, i18n } = useTranslation();
   const { canEdit, canDelete, canView } = useSectionPermissions();
   const { toast } = useToast();
+  const { checkDownloadStatus } = useOfflineDownload();
+  const [isDownloaded, setIsDownloaded] = useState(false);
+  
+  useEffect(() => {
+    if (showOfflineDownload) {
+      checkDownloadStatus(exam.id).then(setIsDownloaded);
+    }
+  }, [exam.id, showOfflineDownload, checkDownloadStatus]);
   
   const isActive =
     exam.is_published &&
@@ -159,26 +172,53 @@ export function ExamCard({ exam, isAdmin = false, hasAttempted = false, onDelete
             )}
           </div>
         ) : !hideActions && !isAdmin ? (
-          isActive && !hasAttempted ? (
-            <Button asChild className="w-full rounded-xl bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-600 hover:to-teal-600 text-white shadow-md">
-              <Link to={`/exam/${exam.id}`}>
-                <Play className="h-4 w-4 mr-2" />
-                {t("exam.action.start")}
-              </Link>
-            </Button>
-          ) : (
-            <Button disabled className="w-full rounded-xl" variant="outline">
-              {hasAttempted ? (
-                t("exam.status.alreadyAttempted")
-              ) : isUpcoming ? (
-                t("exam.status.notAvailable")
-              ) : isPast ? (
-                t("exam.status.ended")
-              ) : (
-                t("exam.action.start")
-              )}
-            </Button>
-          )
+          <>
+            {showOfflineDownload && (
+              <OfflineDownloadButton
+                exam={{
+                  examId: exam.id,
+                  title: exam.title,
+                  description: exam.description,
+                  durationMinutes: exam.duration_minutes,
+                  questionCount: exam.question_count || 0,
+                  isPublished: exam.is_published,
+                  maxAttempts: 0,
+                  resultsPublished: false,
+                  shuffleQuestions: false,
+                  shuffleOptions: false,
+                  startTime: exam.start_time ? new Date(exam.start_time) as any : null,
+                  endTime: exam.end_time ? new Date(exam.end_time) as any : null,
+                  totalMarks: 0,
+                  createdBy: '',
+                  createdAt: new Date() as any,
+                  updatedAt: new Date() as any,
+                }}
+                isDownloaded={isDownloaded}
+                departmentId={departmentId}
+                onDownloadComplete={() => setIsDownloaded(true)}
+              />
+            )}
+            {isActive && !hasAttempted ? (
+              <Button asChild className="w-full rounded-xl bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-600 hover:to-teal-600 text-white shadow-md">
+                <Link to={`/exam/${exam.id}`}>
+                  <Play className="h-4 w-4 mr-2" />
+                  {t("exam.action.start")}
+                </Link>
+              </Button>
+            ) : (
+              <Button disabled className="w-full rounded-xl" variant="outline">
+                {hasAttempted ? (
+                  t("exam.status.alreadyAttempted")
+                ) : isUpcoming ? (
+                  t("exam.status.notAvailable")
+                ) : isPast ? (
+                  t("exam.status.ended")
+                ) : (
+                  t("exam.action.start")
+                )}
+              </Button>
+            )}
+          </>
         ) : null}
       </CardContent>
     </Card>
