@@ -172,7 +172,7 @@ export function ExamCard({ exam, isAdmin = false, hasAttempted = false, onDelete
             )}
           </div>
         ) : !hideActions && !isAdmin ? (
-          <>
+          <div className="space-y-3">
             {showOfflineDownload && (
               <OfflineDownloadButton
                 exam={{
@@ -218,7 +218,7 @@ export function ExamCard({ exam, isAdmin = false, hasAttempted = false, onDelete
                 )}
               </Button>
             )}
-          </>
+          </div>
         ) : null}
       </CardContent>
     </Card>

@@ -173,7 +173,12 @@ const StudentExams = () => {
 
             {/* Available Exams */}
             <div className="space-y-4">
-              <h2 className="text-lg font-semibold">{t("student.exams.available") || "Available Exams"}</h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold">{t("student.exams.available") || "Available Exams"}</h2>
+                <p className="text-sm text-muted-foreground">
+                  {isOnline ? '🟢 Online' : '🔴 Offline'}
+                </p>
+              </div>
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredExams.map((exam) => (
                   <ExamCard

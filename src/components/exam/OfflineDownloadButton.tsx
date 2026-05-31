@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Exam } from '@/integrations/firebase/types';
 import { Button } from '@/components/ui/button';
-import { Download, Trash2, CheckCircle, AlertCircle } from 'lucide-react';
+import { Download, Trash2, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { useOfflineDownload } from '@/hooks/useOfflineDownload';
 import {
   AlertDialog,
@@ -48,15 +48,15 @@ export function OfflineDownloadButton({
   if (isDownloaded) {
     return (
       <>
-        <div className="flex gap-2 items-center">
-          <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/30 px-3 py-2 rounded-lg flex-1">
-            <CheckCircle className="h-4 w-4" />
-            <span className="font-medium">Downloaded</span>
+        <div className="flex gap-2 items-center w-full">
+          <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/30 px-3 py-2 rounded-lg flex-1 font-medium">
+            <CheckCircle className="h-4 w-4 flex-shrink-0" />
+            <span>Downloaded</span>
           </div>
           <Button
             variant="outline"
-            size="icon"
-            className="border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950/30"
+            size="sm"
+            className="border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950/30 flex-shrink-0"
             onClick={() => setShowDeleteDialog(true)}
             title="Delete offline data"
           >
@@ -86,32 +86,35 @@ export function OfflineDownloadButton({
 
   if (isDownloading) {
     return (
-      <div className="flex items-center gap-2 w-full">
-        <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
-          <div
-            className="bg-cyan-500 h-full transition-all duration-300"
-            style={{ width: `${progress?.progress || 0}%` }}
-          />
+      <div className="flex items-center gap-3 w-full">
+        <div className="flex-1">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-medium text-muted-foreground">Downloading...</span>
+            <span className="text-xs font-bold text-cyan-600 dark:text-cyan-400">{progress?.progress || 0}%</span>
+          </div>
+          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+            <div
+              className="bg-gradient-to-r from-cyan-500 to-teal-500 h-full transition-all duration-300"
+              style={{ width: `${progress?.progress || 0}%` }}
+            />
+          </div>
         </div>
-        <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
-          {progress?.progress || 0}%
-        </span>
       </div>
     );
   }
 
   if (isFailed) {
     return (
-      <div className="flex gap-2 items-center">
-        <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 px-3 py-2 rounded-lg flex-1">
-          <AlertCircle className="h-4 w-4" />
-          <span className="font-medium">Failed</span>
+      <div className="flex gap-2 items-center w-full">
+        <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 px-3 py-2 rounded-lg flex-1 font-medium">
+          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+          <span>Download Failed</span>
         </div>
         <Button
           size="sm"
           variant="outline"
           onClick={handleDownload}
-          className="whitespace-nowrap"
+          className="whitespace-nowrap flex-shrink-0"
         >
           Retry
         </Button>
@@ -121,13 +124,11 @@ export function OfflineDownloadButton({
 
   return (
     <Button
-      variant="outline"
-      size="sm"
       onClick={handleDownload}
-      className="gap-2 border-cyan-300 hover:bg-cyan-50 dark:border-cyan-700 dark:hover:bg-cyan-950/30"
+      className="w-full gap-2 rounded-xl bg-purple-500 hover:bg-purple-600 text-white shadow-md"
     >
       <Download className="h-4 w-4" />
-      Download
+      Download for Offline
     </Button>
   );
 }
