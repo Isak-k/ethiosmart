@@ -269,7 +269,8 @@ export async function saveOfflineAttempt(attempt: any): Promise<void> {
     const store = transaction.objectStore(ATTEMPTS_STORE);
     const request = store.put(attempt);
 
-    request.onsuccess = () => resolve();
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
     request.onerror = () => reject(request.error);
   });
 }
@@ -313,7 +314,8 @@ export async function saveOfflineAnswer(attemptId: string, questionId: string, a
     const store = transaction.objectStore(ANSWERS_STORE);
     const request = store.put({ ...answer, attemptId, questionId });
 
-    request.onsuccess = () => resolve();
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
     request.onerror = () => reject(request.error);
   });
 }
