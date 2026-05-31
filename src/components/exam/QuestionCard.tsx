@@ -13,6 +13,7 @@ interface QuestionCardProps {
   onSelectOption: (index: number) => void;
   marks: number;
   explanation?: string;
+  isPracticeExam?: boolean;
 }
 
 export function QuestionCard({
@@ -26,10 +27,12 @@ export function QuestionCard({
   onSelectOption,
   marks,
   explanation,
+  isPracticeExam,
 }: QuestionCardProps) {
   const { t } = useTranslation();
-  const showFeedback = feedbackType === "instant" && selectedOption !== null;
-  const showResults = isSubmitted; // Renamed for clarity, effectively same as isSubmitted in this context for final results
+  // For practice exams, always show feedback and explanations
+  const showFeedback = (isPracticeExam || feedbackType === "instant") && selectedOption !== null;
+  const showResults = isSubmitted || isPracticeExam; // Show results for practice exams
   const showExplanation = (showFeedback || showResults) && explanation;
 
   const getOptionClass = (index: number) => {
@@ -77,11 +80,11 @@ export function QuestionCard({
             <button
               key={index}
               onClick={() => !isSubmitted && !showFeedback && onSelectOption(index)}
-              disabled={isSubmitted || showFeedback}
+              disabled={isSubmitted || showFeedback || (isPracticeExam && selectedOption !== null)}
               className={cn(
                 "flex w-full items-center gap-3 rounded-lg border p-4 text-left transition-all sm:gap-4",
                 getOptionClass(index),
-                (isSubmitted || showFeedback) && "cursor-default"
+                (isSubmitted || showFeedback || (isPracticeExam && selectedOption !== null)) && "cursor-default"
               )}
             >
               <div

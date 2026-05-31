@@ -46,6 +46,7 @@ interface Exam {
   shuffleQuestions: boolean;
   shuffleOptions: boolean;
   accessPassword?: string | null;
+  examType?: 'normal' | 'practice';
 }
 
 const TakeExam = () => {
@@ -75,6 +76,7 @@ const TakeExam = () => {
   const [flaggedQuestions, setFlaggedQuestions] = useState<Set<string>>(new Set());
   const [isOfflineMode, setIsOfflineMode] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isPracticeExam, setIsPracticeExam] = useState(false);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -98,21 +100,52 @@ const TakeExam = () => {
         let questionsData: Question[] = [];
         let isOffline = false;
 
-        // Try to fetch from Firebase first
-        try {
-          examData = await getExam(id);
-          questionsData = await getQuestions(id);
-        } catch (error) {
-          console.warn("Firebase fetch failed, trying offline storage:", error);
-          // Fall back to offline storage
-          const offlineExam = await getOfflineExam(id);
-          const offlineQuestions = await getOfflineQuestions(id);
-          
-          if (offlineExam && offlineQuestions.length > 0) {
-            examData = offlineExam as any;
-            questionsData = offlineQuestions;
-            isOffline = true;
-            setIsOfflineMode(true);
+        // For practice exams, ALWAYS use offline storage (no Firebase calls)
+        let isPractice = false;
+        
+        // Try to get exam type from offline storage first
+        const offlineExam = await getOfflineExam(id);
+        if (offlineExam?.examType === 'practice') {
+          isPractice = true;
+          setIsPracticeExam(true);
+          examData = offlineExam as any;
+          questionsData = await getOfflineQuestions(id);
+          isOffline = true;
+          setIsOfflineMode(true);
+        } else {
+          // For normal exams, try Firebase first
+          try {
+            examData = await getExam(id);
+            questionsData = await getQuestions(id);
+            
+            // Check if it's a practice exam
+            if (examData?.examType === 'practice') {
+              isPractice = true;
+              setIsPracticeExam(true);
+              // For practice exams, also load from offline storage
+              const offlineQuestions = await getOfflineQuestions(id);
+              if (offlineQuestions.length > 0) {
+                questionsData = offlineQuestions;
+                isOffline = true;
+                setIsOfflineMode(true);
+              }
+            }
+          } catch (error) {
+            console.warn("Firebase fetch failed, trying offline storage:", error);
+            // Fall back to offline storage
+            const offlineExam = await getOfflineExam(id);
+            const offlineQuestions = await getOfflineQuestions(id);
+            
+            if (offlineExam && offlineQuestions.length > 0) {
+              examData = offlineExam as any;
+              questionsData = offlineQuestions;
+              isOffline = true;
+              setIsOfflineMode(true);
+              if (offlineExam.examType === 'practice') {
+                isPractice = true;
+                setIsPracticeExam(true);
+              }
+            }
           }
         }
   
@@ -131,7 +164,14 @@ const TakeExam = () => {
         // Check for existing attempts
         let attempts: any[] = [];
         try {
-          attempts = await getStudentAttempts(user.uid, id);
+          // For practice exams, only use offline attempts
+          if (isPractice) {
+            attempts = await getOfflineAttemptsByExam(id, user.uid);
+            isOffline = true;
+            setIsOfflineMode(true);
+          } else {
+            attempts = await getStudentAttempts(user.uid, id);
+          }
         } catch (error) {
           console.warn("Could not fetch attempts from Firebase, trying offline:", error);
           // Try offline attempts
@@ -286,8 +326,8 @@ const TakeExam = () => {
   const startExam = async () => {
     if (!user || !exam || !user.uid) return;
 
-    // Check password if required
-    if (exam.accessPassword && exam.accessPassword.trim()) {
+    // Check password if required (not for practice exams)
+    if (!isPracticeExam && exam.accessPassword && exam.accessPassword.trim()) {
       if (!enteredPassword) {
         setShowStartDialog(false);
         setShowPasswordDialog(true);
@@ -303,19 +343,8 @@ const TakeExam = () => {
     try {
       let attemptId: string;
       
-      try {
-        const profile = await import("@/lib/auth").then(m => m.getUserProfile(user.uid));
-        
-        attemptId = await createAttempt(
-          exam.examId,
-          user.uid,
-          exam.title,
-          profile?.full_name || user.email || 'Student',
-          user.email || ''
-        );
-      } catch (error) {
-        console.warn("Failed to create attempt on Firebase, creating offline attempt:", error);
-        // Create offline attempt
+      // For practice exams, always create offline attempt
+      if (isPracticeExam) {
         attemptId = `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const offlineAttempt = {
           attemptId,
@@ -334,6 +363,40 @@ const TakeExam = () => {
         };
         await saveOfflineAttempt(offlineAttempt);
         setIsOfflineMode(true);
+      } else {
+        // For normal exams, try Firebase first
+        try {
+          const profile = await import("@/lib/auth").then(m => m.getUserProfile(user.uid));
+          
+          attemptId = await createAttempt(
+            exam.examId,
+            user.uid,
+            exam.title,
+            profile?.full_name || user.email || 'Student',
+            user.email || ''
+          );
+        } catch (error) {
+          console.warn("Failed to create attempt on Firebase, creating offline attempt:", error);
+          // Create offline attempt
+          attemptId = `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          const offlineAttempt = {
+            attemptId,
+            examId: exam.examId,
+            studentId: user.uid,
+            examTitle: exam.title,
+            studentName: user.displayName || user.email || 'Student',
+            studentEmail: user.email || '',
+            startedAt: new Date(),
+            submittedAt: null,
+            isSubmitted: false,
+            timeSpentSeconds: null,
+            totalScore: null,
+            maxScore: null,
+            createdAt: new Date()
+          };
+          await saveOfflineAttempt(offlineAttempt);
+          setIsOfflineMode(true);
+        }
       }
 
       setAttemptId(attemptId);
@@ -364,15 +427,8 @@ const TakeExam = () => {
     const question = questions.find((q) => q.questionId === questionId);
     const isCorrect = question ? optionIndex === question.correctOptionIndex : false;
 
-    try {
-      await saveAnswer(attemptId, questionId, {
-        selectedOptionIndex: optionIndex,
-        isCorrect,
-        timeSpentSeconds: null,
-        answeredAt: null
-      });
-    } catch (error) {
-      console.warn("Failed to save answer to Firebase, saving offline:", error);
+    // For practice exams, only save offline
+    if (isPracticeExam) {
       try {
         await saveOfflineAnswer(attemptId, questionId, {
           selectedOptionIndex: optionIndex,
@@ -380,12 +436,34 @@ const TakeExam = () => {
           timeSpentSeconds: null,
           answeredAt: null
         });
-        setIsOfflineMode(true);
-      } catch (offlineError) {
-        console.error("Error saving answer:", offlineError);
+      } catch (error) {
+        console.error("Error saving answer offline:", error);
+      }
+    } else {
+      // For normal exams, try Firebase first
+      try {
+        await saveAnswer(attemptId, questionId, {
+          selectedOptionIndex: optionIndex,
+          isCorrect,
+          timeSpentSeconds: null,
+          answeredAt: null
+        });
+      } catch (error) {
+        console.warn("Failed to save answer to Firebase, saving offline:", error);
+        try {
+          await saveOfflineAnswer(attemptId, questionId, {
+            selectedOptionIndex: optionIndex,
+            isCorrect,
+            timeSpentSeconds: null,
+            answeredAt: null
+          });
+          setIsOfflineMode(true);
+        } catch (offlineError) {
+          console.error("Error saving answer:", offlineError);
+        }
       }
     }
-  }, [attemptId, answers, questions]);
+  }, [attemptId, answers, questions, isPracticeExam]);
 
   const submitExam = async () => {
     if (!attemptId || !startedAt) return;
@@ -407,7 +485,35 @@ const TakeExam = () => {
 
       const timeSpent = Math.floor((new Date().getTime() - startedAt.getTime()) / 1000);
 
-      await submitAttempt(attemptId, totalScore, maxScore, timeSpent);
+      // For practice exams, only save offline
+      if (isPracticeExam) {
+        const offlineAttempt = await getOfflineAttempt(attemptId);
+        if (offlineAttempt) {
+          offlineAttempt.submittedAt = new Date();
+          offlineAttempt.isSubmitted = true;
+          offlineAttempt.totalScore = totalScore;
+          offlineAttempt.maxScore = maxScore;
+          offlineAttempt.timeSpentSeconds = timeSpent;
+          await saveOfflineAttempt(offlineAttempt);
+        }
+      } else {
+        // For normal exams, try Firebase first
+        try {
+          await submitAttempt(attemptId, totalScore, maxScore, timeSpent);
+        } catch (error) {
+          console.warn("Failed to submit to Firebase, saving offline:", error);
+          // Save offline as fallback
+          const offlineAttempt = await getOfflineAttempt(attemptId);
+          if (offlineAttempt) {
+            offlineAttempt.submittedAt = new Date();
+            offlineAttempt.isSubmitted = true;
+            offlineAttempt.totalScore = totalScore;
+            offlineAttempt.maxScore = maxScore;
+            offlineAttempt.timeSpentSeconds = timeSpent;
+            await saveOfflineAttempt(offlineAttempt);
+          }
+        }
+      }
 
       toast({
         title: t("student.exam.submitted"),
@@ -687,6 +793,7 @@ const TakeExam = () => {
                 onSelectOption={(index) => handleSelectOption(currentQuestion.questionId, index)}
                 marks={currentQuestion.marks}
                 explanation={currentQuestion.explanation}
+                isPracticeExam={isPracticeExam}
               />
 
               {/* Flag Button for Current Question */}

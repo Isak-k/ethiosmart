@@ -35,6 +35,7 @@ const CreateExam = () => {
     shuffle_questions: false,
     shuffle_options: false,
     allow_offline_download: false,
+    exam_type: "normal",
     start_time: "",
     end_time: "",
     department_id: "all",
@@ -92,6 +93,7 @@ const CreateExam = () => {
         shuffleQuestions: form.shuffle_questions,
         shuffleOptions: form.shuffle_options,
         allowOfflineDownload: form.allow_offline_download,
+        examType: form.exam_type,
         startTime: form.start_time ? Timestamp.fromDate(new Date(form.start_time)) : null,
         endTime: form.end_time ? Timestamp.fromDate(new Date(form.end_time)) : null,
         questionCount: 0,
@@ -243,6 +245,26 @@ const CreateExam = () => {
               <CardTitle className="text-lg">{t("admin.exams.form.settings")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="exam_type">Exam Type *</Label>
+                <Select 
+                  value={form.exam_type} 
+                  onValueChange={(v) => setForm({ ...form, exam_type: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select exam type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="normal">Normal Exam (Fetch from Firebase)</SelectItem>
+                    <SelectItem value="practice">Practice Exam (100% Offline)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-muted-foreground">
+                  <strong>Normal:</strong> Fetches questions from Firebase, requires internet to start<br/>
+                  <strong>Practice:</strong> Works 100% offline after download, shows explanations by default
+                </p>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="department">{t("admin.exams.form.department")}</Label>
                 <Select 

@@ -80,6 +80,7 @@ interface Exam {
   resultsPublished: boolean;
   accessPassword?: string | null;
   allowOfflineDownload?: boolean;
+  examType?: 'normal' | 'practice';
 }
 
 const EditExam = () => {
@@ -288,6 +289,7 @@ const EditExam = () => {
         shuffleQuestions: exam.shuffleQuestions,
         shuffleOptions: exam.shuffleOptions,
         allowOfflineDownload: exam.allowOfflineDownload,
+        examType: exam.examType,
         startTime: exam.startTime,
         endTime: exam.endTime,
         isPublished: exam.isPublished,
@@ -640,6 +642,31 @@ const EditExam = () => {
                     setExam({ ...exam, allowOfflineDownload: checked })
                   }
                 />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="exam_type">Exam Type</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Normal: Fetches from Firebase | Practice: 100% Offline with explanations
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant={exam.examType === 'normal' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setExam({ ...exam, examType: 'normal' })}
+                  >
+                    Normal
+                  </Button>
+                  <Button
+                    variant={exam.examType === 'practice' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setExam({ ...exam, examType: 'practice' })}
+                  >
+                    Practice
+                  </Button>
+                </div>
               </div>
             </div>
           </CardContent>

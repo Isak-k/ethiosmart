@@ -41,6 +41,7 @@ export interface Exam {
   totalMarks: number;
   accessPassword?: string | null; // Optional password/PIN to access exam
   allowOfflineDownload?: boolean; // Allow students to download exam for offline use
+  examType?: 'normal' | 'practice'; // normal = fetch from Firebase, practice = 100% offline
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
