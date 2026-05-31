@@ -79,6 +79,7 @@ interface Exam {
   isPublished: boolean;
   resultsPublished: boolean;
   accessPassword?: string | null;
+  allowOfflineDownload?: boolean;
 }
 
 const EditExam = () => {
@@ -286,6 +287,7 @@ const EditExam = () => {
         maxAttempts: exam.maxAttempts,
         shuffleQuestions: exam.shuffleQuestions,
         shuffleOptions: exam.shuffleOptions,
+        allowOfflineDownload: exam.allowOfflineDownload,
         startTime: exam.startTime,
         endTime: exam.endTime,
         isPublished: exam.isPublished,
@@ -589,6 +591,56 @@ const EditExam = () => {
               <p className="text-sm text-muted-foreground">
                 {t("admin.exams.form.accessPasswordHelp")}
               </p>
+            </div>
+
+            <div className="space-y-4 pt-4 border-t">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="shuffle_questions">Shuffle Questions</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Randomize question order for each student
+                  </p>
+                </div>
+                <Switch
+                  id="shuffle_questions"
+                  checked={exam.shuffleQuestions}
+                  onCheckedChange={(checked) =>
+                    setExam({ ...exam, shuffleQuestions: checked })
+                  }
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="shuffle_options">Shuffle Options</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Randomize answer options for each question
+                  </p>
+                </div>
+                <Switch
+                  id="shuffle_options"
+                  checked={exam.shuffleOptions}
+                  onCheckedChange={(checked) =>
+                    setExam({ ...exam, shuffleOptions: checked })
+                  }
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="allow_offline_download">Allow Offline Download</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Students can download this exam to take it offline. Answers will sync when back online.
+                  </p>
+                </div>
+                <Switch
+                  id="allow_offline_download"
+                  checked={exam.allowOfflineDownload || false}
+                  onCheckedChange={(checked) =>
+                    setExam({ ...exam, allowOfflineDownload: checked })
+                  }
+                />
+              </div>
             </div>
           </CardContent>
         </Card>

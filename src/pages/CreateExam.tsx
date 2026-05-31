@@ -34,6 +34,7 @@ const CreateExam = () => {
     max_attempts: 1,
     shuffle_questions: false,
     shuffle_options: false,
+    allow_offline_download: false,
     start_time: "",
     end_time: "",
     department_id: "all",
@@ -90,6 +91,7 @@ const CreateExam = () => {
         resultsPublished: false,
         shuffleQuestions: form.shuffle_questions,
         shuffleOptions: form.shuffle_options,
+        allowOfflineDownload: form.allow_offline_download,
         startTime: form.start_time ? Timestamp.fromDate(new Date(form.start_time)) : null,
         endTime: form.end_time ? Timestamp.fromDate(new Date(form.end_time)) : null,
         questionCount: 0,
@@ -348,6 +350,22 @@ const CreateExam = () => {
                     checked={form.shuffle_options}
                     onCheckedChange={(checked) =>
                       setForm({ ...form, shuffle_options: checked })
+                    }
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="allow_offline_download">Allow Offline Download</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Students can download this exam to take it offline. Answers will sync when back online.
+                    </p>
+                  </div>
+                  <Switch
+                    id="allow_offline_download"
+                    checked={form.allow_offline_download}
+                    onCheckedChange={(checked) =>
+                      setForm({ ...form, allow_offline_download: checked })
                     }
                   />
                 </div>

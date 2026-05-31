@@ -173,7 +173,7 @@ export function ExamCard({ exam, isAdmin = false, hasAttempted = false, onDelete
           </div>
         ) : !hideActions && !isAdmin ? (
           <div className="space-y-3">
-            {showOfflineDownload && (
+            {showOfflineDownload && (exam as any).allow_offline_download && (
               <OfflineDownloadButton
                 exam={{
                   examId: exam.id,

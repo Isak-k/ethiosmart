@@ -40,6 +40,7 @@ export interface Exam {
   questionCount: number;
   totalMarks: number;
   accessPassword?: string | null; // Optional password/PIN to access exam
+  allowOfflineDownload?: boolean; // Allow students to download exam for offline use
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

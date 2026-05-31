@@ -23,6 +23,8 @@ interface ExamData {
   start_time: string | null;
   end_time: string | null;
   is_published: boolean;
+  question_count?: number;
+  allow_offline_download?: boolean;
 }
 
 const StudentExams = () => {
@@ -80,7 +82,9 @@ const StudentExams = () => {
         duration_minutes: exam.durationMinutes,
         start_time: exam.startTime?.toDate().toISOString() || null,
         end_time: exam.endTime?.toDate().toISOString() || null,
-        is_published: exam.isPublished
+        is_published: exam.isPublished,
+        question_count: exam.questionCount,
+        allow_offline_download: exam.allowOfflineDownload || false
       }));
 
       setAttemptedExamIds(new Set(attempts.map((a) => a.examId)));
