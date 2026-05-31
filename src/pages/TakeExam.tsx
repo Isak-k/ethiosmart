@@ -125,13 +125,14 @@ const TakeExam = () => {
             if (examData?.examType === 'practice') {
               isPractice = true;
               setIsPracticeExam(true);
-              // For practice exams, also load from offline storage
+              // For practice exams, try to load from offline storage if available
               const offlineQuestions = await getOfflineQuestions(id);
               if (offlineQuestions.length > 0) {
                 questionsData = offlineQuestions;
                 isOffline = true;
                 setIsOfflineMode(true);
               }
+              // If no offline questions, we'll use Firebase questions but still mark as practice
             }
           } catch (error) {
             console.warn("Firebase fetch failed, trying offline storage:", error);
@@ -155,7 +156,7 @@ const TakeExam = () => {
         if (!examData) {
           toast({
             title: "Exam not found",
-            description: "This exam is not available. Make sure you downloaded it for offline use.",
+            description: "This exam is not available.",
             variant: "destructive",
           });
           navigate("/dashboard");
@@ -372,7 +373,7 @@ const TakeExam = () => {
           setIsOfflineMode(true);
         } catch (error) {
           console.error("Error creating offline attempt:", error);
-          throw new Error("Failed to initialize offline storage for practice exam");
+          throw error;
         }
       } else {
         // For normal exams, try Firebase first
