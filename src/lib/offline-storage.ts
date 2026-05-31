@@ -1,7 +1,7 @@
 import { Exam, Question } from '@/integrations/firebase/types';
 
 const DB_NAME = 'exam_pro_offline';
-const DB_VERSION = 1;
+const DB_VERSION = 2;  // Increment version to force schema upgrade
 const EXAMS_STORE = 'exams';
 const QUESTIONS_STORE = 'questions';
 const METADATA_STORE = 'metadata';
@@ -45,27 +45,37 @@ export async function initOfflineDB(): Promise<IDBDatabase> {
     request.onupgradeneeded = (event) => {
       try {
         const database = (event.target as IDBOpenDBRequest).result;
+        const oldVersion = event.oldVersion;
+
+        console.log(`Upgrading database from version ${oldVersion} to ${DB_VERSION}`);
 
         // Create object stores if they don't exist
         if (!database.objectStoreNames.contains(EXAMS_STORE)) {
+          console.log(`Creating object store: ${EXAMS_STORE}`);
           database.createObjectStore(EXAMS_STORE, { keyPath: 'examId' });
         }
         if (!database.objectStoreNames.contains(QUESTIONS_STORE)) {
+          console.log(`Creating object store: ${QUESTIONS_STORE}`);
           const questionStore = database.createObjectStore(QUESTIONS_STORE, { keyPath: 'questionId' });
           questionStore.createIndex('examId', 'examId', { unique: false });
         }
         if (!database.objectStoreNames.contains(METADATA_STORE)) {
+          console.log(`Creating object store: ${METADATA_STORE}`);
           database.createObjectStore(METADATA_STORE, { keyPath: 'examId' });
         }
         if (!database.objectStoreNames.contains(ATTEMPTS_STORE)) {
+          console.log(`Creating object store: ${ATTEMPTS_STORE}`);
           const attemptStore = database.createObjectStore(ATTEMPTS_STORE, { keyPath: 'attemptId' });
           attemptStore.createIndex('examId', 'examId', { unique: false });
           attemptStore.createIndex('studentId', 'studentId', { unique: false });
         }
         if (!database.objectStoreNames.contains(ANSWERS_STORE)) {
+          console.log(`Creating object store: ${ANSWERS_STORE}`);
           const answerStore = database.createObjectStore(ANSWERS_STORE, { keyPath: ['attemptId', 'questionId'] });
           answerStore.createIndex('attemptId', 'attemptId', { unique: false });
         }
+        
+        console.log("Database schema upgrade completed successfully");
       } catch (error) {
         console.error("Error in onupgradeneeded:", error);
         reject(error);
