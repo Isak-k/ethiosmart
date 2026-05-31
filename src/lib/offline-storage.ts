@@ -32,34 +32,43 @@ export async function initOfflineDB(): Promise<IDBDatabase> {
 
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-    request.onerror = () => reject(request.error);
+    request.onerror = () => {
+      console.error("IndexedDB open error:", request.error);
+      reject(request.error);
+    };
+    
     request.onsuccess = () => {
       db = request.result;
       resolve(db);
     };
 
     request.onupgradeneeded = (event) => {
-      const database = (event.target as IDBOpenDBRequest).result;
+      try {
+        const database = (event.target as IDBOpenDBRequest).result;
 
-      // Create object stores if they don't exist
-      if (!database.objectStoreNames.contains(EXAMS_STORE)) {
-        database.createObjectStore(EXAMS_STORE, { keyPath: 'examId' });
-      }
-      if (!database.objectStoreNames.contains(QUESTIONS_STORE)) {
-        const questionStore = database.createObjectStore(QUESTIONS_STORE, { keyPath: 'questionId' });
-        questionStore.createIndex('examId', 'examId', { unique: false });
-      }
-      if (!database.objectStoreNames.contains(METADATA_STORE)) {
-        database.createObjectStore(METADATA_STORE, { keyPath: 'examId' });
-      }
-      if (!database.objectStoreNames.contains(ATTEMPTS_STORE)) {
-        const attemptStore = database.createObjectStore(ATTEMPTS_STORE, { keyPath: 'attemptId' });
-        attemptStore.createIndex('examId', 'examId', { unique: false });
-        attemptStore.createIndex('studentId', 'studentId', { unique: false });
-      }
-      if (!database.objectStoreNames.contains(ANSWERS_STORE)) {
-        const answerStore = database.createObjectStore(ANSWERS_STORE, { keyPath: ['attemptId', 'questionId'] });
-        answerStore.createIndex('attemptId', 'attemptId', { unique: false });
+        // Create object stores if they don't exist
+        if (!database.objectStoreNames.contains(EXAMS_STORE)) {
+          database.createObjectStore(EXAMS_STORE, { keyPath: 'examId' });
+        }
+        if (!database.objectStoreNames.contains(QUESTIONS_STORE)) {
+          const questionStore = database.createObjectStore(QUESTIONS_STORE, { keyPath: 'questionId' });
+          questionStore.createIndex('examId', 'examId', { unique: false });
+        }
+        if (!database.objectStoreNames.contains(METADATA_STORE)) {
+          database.createObjectStore(METADATA_STORE, { keyPath: 'examId' });
+        }
+        if (!database.objectStoreNames.contains(ATTEMPTS_STORE)) {
+          const attemptStore = database.createObjectStore(ATTEMPTS_STORE, { keyPath: 'attemptId' });
+          attemptStore.createIndex('examId', 'examId', { unique: false });
+          attemptStore.createIndex('studentId', 'studentId', { unique: false });
+        }
+        if (!database.objectStoreNames.contains(ANSWERS_STORE)) {
+          const answerStore = database.createObjectStore(ANSWERS_STORE, { keyPath: ['attemptId', 'questionId'] });
+          answerStore.createIndex('attemptId', 'attemptId', { unique: false });
+        }
+      } catch (error) {
+        console.error("Error in onupgradeneeded:", error);
+        reject(error);
       }
     };
   });
@@ -262,17 +271,39 @@ export async function getOfflineStorageSize(): Promise<number> {
 
 // Attempt and Answer Management
 export async function saveOfflineAttempt(attempt: any): Promise<void> {
-  const database = await initOfflineDB();
-  const transaction = database.transaction([ATTEMPTS_STORE], 'readwrite');
+  try {
+    const database = await initOfflineDB();
+    
+    // Verify the store exists
+    if (!database.objectStoreNames.contains(ATTEMPTS_STORE)) {
+      throw new Error(`Object store '${ATTEMPTS_STORE}' not found in database`);
+    }
+    
+    const transaction = database.transaction([ATTEMPTS_STORE], 'readwrite');
 
-  return new Promise((resolve, reject) => {
-    const store = transaction.objectStore(ATTEMPTS_STORE);
-    const request = store.put(attempt);
+    return new Promise((resolve, reject) => {
+      const store = transaction.objectStore(ATTEMPTS_STORE);
+      const request = store.put(attempt);
 
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error);
-    request.onerror = () => reject(request.error);
-  });
+      request.onerror = () => {
+        console.error("Put request error:", request.error);
+        reject(request.error);
+      };
+
+      transaction.oncomplete = () => {
+        console.log("Attempt saved successfully");
+        resolve();
+      };
+      
+      transaction.onerror = () => {
+        console.error("Transaction error:", transaction.error);
+        reject(transaction.error);
+      };
+    });
+  } catch (error) {
+    console.error("Error in saveOfflineAttempt:", error);
+    throw error;
+  }
 }
 
 export async function getOfflineAttempt(attemptId: string): Promise<any | null> {
@@ -307,17 +338,39 @@ export async function getOfflineAttemptsByExam(examId: string, studentId: string
 }
 
 export async function saveOfflineAnswer(attemptId: string, questionId: string, answer: any): Promise<void> {
-  const database = await initOfflineDB();
-  const transaction = database.transaction([ANSWERS_STORE], 'readwrite');
+  try {
+    const database = await initOfflineDB();
+    
+    // Verify the store exists
+    if (!database.objectStoreNames.contains(ANSWERS_STORE)) {
+      throw new Error(`Object store '${ANSWERS_STORE}' not found in database`);
+    }
+    
+    const transaction = database.transaction([ANSWERS_STORE], 'readwrite');
 
-  return new Promise((resolve, reject) => {
-    const store = transaction.objectStore(ANSWERS_STORE);
-    const request = store.put({ ...answer, attemptId, questionId });
+    return new Promise((resolve, reject) => {
+      const store = transaction.objectStore(ANSWERS_STORE);
+      const request = store.put({ ...answer, attemptId, questionId });
 
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error);
-    request.onerror = () => reject(request.error);
-  });
+      request.onerror = () => {
+        console.error("Put request error:", request.error);
+        reject(request.error);
+      };
+
+      transaction.oncomplete = () => {
+        console.log("Answer saved successfully");
+        resolve();
+      };
+      
+      transaction.onerror = () => {
+        console.error("Transaction error:", transaction.error);
+        reject(transaction.error);
+      };
+    });
+  } catch (error) {
+    console.error("Error in saveOfflineAnswer:", error);
+    throw error;
+  }
 }
 
 export async function getOfflineAnswers(attemptId: string): Promise<any[]> {
