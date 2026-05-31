@@ -70,11 +70,11 @@ export function SimpleLeaderboard({ departmentId, refreshSignal }: SimpleLeaderb
   const podiumOrder = [topThree[1], topThree[0], topThree[2]].filter(Boolean);
 
   return (
-    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-purple-600 via-blue-600 to-cyan-500 shadow-2xl">
+    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-purple-600 via-blue-600 to-cyan-500 shadow-2xl w-full">
       {/* Decorative background pattern */}
       <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48cGF0aCBkPSJNMzYgMzRjMC0yLjIxLTEuNzktNC00LTRzLTQgMS43OS00IDQgMS43OSA0IDQgNCA0LTEuNzkgNC00em0wLTEwYzAtMi4yMS0xLjc5LTQtNC00cy00IDEuNzktNCA0IDEuNzkgNCA0IDQgNC0xLjc5IDQtNHptMC0xMGMwLTIuMjEtMS43OS00LTQtNHMtNCAxLjc5LTQgNCAxLjc5IDQgNCA0IDQtMS43OSA0LTR6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-20"></div>
       
-      <div className="relative p-6">
+      <div className="relative p-4 sm:p-6">
         {/* Header */}
         <div className="text-center mb-6">
           <div className="inline-flex items-center gap-2 px-6 py-3 bg-white/20 backdrop-blur-sm rounded-2xl">
@@ -93,7 +93,7 @@ export function SimpleLeaderboard({ departmentId, refreshSignal }: SimpleLeaderb
         ) : (
           <>
             {/* Podium - Top 3 */}
-            <div className="flex items-end justify-center gap-2 sm:gap-4 mb-6 px-2">
+            <div className="flex items-end justify-center gap-1 sm:gap-3 mb-6 px-1 sm:px-2 w-full">
               {podiumOrder.map((entry, idx) => {
                 if (!entry) return null;
                 const actualRank = entry.rankPosition;
@@ -106,13 +106,13 @@ export function SimpleLeaderboard({ departmentId, refreshSignal }: SimpleLeaderb
                   : 'from-amber-500 to-orange-600';
 
                 return (
-                  <div key={entry.studentId} className="flex-1 max-w-[140px]">
+                  <div key={entry.studentId} className="flex-1 min-w-0">
                     {/* Trophy and Avatar */}
                     <div className="flex flex-col items-center mb-2">
-                      {actualRank === 1 && <Crown className="w-8 h-8 text-yellow-300 mb-1 animate-bounce" />}
+                      {actualRank === 1 && <Crown className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-300 mb-1 animate-bounce" />}
                       <div className="relative">
-                        <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br ${bgGradient} flex items-center justify-center shadow-lg ring-4 ring-white/30`}>
-                          <Trophy className={`w-8 h-8 sm:w-10 sm:h-10 ${trophyColor}`} />
+                        <div className={`w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br ${bgGradient} flex items-center justify-center shadow-lg ring-4 ring-white/30`}>
+                          <Trophy className={`w-7 h-7 sm:w-10 sm:h-10 ${trophyColor}`} />
                         </div>
                         {actualRank === 1 && (
                           <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center text-xs font-bold text-yellow-900 shadow-lg">
@@ -121,11 +121,11 @@ export function SimpleLeaderboard({ departmentId, refreshSignal }: SimpleLeaderb
                         )}
                       </div>
                       <div className="mt-2 text-center">
-                        <p className="text-white font-bold text-sm sm:text-base truncate max-w-[120px]">
+                        <p className="text-white font-bold text-xs sm:text-base truncate max-w-[100px] sm:max-w-[120px]">
                           {entry.displayName}
                         </p>
-                        <p className="text-white/90 text-xl sm:text-2xl font-bold mt-1">
-                          {entry.bestScore}<span className="text-sm">%</span>
+                        <p className="text-white/90 text-lg sm:text-2xl font-bold mt-1">
+                          {entry.bestScore}<span className="text-xs sm:text-sm">%</span>
                         </p>
                       </div>
                     </div>
@@ -144,26 +144,26 @@ export function SimpleLeaderboard({ departmentId, refreshSignal }: SimpleLeaderb
 
             {/* Rest of the list */}
             {restOfList.length > 0 && (
-              <div className="space-y-2 mt-6">
+              <div className="space-y-2 mt-6 px-1 sm:px-0">
                 {restOfList.map((entry) => (
                   <div
                     key={entry.studentId}
-                    className="flex items-center justify-between px-4 py-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 transition-all"
+                    className="flex items-center justify-between px-3 sm:px-4 py-3 rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 transition-all"
                   >
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-pink-500 flex items-center justify-center font-bold text-white shadow-lg flex-shrink-0">
+                    <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-pink-500 flex items-center justify-center font-bold text-white shadow-lg flex-shrink-0 text-sm">
                         {entry.rankPosition}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-white truncate">{entry.displayName}</p>
+                        <p className="font-semibold text-white truncate text-sm sm:text-base">{entry.displayName}</p>
                         <p className="text-xs text-white/70">
                           {entry.totalAttempts} attempts
                         </p>
                       </div>
                     </div>
                     <div className="text-right flex-shrink-0 ml-2">
-                      <p className="text-xl font-bold text-white">
-                        {entry.bestScore}<span className="text-sm">%</span>
+                      <p className="text-lg sm:text-xl font-bold text-white">
+                        {entry.bestScore}<span className="text-xs sm:text-sm">%</span>
                       </p>
                     </div>
                   </div>
@@ -174,7 +174,7 @@ export function SimpleLeaderboard({ departmentId, refreshSignal }: SimpleLeaderb
             {/* Refresh Button */}
             <button
               onClick={refetch}
-              className="w-full mt-6 px-6 py-3 bg-white/20 backdrop-blur-sm rounded-2xl hover:bg-white/30 transition-all font-semibold text-white flex items-center justify-center gap-2 shadow-lg"
+              className="w-full mt-6 px-4 sm:px-6 py-3 bg-white/20 backdrop-blur-sm rounded-2xl hover:bg-white/30 transition-all font-semibold text-white flex items-center justify-center gap-2 shadow-lg text-sm sm:text-base"
             >
               <RefreshCw className="w-5 h-5" />
               Refresh Leaderboard
