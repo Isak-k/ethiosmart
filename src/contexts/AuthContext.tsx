@@ -3,6 +3,7 @@ import { User, onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/integrations/firebase/client";
 import { getUserRole, getUserProfile, AppRole } from "@/lib/auth";
 import { UserPermissions } from "@/types/permissions";
+import { saveSession, getStoredSession, clearSession, refreshSessionExpiry } from "@/lib/session-persistence";
 
 interface Profile {
   id: string;
@@ -95,6 +96,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('Role loaded:', userRole);
           setProfile(userProfile);
           setRole(userRole);
+          
+          // Save session to persistent storage
+          saveSession(currentUser, userProfile, userRole);
+          
+          // Refresh session expiry on each auth state change
+          refreshSessionExpiry();
         } catch (error) {
           console.error('Error loading profile:', error);
           setProfile(null);
@@ -103,6 +110,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         setProfile(null);
         setRole(null);
+        // Clear session when user logs out
+        clearSession();
       }
       
       setLoading(false);

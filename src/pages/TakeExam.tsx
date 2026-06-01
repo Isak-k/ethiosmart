@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getExam, getQuestions } from "@/lib/firebase-exams";
 import { createAttempt, saveAnswer, submitAttempt, getAttempt, getAnswers, getStudentAttempts } from "@/lib/firebase-attempts";
 import { getOfflineExam, getOfflineQuestions, getOfflineAttemptsByExam, getOfflineAttempt, getOfflineAnswers, saveOfflineAttempt, saveOfflineAnswer, initOfflineDB } from "@/lib/offline-storage";
+import { submitPracticeExam, savePracticeAnswer, createPracticeAttempt } from "@/lib/offline-practice-exam";
 import { QuestionCard } from "@/components/exam/QuestionCard";
 import { ExamTimer } from "@/components/exam/ExamTimer";
 import { KeyboardShortcutsHelp } from "@/components/exam/KeyboardShortcutsHelp";
@@ -347,32 +348,20 @@ const TakeExam = () => {
     try {
       let attemptId: string;
       
-      // For practice exams, always create offline attempt
+      // For practice exams, use practice exam module
       if (isPracticeExam) {
         try {
           // Ensure offline DB is initialized
           await initOfflineDB();
           
-          attemptId = `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-          const offlineAttempt = {
-            attemptId,
-            examId: exam.examId,
-            studentId: user.uid,
-            examTitle: exam.title,
-            studentName: user.displayName || user.email || 'Student',
-            studentEmail: user.email || '',
-            startedAt: new Date(),
-            submittedAt: null,
-            isSubmitted: false,
-            timeSpentSeconds: null,
-            totalScore: null,
-            maxScore: null,
-            createdAt: new Date()
-          };
-          await saveOfflineAttempt(offlineAttempt);
+          // Calculate max score from questions
+          const maxScore = questions.reduce((sum, q) => sum + (q.marks || 0), 0);
+          
+          // Create practice attempt (returns attemptId)
+          attemptId = await createPracticeAttempt(exam.examId, user.uid, maxScore);
           setIsOfflineMode(true);
         } catch (error) {
-          console.error("Error creating offline attempt:", error);
+          console.error("Error creating practice attempt:", error);
           throw error;
         }
       } else {
@@ -445,18 +434,14 @@ const TakeExam = () => {
     // Save answer to database
     const question = questions.find((q) => q.questionId === questionId);
     const isCorrect = question ? optionIndex === question.correctOptionIndex : false;
+    const marks = question?.marks || 0;
 
-    // For practice exams, only save offline
+    // For practice exams, use practice exam module
     if (isPracticeExam) {
       try {
-        await saveOfflineAnswer(attemptId, questionId, {
-          selectedOptionIndex: optionIndex,
-          isCorrect,
-          timeSpentSeconds: null,
-          answeredAt: null
-        });
+        await savePracticeAnswer(attemptId, questionId, optionIndex, isCorrect, marks);
       } catch (error) {
-        console.error("Error saving answer offline:", error);
+        console.error("Error saving practice answer:", error);
       }
     } else {
       // For normal exams, try Firebase first
@@ -485,38 +470,52 @@ const TakeExam = () => {
   }, [attemptId, answers, questions, isPracticeExam]);
 
   const submitExam = async () => {
-    if (!attemptId || !startedAt) return;
+    if (!attemptId || !startedAt || !exam) return;
 
     setSubmitting(true);
 
     try {
-      // Calculate score
-      let totalScore = 0;
-      let maxScore = 0;
-
-      questions.forEach((q) => {
-        maxScore += q.marks;
-        const selectedOption = answers.get(q.questionId);
-        if (selectedOption === q.correctOptionIndex) {
-          totalScore += q.marks;
-        }
-      });
-
-      const timeSpent = Math.floor((new Date().getTime() - startedAt.getTime()) / 1000);
-
-      // For practice exams, only save offline
+      // For practice exams, use offline practice exam submission with instant result calculation
       if (isPracticeExam) {
-        const offlineAttempt = await getOfflineAttempt(attemptId);
-        if (offlineAttempt) {
-          offlineAttempt.submittedAt = new Date();
-          offlineAttempt.isSubmitted = true;
-          offlineAttempt.totalScore = totalScore;
-          offlineAttempt.maxScore = maxScore;
-          offlineAttempt.timeSpentSeconds = timeSpent;
-          await saveOfflineAttempt(offlineAttempt);
+        try {
+          // Submit practice exam and get results instantly (all calculated locally)
+          const result = await submitPracticeExam(attemptId, 50); // 50% passing threshold
+          
+          console.log('✓ Practice exam submitted with results:', result);
+          
+          toast({
+            title: t("student.exam.submitted"),
+            description: t("student.exam.submittedDesc"),
+          });
+
+          // Navigate to results page with result data
+          navigate(`/dashboard/results/${attemptId}`, { 
+            state: { 
+              result,
+              examTitle: exam.title,
+              isPracticeExam: true 
+            } 
+          });
+        } catch (error) {
+          console.error("Error submitting practice exam:", error);
+          throw error;
         }
       } else {
-        // For normal exams, try Firebase first
+        // For normal exams, calculate score and submit to Firebase
+        let totalScore = 0;
+        let maxScore = 0;
+
+        questions.forEach((q) => {
+          maxScore += q.marks;
+          const selectedOption = answers.get(q.questionId);
+          if (selectedOption === q.correctOptionIndex) {
+            totalScore += q.marks;
+          }
+        });
+
+        const timeSpent = Math.floor((new Date().getTime() - startedAt.getTime()) / 1000);
+
+        // Try Firebase first
         try {
           await submitAttempt(attemptId, totalScore, maxScore, timeSpent);
         } catch (error) {
@@ -532,14 +531,14 @@ const TakeExam = () => {
             await saveOfflineAttempt(offlineAttempt);
           }
         }
+
+        toast({
+          title: t("student.exam.submitted"),
+          description: t("student.exam.submittedDesc"),
+        });
+
+        navigate("/dashboard/results");
       }
-
-      toast({
-        title: t("student.exam.submitted"),
-        description: t("student.exam.submittedDesc"),
-      });
-
-      navigate("/dashboard/results");
     } catch (error) {
       console.error("Error submitting exam:", error);
       toast({
