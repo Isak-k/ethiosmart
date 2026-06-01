@@ -5,6 +5,7 @@ import { getStudentAttempts } from "@/lib/firebase-attempts";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ExamCard } from "@/components/exam/ExamCard";
 import { OfflineExamsSection } from "@/components/exam/OfflineExamsSection";
+import { DepartmentDownloads } from "@/components/department/DepartmentDownloads";
 import { Loader2, ClipboardList, Send, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -185,6 +186,33 @@ const StudentExams = () => {
           <>
             {/* Offline Exams Section */}
             <OfflineExamsSection departmentId={profile?.departmentId} isOnline={isOnline} />
+
+            {/* Department Downloads Section */}
+            {profile?.departmentId && (
+              <DepartmentDownloads 
+                departmentId={profile.departmentId}
+                exams={exams.map(e => ({
+                  examId: e.id,
+                  title: e.title,
+                  description: e.description,
+                  durationMinutes: e.duration_minutes,
+                  questionCount: e.question_count || 0,
+                  allowOfflineDownload: e.allow_offline_download || false,
+                  examType: 'normal' as const,
+                  maxAttempts: e.max_attempts || 1,
+                  isPublished: e.is_published,
+                  createdBy: '',
+                  totalMarks: 0,
+                  shuffleQuestions: false,
+                  shuffleOptions: false,
+                  startTime: e.start_time ? new Date(e.start_time) : null,
+                  endTime: e.end_time ? new Date(e.end_time) : null,
+                  resultsPublished: false,
+                  createdAt: new Date(),
+                  updatedAt: new Date(),
+                } as any))}
+              />
+            )}
 
             {/* Available Exams */}
             <div className="space-y-4">
