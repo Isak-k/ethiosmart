@@ -1,12 +1,15 @@
-import { Exam, Question } from '@/integrations/firebase/types';
+import { Exam, Question, PracticeExamConfig } from '@/integrations/firebase/types';
 
 const DB_NAME = 'exam_pro_offline';
-const DB_VERSION = 2;  // Increment version to force schema upgrade
+const DB_VERSION = 3;  // Increment version to force schema upgrade
 const EXAMS_STORE = 'exams';
 const QUESTIONS_STORE = 'questions';
 const METADATA_STORE = 'metadata';
 const ATTEMPTS_STORE = 'attempts';
 const ANSWERS_STORE = 'answers';
+const PRACTICE_CONFIGS_STORE = 'practice_configs';
+const EXAM_ATTEMPTS_SUBMITTED_STORE = 'exam_attempts_submitted';
+const APP_STATE_STORE = 'app_state';
 
 interface OfflineExam extends Exam {
   downloadedAt: number;
@@ -73,6 +76,24 @@ export async function initOfflineDB(): Promise<IDBDatabase> {
           console.log(`Creating object store: ${ANSWERS_STORE}`);
           const answerStore = database.createObjectStore(ANSWERS_STORE, { keyPath: ['attemptId', 'questionId'] });
           answerStore.createIndex('attemptId', 'attemptId', { unique: false });
+        }
+        
+        // New stores for v3
+        if (!database.objectStoreNames.contains(PRACTICE_CONFIGS_STORE)) {
+          console.log(`Creating object store: ${PRACTICE_CONFIGS_STORE}`);
+          const configStore = database.createObjectStore(PRACTICE_CONFIGS_STORE, { keyPath: 'examId' });
+          configStore.createIndex('examType', 'examType', { unique: false });
+        }
+        if (!database.objectStoreNames.contains(EXAM_ATTEMPTS_SUBMITTED_STORE)) {
+          console.log(`Creating object store: ${EXAM_ATTEMPTS_SUBMITTED_STORE}`);
+          const submittedStore = database.createObjectStore(EXAM_ATTEMPTS_SUBMITTED_STORE, { keyPath: 'attemptId' });
+          submittedStore.createIndex('examId', 'examId', { unique: false });
+          submittedStore.createIndex('studentId', 'studentId', { unique: false });
+          submittedStore.createIndex('completedAt', 'completedAt', { unique: false });
+        }
+        if (!database.objectStoreNames.contains(APP_STATE_STORE)) {
+          console.log(`Creating object store: ${APP_STATE_STORE}`);
+          database.createObjectStore(APP_STATE_STORE, { keyPath: 'key' });
         }
         
         console.log("Database schema upgrade completed successfully");
@@ -395,5 +416,249 @@ export async function getOfflineAnswers(attemptId: string): Promise<any[]> {
 
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
+  });
+}
+
+
+// Practice Config Management
+export async function savePracticeConfig(examId: string, config: PracticeExamConfig): Promise<void> {
+  const database = await initOfflineDB();
+  const transaction = database.transaction([PRACTICE_CONFIGS_STORE], 'readwrite');
+
+  return new Promise((resolve, reject) => {
+    const store = transaction.objectStore(PRACTICE_CONFIGS_STORE);
+    const request = store.put({ examId, ...config });
+
+    request.onerror = () => reject(request.error);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+  });
+}
+
+export async function getPracticeConfig(examId: string): Promise<PracticeExamConfig | null> {
+  const database = await initOfflineDB();
+  const transaction = database.transaction([PRACTICE_CONFIGS_STORE], 'readonly');
+
+  return new Promise((resolve, reject) => {
+    const store = transaction.objectStore(PRACTICE_CONFIGS_STORE);
+    const request = store.get(examId);
+
+    request.onsuccess = () => {
+      const result = request.result;
+      if (result) {
+        // Remove examId from config object
+        const { examId: _, ...config } = result;
+        resolve(config as PracticeExamConfig);
+      } else {
+        resolve(null);
+      }
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function getAllPracticeConfigs(): Promise<Array<{ examId: string; config: PracticeExamConfig }>> {
+  const database = await initOfflineDB();
+  const transaction = database.transaction([PRACTICE_CONFIGS_STORE], 'readonly');
+
+  return new Promise((resolve, reject) => {
+    const store = transaction.objectStore(PRACTICE_CONFIGS_STORE);
+    const request = store.getAll();
+
+    request.onsuccess = () => {
+      const results = request.result.map((item: any) => {
+        const { examId, ...config } = item;
+        return { examId, config: config as PracticeExamConfig };
+      });
+      resolve(results);
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function deletePracticeConfig(examId: string): Promise<void> {
+  const database = await initOfflineDB();
+  const transaction = database.transaction([PRACTICE_CONFIGS_STORE], 'readwrite');
+
+  return new Promise((resolve, reject) => {
+    const store = transaction.objectStore(PRACTICE_CONFIGS_STORE);
+    const request = store.delete(examId);
+
+    request.onerror = () => reject(request.error);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+  });
+}
+
+// Submitted Exam Attempts Management
+export interface SubmittedExamAttempt {
+  attemptId: string;
+  examId: string;
+  studentId: string;
+  studentName: string;
+  studentEmail: string;
+  examTitle: string;
+  completedAt: number;
+  totalScore: number;
+  maxScore: number;
+  percentage: number;
+  timeSpentSeconds: number;
+  practiceMode?: boolean; // true if this is a practice exam
+  results?: {
+    correct: number;
+    wrong: number;
+    skipped: number;
+  };
+}
+
+export async function saveSubmittedExamAttempt(attempt: SubmittedExamAttempt): Promise<void> {
+  const database = await initOfflineDB();
+  const transaction = database.transaction([EXAM_ATTEMPTS_SUBMITTED_STORE], 'readwrite');
+
+  return new Promise((resolve, reject) => {
+    const store = transaction.objectStore(EXAM_ATTEMPTS_SUBMITTED_STORE);
+    const request = store.put(attempt);
+
+    request.onerror = () => reject(request.error);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+  });
+}
+
+export async function getSubmittedExamAttempt(attemptId: string): Promise<SubmittedExamAttempt | null> {
+  const database = await initOfflineDB();
+  const transaction = database.transaction([EXAM_ATTEMPTS_SUBMITTED_STORE], 'readonly');
+
+  return new Promise((resolve, reject) => {
+    const store = transaction.objectStore(EXAM_ATTEMPTS_SUBMITTED_STORE);
+    const request = store.get(attemptId);
+
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function getStudentSubmittedAttempts(studentId: string): Promise<SubmittedExamAttempt[]> {
+  const database = await initOfflineDB();
+  const transaction = database.transaction([EXAM_ATTEMPTS_SUBMITTED_STORE], 'readonly');
+
+  return new Promise((resolve, reject) => {
+    const store = transaction.objectStore(EXAM_ATTEMPTS_SUBMITTED_STORE);
+    const index = store.index('studentId');
+    const range = IDBKeyRange.only(studentId);
+    const request = index.getAll(range);
+
+    request.onsuccess = () => {
+      const attempts = request.result.sort(
+        (a, b) => b.completedAt - a.completedAt
+      );
+      resolve(attempts);
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function getExamSubmittedAttempts(examId: string): Promise<SubmittedExamAttempt[]> {
+  const database = await initOfflineDB();
+  const transaction = database.transaction([EXAM_ATTEMPTS_SUBMITTED_STORE], 'readonly');
+
+  return new Promise((resolve, reject) => {
+    const store = transaction.objectStore(EXAM_ATTEMPTS_SUBMITTED_STORE);
+    const index = store.index('examId');
+    const range = IDBKeyRange.only(examId);
+    const request = index.getAll(range);
+
+    request.onsuccess = () => {
+      const attempts = request.result.sort(
+        (a, b) => b.completedAt - a.completedAt
+      );
+      resolve(attempts);
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function deleteSubmittedExamAttempt(attemptId: string): Promise<void> {
+  const database = await initOfflineDB();
+  const transaction = database.transaction([EXAM_ATTEMPTS_SUBMITTED_STORE], 'readwrite');
+
+  return new Promise((resolve, reject) => {
+    const store = transaction.objectStore(EXAM_ATTEMPTS_SUBMITTED_STORE);
+    const request = store.delete(attemptId);
+
+    request.onerror = () => reject(request.error);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+  });
+}
+
+// App State Management
+export interface AppStateValue {
+  key: string;
+  value: any;
+  lastUpdated: number;
+}
+
+export async function setAppState(key: string, value: any): Promise<void> {
+  const database = await initOfflineDB();
+  const transaction = database.transaction([APP_STATE_STORE], 'readwrite');
+
+  const stateValue: AppStateValue = {
+    key,
+    value,
+    lastUpdated: Date.now(),
+  };
+
+  return new Promise((resolve, reject) => {
+    const store = transaction.objectStore(APP_STATE_STORE);
+    const request = store.put(stateValue);
+
+    request.onerror = () => reject(request.error);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+  });
+}
+
+export async function getAppState(key: string): Promise<any> {
+  const database = await initOfflineDB();
+  const transaction = database.transaction([APP_STATE_STORE], 'readonly');
+
+  return new Promise((resolve, reject) => {
+    const store = transaction.objectStore(APP_STATE_STORE);
+    const request = store.get(key);
+
+    request.onsuccess = () => {
+      const result = request.result;
+      resolve(result?.value || null);
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function deleteAppState(key: string): Promise<void> {
+  const database = await initOfflineDB();
+  const transaction = database.transaction([APP_STATE_STORE], 'readwrite');
+
+  return new Promise((resolve, reject) => {
+    const store = transaction.objectStore(APP_STATE_STORE);
+    const request = store.delete(key);
+
+    request.onerror = () => reject(request.error);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+  });
+}
+
+export async function clearAppState(): Promise<void> {
+  const database = await initOfflineDB();
+  const transaction = database.transaction([APP_STATE_STORE], 'readwrite');
+
+  return new Promise((resolve, reject) => {
+    const store = transaction.objectStore(APP_STATE_STORE);
+    const request = store.clear();
+
+    request.onerror = () => reject(request.error);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
   });
 }

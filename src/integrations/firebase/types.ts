@@ -22,6 +22,18 @@ export interface Department {
   createdAt: Timestamp;
 }
 
+export type ExamType = 'normal' | 'practice';
+export type PracticeModeType = 'practice' | 'exam';
+
+export interface PracticeExamConfig {
+  mode: PracticeModeType;
+  showFeedback: boolean;           // Practice mode: show if answer is correct
+  showExplanations: boolean;       // Practice mode: show explanations
+  timerEnabled: boolean;           // Exam mode: enable countdown timer
+  timeLimit?: number;              // Exam mode: time in seconds
+  passingScore: number;            // Percentage to pass (default 50)
+}
+
 export interface Exam {
   examId: string;
   title: string;
@@ -41,7 +53,9 @@ export interface Exam {
   totalMarks: number;
   accessPassword?: string | null; // Optional password/PIN to access exam
   allowOfflineDownload?: boolean; // Allow students to download exam for offline use
-  examType?: 'normal' | 'practice'; // normal = fetch from Firebase, practice = 100% offline
+  examType?: ExamType; // normal = fetch from Firebase, practice = 100% offline
+  practiceMode?: PracticeModeType; // Which practice mode (if examType is 'practice')
+  practiceConfig?: PracticeExamConfig; // Detailed practice exam configuration
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

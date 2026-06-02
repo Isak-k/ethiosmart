@@ -3,7 +3,21 @@ import { User, onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/integrations/firebase/client";
 import { getUserRole, getUserProfile, AppRole } from "@/lib/auth";
 import { UserPermissions } from "@/types/permissions";
-import { saveSession, getStoredSession, clearSession, refreshSessionExpiry } from "@/lib/session-persistence";
+import { 
+  saveSession, 
+  getStoredSession, 
+  clearSession, 
+  refreshSessionExpiry,
+  hasValidSession,
+  getSessionRestoreData 
+} from "@/lib/session-persistence-v2";
+import { 
+  setOfflineSession, 
+  clearOfflineSession,
+  setupOnlineOfflineListeners,
+  getOfflineModeInfo,
+  initOfflineState 
+} from "@/lib/offline-state";
 
 interface Profile {
   id: string;
@@ -23,6 +37,8 @@ interface AuthContextType {
   profile: Profile | null;
   role: AppRole | null;
   loading: boolean;
+  isOfflineMode: boolean;
+  offlineModeInfo: ReturnType<typeof getOfflineModeInfo>;
   refreshProfile: () => Promise<void>;
 }
 
@@ -45,9 +61,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<{ user: User } | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [role, setRole] = useState<AppRole | null>(null);
+  const [isOfflineMode, setIsOfflineMode] = useState(false);
+  const [offlineModeInfo, setOfflineModeInfo] = useState(getOfflineModeInfo());
   // Initialize loading to false if we've already initialized once (prevents flickering on re-mounts)
   const [loading, setLoading] = useState(!globalAuthInitialized);
   const loadingTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const cleanupListenerRef = React.useRef<(() => void) | null>(null);
 
   const refreshProfile = async () => {
     if (!user) return;
@@ -62,6 +81,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
+    // Initialize offline state on app start
+    initOfflineState();
+
     // Set global flag to true immediately to prevent other instances from initializing loading state
     if (loading) {
       // Only set timeout if we are actually loading
@@ -70,6 +92,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(false);
         globalAuthInitialized = true;
       }, 3000);
+    }
+
+    // Try to restore session from localStorage first
+    const restoredData = getSessionRestoreData();
+    if (restoredData && !user) {
+      console.log('✓ Restored session from storage');
+      setProfile(restoredData.profile as Profile);
+      setRole(restoredData.role as AppRole);
+      setIsOfflineMode(true);
+      setOfflineModeInfo(getOfflineModeInfo());
+    }
+
+    // Setup online/offline listeners
+    if (cleanupListenerRef.current === null) {
+      cleanupListenerRef.current = setupOnlineOfflineListeners(
+        () => {
+          console.log('✓ Back online');
+          setOfflineModeInfo(getOfflineModeInfo());
+        },
+        () => {
+          console.log('⚠ Going offline');
+          setIsOfflineMode(true);
+          setOfflineModeInfo(getOfflineModeInfo());
+        }
+      );
     }
 
     // Firebase auth state listener
@@ -97,11 +144,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setProfile(userProfile);
           setRole(userRole);
           
-          // Save session to persistent storage
+          // Save session to persistent storage (30-day expiry)
           saveSession(currentUser, userProfile, userRole);
           
-          // Refresh session expiry on each auth state change
-          refreshSessionExpiry();
+          // Also save to offline state for offline access
+          setOfflineSession(userProfile);
+          
+          // Disable offline mode when logged in and online
+          if (navigator.onLine) {
+            setIsOfflineMode(false);
+          }
         } catch (error) {
           console.error('Error loading profile:', error);
           setProfile(null);
@@ -112,6 +164,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setRole(null);
         // Clear session when user logs out
         clearSession();
+        clearOfflineSession();
+        setIsOfflineMode(false);
       }
       
       setLoading(false);
@@ -122,12 +176,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (loadingTimeoutRef.current) {
         clearTimeout(loadingTimeoutRef.current);
       }
+      if (cleanupListenerRef.current) {
+        cleanupListenerRef.current();
+      }
       unsubscribe();
     };
   }, []); // Empty dependency array - only run once
 
   return (
-    <AuthContext.Provider value={{ user, session, profile, role, loading, refreshProfile }}>
+    <AuthContext.Provider 
+      value={{ 
+        user, 
+        session, 
+        profile, 
+        role, 
+        loading, 
+        isOfflineMode,
+        offlineModeInfo,
+        refreshProfile 
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
