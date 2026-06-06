@@ -14,6 +14,7 @@ interface QuestionCardProps {
   marks: number;
   explanation?: string;
   isPracticeExam?: boolean;
+  mode?: 'practice' | 'exam'; // NEW: Practice mode type
 }
 
 export function QuestionCard({
@@ -28,10 +29,17 @@ export function QuestionCard({
   marks,
   explanation,
   isPracticeExam,
+  mode = 'exam', // NEW: Default to exam mode
 }: QuestionCardProps) {
   const { t } = useTranslation();
+  
+  // NEW: Determine if feedback should be shown based on mode
+  // In practice mode, show instant feedback after selection
+  // In exam mode, hide feedback until submission
+  const shouldShowFeedback = mode === 'practice' && selectedOption !== null;
+  
   // For practice exams, show feedback after student selects an option
-  const showFeedback = (isPracticeExam || feedbackType === "instant") && selectedOption !== null;
+  const showFeedback = (isPracticeExam || feedbackType === "instant" || shouldShowFeedback) && selectedOption !== null;
   const showResults = isSubmitted; // Only show results after submission
   const showExplanation = (showFeedback || showResults) && explanation;
 
