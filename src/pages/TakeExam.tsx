@@ -841,10 +841,10 @@ const TakeExam = () => {
               </div>
 
               {/* Question Navigator - Desktop */}
-              <div className="hidden lg:block w-48 flex-shrink-0">
-                <div className="sticky top-24 rounded-xl border bg-card shadow-sm p-3">
-                  <p className="text-xs font-medium mb-2">Questions</p>
-                  <div className="grid grid-cols-4 gap-1.5">
+              <div className="hidden lg:block w-64 flex-shrink-0">
+                <div className="sticky top-24 rounded-xl border bg-card shadow-sm p-4">
+                  <p className="text-sm font-medium mb-3">Questions</p>
+                  <div className="grid grid-cols-4 gap-2">
                     {questions.map((q, idx) => {
                       const isAnswered = answers.get(q.questionId) !== null;
                       const isCurrent = idx === currentIndex;
@@ -854,45 +854,44 @@ const TakeExam = () => {
                         <div key={q.questionId} className="flex items-center justify-center">
                           <button
                             onClick={() => setCurrentIndex(idx)}
-                            className={`h-8 w-8 rounded-md text-xs font-medium transition-all duration-200 transform hover:scale-110 relative flex items-center justify-center overflow-hidden group ${
+                            className={`h-12 w-12 rounded-md text-sm font-bold transition-all duration-200 transform hover:scale-105 relative flex items-center justify-center overflow-hidden ${
                               isCurrent
-                                ? "bg-gradient-to-r from-cyan-500 to-teal-500 text-white shadow-md"
+                                ? "bg-cyan-500 text-white shadow-lg ring-2 ring-cyan-300"
                                 : isAnswered
-                                ? "bg-gradient-to-r from-green-400 to-emerald-400 text-white shadow-sm hover:shadow-md"
-                                : "bg-gray-100 hover:bg-gray-200 text-gray-700 shadow-sm hover:shadow-md"
+                                ? "bg-green-500 text-white shadow-md hover:shadow-lg"
+                                : "bg-white text-gray-800 border-2 border-gray-300 hover:border-gray-400 shadow-sm hover:shadow-md"
                             }`}
                           >
-                            {/* Diagonal Red Stripe for Flagged State */}
+                            {/* Lower Diagonal Red Triangle for Flagged State */}
                             {isFlagged && (
                               <div
-                                className="absolute inset-0 bg-gradient-to-r from-transparent to-red-500"
+                                className="absolute inset-0 bg-red-500"
                                 style={{
                                   clipPath: "polygon(100% 0, 100% 100%, 0 100%)",
-                                  zIndex: 0,
+                                  zIndex: 1,
                                 }}
                               />
                             )}
                             
-                            {/* Question Number/Check Icon */}
-                            <span className="relative z-10 flex items-center justify-center w-full h-full">
-                              {isAnswered ? (
-                                <Check className="w-2.5 h-2.5" />
-                              ) : (
-                                idx + 1
-                              )}
+                            {/* Question Number - Always Visible */}
+                            <span className="relative z-10 font-bold">
+                              {idx + 1}
                             </span>
                             
-                            {/* Flag Button */}
-                            <button
+                            {/* Flag Icon on Flagged Questions */}
+                            {isFlagged && (
+                              <Flag className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 text-white fill-white z-20" />
+                            )}
+                            
+                            {/* Click to Toggle Flag */}
+                            <div
                               onClick={(e) => {
                                 e.stopPropagation();
                                 toggleFlag(q.questionId);
                               }}
-                              className="absolute inset-0 opacity-0 hover:opacity-100 transition-opacity duration-200 flex items-center justify-center cursor-pointer"
+                              className="absolute inset-0 z-30 cursor-pointer"
                               title={isFlagged ? "Remove flag" : "Flag for review"}
-                            >
-                              <Flag className={`w-3 h-3 ${isFlagged ? "text-white fill-white" : "text-white fill-white drop-shadow-md"}`} />
-                            </button>
+                            />
                           </button>
                         </div>
                       );
