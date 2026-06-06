@@ -245,6 +245,7 @@ const resources = {
       "student": {
         "exams": {
           "title": "Available Exams",
+          "available": "Available Exams",
           "subtitle": "Browse and take your exams",
           "empty": {
             "title": "No exams available",
@@ -842,6 +843,7 @@ const resources = {
       "student": {
         "exams": {
           "title": "Qormaata Jiru",
+          "available": "Qormaata Jiru",
           "subtitle": "Qormaata kee ilaali fi fudhadhu",
           "empty": {
             "title": "Qormaanni hin jiru",
@@ -1429,6 +1431,7 @@ const resources = {
       "student": {
         "exams": {
           "title": "ያሉ ፈተናዎች",
+          "available": "ያሉ ፈተናዎች",
           "subtitle": "ፈተናዎችን ያስሱ እና ይውሰዱ",
           "empty": {
             "title": "ምንም ፈተና የለም",
