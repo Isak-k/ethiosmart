@@ -83,7 +83,7 @@ export function PracticeModeDialog({
 
   return (
     <AlertDialog open={open}>
-      <AlertDialogContent className="max-w-2xl">
+      <AlertDialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
         <AlertDialogHeader>
           <AlertDialogTitle className="text-2xl">
             Choose Exam Mode
@@ -93,77 +93,80 @@ export function PracticeModeDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
-          {PRACTICE_MODE_OPTIONS.map((option) => (
-            <div
-              key={option.mode}
-              onClick={() => setSelectedMode(option.mode)}
-              className="cursor-pointer"
-            >
-              <Card
-                className={`transition-all ${
-                  selectedMode === option.mode
-                    ? 'ring-2 ring-primary border-primary'
-                    : 'border-gray-200'
-                } ${option.color}`}
+        {/* Scrollable Content Area */}
+        <div className="flex-1 overflow-y-auto pr-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+            {PRACTICE_MODE_OPTIONS.map((option) => (
+              <div
+                key={option.mode}
+                onClick={() => setSelectedMode(option.mode)}
+                className="cursor-pointer"
               >
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="text-primary">{option.icon}</div>
-                      <div>
-                        <CardTitle className="text-lg">{option.title}</CardTitle>
-                        {option.badge && (
-                          <Badge variant="secondary" className="mt-1">
-                            {option.badge}
-                          </Badge>
-                        )}
+                <Card
+                  className={`transition-all ${
+                    selectedMode === option.mode
+                      ? 'ring-2 ring-primary border-primary'
+                      : 'border-gray-200'
+                  } ${option.color}`}
+                >
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="text-primary">{option.icon}</div>
+                        <div>
+                          <CardTitle className="text-lg">{option.title}</CardTitle>
+                          {option.badge && (
+                            <Badge variant="secondary" className="mt-1">
+                              {option.badge}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex-shrink-0">
+                        <input
+                          type="radio"
+                          name="mode"
+                          value={option.mode}
+                          checked={selectedMode === option.mode}
+                          onChange={() => setSelectedMode(option.mode)}
+                          className="h-4 w-4 accent-primary"
+                        />
                       </div>
                     </div>
-                    <div className="flex-shrink-0">
-                      <input
-                        type="radio"
-                        name="mode"
-                        value={option.mode}
-                        checked={selectedMode === option.mode}
-                        onChange={() => setSelectedMode(option.mode)}
-                        className="h-4 w-4 accent-primary"
-                      />
-                    </div>
-                  </div>
-                </CardHeader>
+                  </CardHeader>
 
-                <CardContent className="space-y-3">
-                  <CardDescription>{option.description}</CardDescription>
+                  <CardContent className="space-y-3">
+                    <CardDescription>{option.description}</CardDescription>
 
-                  <ul className="space-y-2 text-sm">
-                    {option.features.map((feature, idx) => (
-                      <li key={idx} className="flex items-start gap-2">
-                        <span className="text-gray-400 flex-shrink-0">•</span>
-                        <span>{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
+                    <ul className="space-y-2 text-sm">
+                      {option.features.map((feature, idx) => (
+                        <li key={idx} className="flex items-start gap-2">
+                          <span className="text-gray-400 flex-shrink-0">•</span>
+                          <span>{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
 
-                  {option.mode === 'exam' && durationMinutes && (
-                    <div className="pt-2 px-3 py-2 bg-gray-100 rounded-lg text-sm">
-                      <div className="flex items-center gap-2 text-gray-700">
-                        <Clock className="h-4 w-4" />
-                        <span>Time limit: {durationMinutes} minutes</span>
+                    {option.mode === 'exam' && durationMinutes && (
+                      <div className="pt-2 px-3 py-2 bg-gray-100 rounded-lg text-sm">
+                        <div className="flex items-center gap-2 text-gray-700">
+                          <Clock className="h-4 w-4" />
+                          <span>Time limit: {durationMinutes} minutes</span>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          ))}
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            ))}
+          </div>
+
+          <AlertDialogDescription className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <strong>💡 Tip:</strong> You can always restart in a different mode if you change your mind.
+          </AlertDialogDescription>
         </div>
 
-        <AlertDialogDescription className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-          <strong>💡 Tip:</strong> You can always restart in a different mode if you change your mind.
-        </AlertDialogDescription>
-
-        <div className="flex gap-3 justify-end">
+        <div className="flex gap-3 justify-end mt-4">
           <AlertDialogCancel onClick={onCancel} className="border-gray-300">
             Cancel
           </AlertDialogCancel>
