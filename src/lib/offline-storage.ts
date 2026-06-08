@@ -1,7 +1,7 @@
 import { Exam, Question, PracticeExamConfig } from '@/integrations/firebase/types';
 
 const DB_NAME = 'exam_pro_offline';
-const DB_VERSION = 3;  // Increment version to force schema upgrade
+const DB_VERSION = 4;  // Increment version to force schema upgrade with practice stores
 const EXAMS_STORE = 'exams';
 const QUESTIONS_STORE = 'questions';
 const METADATA_STORE = 'metadata';
@@ -10,6 +10,8 @@ const ANSWERS_STORE = 'answers';
 const PRACTICE_CONFIGS_STORE = 'practice_configs';
 const EXAM_ATTEMPTS_SUBMITTED_STORE = 'exam_attempts_submitted';
 const APP_STATE_STORE = 'app_state';
+const PRACTICE_ATTEMPTS_STORE = 'practice_attempts';
+const PRACTICE_ANSWERS_STORE = 'practice_answers';
 
 interface OfflineExam extends Exam {
   downloadedAt: number;
@@ -94,6 +96,19 @@ export async function initOfflineDB(): Promise<IDBDatabase> {
         if (!database.objectStoreNames.contains(APP_STATE_STORE)) {
           console.log(`Creating object store: ${APP_STATE_STORE}`);
           database.createObjectStore(APP_STATE_STORE, { keyPath: 'key' });
+        }
+        
+        // Practice exam stores
+        if (!database.objectStoreNames.contains(PRACTICE_ATTEMPTS_STORE)) {
+          console.log(`Creating object store: ${PRACTICE_ATTEMPTS_STORE}`);
+          const practiceAttemptStore = database.createObjectStore(PRACTICE_ATTEMPTS_STORE, { keyPath: 'attemptId' });
+          practiceAttemptStore.createIndex('examId', 'examId', { unique: false });
+          practiceAttemptStore.createIndex('studentId', 'studentId', { unique: false });
+        }
+        if (!database.objectStoreNames.contains(PRACTICE_ANSWERS_STORE)) {
+          console.log(`Creating object store: ${PRACTICE_ANSWERS_STORE}`);
+          const practiceAnswerStore = database.createObjectStore(PRACTICE_ANSWERS_STORE, { keyPath: ['attemptId', 'questionId'] });
+          practiceAnswerStore.createIndex('attemptId', 'attemptId', { unique: false });
         }
         
         console.log("Database schema upgrade completed successfully");
@@ -662,3 +677,9 @@ export async function clearAppState(): Promise<void> {
     transaction.onerror = () => reject(transaction.error);
   });
 }
+
+// Export store names for use in other modules
+export {
+  PRACTICE_ATTEMPTS_STORE,
+  PRACTICE_ANSWERS_STORE,
+};

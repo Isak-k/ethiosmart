@@ -3,10 +3,7 @@
  * Handles offline practice exam execution and result calculation
  */
 
-import { initOfflineDB } from './offline-storage';
-
-const PRACTICE_ATTEMPTS_STORE = 'practice_attempts';
-const PRACTICE_ANSWERS_STORE = 'practice_answers';
+import { initOfflineDB, PRACTICE_ATTEMPTS_STORE, PRACTICE_ANSWERS_STORE } from './offline-storage';
 
 export interface PracticeAttempt {
   attemptId: string;

@@ -41,6 +41,7 @@ import ExamDiagnostic from "./pages/ExamDiagnostic";
 import SuperAdmin from "./pages/SuperAdmin";
 import PermissionTest from "./pages/PermissionTest";
 import AIStudyAssistant from "./pages/AIStudyAssistant";
+import PracticeExamResultsPage from "./pages/PracticeExamResultsPage";
 
 const queryClient = new QueryClient();
 
@@ -195,6 +196,18 @@ function AppRoutes() {
         <Route path="/exam/:id" element={
           <ProtectedRoute allowedRoles={["student"]}>
             <TakeExam />
+          </ProtectedRoute>
+        } />
+        
+        {/* Practice Exam Results Routes */}
+        <Route path="/dashboard/practice-results/:attemptId" element={
+          <ProtectedRoute allowedRoles={["student"]}>
+            <PracticeExamResultsPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/dashboard/exam-results/:attemptId" element={
+          <ProtectedRoute allowedRoles={["student"]}>
+            <PracticeExamResultsPage />
           </ProtectedRoute>
         } />
         
