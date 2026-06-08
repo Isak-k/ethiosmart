@@ -136,40 +136,6 @@ export function DepartmentDownloads({ departmentId, exams }: DepartmentDownloads
 
   return (
     <div className="space-y-6">
-      {/* Storage Usage Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <HardDrive className="w-5 h-5" />
-            Offline Storage
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <div className="flex justify-between mb-2">
-              <span className="text-sm font-medium">Storage Used</span>
-              <span className="text-sm text-muted-foreground">{formatStorageSize(storageUsage)}</span>
-            </div>
-            <Progress value={Math.min((storageUsage / (100 * 1024 * 1024)) * 100, 100)} />
-            <p className="text-xs text-muted-foreground mt-2">
-              Maximum recommended: 100 MB
-            </p>
-          </div>
-
-          {downloadedExams.length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowClearDialog(true)}
-              className="w-full"
-            >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Clear All Downloads
-            </Button>
-          )}
-        </CardContent>
-      </Card>
-
       {/* Downloads Section */}
       <Card>
         <CardHeader>
