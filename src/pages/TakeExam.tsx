@@ -908,7 +908,7 @@ const TakeExam = () => {
               </div>
 
               {/* Question Navigator - Mobile (Full Screen) */}
-              <div className="lg:hidden fixed right-4 top-1/2 transform -translate-y-1/2 z-50">
+              <div className="lg:hidden fixed right-2 top-1/2 transform -translate-y-1/2 z-50">
                 {/* Button - Always Visible */}
                 {!mobileNavOpen && (
                   <button
