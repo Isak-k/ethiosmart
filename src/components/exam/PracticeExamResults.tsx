@@ -98,6 +98,7 @@ export function PracticeExamResults({
         [''],
         ['Correct Answers', result.correctAnswers],
         ['Incorrect Answers', result.incorrectAnswers],
+        ['Skipped Answers', result.skippedAnswers],
         ['Time Spent', formatTime(result.timeSpentSeconds)],
       ]
         .map((row) => row.join(','))
@@ -216,6 +217,19 @@ export function PracticeExamResults({
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-red-600">{result.incorrectAnswers}</p>
+          </CardContent>
+        </Card>
+
+        {/* Skipped Answers */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Clock className="w-4 h-4 text-gray-600" />
+              Skipped Answers
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold text-gray-600">{result.skippedAnswers}</p>
           </CardContent>
         </Card>
 

@@ -80,6 +80,7 @@ export function PracticeExamResultsPage() {
     maxScore: attempt.maxScore || 0,
     correctAnswers: attempt.correctAnswers || 0,
     incorrectAnswers: attempt.incorrectAnswers || 0,
+    skippedAnswers: attempt.skippedAnswers || 0,
     percentage: attempt.percentage || 0,
     passStatus: attempt.passStatus || 'fail',
     timeSpentSeconds: attempt.timeSpentSeconds || 0,

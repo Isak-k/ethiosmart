@@ -17,6 +17,7 @@ export interface PracticeAttempt {
   maxScore: number | null;
   correctAnswers: number;
   incorrectAnswers: number;
+  skippedAnswers: number;
   percentage: number | null;
   passStatus: 'pass' | 'fail' | null;
   createdAt: number;
@@ -37,6 +38,7 @@ export interface PracticeExamResult {
   maxScore: number;
   correctAnswers: number;
   incorrectAnswers: number;
+  skippedAnswers: number;
   percentage: number;
   passStatus: 'pass' | 'fail';
   timeSpentSeconds: number;
@@ -91,6 +93,7 @@ export async function createPracticeAttempt(
     maxScore,
     correctAnswers: 0,
     incorrectAnswers: 0,
+    skippedAnswers: 0,
     percentage: null,
     passStatus: null,
     createdAt: Date.now(),
@@ -178,6 +181,7 @@ export async function submitPracticeExam(
   let totalScore = 0;
   let correctAnswers = 0;
   let incorrectAnswers = 0;
+  const skippedAnswers = attempt.maxScore - answers.length;
 
   answers.forEach((answer) => {
     if (answer.isCorrect) {
@@ -200,6 +204,7 @@ export async function submitPracticeExam(
     totalScore,
     correctAnswers,
     incorrectAnswers,
+    skippedAnswers,
     percentage,
     passStatus,
     timeSpentSeconds,
@@ -219,6 +224,7 @@ export async function submitPracticeExam(
         maxScore: attempt.maxScore,
         correctAnswers,
         incorrectAnswers,
+        skippedAnswers,
         percentage,
         passStatus,
         timeSpentSeconds,
