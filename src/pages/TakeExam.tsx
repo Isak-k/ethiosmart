@@ -924,9 +924,15 @@ const TakeExam = () => {
 
                 {/* Full Screen Modal */}
                 {mobileNavOpen && (
-                  <div className="fixed inset-0 bg-black/50 z-40 flex flex-col">
+                  <div 
+                    className="fixed inset-0 bg-black/50 z-40 flex flex-col"
+                    onClick={() => setMobileNavOpen(false)}
+                  >
                     {/* Header */}
-                    <div className="bg-card border-b p-4 flex items-center justify-between">
+                    <div 
+                      className="bg-card border-b p-4 flex items-center justify-between"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <h2 className="font-semibold">Questions ({currentIndex + 1}/{questions.length})</h2>
                       <button
                         onClick={() => setMobileNavOpen(false)}
@@ -937,7 +943,10 @@ const TakeExam = () => {
                     </div>
 
                     {/* Navigator Grid */}
-                    <div className="flex-1 overflow-y-auto bg-card p-4">
+                    <div 
+                      className="flex-1 overflow-y-auto bg-card p-4"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <div className="grid grid-cols-5 gap-2">
                         {questions.map((q, idx) => {
                           const isAnswered = answers.get(q.questionId) !== null && answers.get(q.questionId) !== undefined;
