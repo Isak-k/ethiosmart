@@ -4,8 +4,8 @@ import { getPublishedExams } from "@/lib/firebase-exams";
 import { getStudentAttempts } from "@/lib/firebase-attempts";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ExamCard } from "@/components/exam/ExamCard";
-import { OfflineExamsSection } from "@/components/exam/OfflineExamsSection";
-import { DepartmentDownloads } from "@/components/department/DepartmentDownloads";
+// import { OfflineExamsSection } from "@/components/exam/OfflineExamsSection";
+// import { DepartmentDownloads } from "@/components/department/DepartmentDownloads";
 import { Loader2, ClipboardList, Send, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -184,11 +184,11 @@ const StudentExams = () => {
           </div>
         ) : filteredExams.length > 0 ? (
           <>
-            {/* Offline Exams Section */}
-            <OfflineExamsSection departmentId={profile?.departmentId} isOnline={isOnline} />
+            {/* Offline Exams Section - HIDDEN */}
+            {/* <OfflineExamsSection departmentId={profile?.departmentId} isOnline={isOnline} /> */}
 
-            {/* Department Downloads Section */}
-            {profile?.departmentId && (
+            {/* Department Downloads Section - HIDDEN */}
+            {/* {profile?.departmentId && (
               <DepartmentDownloads 
                 departmentId={profile.departmentId}
                 exams={exams.map(e => ({
@@ -212,7 +212,7 @@ const StudentExams = () => {
                   updatedAt: new Date(),
                 } as any))}
               />
-            )}
+            )} */}
 
             {/* Available Exams */}
             <div className="space-y-4">
