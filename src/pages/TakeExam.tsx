@@ -59,7 +59,8 @@ import {
   CheckCircle, 
   AlertCircle, 
   Flag, 
-  Check
+  Check,
+  X
 } from "lucide-react";
 import type { Exam, Question, PracticeExamConfig, ExamType, PracticeModeType } from "@/integrations/firebase/types";
 
@@ -619,6 +620,44 @@ const TakeExam = () => {
     });
   }, []);
 
+  const handleClearCurrentAnswer = useCallback(async () => {
+    if (!attemptId || currentIndex < 0 || currentIndex >= questions.length) return;
+
+    const question = questions[currentIndex];
+    const questionId = question.questionId;
+    
+    // Clear from state
+    const newAnswers = new Map(answers);
+    newAnswers.delete(questionId);
+    setAnswers(newAnswers);
+
+    // Save cleared answer to database
+    try {
+      if (examType === 'practice') {
+        await savePracticeAnswer(attemptId, questionId, -1, false, 0);
+      } else {
+        try {
+          await saveAnswer(attemptId, questionId, {
+            selectedOptionIndex: null,
+            isCorrect: false,
+            timeSpentSeconds: null,
+            answeredAt: null
+          });
+        } catch (error) {
+          console.warn("Firebase save failed, saving offline:", error);
+          await saveOfflineAnswer(attemptId, questionId, {
+            selectedOptionIndex: null,
+            isCorrect: false,
+            timeSpentSeconds: null,
+            answeredAt: null
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error clearing answer:", error);
+    }
+  }, [attemptId, currentIndex, questions, answers, examType]);
+
   // Enable keyboard navigation
   useExamKeyboardNavigation({
     onNext: handleNext,
@@ -785,19 +824,16 @@ const TakeExam = () => {
                   mode={practiceMode || 'exam'}  // For normal exams (practiceMode is null), use 'exam' (no feedback)
                 />
 
-                {/* Flag Button */}
+                {/* Clear Answer Button */}
                 <div className="mt-4 px-3 sm:px-0">
                   <Button
                     variant="outline"
-                    onClick={() => toggleFlag(currentQuestion.questionId)}
-                    className={`flex items-center gap-2 transition-all duration-200 ${
-                      flaggedQuestions.has(currentQuestion.questionId)
-                        ? "bg-red-50 border-red-200 text-red-700 hover:bg-red-100"
-                        : "bg-white hover:bg-gray-50 text-gray-700 border-gray-300"
-                    }`}
+                    onClick={handleClearCurrentAnswer}
+                    disabled={!currentQuestion || (answers.get(currentQuestion.questionId) === null || answers.get(currentQuestion.questionId) === undefined)}
+                    className="flex items-center gap-2 transition-all duration-200 bg-white hover:bg-gray-50 text-gray-700 border-gray-300 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Flag className={`h-4 w-4 ${flaggedQuestions.has(currentQuestion.questionId) ? "fill-red-500 text-red-500" : ""}`} />
-                    {flaggedQuestions.has(currentQuestion.questionId) ? "Remove Flag" : "Flag for Review"}
+                    <X className="h-4 w-4" />
+                    Clear Answer
                   </Button>
                 </div>
 
