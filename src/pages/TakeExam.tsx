@@ -824,18 +824,20 @@ const TakeExam = () => {
                   mode={practiceMode || 'exam'}  // For normal exams (practiceMode is null), use 'exam' (no feedback)
                 />
 
-                {/* Clear Answer Button - 30% smaller, 7px gap to Previous */}
-                <div className="mt-3 mb-1.5 px-3 sm:px-0">
-                  <Button
-                    variant="outline"
-                    onClick={handleClearCurrentAnswer}
-                    disabled={!currentQuestion || (answers.get(currentQuestion.questionId) === null || answers.get(currentQuestion.questionId) === undefined)}
-                    className="flex items-center gap-1 transition-all duration-200 bg-white hover:bg-gray-50 text-gray-700 border-gray-300 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed text-xs px-2 py-1"
-                  >
-                    <X className="h-2.5 w-2.5" />
-                    Clear Answer
-                  </Button>
-                </div>
+                {/* Clear Answer Button - Hidden in practice mode, 30% smaller, 7px gap to Previous */}
+                {examType !== 'practice' || practiceMode !== 'practice' ? (
+                  <div className="mt-3 mb-1.5 px-3 sm:px-0">
+                    <Button
+                      variant="outline"
+                      onClick={handleClearCurrentAnswer}
+                      disabled={!currentQuestion || (answers.get(currentQuestion.questionId) === null || answers.get(currentQuestion.questionId) === undefined)}
+                      className="flex items-center gap-1 transition-all duration-200 bg-white hover:bg-gray-50 text-gray-700 border-gray-300 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed text-xs px-2 py-1"
+                    >
+                      <X className="h-2.5 w-2.5" />
+                      Clear Answer
+                    </Button>
+                  </div>
+                ) : null}
 
                 {/* Navigation */}
                 <div className="mt-6 flex items-center justify-between px-3 sm:mt-8 sm:px-0">
