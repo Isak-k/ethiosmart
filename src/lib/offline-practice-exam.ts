@@ -3,10 +3,7 @@
  * Handles offline practice exam execution and result calculation
  */
 
-import { initOfflineDB } from './offline-storage';
-
-const PRACTICE_ATTEMPTS_STORE = 'practice_attempts';
-const PRACTICE_ANSWERS_STORE = 'practice_answers';
+import { initOfflineDB, PRACTICE_ATTEMPTS_STORE, PRACTICE_ANSWERS_STORE } from './offline-storage';
 
 export interface PracticeAttempt {
   attemptId: string;
@@ -48,27 +45,12 @@ export interface PracticeExamResult {
 
 /**
  * Initialize practice exam stores
+ * NOTE: This only ensures stores exist - actual creation happens in initOfflineDB's onupgradeneeded
  */
 async function initPracticeStores(): Promise<IDBDatabase> {
+  // Just initialize the main database - all stores are created in offline-storage.ts
   const db = await initOfflineDB();
-
-  return new Promise((resolve, reject) => {
-    try {
-      if (!db.objectStoreNames.contains(PRACTICE_ATTEMPTS_STORE)) {
-        const attemptStore = db.createObjectStore(PRACTICE_ATTEMPTS_STORE, { keyPath: 'attemptId' });
-        attemptStore.createIndex('examId', 'examId', { unique: false });
-        attemptStore.createIndex('studentId', 'studentId', { unique: false });
-      }
-      if (!db.objectStoreNames.contains(PRACTICE_ANSWERS_STORE)) {
-        const answerStore = db.createObjectStore(PRACTICE_ANSWERS_STORE, { keyPath: ['attemptId', 'questionId'] });
-        answerStore.createIndex('attemptId', 'attemptId', { unique: false });
-      }
-      resolve(db);
-    } catch (error) {
-      // Stores might already exist
-      resolve(db);
-    }
-  });
+  return db;
 }
 
 /**
