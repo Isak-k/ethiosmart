@@ -908,15 +908,15 @@ const TakeExam = () => {
               </div>
 
               {/* Question Navigator - Mobile (Full Screen) */}
-              <div className="lg:hidden fixed right-6 top-1/2 transform -translate-y-1/2 z-50">
+              <div className="lg:hidden fixed left-6 bottom-6 z-50">
                 {/* Button - Always Visible */}
                 {!mobileNavOpen && (
                   <button
                     onClick={() => setMobileNavOpen(true)}
-                    className="h-12 w-12 rounded-full bg-gradient-to-r from-cyan-500 to-teal-500 text-white shadow-lg hover:shadow-xl transform hover:scale-110 transition-all flex items-center justify-center"
+                    className="h-14 w-14 rounded-full bg-gradient-to-r from-cyan-500 to-teal-500 text-white shadow-lg hover:shadow-xl transform hover:scale-110 transition-all flex items-center justify-center"
                     title="View all questions"
                   >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                     </svg>
                   </button>
