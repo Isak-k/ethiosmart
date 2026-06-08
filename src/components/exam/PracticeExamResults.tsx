@@ -132,7 +132,7 @@ export function PracticeExamResults({
   const isPassed = result.percentage >= passPercentage;
 
   return (
-    <div className="w-screen mx-[calc(-50vw+50%)] space-y-6 px-4">
+    <div className="md:container md:mx-auto w-screen md:w-auto mx-[calc(-50vw+50%)] md:mx-auto space-y-6 px-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <Button

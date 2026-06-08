@@ -908,7 +908,7 @@ const TakeExam = () => {
               </div>
 
               {/* Question Navigator - Mobile (Collapsible Drawer) */}
-              <div className="lg:hidden fixed right-6 top-1/2 transform -translate-y-1/2 z-40">
+              <div className="lg:hidden fixed right-6 top-1/2 transform -translate-y-1/2 z-50">
                 {/* Expand/Collapse Button */}
                 {!mobileNavOpen && (
                   <button
@@ -930,7 +930,7 @@ const TakeExam = () => {
                       <h2 className="font-semibold">Questions ({currentIndex + 1}/{questions.length})</h2>
                       <button
                         onClick={() => setMobileNavOpen(false)}
-                        className="text-gray-500 hover:text-gray-700 text-2xl"
+                        className="text-gray-500 hover:text-gray-700 text-2xl w-8 h-8 flex items-center justify-center"
                       >
                         ×
                       </button>
