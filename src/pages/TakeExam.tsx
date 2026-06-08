@@ -824,32 +824,16 @@ const TakeExam = () => {
                   mode={practiceMode || 'exam'}  // For normal exams (practiceMode is null), use 'exam' (no feedback)
                 />
 
-                {/* Clear Answer Button */}
-                <div className="mt-4 px-3 sm:px-0">
+                {/* Clear Answer Button - 30% smaller */}
+                <div className="mt-3 px-3 sm:px-0">
                   <Button
                     variant="outline"
                     onClick={handleClearCurrentAnswer}
                     disabled={!currentQuestion || (answers.get(currentQuestion.questionId) === null || answers.get(currentQuestion.questionId) === undefined)}
-                    className="flex items-center gap-2 transition-all duration-200 bg-white hover:bg-gray-50 text-gray-700 border-gray-300 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center gap-1.5 transition-all duration-200 bg-white hover:bg-gray-50 text-gray-700 border-gray-300 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed text-xs px-2.5 py-1.5"
                   >
-                    <X className="h-4 w-4" />
+                    <X className="h-3 w-3" />
                     Clear Answer
-                  </Button>
-                </div>
-
-                {/* Flag for Review Button */}
-                <div className="mt-4 px-3 sm:px-0">
-                  <Button
-                    variant="outline"
-                    onClick={() => toggleFlag(currentQuestion.questionId)}
-                    className={`flex items-center gap-2 transition-all duration-200 ${
-                      flaggedQuestions.has(currentQuestion.questionId)
-                        ? "bg-red-50 border-red-200 text-red-700 hover:bg-red-100 shadow-md hover:shadow-lg"
-                        : "bg-white hover:bg-gray-50 text-gray-700 border-gray-300 shadow-md hover:shadow-lg"
-                    }`}
-                  >
-                    <Flag className={`h-4 w-4 ${flaggedQuestions.has(currentQuestion.questionId) ? "fill-red-500 text-red-500" : ""}`} />
-                    {flaggedQuestions.has(currentQuestion.questionId) ? "Flagged" : "Flag for Review"}
                   </Button>
                 </div>
 
@@ -865,33 +849,51 @@ const TakeExam = () => {
                     Previous
                   </Button>
 
-                  {currentIndex === questions.length - 1 ? (
-                    <Button
-                      onClick={submitExam}
-                      disabled={submitting}
-                      className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
-                    >
-                      {submitting ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Submitting...
-                        </>
-                      ) : (
-                        <>
-                          <Send className="h-4 w-4 mr-2" />
-                          Submit
-                        </>
-                      )}
-                    </Button>
-                  ) : (
-                    <Button
-                      onClick={handleNext}
-                      className="bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-600 hover:to-teal-600 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
-                    >
-                      Next
-                      <ChevronRight className="h-4 w-4 ml-2" />
-                    </Button>
-                  )}
+                  {/* Flag for Review Button - positioned at top right of Next button, 30% smaller */}
+                  <div className="relative">
+                    <div className="absolute -top-16 right-0">
+                      <Button
+                        variant="outline"
+                        onClick={() => toggleFlag(currentQuestion.questionId)}
+                        className={`flex items-center gap-1.5 transition-all duration-200 text-xs px-2.5 py-1.5 ${
+                          flaggedQuestions.has(currentQuestion.questionId)
+                            ? "bg-red-50 border-red-200 text-red-700 hover:bg-red-100 shadow-sm hover:shadow-md"
+                            : "bg-white hover:bg-gray-50 text-gray-700 border-gray-300 shadow-sm hover:shadow-md"
+                        }`}
+                      >
+                        <Flag className={`h-3 w-3 ${flaggedQuestions.has(currentQuestion.questionId) ? "fill-red-500 text-red-500" : ""}`} />
+                        {flaggedQuestions.has(currentQuestion.questionId) ? "Flagged" : "Flag for Review"}
+                      </Button>
+                    </div>
+
+                    {currentIndex === questions.length - 1 ? (
+                      <Button
+                        onClick={submitExam}
+                        disabled={submitting}
+                        className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                      >
+                        {submitting ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Submitting...
+                          </>
+                        ) : (
+                          <>
+                            <Send className="h-4 w-4 mr-2" />
+                            Submit
+                          </>
+                        )}
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={handleNext}
+                        className="bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-600 hover:to-teal-600 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                      >
+                        Next
+                        <ChevronRight className="h-4 w-4 ml-2" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
 
