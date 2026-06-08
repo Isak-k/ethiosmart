@@ -190,6 +190,9 @@ const TakeExam = () => {
         await loadPreviousAnswers(incompleteAttempt.attemptId);
         setViewMode('exam');
       } else {
+        // New exam - start with empty answers
+        setAnswers(new Map<string, number | null>());
+        
         // Check max attempts
         const submittedCount = attempts.filter(a => a.isSubmitted).length;
         if (submittedCount >= loadedExam.maxAttempts) {
@@ -846,7 +849,7 @@ const TakeExam = () => {
                   <p className="text-xs font-medium mb-2">Questions</p>
                   <div className="grid grid-cols-4 gap-1.5">
                     {questions.map((q, idx) => {
-                      const isAnswered = answers.get(q.questionId) !== null;
+                      const isAnswered = answers.get(q.questionId) !== null && answers.get(q.questionId) !== undefined;
                       const isCurrent = idx === currentIndex;
                       const isFlagged = flaggedQuestions.has(q.questionId);
 
