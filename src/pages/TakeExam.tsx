@@ -907,9 +907,9 @@ const TakeExam = () => {
                 </div>
               </div>
 
-              {/* Question Navigator - Mobile (Full Screen Modal) */}
+              {/* Question Navigator - Mobile (Full Screen, Same as Desktop) */}
               <div className="lg:hidden fixed right-6 top-1/2 transform -translate-y-1/2 z-50">
-                {/* Expand/Collapse Button */}
+                {/* Button - Always Visible */}
                 {!mobileNavOpen && (
                   <button
                     onClick={() => setMobileNavOpen(true)}
@@ -923,91 +923,88 @@ const TakeExam = () => {
                   </button>
                 )}
 
-                {/* Full Screen Navigator Modal */}
+                {/* Navigator Overlay - Full Screen */}
                 {mobileNavOpen && (
                   <>
-                    {/* Backdrop */}
+                    {/* Backdrop - Click to close */}
                     <div 
-                      className="fixed inset-0 bg-black/40 z-40"
+                      className="fixed inset-0 bg-black/50 z-40"
                       onClick={() => setMobileNavOpen(false)}
                     />
                     
-                    {/* Modal Panel */}
-                    <div className="fixed inset-0 z-50 flex flex-col bg-card overflow-hidden">
-                      {/* Header */}
-                      <div className="flex items-center justify-between bg-gradient-to-r from-cyan-50 to-teal-50 border-b p-4 sticky top-0">
-                        <div>
-                          <h2 className="font-bold text-lg">Questions Navigator</h2>
-                          <p className="text-sm text-muted-foreground">
-                            {currentIndex + 1} of {questions.length}
-                          </p>
+                    {/* Navigator Modal - Centered, Same as Desktop */}
+                    <div className="fixed inset-4 z-50 flex items-center justify-center">
+                      <div className="bg-card rounded-xl border shadow-sm p-3 max-h-[90vh] overflow-y-auto w-full">
+                        {/* Header */}
+                        <div className="flex items-center justify-between mb-3 pb-2 border-b">
+                          <p className="text-xs font-medium">Questions ({currentIndex + 1}/{questions.length})</p>
+                          <button
+                            onClick={() => setMobileNavOpen(false)}
+                            className="text-gray-500 hover:text-gray-700 text-xl w-6 h-6 flex items-center justify-center"
+                            title="Close navigator"
+                            aria-label="Close navigator"
+                          >
+                            ✕
+                          </button>
                         </div>
-                        <button
-                          onClick={() => setMobileNavOpen(false)}
-                          className="h-10 w-10 rounded-lg hover:bg-gray-200 flex items-center justify-center text-2xl font-light text-gray-600 transition-colors"
-                          title="Close navigator"
-                          aria-label="Close navigator"
-                        >
-                          ✕
-                        </button>
-                      </div>
 
-                      {/* Navigator Grid - Full Screen */}
-                      <div className="flex-1 overflow-y-auto p-4 bg-card">
-                        <div className="grid grid-cols-6 gap-3 auto-rows-max">
+                        {/* Navigator Grid - 5 Columns for Mobile */}
+                        <div className="grid grid-cols-5 gap-1.5">
                           {questions.map((q, idx) => {
                             const isAnswered = answers.get(q.questionId) !== null && answers.get(q.questionId) !== undefined;
                             const isCurrent = idx === currentIndex;
                             const isFlagged = flaggedQuestions.has(q.questionId);
 
                             return (
-                              <div key={q.questionId} className="flex flex-col items-center gap-1">
+                              <div key={q.questionId} className="flex items-center justify-center">
                                 <button
                                   onClick={() => {
                                     setCurrentIndex(idx);
                                     setMobileNavOpen(false);
                                   }}
-                                  className={`h-14 w-14 rounded-lg text-sm font-bold transition-all duration-150 relative flex items-center justify-center shadow-sm hover:shadow-md ${
+                                  className={`h-9 w-9 rounded-md text-xs font-bold transition-all duration-200 transform hover:scale-105 relative flex items-center justify-center overflow-hidden ${
                                     isCurrent
-                                      ? "bg-gradient-to-br from-cyan-500 to-teal-500 text-white ring-2 ring-cyan-300 scale-105"
+                                      ? "bg-cyan-500 text-white shadow-lg ring-2 ring-cyan-300"
                                       : isAnswered
-                                      ? "bg-green-500 text-white hover:bg-green-600"
-                                      : "bg-blue-100 text-blue-900 border-2 border-blue-300 hover:bg-blue-200"
+                                      ? "bg-green-500 text-white shadow-md hover:shadow-lg"
+                                      : "bg-blue-200 text-gray-800 border border-blue-300 shadow-sm hover:shadow-md"
                                   }`}
                                 >
-                                  {/* Flagged Indicator */}
+                                  {/* Lower Diagonal Red Triangle for Flagged State */}
                                   {isFlagged && (
-                                    <div className="absolute top-1 right-1 bg-red-500 rounded-full w-3 h-3 border border-white" />
+                                    <div
+                                      className="absolute inset-0 bg-red-500"
+                                      style={{
+                                        clipPath: "polygon(100% 0, 100% 100%, 0 100%)",
+                                        zIndex: 1,
+                                      }}
+                                    />
                                   )}
                                   
-                                  <span className="font-bold">{idx + 1}</span>
+                                  {/* Question Number - Always Visible */}
+                                  <span className="relative z-10 font-bold text-xs">
+                                    {idx + 1}
+                                  </span>
+                                  
+                                  {/* Small Flag Icon at Lower Right - Click to Flag */}
+                                  <div
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleFlag(q.questionId);
+                                    }}
+                                    className="absolute bottom-0.5 right-0.5 z-20 cursor-pointer hover:scale-125 transition-transform"
+                                    title={isFlagged ? "Remove flag" : "Flag for review"}
+                                  >
+                                    {isFlagged ? (
+                                      <Flag className="w-2.5 h-2.5 text-white fill-white drop-shadow" />
+                                    ) : (
+                                      <Flag className="w-2 h-2 text-gray-400 fill-gray-400" />
+                                    )}
+                                  </div>
                                 </button>
-
-                                {/* Small Info Text */}
-                                <span className="text-xs text-muted-foreground text-center w-full truncate">
-                                  {isAnswered ? '✓' : isFlagged ? '⚑' : '○'}
-                                </span>
                               </div>
                             );
                           })}
-                        </div>
-                      </div>
-
-                      {/* Footer with Legend */}
-                      <div className="border-t bg-gray-50 p-4 sticky bottom-0">
-                        <div className="grid grid-cols-3 gap-4 text-xs">
-                          <div className="flex items-center gap-2">
-                            <div className="w-4 h-4 bg-green-500 rounded" />
-                            <span>Answered</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="w-4 h-4 bg-blue-100 border border-blue-300 rounded" />
-                            <span>Unanswered</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 bg-red-500 rounded-full" />
-                            <span>Flagged</span>
-                          </div>
                         </div>
                       </div>
                     </div>
