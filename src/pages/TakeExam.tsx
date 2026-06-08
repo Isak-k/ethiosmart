@@ -824,8 +824,8 @@ const TakeExam = () => {
                   mode={practiceMode || 'exam'}  // For normal exams (practiceMode is null), use 'exam' (no feedback)
                 />
 
-                {/* Clear Answer Button - 30% smaller */}
-                <div className="mt-3 px-3 sm:px-0">
+                {/* Clear Answer Button - 30% smaller, 7px gap to Previous */}
+                <div className="mt-3 mb-1.5 px-3 sm:px-0">
                   <Button
                     variant="outline"
                     onClick={handleClearCurrentAnswer}
@@ -849,9 +849,9 @@ const TakeExam = () => {
                     Previous
                   </Button>
 
-                  {/* Flag for Review Button - positioned at top right of Next button, 30% smaller */}
+                  {/* Flag for Review Button - positioned at top right of Next button, 30% smaller, 7px gap */}
                   <div className="relative">
-                    <div className="absolute -top-16 right-0">
+                    <div className="absolute -top-12 right-0">
                       <Button
                         variant="outline"
                         onClick={() => toggleFlag(currentQuestion.questionId)}
