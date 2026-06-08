@@ -907,7 +907,7 @@ const TakeExam = () => {
                 </div>
               </div>
 
-              {/* Question Navigator - Mobile (Full Screen, Same as Desktop) */}
+              {/* Question Navigator - Mobile (Overlay on top of content) */}
               <div className="lg:hidden fixed right-6 top-1/2 transform -translate-y-1/2 z-50">
                 {/* Button - Always Visible */}
                 {!mobileNavOpen && (
@@ -923,18 +923,18 @@ const TakeExam = () => {
                   </button>
                 )}
 
-                {/* Navigator Overlay - Full Screen */}
+                {/* Navigator Overlay - Overlaps on top of exam page */}
                 {mobileNavOpen && (
                   <>
                     {/* Backdrop - Click to close */}
                     <div 
-                      className="fixed inset-0 bg-black/50 z-40"
+                      className="fixed inset-0 bg-black/30 z-40"
                       onClick={() => setMobileNavOpen(false)}
                     />
                     
-                    {/* Navigator Modal - Centered, Same as Desktop */}
-                    <div className="fixed inset-4 z-50 flex items-center justify-center">
-                      <div className="bg-card rounded-xl border shadow-sm p-3 max-h-[90vh] overflow-y-auto w-full">
+                    {/* Navigator Modal - Centered on top of content */}
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+                      <div className="bg-card rounded-xl border shadow-2xl p-3 max-h-[85vh] overflow-y-auto w-full max-w-sm pointer-events-auto">
                         {/* Header */}
                         <div className="flex items-center justify-between mb-3 pb-2 border-b">
                           <p className="text-xs font-medium">Questions ({currentIndex + 1}/{questions.length})</p>
