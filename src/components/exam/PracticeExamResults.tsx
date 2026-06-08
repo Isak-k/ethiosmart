@@ -132,7 +132,7 @@ export function PracticeExamResults({
   const isPassed = result.percentage >= passPercentage;
 
   return (
-    <div className="space-y-6">
+    <div className="w-screen mx-[calc(-50vw+50%)] space-y-6 px-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <Button
@@ -149,23 +149,30 @@ export function PracticeExamResults({
       </div>
 
       {/* Result Summary Card */}
-      <Card className={isPassed ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}>
+      <Card className={isPassed ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50'}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             {isPassed ? (
               <>
                 <CheckCircle className="w-6 h-6 text-green-600" />
-                <span className="text-green-600">Passed</span>
+                <span className="text-green-600">Excellent! You Passed!</span>
               </>
             ) : (
               <>
-                <XCircle className="w-6 h-6 text-red-600" />
-                <span className="text-red-600">Failed</span>
+                <Award className="w-6 h-6 text-amber-600" />
+                <span className="text-amber-600">Keep Practicing!</span>
               </>
             )}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Motivational Message */}
+          {!isPassed && (
+            <p className="text-sm text-amber-700 font-medium">
+              Great effort! You're on the right track. Review your answers and practice again to improve your score.
+            </p>
+          )}
+          
           {/* Score Display */}
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -308,14 +315,6 @@ export function PracticeExamResults({
 
       {/* Action Buttons */}
       <div className="flex gap-3">
-        <Button
-          onClick={handleDownloadResults}
-          variant="outline"
-          className="flex-1"
-        >
-          <Download className="w-4 h-4 mr-2" />
-          Download Results
-        </Button>
         <Button
           onClick={() => navigate('/dashboard/exams')}
           className="flex-1"

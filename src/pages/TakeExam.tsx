@@ -908,7 +908,7 @@ const TakeExam = () => {
               </div>
 
               {/* Question Navigator - Mobile (Collapsible Drawer) */}
-              <div className="lg:hidden fixed bottom-6 right-6 z-40">
+              <div className="lg:hidden fixed right-6 top-1/2 transform -translate-y-1/2 z-40">
                 {/* Expand/Collapse Button */}
                 {!mobileNavOpen && (
                   <button
