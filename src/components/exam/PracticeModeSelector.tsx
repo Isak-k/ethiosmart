@@ -17,6 +17,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Lightbulb, Clock, CheckCircle2, Eye, EyeOff } from 'lucide-react';
+import { ExamTimePicker } from './ExamTimePicker';
 
 export type PracticeModeType = 'practice' | 'exam';
 
@@ -50,7 +51,7 @@ export const PRACTICE_MODE_OPTIONS: PracticeModeOption[] = [
     title: 'Exam Mode',
     description: 'Timed exam with no feedback until completion',
     features: [
-      '⏱ Countdown timer',
+      '⏱ Custom countdown timer',
       '✗ No instant feedback',
       '✗ No explanations shown',
       '✓ Summary on completion (Correct/Wrong/Skipped)',
@@ -65,7 +66,7 @@ export interface PracticeModeDialogProps {
   open: boolean;
   examTitle?: string;
   durationMinutes?: number;
-  onSelect: (mode: PracticeModeType) => void;
+  onSelect: (mode: PracticeModeType, customTimeLimit?: number) => void;
   onCancel: () => void;
 }
 
@@ -80,6 +81,47 @@ export function PracticeModeDialog({
   onCancel,
 }: PracticeModeDialogProps) {
   const [selectedMode, setSelectedMode] = React.useState<PracticeModeType>('practice');
+  const [showTimePicker, setShowTimePicker] = React.useState(false);
+  const [customTimeLimit, setCustomTimeLimit] = React.useState<number>(durationMinutes || 60);
+
+  const handleModeSelection = () => {
+    if (selectedMode === 'exam') {
+      setShowTimePicker(true);
+    } else {
+      onSelect(selectedMode);
+    }
+  };
+
+  const handleTimeConfirm = (minutes: number) => {
+    setCustomTimeLimit(minutes);
+    onSelect(selectedMode, minutes);
+    setShowTimePicker(false);
+  };
+
+  if (showTimePicker) {
+    return (
+      <AlertDialog open={open}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl">
+              Exam Time Setup
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Set your custom time limit for <strong>{examTitle}</strong>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="py-4">
+            <ExamTimePicker
+              defaultMinutes={customTimeLimit}
+              onConfirm={handleTimeConfirm}
+              onCancel={() => setShowTimePicker(false)}
+            />
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+    );
+  }
 
   return (
     <AlertDialog open={open}>
@@ -146,15 +188,6 @@ export function PracticeModeDialog({
                         </li>
                       ))}
                     </ul>
-
-                    {option.mode === 'exam' && durationMinutes && (
-                      <div className="pt-2 px-3 py-2 bg-gray-100 rounded-lg text-sm">
-                        <div className="flex items-center gap-2 text-gray-700">
-                          <Clock className="h-4 w-4" />
-                          <span>Time limit: {durationMinutes} minutes</span>
-                        </div>
-                      </div>
-                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -171,10 +204,10 @@ export function PracticeModeDialog({
             Cancel
           </AlertDialogCancel>
           <AlertDialogAction
-            onClick={() => onSelect(selectedMode)}
+            onClick={handleModeSelection}
             className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
           >
-            Continue in {selectedMode === 'practice' ? 'Practice' : 'Exam'} Mode
+            {selectedMode === 'exam' ? 'Set Time & Continue' : 'Continue in Practice Mode'}
           </AlertDialogAction>
         </div>
       </AlertDialogContent>

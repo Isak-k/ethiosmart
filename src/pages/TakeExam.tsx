@@ -377,8 +377,12 @@ const TakeExam = () => {
 
   // ============== Mode Selection ==============
 
-  const handleModeSelected = (mode: 'practice' | 'exam') => {
+  const handleModeSelected = (mode: 'practice' | 'exam', customTimeLimit?: number) => {
     setPracticeMode(mode);
+    if (customTimeLimit && mode === 'exam' && exam) {
+      // Store custom time limit for exam mode
+      sessionStorage.setItem(`exam-custom-time-${exam.examId}`, customTimeLimit.toString());
+    }
     startExam(mode);
   };
 
@@ -795,8 +799,11 @@ const TakeExam = () => {
                   <ExamTimer
                     durationMinutes={
                       practiceMode === 'exam' 
-                        ? exam.durationMinutes 
-                        : (practiceConfig?.timeLimit ? Math.ceil(practiceConfig.timeLimit / 60) : exam.durationMinutes)
+                        ? (() => {
+                            const customTime = exam ? sessionStorage.getItem(`exam-custom-time-${exam.examId}`) : null;
+                            return customTime ? parseInt(customTime) : exam?.durationMinutes || 60;
+                          })()
+                        : (practiceConfig?.timeLimit ? Math.ceil(practiceConfig.timeLimit / 60) : exam?.durationMinutes || 60)
                     }
                     startedAt={startedAt}
                     onTimeUp={submitExam}
