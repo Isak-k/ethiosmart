@@ -58,20 +58,6 @@ export function OfflineExamsSection({ departmentId, isOnline }: OfflineExamsSect
       </CardHeader>
 
       <CardContent className="p-6 space-y-4">
-        {/* Storage Info */}
-        <div className="bg-purple-50 dark:bg-purple-950/20 p-4 rounded-xl">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Storage Used</p>
-              <p className="text-lg font-bold text-purple-600 dark:text-purple-400">{storageInfo.formatted}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-sm font-medium text-muted-foreground">Downloaded Exams</p>
-              <p className="text-lg font-bold text-purple-600 dark:text-purple-400">{downloadedExams.length}</p>
-            </div>
-          </div>
-        </div>
-
         {/* Downloaded Exams List */}
         <div className="space-y-3">
           <p className="text-sm font-medium text-muted-foreground">Available Offline</p>

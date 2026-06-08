@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
@@ -13,7 +13,8 @@ import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { newPasswordSchema } from "@/lib/validations";
-import { Loader2, User, Mail, Lock, Save, Shield, ArrowLeft } from "lucide-react";
+import { Loader2, User, Mail, Lock, Save, Shield, ArrowLeft, HardDrive, Trash2 } from "lucide-react";
+import { initOfflineDB, getOfflineStorageSize } from "@/lib/offline-storage";
 
 const Settings = () => {
   const { profile, refreshProfile, user } = useAuth();
@@ -22,12 +23,70 @@ const Settings = () => {
   
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState(profile?.full_name || "");
+  const [storageUsed, setStorageUsed] = useState("0 MB");
+  const [clearingCache, setClearingCache] = useState(false);
   
   // Password change
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordErrors, setPasswordErrors] = useState<{ password?: string; confirmPassword?: string }>({});
+
+  useEffect(() => {
+    updateStorageInfo();
+  }, []);
+
+  const updateStorageInfo = async () => {
+    try {
+      const sizeBytes = await getOfflineStorageSize();
+      const mb = (sizeBytes / 1024 / 1024).toFixed(2);
+      setStorageUsed(`${mb} MB`);
+    } catch (error) {
+      console.error('Error calculating storage:', error);
+      setStorageUsed('0 MB');
+    }
+  };
+
+  const handleClearCache = async () => {
+    if (!window.confirm('This will delete all downloaded exams and offline data. Continue?')) {
+      return;
+    }
+
+    setClearingCache(true);
+    try {
+      const db = await initOfflineDB();
+      const stores = ['exams', 'questions', 'metadata', 'attempts', 'answers', 'practice_configs', 'exam_attempts_submitted', 'practice_attempts', 'practice_answers'];
+      
+      for (const storeName of stores) {
+        try {
+          const transaction = db.transaction(storeName, 'readwrite');
+          const store = transaction.objectStore(storeName);
+          await new Promise<void>((resolve, reject) => {
+            const req = store.clear();
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+          });
+        } catch (e) {
+          console.warn(`Could not clear store ${storeName}:`, e);
+        }
+      }
+
+      setStorageUsed('0 MB');
+      toast({
+        title: "Cache cleared",
+        description: "All downloaded exams and offline data have been deleted.",
+      });
+    } catch (error) {
+      console.error('Error clearing cache:', error);
+      toast({
+        title: "Error",
+        description: "Failed to clear cache. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setClearingCache(false);
+    }
+  };
 
   const initials = profile?.full_name
     ?.split(" ")
@@ -216,6 +275,46 @@ const Settings = () => {
                 Save Changes
               </Button>
             </form>
+          </CardContent>
+        </Card>
+
+        {/* Storage & Cache Section */}
+        <Card className="card-elevated">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <HardDrive className="h-5 w-5" />
+              Storage & Cache
+            </CardTitle>
+            <CardDescription>
+              Manage offline storage and clear cached data
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+                <div>
+                  <p className="font-medium text-sm">Storage Used</p>
+                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{storageUsed}</p>
+                </div>
+                <Button
+                  onClick={handleClearCache}
+                  disabled={clearingCache || storageUsed === '0 MB'}
+                  variant="destructive"
+                  size="sm"
+                  className="gap-2"
+                >
+                  {clearingCache ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                  Clear Cache
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Clears all downloaded exams and offline data from your device
+              </p>
+            </div>
           </CardContent>
         </Card>
 
