@@ -98,3 +98,4 @@ export function PracticeExamResultsPage() {
     </DashboardLayout>
   );
 }
+export default PracticeExamResultsPage;

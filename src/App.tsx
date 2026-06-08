@@ -41,7 +41,7 @@ import ExamDiagnostic from "./pages/ExamDiagnostic";
 import SuperAdmin from "./pages/SuperAdmin";
 import PermissionTest from "./pages/PermissionTest";
 import AIStudyAssistant from "./pages/AIStudyAssistant";
-import { PracticeExamResultsPage } from "./pages/PracticeExamResultsPage";
+import PracticeExamResultsPage from "./pages/PracticeExamResultsPage";
 
 const queryClient = new QueryClient();
 
