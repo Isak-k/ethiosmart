@@ -830,9 +830,9 @@ const TakeExam = () => {
                     variant="outline"
                     onClick={handleClearCurrentAnswer}
                     disabled={!currentQuestion || (answers.get(currentQuestion.questionId) === null || answers.get(currentQuestion.questionId) === undefined)}
-                    className="flex items-center gap-1.5 transition-all duration-200 bg-white hover:bg-gray-50 text-gray-700 border-gray-300 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed text-xs px-2.5 py-1.5"
+                    className="flex items-center gap-1 transition-all duration-200 bg-white hover:bg-gray-50 text-gray-700 border-gray-300 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed text-xs px-2 py-1"
                   >
-                    <X className="h-3 w-3" />
+                    <X className="h-2.5 w-2.5" />
                     Clear Answer
                   </Button>
                 </div>
@@ -855,13 +855,13 @@ const TakeExam = () => {
                       <Button
                         variant="outline"
                         onClick={() => toggleFlag(currentQuestion.questionId)}
-                        className={`flex items-center gap-1.5 transition-all duration-200 text-xs px-2.5 py-1.5 ${
+                        className={`flex items-center gap-1 transition-all duration-200 text-xs px-2 py-1 ${
                           flaggedQuestions.has(currentQuestion.questionId)
                             ? "bg-red-50 border-red-200 text-red-700 hover:bg-red-100 shadow-sm hover:shadow-md"
                             : "bg-white hover:bg-gray-50 text-gray-700 border-gray-300 shadow-sm hover:shadow-md"
                         }`}
                       >
-                        <Flag className={`h-3 w-3 ${flaggedQuestions.has(currentQuestion.questionId) ? "fill-red-500 text-red-500" : ""}`} />
+                        <Flag className={`h-2.5 w-2.5 ${flaggedQuestions.has(currentQuestion.questionId) ? "fill-red-500 text-red-500" : ""}`} />
                         {flaggedQuestions.has(currentQuestion.questionId) ? "Flagged" : "Flag for Review"}
                       </Button>
                     </div>
