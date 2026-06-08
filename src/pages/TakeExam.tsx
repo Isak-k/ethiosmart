@@ -779,7 +779,7 @@ const TakeExam = () => {
                   onSelectOption={(index) => handleSelectOption(currentQuestion.questionId, index)}
                   marks={currentQuestion.marks}
                   explanation={currentQuestion.explanation}
-                  mode={practiceMode || 'practice'}
+                  mode={practiceMode || 'exam'}  // For normal exams (practiceMode is null), use 'exam' (no feedback)
                 />
 
                 {/* Flag Button */}

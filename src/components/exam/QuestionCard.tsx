@@ -33,13 +33,13 @@ export function QuestionCard({
 }: QuestionCardProps) {
   const { t } = useTranslation();
   
-  // NEW: Determine if feedback should be shown based on mode
-  // In practice mode, show instant feedback after selection
-  // In exam mode, hide feedback until submission
+  // Determine if feedback should be shown based on mode
+  // ONLY show feedback in practice mode when user selects an option
+  // In exam mode and normal exams, hide feedback until submission
   const shouldShowFeedback = mode === 'practice' && selectedOption !== null;
   
-  // For practice exams, show feedback after student selects an option
-  const showFeedback = (isPracticeExam || feedbackType === "instant" || shouldShowFeedback) && selectedOption !== null;
+  // Show feedback ONLY in practice mode (not for normal exams or exam mode)
+  const showFeedback = shouldShowFeedback;
   const showResults = isSubmitted; // Only show results after submission
   const showExplanation = (showFeedback || showResults) && explanation;
 
