@@ -841,10 +841,10 @@ const TakeExam = () => {
               </div>
 
               {/* Question Navigator - Desktop */}
-              <div className="hidden lg:block w-64 flex-shrink-0">
-                <div className="sticky top-24 rounded-xl border bg-card shadow-sm p-4">
-                  <p className="text-sm font-medium mb-3">Questions</p>
-                  <div className="grid grid-cols-4 gap-2">
+              <div className="hidden lg:block w-48 flex-shrink-0">
+                <div className="sticky top-24 rounded-xl border bg-card shadow-sm p-3">
+                  <p className="text-xs font-medium mb-2">Questions</p>
+                  <div className="grid grid-cols-4 gap-1.5">
                     {questions.map((q, idx) => {
                       const isAnswered = answers.get(q.questionId) !== null;
                       const isCurrent = idx === currentIndex;
@@ -854,12 +854,12 @@ const TakeExam = () => {
                         <div key={q.questionId} className="flex items-center justify-center">
                           <button
                             onClick={() => setCurrentIndex(idx)}
-                            className={`h-12 w-12 rounded-md text-sm font-bold transition-all duration-200 transform hover:scale-105 relative flex items-center justify-center overflow-hidden ${
+                            className={`h-9 w-9 rounded-md text-xs font-bold transition-all duration-200 transform hover:scale-105 relative flex items-center justify-center overflow-hidden ${
                               isCurrent
                                 ? "bg-cyan-500 text-white shadow-lg ring-2 ring-cyan-300"
                                 : isAnswered
                                 ? "bg-green-500 text-white shadow-md hover:shadow-lg"
-                                : "bg-white text-gray-800 border-2 border-gray-300 hover:border-gray-400 shadow-sm hover:shadow-md"
+                                : "bg-blue-200 text-gray-800 border border-blue-300 shadow-sm hover:shadow-md"
                             }`}
                           >
                             {/* Lower Diagonal Red Triangle for Flagged State */}
@@ -874,24 +874,25 @@ const TakeExam = () => {
                             )}
                             
                             {/* Question Number - Always Visible */}
-                            <span className="relative z-10 font-bold">
+                            <span className="relative z-10 font-bold text-xs">
                               {idx + 1}
                             </span>
                             
-                            {/* Flag Icon on Flagged Questions */}
-                            {isFlagged && (
-                              <Flag className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 text-white fill-white z-20" />
-                            )}
-                            
-                            {/* Click to Toggle Flag */}
+                            {/* Small Flag Icon at Lower Right - Click to Flag */}
                             <div
                               onClick={(e) => {
                                 e.stopPropagation();
                                 toggleFlag(q.questionId);
                               }}
-                              className="absolute inset-0 z-30 cursor-pointer"
+                              className="absolute bottom-0.5 right-0.5 z-20 cursor-pointer hover:scale-125 transition-transform"
                               title={isFlagged ? "Remove flag" : "Flag for review"}
-                            />
+                            >
+                              {isFlagged ? (
+                                <Flag className="w-2.5 h-2.5 text-white fill-white drop-shadow" />
+                              ) : (
+                                <Flag className="w-2 h-2 text-gray-400 fill-gray-400" />
+                              )}
+                            </div>
                           </button>
                         </div>
                       );

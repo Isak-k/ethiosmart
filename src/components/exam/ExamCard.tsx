@@ -211,14 +211,14 @@ export function ExamCard({ exam, isAdmin = false, hasAttempted = false, onDelete
               <Button asChild className="w-full rounded-xl bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-600 hover:to-teal-600 text-white shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105 group">
                 <Link to={`/exam/${exam.id}`} className="flex items-center justify-center">
                   <Play className="h-4 w-4 mr-2 group-hover:translate-x-1 transition-transform duration-300" />
-                  <span className="font-semibold">{t("exam.action.start")}</span>
+                  <span className="font-semibold">Start Exam</span>
                 </Link>
               </Button>
             ) : isActive && exam.max_attempts && exam.attempt_count && exam.attempt_count < exam.max_attempts ? (
               <Button asChild className="w-full rounded-xl bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-600 hover:to-teal-600 text-white shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105 group">
                 <Link to={`/exam/${exam.id}`} className="flex items-center justify-center">
                   <Play className="h-4 w-4 mr-2 group-hover:translate-x-1 transition-transform duration-300" />
-                  <span className="font-semibold">{t("exam.action.retake")}</span>
+                  <span className="font-semibold">Start Exam</span>
                   <span className="ml-2 text-xs bg-white/20 px-2 py-1 rounded-full">
                     {exam.max_attempts - exam.attempt_count} left
                   </span>
