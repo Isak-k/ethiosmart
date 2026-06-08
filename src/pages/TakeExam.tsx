@@ -921,10 +921,11 @@ const TakeExam = () => {
                     </svg>
                   </button>
                 )}
+              </div>
 
-                {/* Full Screen Navigator */}
-                {mobileNavOpen && (
-                  <div className="fixed inset-0 z-50 bg-card flex flex-col">
+              {/* Full Screen Navigator - Moved outside to prevent z-index issues */}
+              {mobileNavOpen && (
+                <div className="lg:hidden fixed inset-0 z-[9999] bg-background flex flex-col">
                     {/* Header */}
                     <div className="flex items-center justify-between bg-gradient-to-r from-cyan-500 to-teal-500 text-white p-4">
                       <div>
@@ -1000,7 +1001,7 @@ const TakeExam = () => {
                     </div>
                   </div>
                 )}
-              </div>
+            
 
               {/* Question Navigator - Desktop */}
               <div className="hidden lg:block w-48 flex-shrink-0">
