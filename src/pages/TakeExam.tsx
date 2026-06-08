@@ -837,6 +837,22 @@ const TakeExam = () => {
                   </Button>
                 </div>
 
+                {/* Flag for Review Button */}
+                <div className="mt-4 px-3 sm:px-0">
+                  <Button
+                    variant="outline"
+                    onClick={() => toggleFlag(currentQuestion.questionId)}
+                    className={`flex items-center gap-2 transition-all duration-200 ${
+                      flaggedQuestions.has(currentQuestion.questionId)
+                        ? "bg-red-50 border-red-200 text-red-700 hover:bg-red-100 shadow-md hover:shadow-lg"
+                        : "bg-white hover:bg-gray-50 text-gray-700 border-gray-300 shadow-md hover:shadow-lg"
+                    }`}
+                  >
+                    <Flag className={`h-4 w-4 ${flaggedQuestions.has(currentQuestion.questionId) ? "fill-red-500 text-red-500" : ""}`} />
+                    {flaggedQuestions.has(currentQuestion.questionId) ? "Flagged" : "Flag for Review"}
+                  </Button>
+                </div>
+
                 {/* Navigation */}
                 <div className="mt-6 flex items-center justify-between px-3 sm:mt-8 sm:px-0">
                   <Button
