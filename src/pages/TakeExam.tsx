@@ -116,6 +116,7 @@ const TakeExam = () => {
   const [submitting, setSubmitting] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isOfflineMode, setIsOfflineMode] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   
   // Exam type info
   const [examType, setExamType] = useState<ExamType>('normal');
@@ -806,7 +807,7 @@ const TakeExam = () => {
           </header>
 
           {/* Question */}
-          <main className="w-full px-0 py-4 sm:container sm:mx-auto sm:px-4 sm:py-8 lg:pb-8 pb-40">
+          <main className="w-full px-0 py-4 sm:container sm:mx-auto sm:px-4 sm:py-8">
             <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
               <div className="flex-1 min-w-0">
                 {/* Question Card */}
@@ -899,49 +900,97 @@ const TakeExam = () => {
                 </div>
               </div>
 
-              {/* Question Navigator - Mobile */}
-              <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-card border-t">
-                <div className="max-h-32 overflow-y-auto p-3">
-                  <p className="text-xs font-medium mb-2">Questions</p>
-                  <div className="grid grid-cols-8 gap-1">
-                    {questions.map((q, idx) => {
-                      const isAnswered = answers.get(q.questionId) !== null && answers.get(q.questionId) !== undefined;
-                      const isCurrent = idx === currentIndex;
-                      const isFlagged = flaggedQuestions.has(q.questionId);
+              {/* Question Navigator - Mobile (Collapsible Drawer) */}
+              <div className="lg:hidden fixed bottom-6 right-6 z-40">
+                {/* Expand/Collapse Button */}
+                {!mobileNavOpen && (
+                  <button
+                    onClick={() => setMobileNavOpen(true)}
+                    className="h-12 w-12 rounded-full bg-gradient-to-r from-cyan-500 to-teal-500 text-white shadow-lg hover:shadow-xl transform hover:scale-110 transition-all flex items-center justify-center"
+                    title="View questions"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                  </button>
+                )}
 
-                      return (
-                        <div key={q.questionId} className="flex items-center justify-center">
-                          <button
-                            onClick={() => setCurrentIndex(idx)}
-                            className={`h-7 w-7 rounded-md text-2xs font-bold transition-all duration-200 relative flex items-center justify-center overflow-hidden ${
-                              isCurrent
-                                ? "bg-cyan-500 text-white shadow-lg ring-1 ring-cyan-300"
-                                : isAnswered
-                                ? "bg-green-500 text-white shadow-md"
-                                : "bg-blue-200 text-gray-800 border border-blue-300 shadow-sm"
-                            }`}
-                          >
-                            {/* Lower Diagonal Red Triangle for Flagged State */}
-                            {isFlagged && (
-                              <div
-                                className="absolute inset-0 bg-red-500"
-                                style={{
-                                  clipPath: "polygon(100% 0, 100% 100%, 0 100%)",
-                                  zIndex: 1,
+                {/* Full Screen Modal */}
+                {mobileNavOpen && (
+                  <div className="fixed inset-0 bg-black/50 z-40 flex flex-col">
+                    {/* Header */}
+                    <div className="bg-card border-b p-4 flex items-center justify-between">
+                      <h2 className="font-semibold">Questions ({currentIndex + 1}/{questions.length})</h2>
+                      <button
+                        onClick={() => setMobileNavOpen(false)}
+                        className="text-gray-500 hover:text-gray-700 text-2xl"
+                      >
+                        ×
+                      </button>
+                    </div>
+
+                    {/* Navigator Grid */}
+                    <div className="flex-1 overflow-y-auto bg-card p-4">
+                      <div className="grid grid-cols-5 gap-2">
+                        {questions.map((q, idx) => {
+                          const isAnswered = answers.get(q.questionId) !== null && answers.get(q.questionId) !== undefined;
+                          const isCurrent = idx === currentIndex;
+                          const isFlagged = flaggedQuestions.has(q.questionId);
+
+                          return (
+                            <div key={q.questionId} className="flex items-center justify-center">
+                              <button
+                                onClick={() => {
+                                  setCurrentIndex(idx);
+                                  setMobileNavOpen(false);
                                 }}
-                              />
-                            )}
-                            
-                            {/* Question Number - Always Visible */}
-                            <span className="relative z-10 font-bold text-2xs">
-                              {idx + 1}
-                            </span>
-                          </button>
-                        </div>
-                      );
-                    })}
+                                className={`h-10 w-10 rounded-md text-xs font-bold transition-all duration-200 transform hover:scale-105 relative flex items-center justify-center overflow-hidden ${
+                                  isCurrent
+                                    ? "bg-cyan-500 text-white shadow-lg ring-2 ring-cyan-300"
+                                    : isAnswered
+                                    ? "bg-green-500 text-white shadow-md hover:shadow-lg"
+                                    : "bg-blue-200 text-gray-800 border border-blue-300 shadow-sm hover:shadow-md"
+                                }`}
+                              >
+                                {/* Lower Diagonal Red Triangle for Flagged State */}
+                                {isFlagged && (
+                                  <div
+                                    className="absolute inset-0 bg-red-500"
+                                    style={{
+                                      clipPath: "polygon(100% 0, 100% 100%, 0 100%)",
+                                      zIndex: 1,
+                                    }}
+                                  />
+                                )}
+                                
+                                {/* Question Number - Always Visible */}
+                                <span className="relative z-10 font-bold text-xs">
+                                  {idx + 1}
+                                </span>
+                                
+                                {/* Small Flag Icon at Lower Right - Click to Flag */}
+                                <div
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleFlag(q.questionId);
+                                  }}
+                                  className="absolute bottom-0.5 right-0.5 z-20 cursor-pointer hover:scale-125 transition-transform"
+                                  title={isFlagged ? "Remove flag" : "Flag for review"}
+                                >
+                                  {isFlagged ? (
+                                    <Flag className="w-2.5 h-2.5 text-white fill-white drop-shadow" />
+                                  ) : (
+                                    <Flag className="w-2 h-2 text-gray-400 fill-gray-400" />
+                                  )}
+                                </div>
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Question Navigator - Desktop */}
