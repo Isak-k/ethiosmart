@@ -806,7 +806,7 @@ const TakeExam = () => {
           </header>
 
           {/* Question */}
-          <main className="w-full px-0 py-4 sm:container sm:mx-auto sm:px-4 sm:py-8">
+          <main className="w-full px-0 py-4 sm:container sm:mx-auto sm:px-4 sm:py-8 lg:pb-8 pb-40">
             <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
               <div className="flex-1 min-w-0">
                 {/* Question Card */}
@@ -895,6 +895,51 @@ const TakeExam = () => {
                         <ChevronRight className="h-4 w-4 ml-2" />
                       </Button>
                     )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Question Navigator - Mobile */}
+              <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-card border-t">
+                <div className="max-h-32 overflow-y-auto p-3">
+                  <p className="text-xs font-medium mb-2">Questions</p>
+                  <div className="grid grid-cols-8 gap-1">
+                    {questions.map((q, idx) => {
+                      const isAnswered = answers.get(q.questionId) !== null && answers.get(q.questionId) !== undefined;
+                      const isCurrent = idx === currentIndex;
+                      const isFlagged = flaggedQuestions.has(q.questionId);
+
+                      return (
+                        <div key={q.questionId} className="flex items-center justify-center">
+                          <button
+                            onClick={() => setCurrentIndex(idx)}
+                            className={`h-7 w-7 rounded-md text-2xs font-bold transition-all duration-200 relative flex items-center justify-center overflow-hidden ${
+                              isCurrent
+                                ? "bg-cyan-500 text-white shadow-lg ring-1 ring-cyan-300"
+                                : isAnswered
+                                ? "bg-green-500 text-white shadow-md"
+                                : "bg-blue-200 text-gray-800 border border-blue-300 shadow-sm"
+                            }`}
+                          >
+                            {/* Lower Diagonal Red Triangle for Flagged State */}
+                            {isFlagged && (
+                              <div
+                                className="absolute inset-0 bg-red-500"
+                                style={{
+                                  clipPath: "polygon(100% 0, 100% 100%, 0 100%)",
+                                  zIndex: 1,
+                                }}
+                              />
+                            )}
+                            
+                            {/* Question Number - Always Visible */}
+                            <span className="relative z-10 font-bold text-2xs">
+                              {idx + 1}
+                            </span>
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
