@@ -246,13 +246,25 @@ export function QuestionRenderer({
     <div className="space-y-6 p-6 bg-card rounded-lg border border-border">
       {/* Question Header */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">
-            Question {questionNumber}
-            <span className="text-sm text-muted-foreground ml-2">({marks} marks)</span>
-          </h3>
-          <div className="text-xs px-2 py-1 bg-primary/10 text-primary rounded">
-            {question.questionType.toUpperCase()}
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex-1">
+            <h3 className="text-lg font-semibold">
+              Question {questionNumber}
+              <span className="text-sm text-muted-foreground ml-2">({marks} marks)</span>
+            </h3>
+          </div>
+          {/* Question Type Badge - More Visible */}
+          <div className={cn(
+            "px-3 py-1.5 rounded-full font-semibold text-sm whitespace-nowrap flex items-center gap-2",
+            question.questionType === 'mcq' && "bg-blue-100 text-blue-700 border border-blue-200",
+            question.questionType === 'true-false' && "bg-purple-100 text-purple-700 border border-purple-200",
+            question.questionType === 'short-answer' && "bg-amber-100 text-amber-700 border border-amber-200",
+            question.questionType === 'essay' && "bg-green-100 text-green-700 border border-green-200"
+          )}>
+            {question.questionType === 'mcq' && '📋 MCQ'}
+            {question.questionType === 'true-false' && '✓/✗ True/False'}
+            {question.questionType === 'short-answer' && '📝 Short Answer'}
+            {question.questionType === 'essay' && '📄 Essay'}
           </div>
         </div>
         <p className="text-base text-foreground">{question.questionText}</p>
