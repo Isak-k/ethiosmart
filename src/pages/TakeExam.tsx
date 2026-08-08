@@ -20,7 +20,7 @@ import {
   saveOfflineAnswer, 
   initOfflineDB 
 } from "@/lib/offline-storage";
-import { submitPracticeExam, savePracticeAnswer, createPracticeAttempt } from "@/lib/offline-practice-exam";
+import { submitPracticeExam, savePracticeAnswer, createPracticeAttempt, deletePracticeAnswer } from "@/lib/offline-practice-exam";
 import { 
   calculatePracticeModeResult, 
   convertToPracticeQuestions 
@@ -29,7 +29,7 @@ import {
   calculateExamModeSummary, 
   convertToExamQuestions 
 } from "@/lib/exam-mode-engine";
-import { QuestionCard } from "@/components/exam/QuestionCard";
+import { QuestionRenderer } from "@/components/exam/QuestionRenderer";
 import { ExamTimer } from "@/components/exam/ExamTimer";
 import { PracticeModeDialog } from "@/components/exam/PracticeModeSelector";
 import { KeyboardShortcutsHelp } from "@/components/exam/KeyboardShortcutsHelp";
@@ -105,7 +105,7 @@ const TakeExam = () => {
   
   // Exam progression
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [answers, setAnswers] = useState<Map<string, number | null>>(new Map());
+  const [answers, setAnswers] = useState<Map<string, number | string | boolean | null>>(new Map());
   const [flaggedQuestions, setFlaggedQuestions] = useState<Set<string>>(new Set());
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [startedAt, setStartedAt] = useState<Date | null>(null);
@@ -193,7 +193,7 @@ const TakeExam = () => {
         setViewMode('exam');
       } else {
         // New exam - start with empty answers
-        setAnswers(new Map<string, number | null>());
+        setAnswers(new Map<string, number | string | boolean | null>());
         
         // Check max attempts
         const submittedCount = attempts.filter(a => a.isSubmitted).length;
@@ -315,10 +315,12 @@ const TakeExam = () => {
   const loadPreviousAnswers = async (attemptIdParam: string) => {
     try {
       const existingAnswers = await getAnswers(attemptIdParam);
-      const answersMap = new Map<string, number | null>();
+      const answersMap = new Map<string, number | string | boolean | null>();
       
       existingAnswers?.forEach((a: any) => {
-        answersMap.set(a.questionId, a.selectedOptionIndex ?? null);
+        // Handle different answer types
+        const answer = a.selectedOptionIndex ?? a.selectedBoolean ?? a.textAnswer ?? null;
+        answersMap.set(a.questionId, answer);
       });
       
       setAnswers(answersMap);
@@ -326,10 +328,12 @@ const TakeExam = () => {
       console.warn("Failed to load previous answers:", error);
       try {
         const offlineAnswers = await getOfflineAnswers(attemptIdParam);
-        const answersMap = new Map<string, number | null>();
+        const answersMap = new Map<string, number | string | boolean | null>();
         
         offlineAnswers?.forEach((a: any) => {
-          answersMap.set(a.questionId, a.selectedOptionIndex ?? null);
+          // Handle different answer types
+          const answer = a.selectedOptionIndex ?? a.selectedBoolean ?? a.textAnswer ?? null;
+          answersMap.set(a.questionId, answer);
         });
         
         setAnswers(answersMap);
@@ -344,16 +348,18 @@ const TakeExam = () => {
   const verifyPassword = () => {
     if (!exam) return false;
     
-    if (!exam.accessPassword?.trim()) {
+    const examPassword = exam.accessPassword?.trim();
+    if (!examPassword) {
       return true; // No password required
     }
 
-    if (!enteredPassword) {
+    const enteredPass = enteredPassword.trim();
+    if (!enteredPass) {
       setPasswordError("Password is required");
       return false;
     }
 
-    if (enteredPassword !== exam.accessPassword) {
+    if (enteredPass !== examPassword) {
       setPasswordError("Incorrect password");
       return false;
     }
@@ -378,6 +384,26 @@ const TakeExam = () => {
   // ============== Mode Selection ==============
 
   const handleModeSelected = (mode: 'practice' | 'exam', customTimeLimit?: number) => {
+    // Validate that practice config exists
+    if (!practiceConfig) {
+      toast({
+        title: "Configuration Missing",
+        description: "Practice exam configuration is not available",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate exam mode requires time limit
+    if (mode === 'exam' && !practiceConfig.timeLimit) {
+      toast({
+        title: "Invalid Configuration",
+        description: "Exam mode requires a time limit to be configured",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setPracticeMode(mode);
     if (customTimeLimit && mode === 'exam' && exam) {
       // Store custom time limit for exam mode
@@ -400,7 +426,19 @@ const TakeExam = () => {
         await initOfflineDB();
         
         const maxScore = questions.reduce((sum, q) => sum + (q.marks || 0), 0);
-        attemptId = await createPracticeAttempt(exam.examId, user.uid, maxScore);
+        const totalQuestions = questions.length;
+        
+        // Validate we have questions
+        if (totalQuestions === 0) {
+          toast({
+            title: "Error",
+            description: "This exam has no questions",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        attemptId = await createPracticeAttempt(exam.examId, user.uid, maxScore, totalQuestions);
         setIsOfflineMode(true);
       } else {
         // Create normal attempt
@@ -459,42 +497,43 @@ const TakeExam = () => {
 
   // ============== Answer Selection ==============
 
-  const handleSelectOption = useCallback(async (questionId: string, optionIndex: number | null) => {
+  const handleSelectOption = useCallback(async (questionId: string, answer: number | string | boolean | null) => {
     if (!attemptId) return;
 
     const newAnswers = new Map(answers);
-    newAnswers.set(questionId, optionIndex);
+    newAnswers.set(questionId, answer);
     setAnswers(newAnswers);
 
-    // Save answer
-    const question = questions.find((q) => q.questionId === questionId);
-    const isCorrect = question && optionIndex !== null && optionIndex === question.correctOptionIndex;
-    const marks = question?.marks || 0;
-
+    // Save answer - Do NOT calculate correctness here
     try {
       if (examType === 'practice') {
-        // Save to offline practice exam
+        // Save to offline practice exam - always store as not correct
+        // Correctness will be calculated on submission
         await savePracticeAnswer(
           attemptId,
           questionId,
-          optionIndex ?? -1,
-          isCorrect || false,
-          marks
+          answer ?? null,
+          false, // Don't mark correct/wrong on save
+          0      // Don't assign marks on save
         );
       } else {
         // Save to normal exam (Firebase or offline)
         try {
           await saveAnswer(attemptId, questionId, {
-            selectedOptionIndex: optionIndex,
-            isCorrect: isCorrect || false,
+            selectedOptionIndex: typeof answer === 'number' ? answer : undefined,
+            selectedBoolean: typeof answer === 'boolean' ? answer : undefined,
+            textAnswer: typeof answer === 'string' ? answer : undefined,
+            isCorrect: false,
             timeSpentSeconds: null,
             answeredAt: null
           });
         } catch (error) {
           console.warn("Firebase save failed, saving offline:", error);
           await saveOfflineAnswer(attemptId, questionId, {
-            selectedOptionIndex: optionIndex,
-            isCorrect: isCorrect || false,
+            selectedOptionIndex: typeof answer === 'number' ? answer : undefined,
+            selectedBoolean: typeof answer === 'boolean' ? answer : undefined,
+            textAnswer: typeof answer === 'string' ? answer : undefined,
+            isCorrect: false,
             timeSpentSeconds: null,
             answeredAt: null
           });
@@ -503,7 +542,7 @@ const TakeExam = () => {
     } catch (error) {
       console.error("Error saving answer:", error);
     }
-  }, [attemptId, answers, questions, examType]);
+  }, [attemptId, answers, examType]);
 
   // ============== Submit Exam ==============
 
@@ -517,7 +556,14 @@ const TakeExam = () => {
 
       if (examType === 'practice') {
         // Submit practice exam - always use offline
-        const result = await submitPracticeExam(attemptId, practiceConfig?.passingScore || 50);
+        // Pass questions for correctness calculation
+        const questionsForCalc = questions.map(q => ({
+          questionId: q.questionId,
+          correctOptionIndex: q.correctOptionIndex,
+          marks: q.marks || 0,
+        }));
+        
+        const result = await submitPracticeExam(attemptId, questionsForCalc, practiceConfig?.passingScore || 50);
 
         toast({
           title: "Exam submitted",
@@ -636,10 +682,11 @@ const TakeExam = () => {
     newAnswers.delete(questionId);
     setAnswers(newAnswers);
 
-    // Save cleared answer to database
+    // Delete cleared answer from database
     try {
       if (examType === 'practice') {
-        await savePracticeAnswer(attemptId, questionId, -1, false, 0);
+        // Actually delete the answer record
+        await deletePracticeAnswer(attemptId, questionId);
       } else {
         try {
           await saveAnswer(attemptId, questionId, {
@@ -661,7 +708,7 @@ const TakeExam = () => {
     } catch (error) {
       console.error("Error clearing answer:", error);
     }
-  }, [attemptId, currentIndex, questions, answers, examType]);
+  }, [attemptId, currentIndex, questions, examType]);
 
   // Enable keyboard navigation
   useExamKeyboardNavigation({
@@ -801,9 +848,9 @@ const TakeExam = () => {
                       practiceMode === 'exam' 
                         ? (() => {
                             const customTime = exam ? sessionStorage.getItem(`exam-custom-time-${exam.examId}`) : null;
-                            return customTime ? parseInt(customTime) : exam?.durationMinutes || 60;
+                            return customTime ? parseInt(customTime) : (exam?.durationMinutes || 60);
                           })()
-                        : (practiceConfig?.timeLimit ? Math.ceil(practiceConfig.timeLimit / 60) : exam?.durationMinutes || 60)
+                        : (practiceConfig?.timeLimit ? Math.ceil(practiceConfig.timeLimit / 60) : (exam?.durationMinutes || 60))
                     }
                     startedAt={startedAt}
                     onTimeUp={submitExam}
@@ -818,17 +865,13 @@ const TakeExam = () => {
             <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
               <div className="flex-1 min-w-0">
                 {/* Question Card */}
-                <QuestionCard
+                <QuestionRenderer
                   questionNumber={currentIndex + 1}
-                  questionText={currentQuestion.questionText}
-                  options={currentQuestion.options}
-                  selectedOption={answers.get(currentQuestion.questionId) ?? null}
-                  correctOption={currentQuestion.correctOptionIndex}
-                  feedbackType={currentQuestion.feedbackType}
+                  question={currentQuestion}
+                  selectedAnswer={answers.get(currentQuestion.questionId) ?? null}
                   isSubmitted={false}
-                  onSelectOption={(index) => handleSelectOption(currentQuestion.questionId, index)}
+                  onAnswerChange={(answer) => handleSelectOption(currentQuestion.questionId, answer)}
                   marks={currentQuestion.marks}
-                  explanation={currentQuestion.explanation}
                   mode={practiceMode || 'exam'}  // For normal exams (practiceMode is null), use 'exam' (no feedback)
                 />
 

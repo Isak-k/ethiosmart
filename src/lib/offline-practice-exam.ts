@@ -21,12 +21,15 @@ export interface PracticeAttempt {
   percentage: number | null;
   passStatus: 'pass' | 'fail' | null;
   createdAt: number;
+  totalQuestions?: number; // Track total question count for skipped calculation
 }
 
 export interface PracticeAnswer {
   attemptId: string;
   questionId: string;
-  selectedOptionIndex: number;
+  selectedOptionIndex?: number | null;
+  selectedBoolean?: boolean | null;
+  textAnswer?: string | null;
   isCorrect: boolean;
   marks: number;
 }
@@ -76,7 +79,8 @@ async function initPracticeStores(): Promise<IDBDatabase> {
 export async function createPracticeAttempt(
   examId: string,
   studentId: string,
-  maxScore: number
+  maxScore: number,
+  totalQuestions?: number
 ): Promise<string> {
   const db = await initPracticeStores();
   const attemptId = `practice_${examId}_${studentId}_${Date.now()}`;
@@ -97,6 +101,7 @@ export async function createPracticeAttempt(
     percentage: null,
     passStatus: null,
     createdAt: Date.now(),
+    totalQuestions: totalQuestions || 0,
   };
 
   return new Promise((resolve, reject) => {
@@ -114,28 +119,32 @@ export async function createPracticeAttempt(
 
 /**
  * Save a practice exam answer
+ * Note: Do NOT mark answers as correct/incorrect here.
+ * Correctness is calculated only during submission.
  */
 export async function savePracticeAnswer(
   attemptId: string,
   questionId: string,
-  selectedOptionIndex: number,
+  answer: number | string | boolean | null,
   isCorrect: boolean,
   marks: number
 ): Promise<void> {
   const db = await initPracticeStores();
 
-  const answer: PracticeAnswer = {
+  const practiceAnswer: PracticeAnswer = {
     attemptId,
     questionId,
-    selectedOptionIndex,
-    isCorrect,
-    marks,
+    selectedOptionIndex: typeof answer === 'number' ? answer : undefined,
+    selectedBoolean: typeof answer === 'boolean' ? answer : undefined,
+    textAnswer: typeof answer === 'string' ? answer : undefined,
+    isCorrect: false, // Always store false; correctness calculated on submit
+    marks: 0, // Always store 0; marks calculated on submit
   };
 
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(PRACTICE_ANSWERS_STORE, 'readwrite');
     const store = transaction.objectStore(PRACTICE_ANSWERS_STORE);
-    const request = store.put(answer);
+    const request = store.put(practiceAnswer);
 
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve();
@@ -160,10 +169,33 @@ export async function getPracticeAnswers(attemptId: string): Promise<PracticeAns
 }
 
 /**
+ * Delete a practice exam answer (for clearing)
+ */
+export async function deletePracticeAnswer(
+  attemptId: string,
+  questionId: string
+): Promise<void> {
+  const db = await initPracticeStores();
+
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(PRACTICE_ANSWERS_STORE, 'readwrite');
+    const store = transaction.objectStore(PRACTICE_ANSWERS_STORE);
+    const request = store.delete([attemptId, questionId]);
+
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      console.log(`✓ Practice answer deleted: ${attemptId}/${questionId}`);
+      resolve();
+    };
+  });
+}
+
+/**
  * Submit a practice exam and calculate results
  */
 export async function submitPracticeExam(
   attemptId: string,
+  questions: Array<{ questionId: string; correctOptionIndex: number; marks: number }>,
   passingPercentage: number = 50
 ): Promise<PracticeExamResult> {
   const db = await initPracticeStores();
@@ -177,22 +209,40 @@ export async function submitPracticeExam(
   // Get all answers
   const answers = await getPracticeAnswers(attemptId);
 
-  // Calculate results
+  // Calculate results by checking correctness here (not from stored value)
   let totalScore = 0;
   let correctAnswers = 0;
   let incorrectAnswers = 0;
-  const skippedAnswers = attempt.maxScore - answers.length;
+  let skippedAnswers = 0;
+
+  // First, calculate actual question count from questions array
+  const totalQuestions = questions.length;
 
   answers.forEach((answer) => {
-    if (answer.isCorrect) {
-      totalScore += answer.marks;
+    // Skip invalid stored values (like -1 from clearing)
+    if (answer.selectedOptionIndex === null || answer.selectedOptionIndex === undefined || answer.selectedOptionIndex === -1) {
+      return; // This will be counted as skipped below
+    }
+
+    // Find the question to check correctness
+    const question = questions.find(q => q.questionId === answer.questionId);
+    if (!question) return;
+
+    // Determine correctness by comparing to correct answer
+    const isCorrect = answer.selectedOptionIndex === question.correctOptionIndex;
+    
+    if (isCorrect) {
+      totalScore += question.marks;
       correctAnswers++;
     } else {
       incorrectAnswers++;
     }
   });
 
-  const percentage = (totalScore / attempt.maxScore) * 100;
+  // Calculate skipped: questions not answered
+  skippedAnswers = totalQuestions - answers.length;
+
+  const percentage = totalQuestions > 0 ? (totalScore / attempt.maxScore) * 100 : 0;
   const passStatus = percentage >= passingPercentage ? 'pass' : 'fail';
   const timeSpentSeconds = Math.floor((Date.now() - attempt.startedAt) / 1000);
 

@@ -1,0 +1,261 @@
+/**
+ * Question Evaluation Engine
+ * Evaluates answers for all question types in both Practice and Exam modes
+ */
+
+import {
+  Question,
+  isMCQQuestion,
+  isTrueFalseQuestion,
+  isShortAnswerQuestion,
+  isEssayQuestion,
+  evaluateTextAnswer,
+} from "@/integrations/firebase/types";
+
+export interface EvaluationResult {
+  isCorrect: boolean;
+  earnedMarks: number;
+  totalMarks: number;
+  feedback?: string;
+  explanation?: string;
+}
+
+/**
+ * Evaluate an MCQ answer
+ */
+export function evaluateMCQ(
+  question: Question,
+  selectedOptionIndex: number | null
+): EvaluationResult {
+  if (!isMCQQuestion(question)) {
+    throw new Error("Question is not MCQ type");
+  }
+
+  if (selectedOptionIndex === null || selectedOptionIndex === undefined) {
+    return {
+      isCorrect: false,
+      earnedMarks: 0,
+      totalMarks: question.marks,
+      feedback: "You skipped this question",
+    };
+  }
+
+  const isCorrect = selectedOptionIndex === question.correctOptionIndex;
+  const earnedMarks = isCorrect ? question.marks : 0;
+
+  return {
+    isCorrect,
+    earnedMarks,
+    totalMarks: question.marks,
+    feedback: isCorrect
+      ? `Correct! You earned ${earnedMarks} marks`
+      : `Incorrect. The correct answer is: ${question.options[question.correctOptionIndex]}`,
+    explanation: question.explanation,
+  };
+}
+
+/**
+ * Evaluate a True/False answer
+ */
+export function evaluateTrueFalse(
+  question: Question,
+  selectedBoolean: boolean | null
+): EvaluationResult {
+  if (!isTrueFalseQuestion(question)) {
+    throw new Error("Question is not True/False type");
+  }
+
+  if (selectedBoolean === null || selectedBoolean === undefined) {
+    return {
+      isCorrect: false,
+      earnedMarks: 0,
+      totalMarks: question.marks,
+      feedback: "You skipped this question",
+    };
+  }
+
+  const isCorrect = selectedBoolean === question.correctAnswer;
+  const earnedMarks = isCorrect ? question.marks : 0;
+
+  return {
+    isCorrect,
+    earnedMarks,
+    totalMarks: question.marks,
+    feedback: isCorrect
+      ? `Correct! You earned ${earnedMarks} marks`
+      : `Incorrect. The correct answer is: ${question.correctAnswer ? "True" : "False"}`,
+    explanation: question.explanation,
+  };
+}
+
+/**
+ * Evaluate a Short Answer
+ */
+export function evaluateShortAnswer(
+  question: Question,
+  textAnswer: string | null
+): EvaluationResult {
+  if (!isShortAnswerQuestion(question)) {
+    throw new Error("Question is not Short Answer type");
+  }
+
+  if (!textAnswer || textAnswer.trim() === "") {
+    return {
+      isCorrect: false,
+      earnedMarks: 0,
+      totalMarks: question.marks,
+      feedback: "You skipped this question",
+    };
+  }
+
+  const isCorrect = evaluateTextAnswer({
+    studentAnswer: textAnswer,
+    correctAnswers: question.correctAnswers,
+    caseSensitive: question.caseSensitive || false,
+    requireExactMatch: question.requireExactMatch || false,
+  });
+
+  const earnedMarks = isCorrect ? question.marks : 0;
+
+  return {
+    isCorrect,
+    earnedMarks,
+    totalMarks: question.marks,
+    feedback: isCorrect
+      ? `Correct! You earned ${earnedMarks} marks`
+      : `Incorrect. Expected answers: ${question.correctAnswers.join(", ")}`,
+    explanation: question.explanation,
+  };
+}
+
+/**
+ * Evaluate an Essay (always returns pending - requires manual grading)
+ */
+export function evaluateEssay(
+  question: Question,
+  textAnswer: string | null
+): EvaluationResult {
+  if (!isEssayQuestion(question)) {
+    throw new Error("Question is not Essay type");
+  }
+
+  const wordCount = textAnswer ? textAnswer.trim().split(/\s+/).length : 0;
+
+  // Check word count limits
+  if (question.minWords && wordCount < question.minWords) {
+    return {
+      isCorrect: false,
+      earnedMarks: 0,
+      totalMarks: question.marks,
+      feedback: `Your essay is too short. Minimum: ${question.minWords} words, Your: ${wordCount} words`,
+    };
+  }
+
+  if (question.maxWords && wordCount > question.maxWords) {
+    return {
+      isCorrect: false,
+      earnedMarks: 0,
+      totalMarks: question.marks,
+      feedback: `Your essay is too long. Maximum: ${question.maxWords} words, Your: ${wordCount} words`,
+    };
+  }
+
+  // Essays always return pending - manual grading required
+  return {
+    isCorrect: false, // Set to false until manually graded
+    earnedMarks: 0,
+    totalMarks: question.marks,
+    feedback: "Your essay has been submitted and is pending review",
+    explanation: question.explanation,
+  };
+}
+
+/**
+ * Unified evaluation function - automatically routes to correct evaluator
+ */
+export function evaluateQuestion(
+  question: Question,
+  answer: string | number | boolean | null
+): EvaluationResult {
+  if (isMCQQuestion(question)) {
+    return evaluateMCQ(question, answer as number | null);
+  } else if (isTrueFalseQuestion(question)) {
+    return evaluateTrueFalse(question, answer as boolean | null);
+  } else if (isShortAnswerQuestion(question)) {
+    return evaluateShortAnswer(question, answer as string | null);
+  } else if (isEssayQuestion(question)) {
+    return evaluateEssay(question, answer as string | null);
+  } else {
+    throw new Error("Unknown question type");
+  }
+}
+
+/**
+ * Batch evaluate all answers
+ */
+export function batchEvaluateAnswers(
+  questions: Question[],
+  answers: Map<string, string | number | boolean | null>
+): EvaluationResult[] {
+  return questions.map((question) => {
+    const answer = answers.get(question.questionId) ?? null;
+    return evaluateQuestion(question, answer);
+  });
+}
+
+/**
+ * Calculate overall exam score
+ */
+export interface ExamScore {
+  totalMarks: number;
+  maxMarks: number;
+  percentage: number;
+  passStatus: "pass" | "fail";
+  correctCount: number;
+  incorrectCount: number;
+  pendingCount: number; // Essays and other manual grading
+  skippedCount: number;
+}
+
+export function calculateExamScore(
+  evaluationResults: EvaluationResult[],
+  passingPercentage: number = 50
+): ExamScore {
+  let totalMarks = 0;
+  let maxMarks = 0;
+  let correctCount = 0;
+  let incorrectCount = 0;
+  let pendingCount = 0;
+  let skippedCount = 0;
+
+  evaluationResults.forEach((result) => {
+    maxMarks += result.totalMarks;
+    totalMarks += result.earnedMarks;
+
+    if (result.feedback?.includes("skipped")) {
+      skippedCount++;
+    } else if (result.feedback?.includes("pending")) {
+      pendingCount++;
+    } else if (result.isCorrect) {
+      correctCount++;
+    } else {
+      incorrectCount++;
+    }
+  });
+
+  const percentage =
+    maxMarks > 0 ? (totalMarks / maxMarks) * 100 : 0;
+  const passStatus =
+    percentage >= passingPercentage ? "pass" : "fail";
+
+  return {
+    totalMarks,
+    maxMarks,
+    percentage,
+    passStatus,
+    correctCount,
+    incorrectCount,
+    pendingCount,
+    skippedCount,
+  };
+}

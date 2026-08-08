@@ -61,17 +61,70 @@ export interface Exam {
 }
 
 
-export interface Question {
+export type QuestionType = 'mcq' | 'true-false' | 'short-answer' | 'essay';
+
+// Base question interface with common fields
+export interface BaseQuestion {
   questionId: string;
   examId: string;
   questionText: string;
-  options: string[];
-  correctOptionIndex: number;
   marks: number;
   orderIndex: number;
   feedbackType: 'instant' | 'hidden';
   explanation?: string;
+  imageUrl?: string; // Optional image URL (Firebase Storage)
+  imageDisplayMode?: 'inline' | 'background' | 'main'; // How to display image (default: inline)
   createdAt: Timestamp;
+  questionType: QuestionType;
+}
+
+// MCQ specific
+export interface MCQQuestion extends BaseQuestion {
+  questionType: 'mcq';
+  options: string[];
+  correctOptionIndex: number;
+}
+
+// True/False specific
+export interface TrueFalseQuestion extends BaseQuestion {
+  questionType: 'true-false';
+  correctAnswer: boolean;
+}
+
+// Short Answer specific
+export interface ShortAnswerQuestion extends BaseQuestion {
+  questionType: 'short-answer';
+  correctAnswers: string[]; // Multiple acceptable answers
+  caseSensitive?: boolean; // Default: false
+  requireExactMatch?: boolean; // Default: false (allows partial matches)
+}
+
+// Essay specific
+export interface EssayQuestion extends BaseQuestion {
+  questionType: 'essay';
+  rubricPoints?: { criteria: string; points: number }[]; // Optional grading rubric
+  minWords?: number;
+  maxWords?: number;
+}
+
+// Union type for all question types
+export type Question = MCQQuestion | TrueFalseQuestion | ShortAnswerQuestion | EssayQuestion;
+
+// Type guard functions
+export function isMCQQuestion(q: Question): q is MCQQuestion {
+  return q.questionType === 'mcq';
+}
+
+export function isTrueFalseQuestion(q: Question): q is TrueFalseQuestion {
+  return q.questionType === 'true-false';
+}
+
+export function isShortAnswerQuestion(q: Question): q is ShortAnswerQuestion {
+  return q.questionType === 'short-answer';
+}
+
+export function isEssayQuestion(q: Question): q is EssayQuestion {
+  return q.questionType === 'essay';
 }
 
 export interface ExamAttempt {
@@ -94,10 +147,42 @@ export interface ExamAttempt {
 export interface Answer {
   questionId: string;
   attemptId: string;
-  selectedOptionIndex: number | null;
+  selectedOptionIndex?: number | null; // MCQ only
+  selectedBoolean?: boolean | null; // True/False only
+  textAnswer?: string | null; // Short Answer / Essay only
   isCorrect: boolean | null;
   timeSpentSeconds: number | null;
   answeredAt: Timestamp | null;
+  rubricScore?: number; // Essay only - for manual grading
+}
+
+export interface TextAnswerEvaluation {
+  studentAnswer: string;
+  correctAnswers: string[];
+  caseSensitive: boolean;
+  requireExactMatch: boolean;
+}
+
+export function evaluateTextAnswer(evaluation: TextAnswerEvaluation): boolean {
+  const normalize = (text: string): string => {
+    let normalized = text.trim();
+    if (!evaluation.caseSensitive) {
+      normalized = normalized.toLowerCase();
+    }
+    return normalized;
+  };
+
+  const normalized = normalize(evaluation.studentAnswer);
+  const normalizedCorrect = evaluation.correctAnswers.map(normalize);
+
+  if (evaluation.requireExactMatch) {
+    return normalizedCorrect.includes(normalized);
+  }
+
+  // Partial match: check if any correct answer contains student answer or vice versa
+  return normalizedCorrect.some(correct => 
+    correct.includes(normalized) || normalized.includes(correct)
+  );
 }
 
 // Leaderboard Types
