@@ -154,6 +154,7 @@ export interface Answer {
   timeSpentSeconds: number | null;
   answeredAt: Timestamp | null;
   rubricScore?: number; // Essay only - for manual grading
+  answerStatus?: 'pending_review' | 'graded' | null; // Essay only - grading status
 }
 
 export interface TextAnswerEvaluation {

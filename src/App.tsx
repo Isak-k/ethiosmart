@@ -42,6 +42,7 @@ import SuperAdmin from "./pages/SuperAdmin";
 import PermissionTest from "./pages/PermissionTest";
 import AIStudyAssistant from "./pages/AIStudyAssistant";
 import PracticeExamResultsPage from "./pages/PracticeExamResultsPage";
+import GradeEssays from "./pages/GradeEssays";
 
 const queryClient = new QueryClient();
 
@@ -117,6 +118,11 @@ function AppRoutes() {
         <Route path="/dashboard/exams/:examId/results" element={
           <ProtectedRoute allowedRoles={["admin"]}>
             <ExamResults />
+          </ProtectedRoute>
+        } />
+        <Route path="/dashboard/exams/:examId/grade-essays/:attemptId?" element={
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <GradeEssays />
           </ProtectedRoute>
         } />
         

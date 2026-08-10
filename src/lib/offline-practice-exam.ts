@@ -4,6 +4,8 @@
  */
 
 import { initOfflineDB, PRACTICE_ATTEMPTS_STORE, PRACTICE_ANSWERS_STORE } from './offline-storage';
+import { Question, isMCQQuestion, isTrueFalseQuestion, isShortAnswerQuestion, isEssayQuestion } from '@/integrations/firebase/types';
+import { evaluateQuestion } from './question-evaluation';
 
 export interface PracticeAttempt {
   attemptId: string;
@@ -192,10 +194,11 @@ export async function deletePracticeAnswer(
 
 /**
  * Submit a practice exam and calculate results
+ * Evaluates ALL question types: MCQ, True/False, Short Answer, Essay
  */
 export async function submitPracticeExam(
   attemptId: string,
-  questions: Array<{ questionId: string; correctOptionIndex: number; marks: number }>,
+  questions: Question[],
   passingPercentage: number = 50
 ): Promise<PracticeExamResult> {
   const db = await initPracticeStores();
@@ -209,40 +212,63 @@ export async function submitPracticeExam(
   // Get all answers
   const answers = await getPracticeAnswers(attemptId);
 
-  // Calculate results by checking correctness here (not from stored value)
+  // Build a Map of answers for quick lookup
+  const answersMap = new Map<string, PracticeAnswer>();
+  answers.forEach((a) => answersMap.set(a.questionId, a));
+
+  // Calculate results by evaluating each question
   let totalScore = 0;
   let correctAnswers = 0;
   let incorrectAnswers = 0;
   let skippedAnswers = 0;
 
-  // First, calculate actual question count from questions array
   const totalQuestions = questions.length;
 
-  answers.forEach((answer) => {
-    // Skip invalid stored values (like -1 from clearing)
-    if (answer.selectedOptionIndex === null || answer.selectedOptionIndex === undefined || answer.selectedOptionIndex === -1) {
-      return; // This will be counted as skipped below
+  questions.forEach((question) => {
+    const storedAnswer = answersMap.get(question.questionId);
+    
+    // Extract answer value from stored answer
+    let answerValue: string | number | boolean | null = null;
+    if (storedAnswer) {
+      answerValue = storedAnswer.selectedOptionIndex ?? 
+                   storedAnswer.selectedBoolean ?? 
+                   storedAnswer.textAnswer ?? 
+                   null;
     }
 
-    // Find the question to check correctness
-    const question = questions.find(q => q.questionId === answer.questionId);
-    if (!question) return;
+    // Check if skipped (no answer stored)
+    const isSkipped = !storedAnswer || answerValue === null || answerValue === undefined ||
+      (typeof answerValue === 'string' && answerValue.trim() === '') ||
+      (typeof answerValue === 'number' && answerValue === -1);
 
-    // Determine correctness by comparing to correct answer
-    const isCorrect = answer.selectedOptionIndex === question.correctOptionIndex;
-    
-    if (isCorrect) {
-      totalScore += question.marks;
+    if (isSkipped) {
+      skippedAnswers++;
+      return;
+    }
+
+    // Evaluate using the unified evaluator
+    const evaluation = evaluateQuestion(question, answerValue);
+    totalScore += evaluation.earnedMarks;
+
+    // Check if pending (essays awaiting manual grading)
+    const isPending = evaluation.feedback?.includes('pending') ?? false;
+
+    if (isPending) {
+      // Essays are pending review - don't count as correct or incorrect
+      // They'll be graded manually later
+    } else if (evaluation.isCorrect) {
       correctAnswers++;
     } else {
       incorrectAnswers++;
     }
   });
 
-  // Calculate skipped: questions not answered
-  skippedAnswers = totalQuestions - answers.length;
+  // If any essays are pending review, they were skipped above. Adjust count.
+  // Recalculate to ensure correct categorization.
+  const answeredCount = totalQuestions - skippedAnswers;
 
-  const percentage = totalQuestions > 0 ? (totalScore / attempt.maxScore) * 100 : 0;
+  const maxScore = attempt.maxScore || questions.reduce((s, q) => s + q.marks, 0);
+  const percentage = totalQuestions > 0 ? (totalScore / maxScore) * 100 : 0;
   const passStatus = percentage >= passingPercentage ? 'pass' : 'fail';
   const timeSpentSeconds = Math.floor((Date.now() - attempt.startedAt) / 1000);
 

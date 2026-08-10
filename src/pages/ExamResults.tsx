@@ -35,6 +35,7 @@ import {
   EyeOff,
   Trophy,
   Trash2,
+  GraduationCap,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -45,6 +46,7 @@ import {
   type ExamSummary,
 } from "@/lib/export-utils";
 import { useSectionPermissions } from "@/hooks/useSectionPermissions";
+import { Link } from "react-router-dom";
 
 interface AttemptWithStudent {
   id: string;
@@ -444,22 +446,37 @@ const ExamResults = () => {
                             {formatTimeSpent(attempt.timeSpentSeconds || 0)}
                           </TableCell>
                           <TableCell className="text-right">
-                            {canDelete('manageExams') && (
+                            <div className="flex items-center justify-end gap-1">
                               <Button
+                                asChild
                                 variant="ghost"
                                 size="icon"
-                                className="text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full"
-                                onClick={() => handleDeleteResult(attempt.id)}
-                                disabled={deletingId === attempt.id}
-                                title="Delete result"
+                                className="text-amber-600 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-full"
+                                title="Grade Essays"
                               >
-                                {deletingId === attempt.id ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Trash2 className="h-4 w-4" />
-                                )}
+                                <Link
+                                  to={`/dashboard/exams/${examId}/grade-essays/${attempt.id}`}
+                                >
+                                  <GraduationCap className="h-4 w-4" />
+                                </Link>
                               </Button>
-                            )}
+                              {canDelete('manageExams') && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full"
+                                  onClick={() => handleDeleteResult(attempt.id)}
+                                  disabled={deletingId === attempt.id}
+                                  title="Delete result"
+                                >
+                                  {deletingId === attempt.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       );

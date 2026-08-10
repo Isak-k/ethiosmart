@@ -264,6 +264,7 @@ ${pdfText.substring(0, 30000)}`; // Limit to 30k chars to avoid token limits
       
       // Map parsed questions to Firestore schema
       const questionsToSave: Omit<Question, 'questionId' | 'createdAt'>[] = questions.map((q, index) => ({
+        questionType: 'mcq' as const,
         examId,
         questionText: q.questionText,
         options: q.options,

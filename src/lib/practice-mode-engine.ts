@@ -1,10 +1,12 @@
 /**
  * Practice Mode Engine
  * Handles practice exams with instant feedback and explanations
+ * Supports all question types: MCQ, True/False, Short Answer, Essay
  * Mode: Shows feedback immediately as user answers
  */
 
 import { Question } from '@/integrations/firebase/types';
+import { evaluateQuestion, calculateExamScore } from './question-evaluation';
 import { 
   savePracticeAnswer, 
   getPracticeAnswers, 
@@ -12,20 +14,12 @@ import {
   PracticeExamResult 
 } from './offline-practice-exam';
 
-export interface PracticeQuestion {
-  questionId: string;
-  questionText: string;
-  options: string[];
-  correctOptionIndex: number;
-  marks: number;
-  explanation?: string;
-  feedbackType: 'instant' | 'hidden';
-  orderIndex: number;
-}
+// PracticeQuestion is just Question - no extension needed
+export type PracticeQuestion = Question;
 
 export interface PracticeModeAnswer {
   questionId: string;
-  selectedOptionIndex: number | null;
+  answer: string | number | boolean | null; // Unified answer field
   isCorrect: boolean;
   marks: number;
   feedback?: string;
@@ -38,7 +32,6 @@ export interface PracticeModeFeedback {
   explanation?: string;
   earnedMarks: number;
   totalMarks: number;
-  correctOption: number;
 }
 
 export interface PracticeModeResult {
@@ -49,88 +42,72 @@ export interface PracticeModeResult {
   passStatus: 'pass' | 'fail';
   correctCount: number;
   incorrectCount: number;
+  pendingCount: number; // For essays awaiting manual grading
+  skippedCount: number;
   answers: PracticeModeAnswer[];
   completedAt: number;
 }
 
 /**
  * Get instant feedback for an answer in practice mode
+ * Works with all question types
  */
 export function getPracticeModeFeedback(
   question: PracticeQuestion,
-  selectedOptionIndex: number | null
+  answer: string | number | boolean | null
 ): PracticeModeFeedback {
-  if (selectedOptionIndex === null) {
-    return {
-      isCorrect: false,
-      feedback: 'You skipped this question',
-      explanation: question.explanation,
-      earnedMarks: 0,
-      totalMarks: question.marks,
-      correctOption: question.correctOptionIndex,
-    };
-  }
-
-  const isCorrect = selectedOptionIndex === question.correctOptionIndex;
-  const earnedMarks = isCorrect ? question.marks : 0;
-
+  const evaluation = evaluateQuestion(question, answer);
+  
   return {
-    isCorrect,
-    feedback: isCorrect 
-      ? `✓ Correct! You earned ${earnedMarks} marks`
-      : `✗ Incorrect. The correct answer is: ${question.options[question.correctOptionIndex]}`,
-    explanation: question.explanation,
-    earnedMarks,
-    totalMarks: question.marks,
-    correctOption: question.correctOptionIndex,
+    isCorrect: evaluation.isCorrect,
+    feedback: evaluation.feedback || '',
+    explanation: evaluation.explanation,
+    earnedMarks: evaluation.earnedMarks,
+    totalMarks: evaluation.totalMarks,
   };
 }
 
 /**
  * Calculate practice mode result
+ * Works with all question types
  */
 export function calculatePracticeModeResult(
   attemptId: string,
   questions: PracticeQuestion[],
-  answers: Map<string, number>, // questionId -> selectedOptionIndex
+  answers: Map<string, string | number | boolean | null>,
   passingPercentage: number = 50
 ): PracticeModeResult {
   let totalScore = 0;
   let correctCount = 0;
   let incorrectCount = 0;
+  let pendingCount = 0;
+  let skippedCount = 0;
   const answersArray: PracticeModeAnswer[] = [];
 
   questions.forEach((question) => {
-    const selectedOptionIndex = answers.get(question.questionId);
+    const answer = answers.get(question.questionId) ?? null;
+    const evaluation = evaluateQuestion(question, answer);
     
-    if (selectedOptionIndex === null || selectedOptionIndex === undefined) {
-      // Skipped
-      answersArray.push({
-        questionId: question.questionId,
-        selectedOptionIndex: null,
-        isCorrect: false,
-        marks: 0,
-      });
-    } else {
-      const isCorrect = selectedOptionIndex === question.correctOptionIndex;
-      const marks = isCorrect ? question.marks : 0;
-      
-      totalScore += marks;
-      if (isCorrect) {
-        correctCount++;
-      } else {
-        incorrectCount++;
-      }
+    totalScore += evaluation.earnedMarks;
 
-      answersArray.push({
-        questionId: question.questionId,
-        selectedOptionIndex,
-        isCorrect,
-        marks,
-        feedback: getPracticeModeFeedback(question, selectedOptionIndex).feedback,
-        explanation: question.explanation,
-      });
+    if (evaluation.feedback?.includes('skipped')) {
+      skippedCount++;
+    } else if (evaluation.feedback?.includes('pending')) {
+      pendingCount++;
+    } else if (evaluation.isCorrect) {
+      correctCount++;
+    } else {
+      incorrectCount++;
     }
+
+    answersArray.push({
+      questionId: question.questionId,
+      answer,
+      isCorrect: evaluation.isCorrect,
+      marks: evaluation.earnedMarks,
+      feedback: evaluation.feedback,
+      explanation: question.explanation,
+    });
   });
 
   const maxScore = questions.reduce((sum, q) => sum + q.marks, 0);
@@ -145,6 +122,8 @@ export function calculatePracticeModeResult(
     passStatus,
     correctCount,
     incorrectCount,
+    pendingCount,
+    skippedCount,
     answers: answersArray,
     completedAt: Date.now(),
   };
@@ -152,35 +131,28 @@ export function calculatePracticeModeResult(
 
 /**
  * Save practice mode answer with instant feedback
+ * Works with all answer types (number, boolean, string)
  */
 export async function savePracticeModeAnswer(
   attemptId: string,
   questionId: string,
-  selectedOptionIndex: number | null,
+  answer: string | number | boolean | null,
   isCorrect: boolean,
   marks: number
 ): Promise<void> {
+  // Convert answer to storage format - delegate properly based on type
   await savePracticeAnswer(
     attemptId,
     questionId,
-    selectedOptionIndex ?? -1,
+    answer ?? null,
     isCorrect,
     marks
   );
 }
 
 /**
- * Convert to practice format
+ * Convert to practice format (no conversion needed - Question type is already compatible)
  */
 export function convertToPracticeQuestions(questions: Question[]): PracticeQuestion[] {
-  return questions.map((q) => ({
-    questionId: q.questionId,
-    questionText: q.questionText,
-    options: q.options,
-    correctOptionIndex: q.correctOptionIndex,
-    marks: q.marks,
-    explanation: q.explanation,
-    feedbackType: q.feedbackType,
-    orderIndex: q.orderIndex,
-  }));
+  return questions as PracticeQuestion[];
 }

@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { getExam, updateExam, getQuestions, addQuestion, updateQuestion as updateQuestionDb, deleteQuestion as deleteQuestionDb, deleteExam } from "@/lib/firebase-exams";
 import { getDepartments } from "@/lib/departments";
-import { Department } from "@/integrations/firebase/types";
+import { Department, Question as FirebaseQuestion } from "@/integrations/firebase/types";
 import { Timestamp } from "firebase/firestore";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useSectionPermissions } from "@/hooks/useSectionPermissions";
+import { Badge } from "@/components/ui/badge";
 import {
   Loader2,
   ArrowLeft,
@@ -54,17 +55,15 @@ import {
 } from "lucide-react";
 
 import { BulkImportQuestions } from "@/components/exam/BulkImportQuestions";
+import { QuestionTypeForm } from "@/components/admin/QuestionTypeForm";
+import { NewQuestionInput } from "@/lib/validations";
+import { Question as FirebaseQuestionType } from "@/integrations/firebase/types";
 
-interface Question {
+// Local working type - store questions as generic objects until save
+type LocalQuestion = Partial<FirebaseQuestionType> & {
   questionId?: string;
-  questionText: string;
-  options: string[];
-  correctOptionIndex: number;
-  feedbackType: "instant" | "hidden";
-  explanation?: string;
-  marks: number;
   orderIndex: number;
-}
+};
 
 interface Exam {
   examId: string;
@@ -93,7 +92,7 @@ const EditExam = () => {
   const canDeleteExams = canDelete('manageExams');
 
   const [exam, setExam] = useState<Exam | null>(null);
-  const [questions, setQuestions] = useState<Question[]>([]);
+  const [questions, setQuestions] = useState<LocalQuestion[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -102,6 +101,9 @@ const EditExam = () => {
   const [publishDialogOpen, setPublishDialogOpen] = useState(false);
   const [questionToDelete, setQuestionToDelete] = useState<number | null>(null);
   const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
+  const [editingQuestionIndex, setEditingQuestionIndex] = useState<number | null>(null);
+  const [questionFormDialogOpen, setQuestionFormDialogOpen] = useState(false);
+  const [questionFormLoading, setQuestionFormLoading] = useState(false);
 
   useEffect(() => {
     const fetchExam = async () => {
@@ -166,21 +168,11 @@ const EditExam = () => {
       toast({ title: "Permission Denied", description: "You cannot edit exams.", variant: "destructive" });
       return;
     }
-    setQuestions([
-      ...questions,
-      {
-        questionText: "",
-        options: ["", "", "", ""],
-        correctOptionIndex: 0,
-        feedbackType: "hidden",
-        explanation: "",
-        marks: 1,
-        orderIndex: questions.length,
-      },
-    ]);
+    setEditingQuestionIndex(questions.length);
+    setQuestionFormDialogOpen(true);
   };
 
-  const updateQuestionState = (index: number, updates: Partial<Question>) => {
+  const updateQuestionState = (index: number, updates: Partial<LocalQuestion>) => {
     if (!canEditExams) {
       toast({ title: "Permission Denied", description: "You cannot edit exams.", variant: "destructive" });
       return;
@@ -252,92 +244,138 @@ const EditExam = () => {
   };
 
   const saveExam = async () => {
-    if (!canEditExams) {
-      toast({ title: "Permission Denied", description: "You cannot edit exams.", variant: "destructive" });
-      return;
-    }
-    if (!exam || !id) return;
-
-    setSaving(true);
-
-    try {
-      // Validate questions
-      const invalidQuestions = questions.filter(
-        (q) =>
-          !q.questionText.trim() ||
-          q.options.some((o) => !o.trim()) ||
-          q.correctOptionIndex < 0 ||
-          q.correctOptionIndex >= q.options.length
-      );
-
-      if (invalidQuestions.length > 0) {
-        toast({
-          title: t("admin.exams.toasts.invalidQuestions"),
-          description: t("admin.exams.toasts.fillAllFields"),
-          variant: "destructive",
-        });
-        setSaving(false);
+      if (!canEditExams) {
+        toast({ title: "Permission Denied", description: "You cannot edit exams.", variant: "destructive" });
         return;
       }
+      if (!exam || !id) return;
 
-      // Update exam
-      await updateExam(id, {
-        title: exam.title,
-        description: exam.description,
-        durationMinutes: exam.durationMinutes,
-        maxAttempts: exam.maxAttempts,
-        shuffleQuestions: exam.shuffleQuestions,
-        shuffleOptions: exam.shuffleOptions,
-        allowOfflineDownload: exam.allowOfflineDownload,
-        examType: exam.examType,
-        startTime: exam.startTime,
-        endTime: exam.endTime,
-        isPublished: exam.isPublished,
-        resultsPublished: exam.resultsPublished,
-        accessPassword: exam.accessPassword?.trim() || null
-      });
+      setSaving(true);
 
-      // Update questions
-      // Use Promise.all to handle async operations and map results
-      const updatedQuestions = await Promise.all(questions.map(async (q, i) => {
-        const questionData = {
-          examId: id,
-          questionText: q.questionText,
-          options: q.options,
-          correctOptionIndex: q.correctOptionIndex,
-          feedbackType: q.feedbackType,
-          explanation: q.explanation || undefined,
-          marks: q.marks,
-          orderIndex: i,
-        };
+      try {
+        // Validate questions - type-aware validation
+        const invalidQuestions = questions.filter((q) => {
+          if (!q.questionText?.trim()) return true;
+          if (!q.marks || q.marks < 1) return true;
+          if (!q.questionType) return true;
 
-        if (q.questionId) {
-          await updateQuestionDb(id, q.questionId, questionData);
-          return q;
-        } else {
-          const newId = await addQuestion(id, questionData);
-          // Return the question with the new ID
-          return { ...q, questionId: newId };
+          // Type-specific validation
+          switch (q.questionType) {
+            case "mcq":
+              return !q.options?.length || q.options.some((o) => !o?.trim()) || q.correctOptionIndex === undefined;
+            case "true-false":
+              return q.correctAnswer === undefined;
+            case "short-answer":
+              return !q.correctAnswers?.length || q.correctAnswers.some((a) => !a?.trim());
+            case "essay":
+              return false; // Essays have no specific requirements
+            default:
+              return true;
+          }
+        });
+
+        if (invalidQuestions.length > 0) {
+          toast({
+            title: "Invalid Questions",
+            description: `${invalidQuestions.length} question(s) have missing required fields. Please check each question.`,
+            variant: "destructive",
+          });
+          setSaving(false);
+          return;
         }
-      }));
-      
-      // Update local state with new IDs to prevent duplicates on subsequent saves
-      setQuestions(updatedQuestions);
 
-      toast({
-        title: t("admin.exams.toasts.examSaved"),
-      });
-    } catch (error: any) {
-      console.error("Error saving exam:", error);
-      toast({
-        title: t("admin.exams.toasts.saveFailed"),
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
+        // Update exam
+        await updateExam(id, {
+          title: exam.title,
+          description: exam.description,
+          durationMinutes: exam.durationMinutes,
+          maxAttempts: exam.maxAttempts,
+          shuffleQuestions: exam.shuffleQuestions,
+          shuffleOptions: exam.shuffleOptions,
+          allowOfflineDownload: exam.allowOfflineDownload,
+          examType: exam.examType,
+          startTime: exam.startTime,
+          endTime: exam.endTime,
+          isPublished: exam.isPublished,
+          resultsPublished: exam.resultsPublished,
+          accessPassword: exam.accessPassword?.trim() || null
+        });
+
+        // Update questions - preserve type-specific data
+        const updatedQuestions = await Promise.all(questions.map(async (q, i) => {
+          // Build question data based on type
+          const baseQuestionData = {
+            examId: id,
+            questionText: q.questionText,
+            feedbackType: q.feedbackType,
+            explanation: q.explanation || undefined,
+            marks: q.marks,
+            orderIndex: i,
+            questionType: q.questionType,
+            imageUrl: q.imageUrl,
+            imageDisplayMode: q.imageDisplayMode,
+          };
+
+          let questionData: any = baseQuestionData;
+
+          // Add type-specific fields
+          switch (q.questionType) {
+            case "mcq":
+              questionData = {
+                ...baseQuestionData,
+                options: q.options || [],
+                correctOptionIndex: q.correctOptionIndex ?? 0,
+              };
+              break;
+            case "true-false":
+              questionData = {
+                ...baseQuestionData,
+                correctAnswer: q.correctAnswer ?? false,
+              };
+              break;
+            case "short-answer":
+              questionData = {
+                ...baseQuestionData,
+                correctAnswers: q.correctAnswers || [],
+                caseSensitive: q.caseSensitive ?? false,
+                requireExactMatch: q.requireExactMatch ?? false,
+              };
+              break;
+            case "essay":
+              questionData = {
+                ...baseQuestionData,
+                minWords: q.minWords,
+                maxWords: q.maxWords,
+              };
+              break;
+          }
+
+          if (q.questionId) {
+            await updateQuestionDb(id, q.questionId, questionData);
+            return q;
+          } else {
+            const newId = await addQuestion(id, questionData);
+            return { ...q, questionId: newId };
+          }
+        }));
+
+        // Update local state with new IDs
+        setQuestions(updatedQuestions);
+
+        toast({
+          title: t("admin.exams.toasts.examSaved"),
+        });
+      } catch (error: any) {
+        console.error("Error saving exam:", error);
+        toast({
+          title: t("admin.exams.toasts.saveFailed"),
+          description: error.message,
+          variant: "destructive",
+        });
+      } finally {
+        setSaving(false);
+      }
+    };
 
   const togglePublish = async () => {
     if (!canEditExams) {
@@ -440,6 +478,119 @@ const EditExam = () => {
         variant: "destructive",
       });
     }
+  };
+
+  const handleQuestionFormSubmit = async (data: NewQuestionInput) => {
+    if (!canEditExams) return;
+    
+    setQuestionFormLoading(true);
+    try {
+      const index = editingQuestionIndex;
+      if (index === null) return;
+
+      const newQuestions = [...questions];
+      
+      // Handle image replacement - delete old image if different
+      const oldQuestion = index < questions.length ? questions[index] : null;
+      if (oldQuestion && oldQuestion.imageUrl && data.imageUrl && oldQuestion.imageUrl !== data.imageUrl) {
+        // New image is different from old image - delete the old one
+        try {
+          const { deleteQuestionImage } = await import("@/lib/image-handler");
+          await deleteQuestionImage(oldQuestion.imageUrl);
+          console.log("Old image deleted successfully");
+        } catch (error) {
+          console.warn("Failed to delete old image, but continuing:", error);
+          // Don't fail the save operation if image deletion fails
+        }
+      }
+
+      // Build the question object based on type
+      const baseQuestion: LocalQuestion = {
+        questionText: data.questionText,
+        marks: data.marks,
+        feedbackType: data.feedbackType,
+        explanation: data.explanation,
+        imageUrl: data.imageUrl,
+        imageDisplayMode: data.imageDisplayMode,
+        questionType: data.questionType,
+        orderIndex: index,
+      };
+
+      let questionToSave: LocalQuestion = baseQuestion;
+
+      // Add type-specific fields
+      switch (data.questionType) {
+        case "mcq":
+          questionToSave = {
+            ...baseQuestion,
+            options: data.options || [],
+            correctOptionIndex: data.correctOptionIndex ?? 0,
+          };
+          break;
+        case "true-false":
+          questionToSave = {
+            ...baseQuestion,
+            correctAnswer: data.correctAnswer ?? false,
+          };
+          break;
+        case "short-answer":
+          questionToSave = {
+            ...baseQuestion,
+            correctAnswers: data.correctAnswers || [],
+            caseSensitive: data.caseSensitive ?? false,
+            requireExactMatch: data.requireExactMatch ?? false,
+          };
+          break;
+        case "essay":
+          questionToSave = {
+            ...baseQuestion,
+            minWords: data.minWords,
+            maxWords: data.maxWords,
+          };
+          break;
+      }
+
+      // Preserve questionId if editing existing
+      if (index < questions.length && questions[index].questionId) {
+        questionToSave.questionId = questions[index].questionId;
+      }
+
+      if (index === questions.length) {
+        // Adding new question
+        newQuestions.push(questionToSave);
+      } else {
+        // Updating existing question
+        newQuestions[index] = questionToSave;
+      }
+
+
+      setQuestions(newQuestions);
+      setQuestionFormDialogOpen(false);
+      setEditingQuestionIndex(null);
+      
+      toast({
+        title: "Question saved",
+        description: index === questions.length ? "Question added successfully" : "Question updated successfully",
+      });
+    } catch (error: any) {
+      console.error("Error saving question:", error);
+      toast({
+        title: "Failed to save question",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setQuestionFormLoading(false);
+    }
+  };
+
+  const openEditQuestion = (index: number) => {
+    if (!canEditExams) {
+      toast({ title: "Permission Denied", description: "You cannot edit exams.", variant: "destructive" });
+      return;
+    }
+    setEditingQuestionIndex(index);
+    setQuestionFormDialogOpen(true);
   };
 
   if (loading) {
@@ -738,7 +889,18 @@ const EditExam = () => {
             </Card>
           ) : (
             <div className="space-y-4">
-              {questions.map((question, qIndex) => (
+              {questions.map((question, qIndex) => {
+                const typeLabel: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+                  "mcq": { label: "MCQ", variant: "secondary" },
+                  "true-false": { label: "True/False", variant: "outline" },
+                  "short-answer": { label: "Short Answer", variant: "default" },
+                  "essay": { label: "Essay", variant: "destructive" },
+                };
+                const typeInfo = question.questionType
+                  ? typeLabel[question.questionType] || { label: question.questionType, variant: "outline" as const }
+                  : null;
+
+                return (
                 <Card key={question.questionId || qIndex}>
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
@@ -747,103 +909,38 @@ const EditExam = () => {
                         <span className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary">
                           {qIndex + 1}
                         </span>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            {typeInfo && (
+                              <Badge variant={typeInfo.variant}>{typeInfo.label}</Badge>
+                            )}
+                          </div>
+                          <p className="font-medium text-sm line-clamp-2">{question.questionText || "Untitled Question"}</p>
+                          <p className="text-xs text-muted-foreground">Marks: {question.marks}</p>
+                        </div>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => confirmDeleteQuestion(qIndex)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openEditQuestion(qIndex)}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => confirmDeleteQuestion(qIndex)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>{t("admin.exams.questions.questionText")}</Label>
-                      <Textarea
-                        value={question.questionText}
-                        onChange={(e) =>
-                          updateQuestionState(qIndex, { questionText: e.target.value })
-                        }
-                        placeholder={t("admin.exams.questions.questionPlaceholder")}
-                        className="input-focus"
-                        rows={2}
-                      />
-                    </div>
-
-                    <div className="space-y-3">
-                      <Label>{t("admin.exams.questions.options")}</Label>
-                      <RadioGroup
-                        value={question.correctOptionIndex.toString()}
-                        onValueChange={(v) =>
-                          updateQuestionState(qIndex, { correctOptionIndex: parseInt(v) })
-                        }
-                      >
-                        {question.options.map((option, oIndex) => (
-                          <div key={oIndex} className="flex items-center gap-3">
-                            <RadioGroupItem value={oIndex.toString()} id={`q${qIndex}-o${oIndex}`} />
-                            <Input
-                              value={option}
-                              onChange={(e) => updateOption(qIndex, oIndex, e.target.value)}
-                              placeholder={t("admin.exams.questions.optionPlaceholder", { number: oIndex + 1 })}
-                              className="input-focus flex-1"
-                            />
-                          </div>
-                        ))}
-                      </RadioGroup>
-                    </div>
-
-                    <div className="space-y-3">
-                      <Label>{t("admin.exams.questions.explanation")}</Label>
-                      <Textarea
-                        value={question.explanation || ""}
-                        onChange={(e) =>
-                          updateQuestionState(qIndex, { explanation: e.target.value })
-                        }
-                        placeholder={t("admin.exams.questions.explanationPlaceholder")}
-                        className="input-focus"
-                        rows={2}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        {t("admin.exams.questions.explanationHelp")}
-                      </p>
-                    </div>
-
-                    <div className="grid sm:grid-cols-2 gap-4 pt-4 border-t">
-                      <div className="space-y-2">
-                        <Label>{t("admin.exams.questions.feedbackType")}</Label>
-                        <Select
-                          value={question.feedbackType}
-                          onValueChange={(v: "instant" | "hidden") =>
-                            updateQuestionState(qIndex, { feedbackType: v })
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="instant">{t("admin.exams.questions.instantFeedback")}</SelectItem>
-                            <SelectItem value="hidden">{t("admin.exams.questions.hiddenFeedback")}</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>{t("admin.exams.questions.marks")}</Label>
-                        <Input
-                          type="number"
-                          min={1}
-                          value={question.marks}
-                          onChange={(e) =>
-                            updateQuestionState(qIndex, { marks: parseInt(e.target.value) || 1 })
-                          }
-                          className="input-focus"
-                        />
-                      </div>
-                    </div>
-                  </CardContent>
                 </Card>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -952,6 +1049,33 @@ const EditExam = () => {
                 Publish Exam
               </Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Question Type Form Dialog */}
+        <Dialog open={questionFormDialogOpen} onOpenChange={setQuestionFormDialogOpen}>
+          <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {editingQuestionIndex === questions.length ? "Add Question" : "Edit Question"}
+              </DialogTitle>
+              <DialogDescription>
+                Create or edit a question with support for multiple question types: MCQ, True/False, Short Answer, and Essay.
+              </DialogDescription>
+            </DialogHeader>
+            {questionFormDialogOpen && editingQuestionIndex !== null && id && (
+              <QuestionTypeForm
+                key={editingQuestionIndex}
+                examId={id}
+                question={editingQuestionIndex < questions.length ? (questions[editingQuestionIndex] as FirebaseQuestionType) : undefined}
+                onSubmit={handleQuestionFormSubmit}
+                isLoading={questionFormLoading}
+                onCancel={() => {
+                  setQuestionFormDialogOpen(false);
+                  setEditingQuestionIndex(null);
+                }}
+              />
+            )}
           </DialogContent>
         </Dialog>
       </div>

@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { Loader2, Trophy, Clock, CheckCircle, XCircle, Eye } from "lucide-react";
+import { Loader2, Trophy, Clock, CheckCircle, XCircle, Eye, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { useTranslation } from "react-i18next";
 import { collection, getDocs, query, where } from "firebase/firestore";
@@ -21,6 +21,8 @@ interface Result {
   maxScore: number | null;
   submittedAt: string | null;
   timeSpentSeconds: number | null;
+  pendingEssayCount?: number | null;
+  gradedEssayCount?: number | null;
   exam: {
     title: string;
     resultsPublished: boolean;
@@ -66,6 +68,8 @@ const StudentResults = () => {
             maxScore: attempt.maxScore,
             submittedAt: attempt.submittedAt?.toDate().toISOString() || null,
             timeSpentSeconds: attempt.timeSpentSeconds,
+            pendingEssayCount: (attempt as any).pendingEssayCount ?? null,
+            gradedEssayCount: (attempt as any).gradedEssayCount ?? null,
             exam: {
               title: exam?.title || 'Unknown Exam',
               resultsPublished: exam?.resultsPublished || false
@@ -79,8 +83,10 @@ const StudentResults = () => {
             examId: attempt.examId,
             totalScore: attempt.totalScore,
             maxScore: attempt.maxScore,
-            submittedAt: attempt.submittedAt?.toDate().toISOString() || null,
+            submittedAt: attempt.submittedAt?.toDate?.()?.toISOString?.() || null,
             timeSpentSeconds: attempt.timeSpentSeconds,
+            pendingEssayCount: (attempt as any).pendingEssayCount ?? null,
+            gradedEssayCount: (attempt as any).gradedEssayCount ?? null,
             exam: {
               title: attempt.examTitle || 'Unknown Exam',
               resultsPublished: true // Show results if we have the attempt data
@@ -96,6 +102,8 @@ const StudentResults = () => {
         maxScore: ar.maxScore ?? null,
         submittedAt: ar.submittedAt?.toDate?.()?.toISOString?.() || null,
         timeSpentSeconds: ar.timeSpentSeconds ?? null,
+        pendingEssayCount: (ar as any).pendingEssayCount ?? null,
+        gradedEssayCount: (ar as any).gradedEssayCount ?? null,
         exam: {
           title: ar.examTitle || "Deleted Exam",
           resultsPublished: true
@@ -159,6 +167,8 @@ const StudentResults = () => {
                 : 0;
               const isPassed = percentage >= 50;
               const isPublished = result.exam.resultsPublished;
+              const hasPendingEssays =
+                typeof result.pendingEssayCount === 'number' && result.pendingEssayCount > 0;
 
               return (
                 <Card key={result.id} className="card-interactive">
@@ -167,33 +177,54 @@ const StudentResults = () => {
                       <CardTitle className="text-lg font-display">
                         {result.exam.title}
                       </CardTitle>
-                      {isPublished ? (
-                        <Badge
-                          variant="outline"
-                          className={isPassed ? "badge-success" : "badge-danger"}
-                        >
-                          {isPassed ? (
-                            <>
-                              <CheckCircle className="h-3 w-3 mr-1" />
-                              {t("student.results.status.passed")}
-                            </>
-                          ) : (
-                            <>
-                              <XCircle className="h-3 w-3 mr-1" />
-                              {t("student.results.status.failed")}
-                            </>
-                          )}
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="badge-warning">
-                          {t("student.results.status.pending")}
-                        </Badge>
-                      )}
+                      <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                        {hasPendingEssays && (
+                          <Badge variant="outline" className="badge-warning">
+                            <Clock className="h-3 w-3 mr-1" />
+                            Essays Pending
+                          </Badge>
+                        )}
+                        {isPublished ? (
+                          <Badge
+                            variant="outline"
+                            className={isPassed ? "badge-success" : "badge-danger"}
+                          >
+                            {isPassed ? (
+                              <>
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                {t("student.results.status.passed")}
+                              </>
+                            ) : (
+                              <>
+                                <XCircle className="h-3 w-3 mr-1" />
+                                {t("student.results.status.failed")}
+                              </>
+                            )}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="badge-warning">
+                            {t("student.results.status.pending")}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>
                     {isPublished ? (
                       <div className="space-y-4">
+                        {hasPendingEssays && (
+                          <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 p-3 text-amber-900 dark:text-amber-200">
+                            <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                            <div className="text-xs">
+                              <div className="font-semibold">
+                                {result.pendingEssayCount} essay{result.pendingEssayCount === 1 ? '' : 's'} awaiting manual grading
+                              </div>
+                              <div className="mt-0.5 opacity-90">
+                                Score shown is preliminary and will increase after your essays are reviewed.
+                              </div>
+                            </div>
+                          </div>
+                        )}
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <Trophy className={`h-5 w-5 ${getScoreColor(percentage)}`} />

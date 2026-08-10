@@ -2,23 +2,18 @@
  * Exam Mode Engine
  * Handles timed exams with NO instant feedback
  * Shows only Correct/Wrong/Skipped summary after submission
+ * Supports all question types: MCQ, True/False, Short Answer, Essay
  */
 
 import { Question } from '@/integrations/firebase/types';
+import { evaluateQuestion, calculateExamScore } from './question-evaluation';
 
-export interface ExamQuestion {
-  questionId: string;
-  questionText: string;
-  options: string[];
-  correctOptionIndex: number;
-  marks: number;
-  orderIndex: number;
-  feedbackType: 'instant' | 'hidden';
-}
+// ExamQuestion is just Question - no extension needed
+export type ExamQuestion = Question;
 
 export interface ExamAnswer {
   questionId: string;
-  selectedOptionIndex: number | null;
+  answer: string | number | boolean | null; // Unified answer field
   isCorrect: boolean | null;
   marks: number;
 }
@@ -27,6 +22,7 @@ export interface ExamModeSummary {
   totalQuestions: number;
   correctCount: number;
   incorrectCount: number;
+  pendingCount: number; // Essays and manual grading
   skippedCount: number;
   totalScore: number;
   maxScore: number;
@@ -44,30 +40,33 @@ export interface ExamModeResult {
 
 /**
  * Calculate exam mode summary (only counts, no details)
+ * Works with all question types
  */
 export function calculateExamModeSummary(
   questions: ExamQuestion[],
-  answers: Map<string, number | null>, // questionId -> selectedOptionIndex | null
+  answers: Map<string, string | number | boolean | null>,
   timeSpentSeconds: number,
   passingPercentage: number = 50
 ): ExamModeSummary {
   let correctCount = 0;
   let incorrectCount = 0;
+  let pendingCount = 0;
   let skippedCount = 0;
   let totalScore = 0;
 
   questions.forEach((question) => {
-    const selectedOptionIndex = answers.get(question.questionId);
+    const answer = answers.get(question.questionId) ?? null;
+    const evaluation = evaluateQuestion(question, answer);
 
-    if (selectedOptionIndex === null || selectedOptionIndex === undefined) {
-      // Skipped
+    totalScore += evaluation.earnedMarks;
+
+    if (evaluation.feedback?.includes('skipped')) {
       skippedCount++;
-    } else if (selectedOptionIndex === question.correctOptionIndex) {
-      // Correct
+    } else if (evaluation.feedback?.includes('pending')) {
+      pendingCount++;
+    } else if (evaluation.isCorrect) {
       correctCount++;
-      totalScore += question.marks;
     } else {
-      // Incorrect
       incorrectCount++;
     }
   });
@@ -80,6 +79,7 @@ export function calculateExamModeSummary(
     totalQuestions: questions.length,
     correctCount,
     incorrectCount,
+    pendingCount,
     skippedCount,
     totalScore,
     maxScore,
@@ -91,37 +91,27 @@ export function calculateExamModeSummary(
 
 /**
  * Calculate exam mode result
+ * Works with all question types
  */
 export function calculateExamModeResult(
   attemptId: string,
   questions: ExamQuestion[],
-  answers: Map<string, number | null>,
+  answers: Map<string, string | number | boolean | null>,
   timeSpentSeconds: number,
   passingPercentage: number = 50
 ): ExamModeResult {
   const answersArray: ExamAnswer[] = [];
 
   questions.forEach((question) => {
-    const selectedOptionIndex = answers.get(question.questionId);
+    const answer = answers.get(question.questionId) ?? null;
+    const evaluation = evaluateQuestion(question, answer);
 
-    if (selectedOptionIndex === null || selectedOptionIndex === undefined) {
-      answersArray.push({
-        questionId: question.questionId,
-        selectedOptionIndex: null,
-        isCorrect: null, // Don't reveal correctness in exam mode
-        marks: 0,
-      });
-    } else {
-      const isCorrect = selectedOptionIndex === question.correctOptionIndex;
-      const marks = isCorrect ? question.marks : 0;
-
-      answersArray.push({
-        questionId: question.questionId,
-        selectedOptionIndex,
-        isCorrect: null, // Don't reveal correctness in exam mode
-        marks,
-      });
-    }
+    answersArray.push({
+      questionId: question.questionId,
+      answer,
+      isCorrect: null, // Don't reveal correctness in exam mode
+      marks: evaluation.earnedMarks,
+    });
   });
 
   const summary = calculateExamModeSummary(
@@ -176,18 +166,10 @@ export function getExamModeResultStatus(summary: ExamModeSummary): {
 }
 
 /**
- * Convert to exam format
+ * Convert to exam format (no conversion needed - Question type is already compatible)
  */
 export function convertToExamQuestions(questions: Question[]): ExamQuestion[] {
-  return questions.map((q) => ({
-    questionId: q.questionId,
-    questionText: q.questionText,
-    options: q.options,
-    correctOptionIndex: q.correctOptionIndex,
-    marks: q.marks,
-    orderIndex: q.orderIndex,
-    feedbackType: q.feedbackType,
-  }));
+  return questions as ExamQuestion[];
 }
 
 /**

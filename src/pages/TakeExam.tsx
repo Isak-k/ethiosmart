@@ -29,6 +29,8 @@ import {
   calculateExamModeSummary, 
   convertToExamQuestions 
 } from "@/lib/exam-mode-engine";
+import { evaluateQuestion } from "@/lib/question-evaluation";
+import { shuffleArray } from "@/lib/utils";
 import { QuestionRenderer } from "@/components/exam/QuestionRenderer";
 import { ExamTimer } from "@/components/exam/ExamTimer";
 import { PracticeModeDialog } from "@/components/exam/PracticeModeSelector";
@@ -194,6 +196,11 @@ const TakeExam = () => {
       } else {
         // New exam - start with empty answers
         setAnswers(new Map<string, number | string | boolean | null>());
+
+        // Apply question shuffling for new attempts (preserves order when resuming)
+        if (loadedExam.shuffleQuestions && loadedQuestions.length > 1) {
+          setQuestions(shuffleArray(loadedQuestions));
+        }
         
         // Check max attempts
         const submittedCount = attempts.filter(a => a.isSubmitted).length;
@@ -556,14 +563,8 @@ const TakeExam = () => {
 
       if (examType === 'practice') {
         // Submit practice exam - always use offline
-        // Pass questions for correctness calculation
-        const questionsForCalc = questions.map(q => ({
-          questionId: q.questionId,
-          correctOptionIndex: q.correctOptionIndex,
-          marks: q.marks || 0,
-        }));
-        
-        const result = await submitPracticeExam(attemptId, questionsForCalc, practiceConfig?.passingScore || 50);
+        // Pass full questions array for correct evaluation of ALL types
+        const result = await submitPracticeExam(attemptId, questions, practiceConfig?.passingScore || 50);
 
         toast({
           title: "Exam submitted",
@@ -599,10 +600,9 @@ const TakeExam = () => {
 
         questions.forEach((q) => {
           maxScore += q.marks || 0;
-          const selectedOption = answers.get(q.questionId);
-          if (selectedOption !== null && selectedOption !== undefined && selectedOption === q.correctOptionIndex) {
-            totalScore += q.marks || 0;
-          }
+          const selectedAnswer = answers.get(q.questionId) ?? null;
+          const evaluation = evaluateQuestion(q, selectedAnswer);
+          totalScore += evaluation.earnedMarks;
         });
 
         try {
@@ -873,6 +873,7 @@ const TakeExam = () => {
                   onAnswerChange={(answer) => handleSelectOption(currentQuestion.questionId, answer)}
                   marks={currentQuestion.marks}
                   mode={practiceMode || 'exam'}  // For normal exams (practiceMode is null), use 'exam' (no feedback)
+                  shuffleOptions={!!exam?.shuffleOptions}
                 />
 
                 {/* Clear Answer Button - Hidden in practice mode, 30% smaller, 7px gap to Previous */}

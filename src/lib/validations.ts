@@ -210,3 +210,261 @@ export const getQuestionSchema = (t: any) => z.object({
     .min(1, t("validations.question.marksMin"))
     .max(100, t("validations.question.marksMax")),
 });
+
+
+// New Question Type Schemas
+
+// Base schema for all questions
+export const baseQuestionSchema = z.object({
+  questionText: z
+    .string()
+    .trim()
+    .min(1, "Question text is required")
+    .max(2000, "Question text must be less than 2000 characters"),
+  marks: z
+    .number()
+    .min(1, "Marks must be at least 1")
+    .max(100, "Marks cannot exceed 100"),
+  feedbackType: z.enum(["instant", "hidden"]),
+  explanation: z
+    .string()
+    .trim()
+    .max(2000, "Explanation must be less than 2000 characters")
+    .optional(),
+  imageUrl: z
+    .string()
+    .url("Image URL must be valid")
+    .optional(),
+  imageDisplayMode: z.enum(["inline", "background", "main"]).optional(),
+});
+
+// MCQ Schema
+const mcqBaseSchema = baseQuestionSchema.extend({
+  questionType: z.literal("mcq"),
+  options: z
+    .array(z.string().trim().min(1, "Option cannot be empty"))
+    .min(2, "At least 2 options are required")
+    .max(6, "Maximum 6 options allowed"),
+  correctOptionIndex: z
+    .number()
+    .int("Must be a whole number")
+    .min(0, "Invalid option index"),
+});
+
+export const mcqQuestionSchema = mcqBaseSchema.superRefine((data, ctx) => {
+  if (data.correctOptionIndex >= data.options.length) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Correct option index must be within options range",
+      path: ["correctOptionIndex"],
+    });
+  }
+});
+
+// True/False Schema
+export const trueFalseQuestionSchema = baseQuestionSchema.extend({
+  questionType: z.literal("true-false"),
+  correctAnswer: z.boolean(),
+});
+
+// Short Answer Schema with validation
+const shortAnswerBaseSchema = baseQuestionSchema.extend({
+  questionType: z.literal("short-answer"),
+  correctAnswers: z
+    .array(z.string().trim().min(1, "Answer cannot be empty"))
+    .min(1, "At least one correct answer is required"),
+  caseSensitive: z.boolean().optional(),
+  requireExactMatch: z.boolean().optional(),
+});
+
+export const shortAnswerQuestionSchema = shortAnswerBaseSchema.superRefine((data, ctx) => {
+  // Additional validation: ensure at least one non-empty answer
+  if (!data.correctAnswers || data.correctAnswers.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "At least one correct answer is required",
+      path: ["correctAnswers"],
+    });
+  }
+  
+  // Validate each answer is non-empty
+  data.correctAnswers?.forEach((answer, index) => {
+    if (!answer || answer.trim() === "") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Answer cannot be empty",
+        path: ["correctAnswers", index],
+      });
+    }
+  });
+});
+
+// Essay Schema
+const essayBaseSchema = baseQuestionSchema.extend({
+  questionType: z.literal("essay"),
+  minWords: z.number().int().positive("Min words must be positive").optional(),
+  maxWords: z.number().int().positive("Max words must be positive").optional(),
+  rubricPoints: z
+    .array(
+      z.object({
+        criteria: z.string().trim().min(1, "Criterion cannot be empty"),
+        points: z.number().int().min(0, "Points must be zero or positive"),
+      })
+    )
+    .optional(),
+});
+
+// Discriminated union for all question types (base validation only)
+const baseQuestionUnion = z.discriminatedUnion("questionType", [
+  mcqBaseSchema,
+  trueFalseQuestionSchema,
+  shortAnswerBaseSchema,
+  essayBaseSchema,
+]);
+
+// Apply additional validations with superRefine
+export const newQuestionSchema = baseQuestionUnion.superRefine((data, ctx) => {
+  // MCQ validation
+  if (data.questionType === "mcq") {
+    if (data.correctOptionIndex >= data.options.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Correct option index must be within options range",
+        path: ["correctOptionIndex"],
+      });
+    }
+  }
+  
+  // Short Answer validation
+  if (data.questionType === "short-answer") {
+    if (!data.correctAnswers || data.correctAnswers.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "At least one correct answer is required",
+        path: ["correctAnswers"],
+      });
+    }
+    
+    data.correctAnswers?.forEach((answer, index) => {
+      if (!answer || answer.trim() === "") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Answer cannot be empty",
+          path: ["correctAnswers", index],
+        });
+      }
+    });
+  }
+  
+  // Essay validation
+  if (data.questionType === "essay") {
+    if (data.minWords && data.maxWords && data.minWords > data.maxWords) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Minimum words cannot exceed maximum words",
+        path: ["minWords"],
+      });
+    }
+    
+    if (data.rubricPoints && data.rubricPoints.length > 0) {
+      data.rubricPoints.forEach((rubric: any, index: number) => {
+        if (!rubric.criteria || !rubric.criteria.trim()) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Rubric criterion ${index + 1} is required`,
+            path: ["rubricPoints", index, "criteria"],
+          });
+        }
+      });
+    }
+  }
+});
+
+// Type exports
+export type MCQQuestionInput = z.infer<typeof mcqBaseSchema>;
+export type TrueFalseQuestionInput = z.infer<typeof trueFalseQuestionSchema>;
+export type ShortAnswerQuestionInput = z.infer<typeof shortAnswerQuestionSchema>;
+export type EssayQuestionInput = z.infer<typeof essayBaseSchema>;
+export type NewQuestionInput = z.infer<typeof newQuestionSchema>;
+
+// Localized schema factories for new question types
+export const getNewQuestionSchema = (t: any) => {
+  const baseSchema = z.object({
+    questionText: z
+      .string()
+      .trim()
+      .min(1, t("validations.required", { field: "Question text" }))
+      .max(2000, t("validations.question.textMax")),
+    marks: z
+      .number()
+      .min(1, t("validations.question.marksMin"))
+      .max(100, t("validations.question.marksMax")),
+    feedbackType: z.enum(["instant", "hidden"]),
+    explanation: z
+      .string()
+      .trim()
+      .max(2000, "Explanation must be less than 2000 characters")
+      .optional(),
+    imageUrl: z
+      .string()
+      .url("Image URL must be valid")
+      .optional(),
+    imageDisplayMode: z.enum(["inline", "background", "main"]).optional(),
+  });
+
+  const mcqSchema = baseSchema.extend({
+    questionType: z.literal("mcq"),
+    options: z
+      .array(z.string().trim().min(1, t("validations.question.optionEmpty")))
+      .min(2, t("validations.question.optionsMin"))
+      .max(6, t("validations.question.optionsMax")),
+    correctOptionIndex: z
+      .number()
+      .int()
+      .min(0, t("validations.question.correctOption")),
+  });
+
+  const trueFalseSchema = baseSchema.extend({
+    questionType: z.literal("true-false"),
+    correctAnswer: z.boolean(),
+  });
+
+  const shortAnswerSchema = baseSchema.extend({
+    questionType: z.literal("short-answer"),
+    correctAnswers: z
+      .array(z.string().trim().min(1, "Answer cannot be empty"))
+      .min(1, "At least one correct answer is required"),
+    caseSensitive: z.boolean().optional(),
+    requireExactMatch: z.boolean().optional(),
+  });
+
+  const essaySchema = baseSchema.extend({
+    questionType: z.literal("essay"),
+    minWords: z.number().int().positive().optional(),
+    maxWords: z.number().int().positive().optional(),
+    rubricPoints: z
+      .array(
+        z.object({
+          criteria: z.string().trim().min(1, "Criterion cannot be empty"),
+          points: z.number().int().min(0, "Points must be zero or positive"),
+        })
+      )
+      .optional(),
+  });
+
+  return z.discriminatedUnion("questionType", [
+    mcqSchema,
+    trueFalseSchema,
+    shortAnswerSchema,
+    essaySchema,
+  ]).refine((data) => {
+    // Custom validation for essay min/max
+    if (data.questionType === "essay" && data.minWords && data.maxWords && data.minWords > data.maxWords) {
+      return false;
+    }
+    return true;
+  }, {
+    message: "Minimum words cannot exceed maximum words",
+    path: ["minWords"],
+  });
+}
