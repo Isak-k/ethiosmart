@@ -253,14 +253,25 @@ export function QuestionTypeForm({
     setUploadingImage(true);
     try {
       const tempQId = question?.questionId || `temp_${Date.now()}`;
+      console.log("[IMAGE FLOW] Starting upload:", { file: file.name, size: file.size, examId, tempQId });
+      
       const result = await uploadQuestionImage(file, examId, tempQId);
+      console.log("[IMAGE FLOW] Upload successful. Result:", { url: result.url, hasDimensions: !!result.dimensions });
+      
+      if (!result.url) {
+        console.error("[IMAGE FLOW] ERROR: Upload returned empty URL!", result);
+        throw new Error("Upload succeeded but no URL was returned");
+      }
+      
       setImageUrl(result.url);
+      console.log("[IMAGE FLOW] State updated. imageUrl is now:", result.url);
+      
       toast({
         title: "Image uploaded successfully",
         description: `File size: ${formatFileSize(file.size)}`,
       });
     } catch (error) {
-      console.error("Error uploading image:", error);
+      console.error("[IMAGE FLOW] Upload failed:", error);
       toast({
         title: "Upload failed",
         description: error instanceof Error ? error.message : "Failed to upload image",
@@ -286,11 +297,22 @@ export function QuestionTypeForm({
     try {
       const finalImageUrl: string | null = imageUrl || null;
 
+      console.log("[IMAGE FLOW] Form submission. State imageUrl:", imageUrl);
+      console.log("[IMAGE FLOW] Using finalImageUrl:", finalImageUrl);
+      console.log("[IMAGE FLOW] Using imageDisplayMode:", imageDisplayMode);
+
       const submissionData = {
         ...data,
         imageUrl: finalImageUrl,
         imageDisplayMode,
       } as NewQuestionInput;
+
+      console.log("[IMAGE FLOW] Complete submissionData:", {
+        questionType: submissionData.questionType,
+        hasImageUrl: !!submissionData.imageUrl,
+        imageUrl: submissionData.imageUrl,
+        imageDisplayMode: submissionData.imageDisplayMode,
+      });
       
       const { validateQuestionBeforeSave, formatValidationErrors } = await import("@/lib/question-validator");
       const validation = validateQuestionBeforeSave(submissionData, t);

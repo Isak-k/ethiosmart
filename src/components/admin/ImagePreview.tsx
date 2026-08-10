@@ -24,9 +24,8 @@ export function ImagePreview({
   showModeSelector = false,
   questionText,
 }: ImagePreviewProps) {
+  const [imageError, setImageError] = React.useState(false);
   const displayClasses = getImageDisplayClasses(displayMode);
-  // For non-Cloudinary URLs (Firebase storage), use the URL directly
-  // optimizeImageUrl will return the original URL if it's not Cloudinary
   const optimizedUrl = optimizeImageUrl(imageUrl, {
     maxWidth: displayMode === "main" ? 1200 : 800,
     quality: "auto",
@@ -35,15 +34,18 @@ export function ImagePreview({
 
   // Log for debugging
   React.useEffect(() => {
-    console.log("ImagePreview - Original URL:", imageUrl);
-    console.log("ImagePreview - Optimized URL:", optimizedUrl);
-    console.log("ImagePreview - Display Mode:", displayMode);
+    console.log("[IMAGE FLOW] ImagePreview received props:", {
+      imageUrl,
+      displayMode,
+      optimizedUrl,
+      isImageUrlEmpty: !imageUrl,
+    });
     
     // Test if URL is valid by trying to fetch it
     if (imageUrl) {
       fetch(imageUrl, { method: 'HEAD' })
-        .then(() => console.log("Image URL is accessible"))
-        .catch((err) => console.error("Image URL is NOT accessible:", err));
+        .then(() => console.log("[IMAGE FLOW] Image URL is accessible (HTTP 200)"))
+        .catch((err) => console.error("[IMAGE FLOW] Image URL is NOT accessible:", err.message));
     }
   }, [imageUrl, optimizedUrl, displayMode]);
 
@@ -80,24 +82,31 @@ export function ImagePreview({
       }`}>
         {displayMode === "inline" && (
           <div className="flex flex-col gap-2 p-3">
-            <img
-              src={optimizedUrl}
-              alt="Question preview"
-              className="max-w-full h-auto max-h-96 object-contain mx-auto rounded"
-              crossOrigin="anonymous"
-              loading="eager"
-              onError={(e) => {
-                console.error("Failed to load image:", {
-                  imageUrl,
-                  optimizedUrl,
-                  error: e,
-                  target: e.currentTarget,
-                });
-              }}
-              onLoad={() => {
-                console.log("Image loaded successfully:", optimizedUrl);
-              }}
-            />
+            {imageError ? (
+              <div className="flex items-center justify-center p-6 bg-red-50 border border-red-300 rounded">
+                <span className="text-red-700 font-medium">Image failed to load. Check the URL or try re-uploading.</span>
+              </div>
+            ) : (
+              <img
+                src={optimizedUrl}
+                alt="Question preview"
+                className="max-w-full h-auto max-h-96 object-contain mx-auto rounded"
+                crossOrigin="anonymous"
+                loading="eager"
+                onError={(e) => {
+                  setImageError(true);
+                  console.error("[IMAGE FLOW] Image failed to load:", {
+                    imageUrl,
+                    optimizedUrl,
+                    statusText: (e.currentTarget as any).statusText,
+                  });
+                }}
+                onLoad={() => {
+                  setImageError(false);
+                  console.log("[IMAGE FLOW] Image loaded successfully:", optimizedUrl);
+                }}
+              />
+            )}
             {questionText && (
               <p className="text-sm text-gray-700 mt-2">{questionText}</p>
             )}
@@ -106,24 +115,31 @@ export function ImagePreview({
 
         {displayMode === "background" && (
           <div className="p-6 relative overflow-hidden rounded" style={{ minHeight: "300px" }}>
-            <img
-              src={optimizedUrl}
-              alt="Background"
-              className="absolute inset-0 w-full h-full object-cover"
-              style={{ opacity: 0.3 }}
-              crossOrigin="anonymous"
-              loading="eager"
-              onError={(e) => {
-                console.error("Failed to load background image:", {
-                  imageUrl,
-                  optimizedUrl,
-                  error: e,
-                });
-              }}
-              onLoad={() => {
-                console.log("Background image loaded successfully:", optimizedUrl);
-              }}
-            />
+            {imageError ? (
+              <div className="flex items-center justify-center h-full bg-red-50 border border-red-300 rounded">
+                <span className="text-red-700 font-medium">Image failed to load</span>
+              </div>
+            ) : (
+              <img
+                src={optimizedUrl}
+                alt="Background"
+                className="absolute inset-0 w-full h-full object-cover"
+                style={{ opacity: 0.3 }}
+                crossOrigin="anonymous"
+                loading="eager"
+                onError={(e) => {
+                  setImageError(true);
+                  console.error("[IMAGE FLOW] Background image failed to load:", {
+                    imageUrl,
+                    optimizedUrl,
+                  });
+                }}
+                onLoad={() => {
+                  setImageError(false);
+                  console.log("[IMAGE FLOW] Background image loaded successfully:", optimizedUrl);
+                }}
+              />
+            )}
             <div className="absolute inset-0 bg-black/20" />
             <div className="relative z-10">
               {questionText && (
@@ -135,24 +151,30 @@ export function ImagePreview({
 
         {displayMode === "main" && (
           <div className="space-y-3 p-3">
-            <img
-              src={optimizedUrl}
-              alt="Question preview"
-              className="max-w-full h-auto object-contain rounded"
-              crossOrigin="anonymous"
-              loading="eager"
-              onError={(e) => {
-                console.error("Failed to load image:", {
-                  imageUrl,
-                  optimizedUrl,
-                  error: e,
-                  target: e.currentTarget,
-                });
-              }}
-              onLoad={() => {
-                console.log("Image loaded successfully:", optimizedUrl);
-              }}
-            />
+            {imageError ? (
+              <div className="flex items-center justify-center p-6 bg-red-50 border border-red-300 rounded">
+                <span className="text-red-700 font-medium">Image failed to load. Check the URL or try re-uploading.</span>
+              </div>
+            ) : (
+              <img
+                src={optimizedUrl}
+                alt="Question preview"
+                className="max-w-full h-auto object-contain rounded"
+                crossOrigin="anonymous"
+                loading="eager"
+                onError={(e) => {
+                  setImageError(true);
+                  console.error("[IMAGE FLOW] Main image failed to load:", {
+                    imageUrl,
+                    optimizedUrl,
+                  });
+                }}
+                onLoad={() => {
+                  setImageError(false);
+                  console.log("[IMAGE FLOW] Main image loaded successfully:", optimizedUrl);
+                }}
+              />
+            )}
             {questionText && (
               <p className="text-sm text-gray-700">{questionText}</p>
             )}

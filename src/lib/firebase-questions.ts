@@ -28,6 +28,14 @@ export async function createQuestion(
   questionData: NewQuestionInput
 ): Promise<Question> {
   try {
+    console.log("[IMAGE FLOW] createQuestion called with:", {
+      examId,
+      hasImageUrl: !!questionData.imageUrl,
+      imageUrl: questionData.imageUrl,
+      imageDisplayMode: questionData.imageDisplayMode,
+      questionType: questionData.questionType,
+    });
+
     const questionsSnap = await getDocs(
       query(
         collection(db, "exams", examId, "questions"),
@@ -53,6 +61,12 @@ export async function createQuestion(
       imageUrl: questionData.imageUrl ?? null,
       imageDisplayMode: questionData.imageDisplayMode || "inline",
     };
+
+    console.log("[IMAGE FLOW] baseQuestion prepared:", {
+      hasImageUrl: !!baseQuestion.imageUrl,
+      imageUrl: baseQuestion.imageUrl,
+      imageDisplayMode: baseQuestion.imageDisplayMode,
+    });
 
     const qType = String(questionData.questionType).replace(/_/g, '-');
     let questionDoc: Record<string, any> = { ...baseQuestion, questionType: qType };
@@ -96,9 +110,19 @@ export async function createQuestion(
       questionDoc
     );
 
-    return {
+    const returnData = {
       questionId: docRef.id,
       ...questionDoc,
+    };
+
+    console.log("[IMAGE FLOW] Question saved to Firestore:", {
+      questionId: docRef.id,
+      hasImageUrl: !!questionDoc.imageUrl,
+      imageUrl: questionDoc.imageUrl,
+      imageDisplayMode: questionDoc.imageDisplayMode,
+    });
+
+    return returnData;
     } as Question;
   } catch (error) {
     console.error("Error creating question:", error);
