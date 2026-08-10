@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
@@ -30,7 +30,7 @@ import {
   isEssayQuestion,
 } from "@/integrations/firebase/types";
 import { getNewQuestionSchema, NewQuestionInput } from "@/lib/validations";
-import { Plus, X, Trash2, Upload, Image as ImageIcon } from "lucide-react";
+import { Plus, X, Trash2, Upload, Image as ImageIcon, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { uploadQuestionImage, validateImageFile, formatFileSize, ImageDisplayMode } from "@/lib/image-handler";
 import { useToast } from "@/hooks/use-toast";
@@ -58,15 +58,17 @@ export function QuestionTypeForm({
   const [questionType, setQuestionType] = useState<string>(
     question?.questionType || "mcq"
   );
-  const [imageUrl, setImageUrl] = useState<string | undefined>(question?.imageUrl);
+  const [imageUrl, setImageUrl] = useState<string | null>(question?.imageUrl || null);
   const [imageDisplayMode, setImageDisplayMode] = useState<ImageDisplayMode>(
     (question?.imageDisplayMode as ImageDisplayMode) || "inline"
   );
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const submitRef = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const schema = getNewQuestionSchema(t);
   
-  // Build default values with proper typing
   const buildDefaultValues = (): NewQuestionInput => {
     if (question) {
       if (isMCQQuestion(question)) {
@@ -113,7 +115,6 @@ export function QuestionTypeForm({
       }
     }
     
-    // Default values for new MCQ question
     return {
       questionType: "mcq" as any,
       questionText: "",
@@ -134,10 +135,8 @@ export function QuestionTypeForm({
   });
 
   const handleQuestionTypeChange = (newType: string) => {
-    // Clear previous type-specific errors
     form.clearErrors();
     
-    // Reset all type-specific fields to defaults
     const resetFields = {
       options: undefined,
       correctOptionIndex: undefined,
@@ -154,7 +153,6 @@ export function QuestionTypeForm({
       form.setValue(key as any, value);
     });
 
-    // Set defaults for new type
     switch (newType) {
       case "mcq":
         form.setValue("options", ["", ""]);
@@ -175,19 +173,16 @@ export function QuestionTypeForm({
         break;
     }
 
-    // Update local state and form value
     setQuestionType(newType);
     form.setValue("questionType", newType as any);
   };
 
-  // Reset form when question prop changes
   useEffect(() => {
     if (question) {
       setQuestionType(question.questionType);
       setImageUrl(question.imageUrl);
       setImageDisplayMode((question.imageDisplayMode as ImageDisplayMode) || "inline");
       
-      // Build defaults based on question type
       let newDefaults: NewQuestionInput;
 
       if (isMCQQuestion(question)) {
@@ -232,7 +227,7 @@ export function QuestionTypeForm({
           rubricPoints: question.rubricPoints || [],
         };
       } else {
-        return; // Unknown type
+        return;
       }
 
       form.reset(newDefaults);
@@ -242,8 +237,8 @@ export function QuestionTypeForm({
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (uploadingImage) return;
 
-    // Validate file
     const validation = validateImageFile(file);
     if (!validation.valid) {
       toast({
@@ -251,12 +246,12 @@ export function QuestionTypeForm({
         description: validation.error,
         variant: "destructive",
       });
+      e.target.value = "";
       return;
     }
 
     setUploadingImage(true);
     try {
-      // Generate temp questionId if creating new
       const tempQId = question?.questionId || `temp_${Date.now()}`;
       const result = await uploadQuestionImage(file, examId, tempQId);
       setImageUrl(result.url);
@@ -273,561 +268,604 @@ export function QuestionTypeForm({
       });
     } finally {
       setUploadingImage(false);
-      // Reset file input
       e.target.value = "";
     }
   };
 
   const handleRemoveImage = () => {
-    setImageUrl(undefined);
-    // imageUrl is managed separately from form state
+    setImageUrl(null);
   };
 
   const handleFormSubmit = async (data: NewQuestionInput) => {
-    // Include imageUrl and imageDisplayMode in the submission data
-    const submissionData = {
-      ...data,
-      imageUrl,
-      imageDisplayMode,
-    } as NewQuestionInput;
+    if (submitting || submitRef.current) return;
+    if (isLoading) return;
     
-    // Validate before submitting
-    const { validateQuestionBeforeSave, formatValidationErrors } = await import("@/lib/question-validator");
-    const validation = validateQuestionBeforeSave(submissionData, t);
-    
-    if (!validation.valid) {
-      // Display validation errors
-      const formattedErrors = formatValidationErrors(validation.errors);
+    submitRef.current = true;
+    setSubmitting(true);
+
+    try {
+      const finalImageUrl: string | null = imageUrl || null;
+
+      const submissionData = {
+        ...data,
+        imageUrl: finalImageUrl,
+        imageDisplayMode,
+      } as NewQuestionInput;
+      
+      const { validateQuestionBeforeSave, formatValidationErrors } = await import("@/lib/question-validator");
+      const validation = validateQuestionBeforeSave(submissionData, t);
+      
+      if (!validation.valid) {
+        const formattedErrors = formatValidationErrors(validation.errors);
+        toast({
+          title: "Validation Error",
+          description: formattedErrors.join("\n"),
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      await onSubmit(submissionData);
+    } catch (error) {
+      console.error("Error in form submit handler:", error);
       toast({
-        title: "Validation Error",
-        description: formattedErrors.join("\n"),
+        title: "Submission failed",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
         variant: "destructive",
       });
-      return;
+    } finally {
+      setSubmitting(false);
+      submitRef.current = false;
     }
-    
-    await onSubmit(submissionData);
   };
+
+  const isFormDisabled = isLoading || submitting;
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
-        {/* Question Type Selector */}
-        <FormField
-          control={form.control}
-          name="questionType"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>{t("admin.questions.type")}</FormLabel>
-              <Select value={questionType} onValueChange={handleQuestionTypeChange}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="mcq">Multiple Choice</SelectItem>
-                  <SelectItem value="true-false">True/False</SelectItem>
-                  <SelectItem value="short-answer">Short Answer</SelectItem>
-                  <SelectItem value="essay">Essay</SelectItem>
-                </SelectContent>
-              </Select>
-            </FormItem>
-          )}
-        />
-
-        {/* Question Text */}
-        <FormField
-          control={form.control}
-          name="questionText"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>{t("admin.questions.questionText")}</FormLabel>
-              <FormControl>
-                <Textarea
-                  placeholder="Enter the question text"
-                  className="resize-none"
-                  rows={3}
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        {/* Marks */}
-        <FormField
-          control={form.control}
-          name="marks"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>{t("admin.questions.marks")}</FormLabel>
-              <FormControl>
-                <Input
-                  type="number"
-                  min="1"
-                  max="100"
-                  {...field}
-                  onChange={(e) => field.onChange(Number(e.target.value))}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        {/* Feedback Type */}
-        <FormField
-          control={form.control}
-          name="feedbackType"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>{t("admin.questions.feedbackType")}</FormLabel>
-              <Select value={field.value} onValueChange={field.onChange}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="instant">Instant (Practice Mode)</SelectItem>
-                  <SelectItem value="hidden">Hidden (Exam Mode)</SelectItem>
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        {/* MCQ Specific */}
-        {questionType === "mcq" && (
-          <div className="space-y-4 p-4 bg-blue-50 rounded-lg">
-            <MCQOptionsManager
-              control={form.control}
-              optionsName="options"
-              correctIndexName="correctOptionIndex"
-              minOptions={2}
-              maxOptions={6}
-            />
-          </div>
-        )}
-
-        {/* True/False Specific */}
-        {questionType === "true-false" && (
-          <div className="space-y-4 p-4 bg-amber-50 rounded-lg border-2 border-amber-200">
-            <FormField
-              control={form.control}
-              name="correctAnswer"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-base font-semibold">Correct Answer</FormLabel>
-                  <FormDescription className="mb-3">
-                    Select whether the statement is True or False
-                  </FormDescription>
+      <form 
+        onSubmit={(e) => {
+          if (isFormDisabled) {
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+          }
+          form.handleSubmit(handleFormSubmit)(e);
+        }} 
+        className="space-y-6"
+      >
+        <fieldset disabled={isFormDisabled} className="disabled:opacity-70 disabled:pointer-events-none border-0 p-0 m-0 space-y-6">
+          <FormField
+            control={form.control}
+            name="questionType"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t("admin.questions.type")}</FormLabel>
+                <Select value={questionType} onValueChange={handleQuestionTypeChange}>
                   <FormControl>
-                    <div className="flex gap-4 items-center pt-2">
-                      {/* True Button */}
-                      <button
-                        type="button"
-                        onClick={() => field.onChange(true)}
-                        className={cn(
-                          "flex-1 px-6 py-4 rounded-lg border-2 font-semibold text-lg transition-all",
-                          field.value === true
-                            ? "bg-green-500 border-green-600 text-white shadow-md"
-                            : "border-gray-300 bg-white text-gray-700 hover:border-green-400 hover:bg-green-50"
-                        )}
-                      >
-                        ✓ True
-                      </button>
-                      
-                      {/* False Button */}
-                      <button
-                        type="button"
-                        onClick={() => field.onChange(false)}
-                        className={cn(
-                          "flex-1 px-6 py-4 rounded-lg border-2 font-semibold text-lg transition-all",
-                          field.value === false
-                            ? "bg-red-500 border-red-600 text-white shadow-md"
-                            : "border-gray-300 bg-white text-gray-700 hover:border-red-400 hover:bg-red-50"
-                        )}
-                      >
-                        ✕ False
-                      </button>
-                    </div>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                   </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-        )}
+                  <SelectContent>
+                    <SelectItem value="mcq">Multiple Choice</SelectItem>
+                    <SelectItem value="true-false">True/False</SelectItem>
+                    <SelectItem value="short-answer">Short Answer</SelectItem>
+                    <SelectItem value="essay">Essay</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormItem>
+            )}
+          />
 
-        {/* Short Answer Specific */}
-        {questionType === "short-answer" && (
-          <div className="space-y-4 p-4 bg-green-50 rounded-lg border-2 border-green-200">
-            {/* Matching Settings Indicator */}
-            <div className="p-3 bg-white rounded border border-green-300">
-              <p className="text-sm font-semibold text-gray-700 mb-2">Matching Settings:</p>
-              <div className="flex flex-wrap gap-3">
-                <div className={cn(
-                  "px-3 py-1 rounded-full text-sm font-medium",
-                  form.watch("caseSensitive") 
-                    ? "bg-blue-100 text-blue-800 border border-blue-300"
-                    : "bg-gray-100 text-gray-800 border border-gray-300"
-                )}>
-                  {form.watch("caseSensitive") ? "🔤 Case Sensitive" : "🔡 Case Insensitive"}
-                </div>
-                <div className={cn(
-                  "px-3 py-1 rounded-full text-sm font-medium",
-                  form.watch("requireExactMatch")
-                    ? "bg-orange-100 text-orange-800 border border-orange-300"
-                    : "bg-blue-100 text-blue-800 border border-blue-300"
-                )}>
-                  {form.watch("requireExactMatch") ? "📌 Exact Match" : "🔍 Partial Match Allowed"}
-                </div>
-              </div>
+          <FormField
+            control={form.control}
+            name="questionText"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t("admin.questions.questionText")}</FormLabel>
+                <FormControl>
+                  <Textarea
+                    placeholder="Enter the question text"
+                    className="resize-none"
+                    rows={3}
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="marks"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t("admin.questions.marks")}</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="100"
+                    {...field}
+                    onChange={(e) => field.onChange(Number(e.target.value))}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="feedbackType"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t("admin.questions.feedbackType")}</FormLabel>
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="instant">Instant (Practice Mode)</SelectItem>
+                    <SelectItem value="hidden">Hidden (Exam Mode)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {questionType === "mcq" && (
+            <div className="space-y-4 p-4 bg-blue-50 rounded-lg">
+              <MCQOptionsManager
+                control={form.control}
+                optionsName="options"
+                correctIndexName="correctOptionIndex"
+                minOptions={2}
+                maxOptions={6}
+              />
             </div>
+          )}
 
-            {/* Acceptable Answers List Manager */}
-            <ShortAnswerListManager
-              control={form.control}
-              answersName="correctAnswers"
-              minAnswers={1}
-              description="Add multiple variations of correct answers"
-            />
-
-            {/* Matching Rules Configuration */}
-            <div className="space-y-3 pt-2 border-t border-green-200">
+          {questionType === "true-false" && (
+            <div className="space-y-4 p-4 bg-amber-50 rounded-lg border-2 border-amber-200">
               <FormField
                 control={form.control}
-                name="caseSensitive"
+                name="correctAnswer"
                 render={({ field }) => (
-                  <FormItem className="flex items-start gap-3">
+                  <FormItem>
+                    <FormLabel className="text-base font-semibold">Correct Answer</FormLabel>
+                    <FormDescription className="mb-3">
+                      Select whether the statement is True or False
+                    </FormDescription>
                     <FormControl>
-                      <input
-                        type="checkbox"
-                        checked={field.value || false}
-                        onChange={field.onChange}
-                        className="mt-1"
-                        id="caseSensitive"
-                      />
+                      <div className="flex gap-4 items-center pt-2">
+                        <button
+                          type="button"
+                          onClick={() => field.onChange(true)}
+                          className={cn(
+                            "flex-1 px-6 py-4 rounded-lg border-2 font-semibold text-lg transition-all",
+                            field.value === true
+                              ? "bg-green-500 border-green-600 text-white shadow-md"
+                              : "border-gray-300 bg-white text-gray-700 hover:border-green-400 hover:bg-green-50"
+                          )}
+                        >
+                          ✓ True
+                        </button>
+                        
+                        <button
+                          type="button"
+                          onClick={() => field.onChange(false)}
+                          className={cn(
+                            "flex-1 px-6 py-4 rounded-lg border-2 font-semibold text-lg transition-all",
+                            field.value === false
+                              ? "bg-red-500 border-red-600 text-white shadow-md"
+                              : "border-gray-300 bg-white text-gray-700 hover:border-red-400 hover:bg-red-50"
+                          )}
+                        >
+                          ✕ False
+                        </button>
+                      </div>
                     </FormControl>
-                    <div className="flex-1">
-                      <FormLabel htmlFor="caseSensitive" className="font-semibold cursor-pointer">
-                        Case Sensitive
-                      </FormLabel>
-                      <FormDescription className="mt-1">
-                        If checked: "Paris" ≠ "paris". If unchecked: "Paris" = "paris"
-                      </FormDescription>
-                    </div>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
-
-              <FormField
-                control={form.control}
-                name="requireExactMatch"
-                render={({ field }) => (
-                  <FormItem className="flex items-start gap-3">
-                    <FormControl>
-                      <input
-                        type="checkbox"
-                        checked={field.value || false}
-                        onChange={field.onChange}
-                        className="mt-1"
-                        id="requireExactMatch"
-                      />
-                    </FormControl>
-                    <div className="flex-1">
-                      <FormLabel htmlFor="requireExactMatch" className="font-semibold cursor-pointer">
-                        Require Exact Match
-                      </FormLabel>
-                      <FormDescription className="mt-1">
-                        If checked: answer must exactly match one of the acceptable answers.<br/>
-                        If unchecked: partial matching allowed (substrings match)
-                      </FormDescription>
-                    </div>
-                  </FormItem>
-                )}
-              />
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Essay Specific */}
-        {questionType === "essay" && (
-          <div className="space-y-4 p-4 bg-purple-50 rounded-lg">
-            {/* Word Count Constraints */}
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+          {questionType === "short-answer" && (
+            <div className="space-y-4 p-4 bg-green-50 rounded-lg border-2 border-green-200">
+              <div className="p-3 bg-white rounded border border-green-300">
+                <p className="text-sm font-semibold text-gray-700 mb-2">Matching Settings:</p>
+                <div className="flex flex-wrap gap-3">
+                  <div className={cn(
+                    "px-3 py-1 rounded-full text-sm font-medium",
+                    form.watch("caseSensitive") 
+                      ? "bg-blue-100 text-blue-800 border border-blue-300"
+                      : "bg-gray-100 text-gray-800 border border-gray-300"
+                  )}>
+                    {form.watch("caseSensitive") ? "🔤 Case Sensitive" : "🔡 Case Insensitive"}
+                  </div>
+                  <div className={cn(
+                    "px-3 py-1 rounded-full text-sm font-medium",
+                    form.watch("requireExactMatch")
+                      ? "bg-orange-100 text-orange-800 border border-orange-300"
+                      : "bg-blue-100 text-blue-800 border border-blue-300"
+                  )}>
+                    {form.watch("requireExactMatch") ? "📌 Exact Match" : "🔍 Partial Match Allowed"}
+                  </div>
+                </div>
+              </div>
+
+              <ShortAnswerListManager
+                control={form.control}
+                answersName="correctAnswers"
+                minAnswers={1}
+                description="Add multiple variations of correct answers"
+              />
+
+              <div className="space-y-3 pt-2 border-t border-green-200">
                 <FormField
                   control={form.control}
-                  name="minWords"
+                  name="caseSensitive"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Minimum Words (Optional)</FormLabel>
+                    <FormItem className="flex items-start gap-3">
                       <FormControl>
-                        <Input
-                          type="number"
-                          min="0"
-                          placeholder="No minimum"
-                          {...field}
-                          onChange={(e) =>
-                            field.onChange(
-                              e.target.value ? Number(e.target.value) : undefined
-                            )
-                          }
+                        <input
+                          type="checkbox"
+                          checked={field.value || false}
+                          onChange={field.onChange}
+                          className="mt-1"
+                          id="caseSensitive"
                         />
                       </FormControl>
-                      <FormMessage />
+                      <div className="flex-1">
+                        <FormLabel htmlFor="caseSensitive" className="font-semibold cursor-pointer">
+                          Case Sensitive
+                        </FormLabel>
+                        <FormDescription className="mt-1">
+                          If checked: "Paris" ≠ "paris". If unchecked: "Paris" = "paris"
+                        </FormDescription>
+                      </div>
                     </FormItem>
                   )}
                 />
+
                 <FormField
                   control={form.control}
-                  name="maxWords"
+                  name="requireExactMatch"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Maximum Words (Optional)</FormLabel>
+                    <FormItem className="flex items-start gap-3">
                       <FormControl>
-                        <Input
-                          type="number"
-                          min="0"
-                          placeholder="No maximum"
-                          {...field}
-                          onChange={(e) =>
-                            field.onChange(
-                              e.target.value ? Number(e.target.value) : undefined
-                            )
-                          }
+                        <input
+                          type="checkbox"
+                          checked={field.value || false}
+                          onChange={field.onChange}
+                          className="mt-1"
+                          id="requireExactMatch"
                         />
                       </FormControl>
-                      <FormMessage />
+                      <div className="flex-1">
+                        <FormLabel htmlFor="requireExactMatch" className="font-semibold cursor-pointer">
+                          Require Exact Match
+                        </FormLabel>
+                        <FormDescription className="mt-1">
+                          If checked: answer must exactly match one of the acceptable answers.<br/>
+                          If unchecked: partial matching allowed (substrings match)
+                        </FormDescription>
+                      </div>
                     </FormItem>
                   )}
                 />
               </div>
+            </div>
+          )}
 
-              {/* Word Count Guidance Text */}
-              {(() => {
-                const minWords = form.getValues("minWords");
-                const maxWords = form.getValues("maxWords");
-                
-                if (minWords || maxWords) {
-                  let guidanceText = "Students must write: ";
-                  if (minWords && maxWords) {
-                    guidanceText += `between ${minWords} and ${maxWords} words`;
-                  } else if (minWords) {
-                    guidanceText += `at least ${minWords} words`;
-                  } else if (maxWords) {
-                    guidanceText += `no more than ${maxWords} words`;
+          {questionType === "essay" && (
+            <div className="space-y-4 p-4 bg-purple-50 rounded-lg">
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="minWords"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Minimum Words (Optional)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min="0"
+                            placeholder="No minimum"
+                            {...field}
+                            onChange={(e) =>
+                              field.onChange(
+                                e.target.value ? Number(e.target.value) : undefined
+                              )
+                            }
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="maxWords"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Maximum Words (Optional)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min="0"
+                            placeholder="No maximum"
+                            {...field}
+                            onChange={(e) =>
+                              field.onChange(
+                                e.target.value ? Number(e.target.value) : undefined
+                              )
+                            }
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {(() => {
+                  const minWords = form.getValues("minWords");
+                  const maxWords = form.getValues("maxWords");
+                  
+                  if (minWords || maxWords) {
+                    let guidanceText = "Students must write: ";
+                    if (minWords && maxWords) {
+                      guidanceText += `between ${minWords} and ${maxWords} words`;
+                    } else if (minWords) {
+                      guidanceText += `at least ${minWords} words`;
+                    } else if (maxWords) {
+                      guidanceText += `no more than ${maxWords} words`;
+                    }
+                    
+                    return (
+                      <div className="p-3 bg-white rounded border border-purple-200">
+                        <p className="text-sm text-purple-700">{guidanceText}</p>
+                      </div>
+                    );
                   }
+                  return null;
+                })()}
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-base font-semibold">Grading Rubric (Optional)</Label>
+                <p className="text-sm text-gray-600">
+                  Define grading criteria and point values for manual essay grading
+                </p>
+                
+                {(() => {
+                  const rubricPoints = form.getValues("rubricPoints") || [];
+                  const totalRubricPoints = rubricPoints.reduce((sum: number, r: any) => sum + (r.points || 0), 0);
                   
                   return (
-                    <div className="p-3 bg-white rounded border border-purple-200">
-                      <p className="text-sm text-purple-700">{guidanceText}</p>
+                    <div className="space-y-3">
+                      {rubricPoints.length > 0 && (
+                        <div className="p-3 bg-white rounded border border-purple-200">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm font-medium">Rubric Criteria</span>
+                            <span className="text-sm font-semibold text-purple-700">
+                              Total Points: {totalRubricPoints}
+                            </span>
+                          </div>
+                          <div className="space-y-2">
+                            {rubricPoints.map((_: any, index: number) => (
+                              <div key={index} className="flex gap-2 items-start">
+                                <FormField
+                                  control={form.control}
+                                  name={`rubricPoints.${index}.criteria`}
+                                  render={({ field }) => (
+                                    <FormControl>
+                                      <Input
+                                        placeholder={`Criterion ${index + 1} (e.g., "Clarity and Organization")`}
+                                        {...field}
+                                        className="flex-1"
+                                      />
+                                    </FormControl>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name={`rubricPoints.${index}.points`}
+                                  render={({ field }) => (
+                                    <FormControl>
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        placeholder="Points"
+                                        {...field}
+                                        onChange={(e) =>
+                                          field.onChange(
+                                            e.target.value ? Number(e.target.value) : 0
+                                          )
+                                        }
+                                        className="w-20"
+                                      />
+                                    </FormControl>
+                                  )}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newRubric = rubricPoints.filter((_: any, i: number) => i !== index);
+                                    form.setValue("rubricPoints", newRubric, { shouldValidate: false });
+                                  }}
+                                  className="p-2 hover:bg-red-100 rounded"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const currentRubric = form.getValues("rubricPoints") || [];
+                          form.setValue(
+                            "rubricPoints",
+                            [...currentRubric, { criteria: "", points: 0 }],
+                            { shouldValidate: false }
+                          );
+                        }}
+                        className="flex items-center gap-2 text-purple-600 hover:text-purple-700 mt-2"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Add Rubric Criterion
+                      </button>
                     </div>
                   );
-                }
-                return null;
-              })()}
+                })()}
+              </div>
             </div>
+          )}
 
-            {/* Rubric Configuration */}
-            <div className="space-y-2">
-              <Label className="text-base font-semibold">Grading Rubric (Optional)</Label>
-              <p className="text-sm text-gray-600">
-                Define grading criteria and point values for manual essay grading
-              </p>
-              
-              {(() => {
-                const rubricPoints = form.getValues("rubricPoints") || [];
-                const totalRubricPoints = rubricPoints.reduce((sum: number, r: any) => sum + (r.points || 0), 0);
+          <FormField
+            control={form.control}
+            name="explanation"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t("admin.questions.explanation")}</FormLabel>
+                <FormControl>
+                  <Textarea
+                    placeholder="Provide explanation for the correct answer (optional)"
+                    className="resize-none"
+                    rows={2}
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <div className="space-y-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="flex items-center gap-2">
+              <ImageIcon className="w-5 h-5 text-gray-600" />
+              <Label className="text-base">Question Image (Optional)</Label>
+            </div>
+            
+            {imageUrl ? (
+              <div className="space-y-4">
+                <ImagePreview
+                  imageUrl={imageUrl}
+                  displayMode={imageDisplayMode}
+                  questionText={form.getValues("questionText")}
+                  onRemove={handleRemoveImage}
+                  onModeChange={setImageDisplayMode}
+                  showModeSelector={true}
+                />
                 
-                return (
-                  <div className="space-y-3">
-                    {rubricPoints.length > 0 && (
-                      <div className="p-3 bg-white rounded border border-purple-200">
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="text-sm font-medium">Rubric Criteria</span>
-                          <span className="text-sm font-semibold text-purple-700">
-                            Total Points: {totalRubricPoints}
-                          </span>
-                        </div>
-                        <div className="space-y-2">
-                          {rubricPoints.map((_: any, index: number) => (
-                            <div key={index} className="flex gap-2 items-start">
-                              <FormField
-                                control={form.control}
-                                name={`rubricPoints.${index}.criteria`}
-                                render={({ field }) => (
-                                  <FormControl>
-                                    <Input
-                                      placeholder={`Criterion ${index + 1} (e.g., "Clarity and Organization")`}
-                                      {...field}
-                                      className="flex-1"
-                                    />
-                                  </FormControl>
-                                )}
-                              />
-                              <FormField
-                                control={form.control}
-                                name={`rubricPoints.${index}.points`}
-                                render={({ field }) => (
-                                  <FormControl>
-                                    <Input
-                                      type="number"
-                                      min="0"
-                                      placeholder="Points"
-                                      {...field}
-                                      onChange={(e) =>
-                                        field.onChange(
-                                          e.target.value ? Number(e.target.value) : 0
-                                        )
-                                      }
-                                      className="w-20"
-                                    />
-                                  </FormControl>
-                                )}
-                              />
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const newRubric = rubricPoints.filter((_: any, i: number) => i !== index);
-                                  form.setValue("rubricPoints", newRubric, { shouldValidate: false });
-                                }}
-                                className="p-2 hover:bg-red-100 rounded"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+                <label className={cn(
+                  "flex items-center justify-center w-full p-3 border-2 border-dashed rounded-lg cursor-pointer transition",
+                  uploadingImage 
+                    ? "border-gray-200 bg-gray-50 cursor-not-allowed opacity-60" 
+                    : "border-blue-300 hover:bg-blue-50"
+                )}>
+                  <div className="flex items-center justify-center gap-2">
+                    {uploadingImage ? (
+                      <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+                    ) : (
+                      <Upload className="w-4 h-4 text-blue-500" />
                     )}
-                    
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const currentRubric = form.getValues("rubricPoints") || [];
-                        form.setValue(
-                          "rubricPoints",
-                          [...currentRubric, { criteria: "", points: 0 }],
-                          { shouldValidate: false }
-                        );
-                      }}
-                      className="flex items-center gap-2 text-purple-600 hover:text-purple-700 mt-2"
-                    >
-                      <Plus className="w-4 h-4" />
-                      Add Rubric Criterion
-                    </button>
+                    <span className={cn(
+                      "text-sm font-medium",
+                      uploadingImage ? "text-gray-500" : "text-blue-600"
+                    )}>
+                      {uploadingImage ? "Uploading..." : "Replace image"}
+                    </span>
                   </div>
-                );
-              })()}
-            </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={handleImageUpload}
+                    disabled={uploadingImage}
+                    className="hidden"
+                  />
+                </label>
+                
+                {uploadingImage && (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                    <span className="text-sm text-gray-600">Uploading image...</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <label className={cn(
+                  "flex flex-col items-center justify-center w-full p-6 border-2 border-dashed rounded-lg cursor-pointer transition",
+                  uploadingImage
+                    ? "border-gray-200 bg-gray-50 cursor-not-allowed opacity-60"
+                    : "border-gray-300 hover:bg-gray-100"
+                )}>
+                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                    {uploadingImage ? (
+                      <Loader2 className="w-8 h-8 text-gray-400 mb-2 animate-spin" />
+                    ) : (
+                      <Upload className="w-8 h-8 text-gray-400 mb-2" />
+                    )}
+                    <p className="text-sm text-gray-600">
+                      <span className="font-semibold">
+                        {uploadingImage ? "Uploading..." : "Click to upload"}
+                      </span>{" "}
+                      {!uploadingImage && "or drag and drop"}
+                    </p>
+                    <p className="text-xs text-gray-500">PNG, JPG, WebP, GIF (Max 5MB)</p>
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={handleImageUpload}
+                    disabled={uploadingImage}
+                    className="hidden"
+                  />
+                </label>
+                
+                {uploadingImage && (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                    <span className="text-sm text-gray-600">Uploading image...</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-        )}
+        </fieldset>
 
-        {/* Explanation */}
-        <FormField
-          control={form.control}
-          name="explanation"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>{t("admin.questions.explanation")}</FormLabel>
-              <FormControl>
-                <Textarea
-                  placeholder="Provide explanation for the correct answer (optional)"
-                  className="resize-none"
-                  rows={2}
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        {/* Image Upload Section */}
-        <div className="space-y-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-          <div className="flex items-center gap-2">
-            <ImageIcon className="w-5 h-5 text-gray-600" />
-            <Label className="text-base">Question Image (Optional)</Label>
-          </div>
-          
-          {imageUrl ? (
-            <div className="space-y-4">
-              {/* Image Preview with Display Mode Selection */}
-              <ImagePreview
-                imageUrl={imageUrl}
-                displayMode={imageDisplayMode}
-                questionText={form.getValues("questionText")}
-                onRemove={handleRemoveImage}
-                onModeChange={setImageDisplayMode}
-                showModeSelector={true}
-              />
-              
-              {/* Upload New Image Button */}
-              <label className="flex items-center justify-center w-full p-3 border-2 border-dashed border-blue-300 rounded-lg cursor-pointer hover:bg-blue-50 transition">
-                <div className="flex items-center justify-center gap-2">
-                  <Upload className="w-4 h-4 text-blue-500" />
-                  <span className="text-sm text-blue-600 font-medium">Replace image</span>
-                </div>
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
-                  onChange={handleImageUpload}
-                  disabled={uploadingImage}
-                  className="hidden"
-                />
-              </label>
-              
-              {uploadingImage && (
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                  <span className="text-sm text-gray-600">Uploading image...</span>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <label className="flex flex-col items-center justify-center w-full p-6 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-100 transition">
-                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                  <Upload className="w-8 h-8 text-gray-400 mb-2" />
-                  <p className="text-sm text-gray-600">
-                    <span className="font-semibold">Click to upload</span> or drag and drop
-                  </p>
-                  <p className="text-xs text-gray-500">PNG, JPG, WebP, GIF (Max 5MB)</p>
-                </div>
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
-                  onChange={handleImageUpload}
-                  disabled={uploadingImage}
-                  className="hidden"
-                />
-              </label>
-              
-              {uploadingImage && (
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                  <span className="text-sm text-gray-600">Uploading image...</span>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Form Actions */}
         <div className="flex gap-2 justify-end">
           {onCancel && (
-            <Button type="button" variant="outline" onClick={onCancel}>
+            <Button type="button" variant="outline" onClick={onCancel} disabled={isFormDisabled}>
               {t("common.cancel")}
             </Button>
           )}
-          <Button type="submit" disabled={isLoading}>
-            {isLoading ? "Saving..." : "Save Question"}
+          <Button type="submit" disabled={isFormDisabled || uploadingImage}>
+            {isLoading || submitting ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              "Save Question"
+            )}
           </Button>
         </div>
       </form>

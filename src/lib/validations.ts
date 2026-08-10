@@ -226,15 +226,8 @@ export const baseQuestionSchema = z.object({
     .min(1, "Marks must be at least 1")
     .max(100, "Marks cannot exceed 100"),
   feedbackType: z.enum(["instant", "hidden"]),
-  explanation: z
-    .string()
-    .trim()
-    .max(2000, "Explanation must be less than 2000 characters")
-    .optional(),
-  imageUrl: z
-    .string()
-    .url("Image URL must be valid")
-    .optional(),
+  explanation: z.union([z.string().trim().max(2000, "Explanation must be less than 2000 characters"), z.literal(null)]).nullable().optional(),
+  imageUrl: z.union([z.string().url("Image URL must be valid"), z.literal(null)]).nullable().optional(),
   imageDisplayMode: z.enum(["inline", "background", "main"]).optional(),
 });
 
@@ -400,15 +393,8 @@ export const getNewQuestionSchema = (t: any) => {
       .min(1, t("validations.question.marksMin"))
       .max(100, t("validations.question.marksMax")),
     feedbackType: z.enum(["instant", "hidden"]),
-    explanation: z
-      .string()
-      .trim()
-      .max(2000, "Explanation must be less than 2000 characters")
-      .optional(),
-    imageUrl: z
-      .string()
-      .url("Image URL must be valid")
-      .optional(),
+    explanation: z.union([z.string().trim().max(2000, "Explanation must be less than 2000 characters"), z.literal(null)]).nullable().optional(),
+    imageUrl: z.union([z.string().url("Image URL must be valid"), z.literal(null)]).nullable().optional(),
     imageDisplayMode: z.enum(["inline", "background", "main"]).optional(),
   });
 

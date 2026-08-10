@@ -1,8 +1,3 @@
-/**
- * Firebase Question Operations
- * CRUD operations for all question types with backward compatibility
- */
-
 import {
   collection,
   addDoc,
@@ -15,6 +10,7 @@ import {
   where,
   orderBy,
   Timestamp,
+  deleteField,
 } from "firebase/firestore";
 import { db } from "@/integrations/firebase/client";
 import {
@@ -27,15 +23,11 @@ import {
 import { ensureQuestionType, migrateLegacyQuestions } from "./question-migration";
 import { NewQuestionInput } from "@/lib/validations";
 
-/**
- * Create a new question of any type
- */
 export async function createQuestion(
   examId: string,
   questionData: NewQuestionInput
 ): Promise<Question> {
   try {
-    // Get existing question count for orderIndex
     const questionsSnap = await getDocs(
       query(
         collection(db, "exams", examId, "questions"),
@@ -48,58 +40,55 @@ export async function createQuestion(
         ? questionsSnap.docs[0].data().orderIndex + 1
         : 0;
 
-    // Build question document based on type
-    const baseQuestion = {
+    const baseQuestion: Record<string, any> = {
       examId,
       questionText: questionData.questionText,
       marks: questionData.marks,
       feedbackType: questionData.feedbackType,
-      explanation: questionData.explanation || null,
+      explanation: questionData.explanation ?? null,
       questionType: questionData.questionType,
       orderIndex: nextOrderIndex,
       createdAt: Timestamp.now(),
-      // Image fields (optional)
-      imageUrl: questionData.imageUrl || null,
+      updatedAt: Timestamp.now(),
+      imageUrl: questionData.imageUrl ?? null,
       imageDisplayMode: questionData.imageDisplayMode || "inline",
     };
 
-    let questionDoc: any = baseQuestion;
+    const qType = String(questionData.questionType).replace(/_/g, '-');
+    let questionDoc: Record<string, any> = { ...baseQuestion, questionType: qType };
 
-    // Add type-specific fields
-    if (questionData.questionType === "mcq" && "options" in questionData) {
-      questionDoc = {
-        ...questionDoc,
-        options: questionData.options,
-        correctOptionIndex: questionData.correctOptionIndex,
-      };
-    } else if (
-      questionData.questionType === "true-false" &&
-      "correctAnswer" in questionData
-    ) {
-      questionDoc = {
-        ...questionDoc,
-        correctAnswer: questionData.correctAnswer,
-      };
-    } else if (
-      questionData.questionType === "short-answer" &&
-      "correctAnswers" in questionData
-    ) {
-      questionDoc = {
-        ...questionDoc,
-        correctAnswers: questionData.correctAnswers,
-        caseSensitive: questionData.caseSensitive || false,
-        requireExactMatch: questionData.requireExactMatch || false,
-      };
-    } else if (
-      questionData.questionType === "essay" &&
-      ("minWords" in questionData || "maxWords" in questionData)
-    ) {
-      questionDoc = {
-        ...questionDoc,
-        minWords: questionData.minWords,
-        maxWords: questionData.maxWords,
-        rubricPoints: questionData.rubricPoints || null,
-      };
+    // Remove any undefined values before saving to Firestore
+    Object.keys(questionDoc).forEach((key) => {
+      if (questionDoc[key] === undefined) {
+        delete questionDoc[key];
+      }
+    });
+
+    switch (qType) {
+      case "mcq":
+        if ("options" in questionData) {
+          questionDoc.options = questionData.options;
+          questionDoc.correctOptionIndex = questionData.correctOptionIndex;
+        }
+        break;
+      case "true-false":
+        if ("correctAnswer" in questionData) {
+          questionDoc.correctAnswer = questionData.correctAnswer;
+        }
+        break;
+      case "short-answer":
+        if ("correctAnswers" in questionData) {
+          questionDoc.correctAnswers = questionData.correctAnswers;
+          questionDoc.caseSensitive = questionData.caseSensitive || false;
+          questionDoc.requireExactMatch = questionData.requireExactMatch || false;
+        }
+        break;
+      case "essay":
+        questionDoc.minWords = ("minWords" in questionData) ? questionData.minWords ?? null : null;
+        questionDoc.maxWords = ("maxWords" in questionData) ? questionData.maxWords ?? null : null;
+        questionDoc.rubricPoints = ("rubricPoints" in questionData) ? questionData.rubricPoints ?? null : null;
+        questionDoc.requiresManualGrading = true;
+        break;
     }
 
     const docRef = await addDoc(
@@ -117,9 +106,6 @@ export async function createQuestion(
   }
 }
 
-/**
- * Get all questions for an exam with backward compatibility
- */
 export async function getQuestions(examId: string): Promise<Question[]> {
   try {
     const questionsSnap = await getDocs(
@@ -137,7 +123,6 @@ export async function getQuestions(examId: string): Promise<Question[]> {
       } as Question;
     });
 
-    // Migrate legacy questions (add questionType if missing)
     return migrateLegacyQuestions(questions);
   } catch (error) {
     console.error("Error fetching questions:", error);
@@ -145,9 +130,6 @@ export async function getQuestions(examId: string): Promise<Question[]> {
   }
 }
 
-/**
- * Get a single question by ID
- */
 export async function getQuestion(
   examId: string,
   questionId: string
@@ -166,7 +148,6 @@ export async function getQuestion(
       ...data,
     } as any;
 
-    // Ensure migration
     return ensureQuestionType(question);
   } catch (error) {
     console.error("Error fetching question:", error);
@@ -174,9 +155,6 @@ export async function getQuestion(
   }
 }
 
-/**
- * Update a question
- */
 export async function updateQuestion(
   examId: string,
   questionId: string,
@@ -185,46 +163,67 @@ export async function updateQuestion(
   try {
     const docRef = doc(db, "exams", examId, "questions", questionId);
 
-    // Build update payload based on question type
-    const updatePayload: any = {
+    const updatePayload: Record<string, any> = {
       questionText: updateData.questionText,
       marks: updateData.marks,
       feedbackType: updateData.feedbackType,
-      explanation: updateData.explanation || null,
+      explanation: updateData.explanation !== undefined ? (updateData.explanation || null) : undefined,
       updatedAt: Timestamp.now(),
-      // Image fields
-      imageUrl: updateData.imageUrl !== undefined ? updateData.imageUrl : undefined,
-      imageDisplayMode: updateData.imageDisplayMode || "inline",
+      imageDisplayMode: updateData.imageDisplayMode || undefined,
     };
 
-    // Remove undefined fields
-    Object.keys(updatePayload).forEach(
-      key => updatePayload[key] === undefined && delete updatePayload[key]
-    );
+    if ("imageUrl" in updateData) {
+      if (updateData.imageUrl === null || updateData.imageUrl === undefined) {
+        updatePayload.imageUrl = deleteField();
+      } else {
+        updatePayload.imageUrl = updateData.imageUrl;
+      }
+    }
 
-    // Add type-specific fields
-    if (updateData.questionType === "mcq" && "options" in updateData) {
-      updatePayload.options = updateData.options;
-      updatePayload.correctOptionIndex = updateData.correctOptionIndex;
-    } else if (
-      updateData.questionType === "true-false" &&
-      "correctAnswer" in updateData
-    ) {
-      updatePayload.correctAnswer = updateData.correctAnswer;
-    } else if (
-      updateData.questionType === "short-answer" &&
-      "correctAnswers" in updateData
-    ) {
-      updatePayload.correctAnswers = updateData.correctAnswers;
-      updatePayload.caseSensitive = updateData.caseSensitive || false;
-      updatePayload.requireExactMatch = updateData.requireExactMatch || false;
-    } else if (
-      updateData.questionType === "essay" &&
-      ("minWords" in updateData || "maxWords" in updateData)
-    ) {
-      updatePayload.minWords = updateData.minWords;
-      updatePayload.maxWords = updateData.maxWords;
-      updatePayload.rubricPoints = updateData.rubricPoints || null;
+    // Remove all undefined values - Firestore doesn't accept undefined
+    Object.keys(updatePayload).forEach((key) => {
+      if (updatePayload[key] === undefined) {
+        delete updatePayload[key];
+      }
+    });
+
+    if (updateData.questionType) {
+      const qType = String(updateData.questionType).replace(/_/g, '-');
+      updatePayload.questionType = qType;
+
+      switch (qType) {
+        case "mcq":
+          if ("options" in updateData) {
+            updatePayload.options = updateData.options;
+            updatePayload.correctOptionIndex = updateData.correctOptionIndex;
+          }
+          break;
+        case "true-false":
+          if ("correctAnswer" in updateData) {
+            updatePayload.correctAnswer = updateData.correctAnswer;
+          }
+          break;
+        case "short-answer":
+          if ("correctAnswers" in updateData) {
+            updatePayload.correctAnswers = updateData.correctAnswers;
+            updatePayload.caseSensitive = updateData.caseSensitive || false;
+            updatePayload.requireExactMatch = updateData.requireExactMatch || false;
+          }
+          break;
+        case "essay":
+          updatePayload.minWords = ("minWords" in updateData) ? (updateData.minWords ?? null) : undefined;
+          updatePayload.maxWords = ("maxWords" in updateData) ? (updateData.maxWords ?? null) : undefined;
+          updatePayload.rubricPoints = ("rubricPoints" in updateData) ? (updateData.rubricPoints ?? null) : undefined;
+          updatePayload.requiresManualGrading = true;
+          Object.keys(updatePayload).forEach(
+            key => {
+              if ((key === 'minWords' || key === 'maxWords' || key === 'rubricPoints') && updatePayload[key] === undefined) {
+                delete updatePayload[key];
+              }
+            }
+          );
+          break;
+      }
     }
 
     await updateDoc(docRef, updatePayload);
@@ -234,9 +233,6 @@ export async function updateQuestion(
   }
 }
 
-/**
- * Delete a question
- */
 export async function deleteQuestion(
   examId: string,
   questionId: string
@@ -250,10 +246,6 @@ export async function deleteQuestion(
   }
 }
 
-/**
- * Update question with image replacement
- * Handles deletion of old image before storing new one
- */
 export async function updateQuestionWithImageReplacement(
   examId: string,
   questionId: string,
@@ -262,7 +254,6 @@ export async function updateQuestionWithImageReplacement(
   onDeleteOldImage?: (imageUrl: string) => Promise<void>
 ): Promise<void> {
   try {
-    // Delete old image if new image is different
     if (oldImageUrl && updateData.imageUrl && oldImageUrl !== updateData.imageUrl) {
       if (onDeleteOldImage) {
         await onDeleteOldImage(oldImageUrl).catch((err) => {
@@ -271,7 +262,6 @@ export async function updateQuestionWithImageReplacement(
       }
     }
 
-    // Update the question
     await updateQuestion(examId, questionId, updateData);
   } catch (error) {
     console.error("Error updating question with image replacement:", error);
@@ -279,9 +269,6 @@ export async function updateQuestionWithImageReplacement(
   }
 }
 
-/**
- * Update question image display mode
- */
 export async function updateQuestionImageDisplayMode(
   examId: string,
   questionId: string,
@@ -299,9 +286,6 @@ export async function updateQuestionImageDisplayMode(
   }
 }
 
-/**
- * Reorder questions
- */
 export async function reorderQuestions(
   examId: string,
   questionIds: string[]
@@ -320,9 +304,6 @@ export async function reorderQuestions(
   }
 }
 
-/**
- * Bulk create questions
- */
 export async function bulkCreateQuestions(
   examId: string,
   questionsList: NewQuestionInput[]
@@ -342,9 +323,6 @@ export async function bulkCreateQuestions(
   }
 }
 
-/**
- * Get question count for an exam
- */
 export async function getQuestionCount(examId: string): Promise<number> {
   try {
     const questionsSnap = await getDocs(
@@ -357,9 +335,6 @@ export async function getQuestionCount(examId: string): Promise<number> {
   }
 }
 
-/**
- * Get total marks for an exam
- */
 export async function getTotalMarks(examId: string): Promise<number> {
   try {
     const questions = await getQuestions(examId);

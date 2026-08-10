@@ -13,11 +13,11 @@ import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CheckCircle2, AlertCircle, Info } from 'lucide-react';
-import { PracticeModeType, PracticeExamConfig, Exam } from '@/integrations/firebase/types';
+import type { PracticeExamConfig as PracticeExamConfigType, PracticeModeType, Exam } from '@/integrations/firebase/types';
 
 export interface PracticeExamConfigProps {
   exam: Exam;
-  onSave: (config: PracticeExamConfig) => Promise<void>;
+  onSave: (config: PracticeExamConfigType) => Promise<void>;
   onCancel: () => void;
   loading?: boolean;
 }
@@ -40,7 +40,7 @@ export function PracticeExamConfig({
 
   const handleSave = async () => {
     try {
-      const config: PracticeExamConfig = {
+      const config: PracticeExamConfigType = {
         mode: isPracticeExam ? 'practice' : practiceMode,
         showFeedback: isPracticeExam ? showFeedback : false,
         showExplanations: isPracticeExam ? showExplanations : false,

@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FileText, Upload, AlertCircle, CheckCircle2, FileUp, Sparkles, Loader2 } from "lucide-react";
-import { parseQuestions } from "@/lib/question-parser";
+import { parseQuestions, parseImportData, ImportParseResult } from "@/lib/question-parser";
 import { saveQuestionsBatch } from "@/lib/firebase-exams";
 import { useToast } from "@/hooks/use-toast";
 import { Question } from "@/integrations/firebase/types";
@@ -55,12 +55,12 @@ export function BulkImportQuestions({ examId, onImportSuccess, currentQuestionCo
     
     setIsAnalyzing(true);
     try {
-      const result = parseQuestions(text, t);
+      const result: ImportParseResult = parseImportData(text, t);
       
       setParseResult({
         count: result.questions.length,
         errors: result.errors,
-        preview: result.questions // Show all questions for verification
+        preview: result.questions
       });
     } catch (error) {
       console.error("Parsing error:", error);
@@ -253,27 +253,34 @@ ${pdfText.substring(0, 30000)}`; // Limit to 30k chars to avoid token limits
   };
 
   const handleImport = async () => {
+    if (isImporting) return;
     if (!parseResult || parseResult.count === 0 || parseResult.errors.length > 0) return;
 
     setIsImporting(true);
     try {
-      // Use the already parsed result instead of re-parsing to ensure consistency
-      // But re-parsing is safer if state is stale. Since we reset on text change, it's fine.
-      // However, let's use the preview data directly if available to match what user saw.
-      const questions = parseResult.preview || parseQuestions(text, t).questions;
+      const parseResultFresh: ImportParseResult = parseImportData(text, t);
+      const questions = parseResultFresh.questions;
       
-      // Map parsed questions to Firestore schema
-      const questionsToSave: Omit<Question, 'questionId' | 'createdAt'>[] = questions.map((q, index) => ({
-        questionType: 'mcq' as const,
-        examId,
-        questionText: q.questionText,
-        options: q.options,
-        correctOptionIndex: q.correctOptionIndex,
-        marks: 1, // Default marks
-        orderIndex: currentQuestionCount + index + 1, // Append to end
-        feedbackType: 'hidden', // Default feedback
-        explanation: q.explanation || undefined
-      }));
+      const questionsToSave: Omit<Question, 'questionId' | 'createdAt'>[] = questions.map((q, index) => {
+        const base: Omit<Question, 'questionId' | 'createdAt'> = {
+          questionType: q.questionType,
+          examId,
+          questionText: q.questionText,
+          marks: q.marks ?? 1,
+          orderIndex: currentQuestionCount + index + 1,
+          feedbackType: q.feedbackType ?? 'hidden',
+          explanation: q.explanation,
+          imageUrl: q.imageUrl,
+          imageDisplayMode: q.imageDisplayMode || 'inline',
+          ...q,
+        };
+
+        if (q.questionType === 'essay') {
+          (base as any).requiresManualGrading = true;
+        }
+
+        return base;
+      });
 
       await saveQuestionsBatch(examId, questionsToSave);
       
@@ -349,30 +356,107 @@ ${pdfText.substring(0, 30000)}`; // Limit to 30k chars to avoid token limits
                      <div className="space-y-4 sm:space-y-6">
                        {parseResult.preview?.map((q, i) => (
                          <div key={i} className="bg-card border rounded-lg p-3 sm:p-4 shadow-sm">
-                           <div className="font-semibold mb-2 flex gap-2 text-sm sm:text-base">
+                           <div className="font-semibold mb-2 flex gap-2 text-sm sm:text-base flex-wrap items-start">
                              <span className="text-muted-foreground">{i + 1}.</span>
-                             <span>{q.questionText}</span>
-                           </div>
-                           <div className="grid gap-2 pl-4 sm:pl-6">
-                             {q.options.map((opt: string, optIndex: number) => (
-                               <div 
-                                 key={optIndex} 
-                                 className={`text-xs sm:text-sm p-2 rounded border flex items-center gap-2 ${
-                                   optIndex === q.correctOptionIndex 
-                                     ? "bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300 font-medium" 
-                                     : "border-transparent bg-muted/50"
-                                 }`}
+                             <span className="flex-1">{q.questionText}</span>
+                             <span className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-normal shrink-0">
+                               {q.questionType}
+                             </span>
+                             {q.imageUrl && (
+                               <a
+                                 href={q.imageUrl}
+                                 target="_blank"
+                                 rel="noopener noreferrer"
+                                 className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 font-normal shrink-0 hover:underline"
                                >
-                                 <span className="w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center rounded-full border text-xs bg-background flex-shrink-0">
-                                   {String.fromCharCode(65 + optIndex)}
-                                 </span>
-                                 <span className="flex-1">{opt}</span>
-                                 {optIndex === q.correctOptionIndex && (
-                                   <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                                 🖼 Image attached
+                               </a>
+                             )}
+                           </div>
+
+                           {q.questionType === 'mcq' && q.options && (
+                             <div className="grid gap-2 pl-4 sm:pl-6">
+                               {q.options.map((opt: string, optIndex: number) => (
+                                 <div
+                                   key={optIndex}
+                                   className={`text-xs sm:text-sm p-2 rounded border flex items-center gap-2 ${
+                                     optIndex === q.correctOptionIndex
+                                       ? "bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300 font-medium"
+                                       : "border-transparent bg-muted/50"
+                                   }`}
+                                 >
+                                   <span className="w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center rounded-full border text-xs bg-background flex-shrink-0">
+                                     {String.fromCharCode(65 + optIndex)}
+                                   </span>
+                                   <span className="flex-1">{opt}</span>
+                                   {optIndex === q.correctOptionIndex && (
+                                     <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                                   )}
+                                 </div>
+                               ))}
+                             </div>
+                           )}
+
+                           {q.questionType === 'true-false' && (
+                             <div className="pl-4 sm:pl-6">
+                               <div className="text-xs sm:text-sm inline-flex items-center gap-2 px-3 py-1.5 rounded bg-green-50 border border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300 font-medium">
+                                 <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                                 Correct Answer: {q.correctAnswer === true ? 'True' : q.correctAnswer === false ? 'False' : String(q.correctAnswer)}
+                               </div>
+                             </div>
+                           )}
+
+                           {q.questionType === 'short-answer' && q.correctAnswers && (
+                             <div className="pl-4 sm:pl-6 space-y-2">
+                               <div className="text-xs sm:text-sm font-medium text-muted-foreground">
+                                 Acceptable Answers:
+                               </div>
+                               <div className="flex flex-wrap gap-1.5">
+                                 {q.correctAnswers.map((ans: string, ansIdx: number) => (
+                                   <span
+                                     key={ansIdx}
+                                     className="text-xs sm:text-sm px-2.5 py-1 rounded bg-green-50 border border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300"
+                                   >
+                                     {ans}
+                                   </span>
+                                 ))}
+                               </div>
+                               {(q.caseSensitive || q.requireExactMatch) && (
+                                 <div className="text-[11px] sm:text-xs text-muted-foreground flex gap-3 flex-wrap">
+                                   {q.caseSensitive && <span>• Case Sensitive</span>}
+                                   {q.requireExactMatch && <span>• Require Exact Match</span>}
+                                 </div>
+                               )}
+                             </div>
+                           )}
+
+                           {q.questionType === 'essay' && (
+                             <div className="pl-4 sm:pl-6 space-y-2 text-xs sm:text-sm">
+                               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded bg-amber-50 border border-amber-200 text-amber-700 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-300 font-medium">
+                                 📝 Requires Manual Grading
+                               </div>
+                               <div className="flex gap-4 text-muted-foreground flex-wrap">
+                                 {q.minWords !== undefined && q.minWords !== null && (
+                                   <span>Min: {q.minWords} words</span>
+                                 )}
+                                 {q.maxWords !== undefined && q.maxWords !== null && (
+                                   <span>Max: {q.maxWords} words</span>
                                  )}
                                </div>
-                             ))}
-                           </div>
+                               {q.rubricPoints && q.rubricPoints.length > 0 && (
+                                 <div className="border rounded-md p-2 sm:p-3 bg-muted/30 space-y-1">
+                                   <div className="font-medium text-muted-foreground mb-1">Rubric:</div>
+                                   {q.rubricPoints.map((rp: any, rpIdx: number) => (
+                                     <div key={rpIdx} className="flex justify-between gap-2 text-[11px] sm:text-xs">
+                                       <span className="flex-1">{rp.criteria}</span>
+                                       <span className="font-semibold shrink-0">{rp.points} pts</span>
+                                     </div>
+                                   ))}
+                                 </div>
+                               )}
+                             </div>
+                           )}
+
                            {q.explanation && (
                              <div className="mt-2 text-xs sm:text-sm text-muted-foreground italic pl-4 sm:pl-6 border-l-2 border-muted">
                                <span className="font-semibold not-italic mr-1">{t("admin.exams.bulkImport.explanation")}</span>

@@ -79,6 +79,7 @@ describe('Backward Compatibility', () => {
         feedbackType: 'hidden',
         minWords: 100,
         maxWords: 500,
+        requiresManualGrading: true,
         createdAt: new Date()
       };
 

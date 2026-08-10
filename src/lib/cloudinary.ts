@@ -185,7 +185,8 @@ export async function uploadImageToCloudinary(
     questionId: string;
     timestamp?: number;
     tags?: string[];
-  }
+  },
+  signal?: AbortSignal
 ): Promise<CloudinaryUploadResult> {
   const cfg = readCloudinaryConfig();
   if (!cfg) throw new Error("Cloudinary is not configured");
@@ -203,10 +204,8 @@ export async function uploadImageToCloudinary(
   fd.append("context", `original_filename=${encodeURIComponent(file.name)}`);
 
   if (cfg.uploadPreset) {
-    // Unsigned upload
     fd.append("upload_preset", cfg.uploadPreset);
   } else if (cfg.apiKey && cfg.apiSecret) {
-    // Signed upload (see note above)
     const payload: Record<string, string> = {
       folder,
       public_id: publicId,
@@ -226,8 +225,11 @@ export async function uploadImageToCloudinary(
 
   let resp: Response;
   try {
-    resp = await fetch(endpoint, { method: "POST", body: fd });
+    resp = await fetch(endpoint, { method: "POST", body: fd, signal });
   } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      throw new Error("Upload was cancelled or timed out. Please try again.");
+    }
     throw new Error(`Network error uploading to Cloudinary: ${err?.message || String(err)}`);
   }
 

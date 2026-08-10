@@ -1,20 +1,7 @@
-/**
- * Extensible Question Model for ExamPro
- * Supports: MCQ, True/False, Short Answer, Essay
- * 100% backward compatible with existing MCQ-only system
- */
-
 import { Timestamp } from 'firebase/firestore';
 
-// ============================================================================
-// QUESTION TYPE DEFINITIONS
-// ============================================================================
+export type QuestionType = 'mcq' | 'true-false' | 'short-answer' | 'essay';
 
-export type QuestionType = 'mcq' | 'true_false' | 'short_answer' | 'essay';
-
-/**
- * Base question interface - shared by all question types
- */
 export interface BaseQuestion {
   questionId: string;
   examId: string;
@@ -23,68 +10,51 @@ export interface BaseQuestion {
   orderIndex: number;
   feedbackType: 'instant' | 'hidden';
   explanation?: string;
-  imageUrl?: string;           // Optional image for any question type
-  imageAltText?: string;       // Accessibility: alt text for image
+  imageUrl?: string;
+  imageAltText?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
-  
-  // Metadata for analytics/filtering
   questionType: QuestionType;
   difficulty?: 'easy' | 'medium' | 'hard';
   tags?: string[];
+  imageDisplayMode?: 'inline' | 'background' | 'main';
 }
 
-/**
- * MCQ Question - fully backward compatible with existing schema
- */
 export interface MCQQuestion extends BaseQuestion {
   questionType: 'mcq';
-  options: string[];                    // 2-6 options
+  options: string[];
   correctOptionIndex: number;
-  optionImages?: string[];              // Optional per-option images (future)
-  multiSelect?: boolean;                // Future: multiple correct answers
+  optionImages?: string[];
+  multiSelect?: boolean;
 }
 
-/**
- * True/False Question
- */
 export interface TrueFalseQuestion extends BaseQuestion {
-  questionType: 'true_false';
+  questionType: 'true-false';
   correctAnswer: boolean;
 }
 
-/**
- * Short Answer Question - pattern matching based
- */
 export interface ShortAnswerQuestion extends BaseQuestion {
-  questionType: 'short_answer';
-  acceptedAnswers: string[];           // Multiple valid answers
-  caseSensitive?: boolean;             // Default: false
-  charLimit?: number;                  // Character limit (e.g., 100, 500)
+  questionType: 'short-answer';
+  correctAnswers: string[];
+  caseSensitive?: boolean;
+  requireExactMatch?: boolean;
+  charLimit?: number;
 }
 
-/**
- * Essay Question - requires manual grading
- */
 export interface EssayQuestion extends BaseQuestion {
   questionType: 'essay';
-  minWords?: number;                   // Minimum word count
-  maxWords?: number;                   // Maximum word count
-  rubric?: GradingRubric;              // Optional rubric for scoring
-  requiresManualGrading: boolean;      // Always true for essays
+  minWords?: number;
+  maxWords?: number;
+  rubric?: GradingRubric;
+  rubricPoints?: { criteria: string; points: number }[];
+  requiresManualGrading: boolean;
 }
 
-/**
- * Grading rubric for essay questions
- */
 export interface GradingRubric {
   criteria: GradingCriterion[];
   totalPoints: number;
 }
 
-/**
- * Individual grading criterion
- */
 export interface GradingCriterion {
   id: string;
   name: string;
@@ -92,24 +62,14 @@ export interface GradingCriterion {
   maxPoints: number;
 }
 
-/**
- * Union type for all question types
- */
 export type Question = 
   | MCQQuestion 
   | TrueFalseQuestion 
   | ShortAnswerQuestion 
   | EssayQuestion;
 
-// ============================================================================
-// ANSWER TYPE DEFINITIONS
-// ============================================================================
+export type AnswerType = 'mcq' | 'true-false' | 'short-answer' | 'essay';
 
-export type AnswerType = 'mcq' | 'true_false' | 'short_answer' | 'essay';
-
-/**
- * Base answer interface - shared by all answer types
- */
 export interface BaseAnswer {
   questionId: string;
   attemptId: string;
@@ -117,64 +77,42 @@ export interface BaseAnswer {
   timeSpentSeconds: number | null;
 }
 
-/**
- * MCQ Answer
- */
 export interface MCQAnswer extends BaseAnswer {
   questionType: 'mcq';
   selectedOptionIndex: number | null;
   isCorrect: boolean | null;
 }
 
-/**
- * True/False Answer
- */
 export interface TrueFalseAnswer extends BaseAnswer {
-  questionType: 'true_false';
+  questionType: 'true-false';
   selectedAnswer: boolean | null;
   isCorrect: boolean | null;
 }
 
-/**
- * Short Answer Response
- */
 export interface ShortAnswerAnswer extends BaseAnswer {
-  questionType: 'short_answer';
+  questionType: 'short-answer';
   studentResponse: string | null;
   isCorrect: boolean | null;
-  matchedAnswer?: string;              // Which accepted answer matched
+  matchedAnswer?: string;
 }
 
-/**
- * Essay Answer - requires manual grading
- */
 export interface EssayAnswer extends BaseAnswer {
   questionType: 'essay';
   studentResponse: string | null;
   wordCount?: number;
-  manualScore?: number;                // Score given by teacher
-  manualFeedback?: string;             // Teacher feedback
-  graderUserId?: string;               // User ID of grader
+  manualScore?: number;
+  manualFeedback?: string;
+  graderUserId?: string;
   gradedAt?: Timestamp;
-  autoScore?: number;                  // Preliminary score from rubric
+  autoScore?: number;
 }
 
-/**
- * Union type for all answer types
- */
 export type Answer = 
   | MCQAnswer 
   | TrueFalseAnswer 
   | ShortAnswerAnswer 
   | EssayAnswer;
 
-// ============================================================================
-// ESSAY GRADING COLLECTION TYPES
-// ============================================================================
-
-/**
- * Essay document for manual grading workflow
- */
 export interface Essay {
   essayId: string;
   attemptId: string;
@@ -187,14 +125,11 @@ export interface Essay {
   status: 'pending' | 'graded' | 'rejected';
   manualScore?: number;
   manualFeedback?: string;
-  gradedBy?: string;                   // User ID of grader
+  gradedBy?: string;
   gradedAt?: Timestamp;
   createdAt: Timestamp;
 }
 
-/**
- * Reusable grading rubric
- */
 export interface Rubric {
   rubricId: string;
   name: string;
@@ -206,98 +141,89 @@ export interface Rubric {
   updatedAt: Timestamp;
 }
 
-// ============================================================================
-// TYPE GUARDS
-// ============================================================================
+function normalizeType(value: string): string {
+  return value.replace(/_/g, '-');
+}
 
 export function isMCQQuestion(q: Question): q is MCQQuestion {
-  return q.questionType === 'mcq';
+  return q && normalizeType(q.questionType) === 'mcq';
 }
 
 export function isTrueFalseQuestion(q: Question): q is TrueFalseQuestion {
-  return q.questionType === 'true_false';
+  return q && normalizeType(q.questionType) === 'true-false';
 }
 
 export function isShortAnswerQuestion(q: Question): q is ShortAnswerQuestion {
-  return q.questionType === 'short_answer';
+  return q && normalizeType(q.questionType) === 'short-answer';
 }
 
 export function isEssayQuestion(q: Question): q is EssayQuestion {
-  return q.questionType === 'essay';
+  return q && normalizeType(q.questionType) === 'essay';
 }
 
 export function isMCQAnswer(a: Answer): a is MCQAnswer {
-  return a.questionType === 'mcq';
+  return a && normalizeType(a.questionType) === 'mcq';
 }
 
 export function isTrueFalseAnswer(a: Answer): a is TrueFalseAnswer {
-  return a.questionType === 'true_false';
+  return a && normalizeType(a.questionType) === 'true-false';
 }
 
 export function isShortAnswerAnswer(a: Answer): a is ShortAnswerAnswer {
-  return a.questionType === 'short_answer';
+  return a && normalizeType(a.questionType) === 'short-answer';
 }
 
 export function isEssayAnswer(a: Answer): a is EssayAnswer {
-  return a.questionType === 'essay';
+  return a && normalizeType(a.questionType) === 'essay';
 }
 
 export function isAutoGradable(question: Question): boolean {
-  return question.questionType !== 'essay';
+  return !isEssayQuestion(question);
 }
 
 export function requiresManualGrading(question: Question): boolean {
-  return isEssayQuestion(question) && question.requiresManualGrading;
+  return isEssayQuestion(question) && (question as EssayQuestion).requiresManualGrading;
 }
 
-// ============================================================================
-// VALIDATION & UTILITY FUNCTIONS
-// ============================================================================
-
-/**
- * Get the correct answer for a question (for auto-gradable questions)
- */
 export function getCorrectAnswer(question: Question): any {
-  switch (question.questionType) {
+  const q = question as any;
+  switch (normalizeType(question.questionType)) {
     case 'mcq':
-      return (question as MCQQuestion).correctOptionIndex;
-    case 'true_false':
-      return (question as TrueFalseQuestion).correctAnswer;
-    case 'short_answer':
-      return (question as ShortAnswerQuestion).acceptedAnswers;
+      return q.correctOptionIndex;
+    case 'true-false':
+      return q.correctAnswer;
+    case 'short-answer':
+      return q.correctAnswers;
     case 'essay':
-      return null; // Requires manual grading
+      return null;
   }
 }
 
-/**
- * Validate a student's answer and return correctness
- */
 export function validateAnswer(
   question: Question,
   answer: Answer
 ): { isCorrect: boolean; feedback?: string } {
-  // MCQ validation
-  if (isMCQQuestion(question) && isMCQAnswer(answer)) {
-    const mcqQ = question as MCQQuestion;
+  const qType = normalizeType(question.questionType);
+
+  if (qType === 'mcq') {
+    const mcqQ = question as unknown as MCQQuestion;
+    const mcqA = answer as unknown as MCQAnswer;
     return {
-      isCorrect: answer.selectedOptionIndex === mcqQ.correctOptionIndex
+      isCorrect: mcqA.selectedOptionIndex === mcqQ.correctOptionIndex
     };
   }
   
-  // True/False validation
-  if (isTrueFalseQuestion(question) && isTrueFalseAnswer(answer)) {
-    const tfQ = question as TrueFalseQuestion;
-    const tfA = answer as TrueFalseAnswer;
+  if (qType === 'true-false') {
+    const tfQ = question as unknown as TrueFalseQuestion;
+    const tfA = answer as unknown as TrueFalseAnswer;
     return {
       isCorrect: tfA.selectedAnswer === tfQ.correctAnswer
     };
   }
   
-  // Short answer validation
-  if (isShortAnswerQuestion(question) && isShortAnswerAnswer(answer)) {
-    const saQ = question as ShortAnswerQuestion;
-    const saA = answer as ShortAnswerAnswer;
+  if (qType === 'short-answer') {
+    const saQ = question as unknown as ShortAnswerQuestion;
+    const saA = answer as unknown as ShortAnswerAnswer;
     
     if (saA.studentResponse === null || saA.studentResponse === '') {
       return { isCorrect: false };
@@ -308,7 +234,7 @@ export function validateAnswer(
     
     const studentNorm = normalize(saA.studentResponse);
     
-    const matched = saQ.acceptedAnswers.find(
+    const matched = saQ.correctAnswers.find(
       a => normalize(a) === studentNorm
     );
     
@@ -318,8 +244,7 @@ export function validateAnswer(
     };
   }
   
-  // Essay validation (requires manual grading)
-  if (isEssayQuestion(question) && isEssayAnswer(answer)) {
+  if (qType === 'essay') {
     return {
       isCorrect: false,
       feedback: 'Awaiting manual grading'
@@ -329,32 +254,24 @@ export function validateAnswer(
   return { isCorrect: false };
 }
 
-/**
- * Check if answer is complete (not skipped)
- */
 export function isAnswerComplete(question: Question, answer: Answer): boolean {
-  switch (question.questionType) {
+  const qType = normalizeType(question.questionType);
+  switch (qType) {
     case 'mcq':
-      return (answer as MCQAnswer).selectedOptionIndex !== null;
-    case 'true_false':
-      return (answer as TrueFalseAnswer).selectedAnswer !== null;
-    case 'short_answer':
-      return !!(answer as ShortAnswerAnswer).studentResponse;
+      return (answer as unknown as MCQAnswer).selectedOptionIndex !== null;
+    case 'true-false':
+      return (answer as unknown as TrueFalseAnswer).selectedAnswer !== null;
+    case 'short-answer':
+      return !!(answer as unknown as ShortAnswerAnswer).studentResponse;
     case 'essay':
-      return !!(answer as EssayAnswer).studentResponse;
+      return !!(answer as unknown as EssayAnswer).studentResponse;
   }
 }
 
-/**
- * Count words in a string (for essay word limits)
- */
 export function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(w => w.length > 0).length;
 }
 
-/**
- * Validate essay word count against question requirements
- */
 export function validateEssayWordCount(
   question: EssayQuestion,
   essay: string
@@ -378,29 +295,22 @@ export function validateEssayWordCount(
   return { valid: true };
 }
 
-// ============================================================================
-// BACKWARD COMPATIBILITY HELPERS
-// ============================================================================
-
-/**
- * Convert legacy question to new format
- * Used for defensive reading when loading questions
- */
 export function ensureQuestionType(data: any): Question {
   if (!data.questionType) {
-    // Default to MCQ for legacy questions
     data.questionType = 'mcq';
+  }
+  data.questionType = normalizeType(data.questionType);
+  if (!data.requiresManualGrading && isEssayQuestion(data as Question)) {
+    data.requiresManualGrading = true;
   }
   return data as Question;
 }
 
-/**
- * Convert legacy answer to new format
- * Used for defensive reading when loading answers
- */
 export function ensureAnswerType(data: any, questionType: QuestionType): Answer {
   if (!data.questionType) {
-    data.questionType = questionType;
+    data.questionType = normalizeType(questionType);
+  } else {
+    data.questionType = normalizeType(data.questionType);
   }
   return data as Answer;
 }

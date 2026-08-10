@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { getExam, updateExam, getQuestions, addQuestion, updateQuestion as updateQuestionDb, deleteQuestion as deleteQuestionDb, deleteExam } from "@/lib/firebase-exams";
@@ -104,6 +104,7 @@ const EditExam = () => {
   const [editingQuestionIndex, setEditingQuestionIndex] = useState<number | null>(null);
   const [questionFormDialogOpen, setQuestionFormDialogOpen] = useState(false);
   const [questionFormLoading, setQuestionFormLoading] = useState(false);
+  const questionFormSubmittingRef = useRef(false);
 
   useEffect(() => {
     const fetchExam = async () => {
@@ -244,6 +245,7 @@ const EditExam = () => {
   };
 
   const saveExam = async () => {
+      if (saving) return;
       if (!canEditExams) {
         toast({ title: "Permission Denied", description: "You cannot edit exams.", variant: "destructive" });
         return;
@@ -312,7 +314,7 @@ const EditExam = () => {
             marks: q.marks,
             orderIndex: i,
             questionType: q.questionType,
-            imageUrl: q.imageUrl,
+            imageUrl: q.imageUrl !== undefined ? q.imageUrl : null,
             imageDisplayMode: q.imageDisplayMode,
           };
 
@@ -346,6 +348,8 @@ const EditExam = () => {
                 ...baseQuestionData,
                 minWords: q.minWords,
                 maxWords: q.maxWords,
+                rubricPoints: q.rubricPoints,
+                requiresManualGrading: true,
               };
               break;
           }
@@ -482,6 +486,8 @@ const EditExam = () => {
 
   const handleQuestionFormSubmit = async (data: NewQuestionInput) => {
     if (!canEditExams) return;
+    if (questionFormLoading || questionFormSubmittingRef.current) return;
+    questionFormSubmittingRef.current = true;
     
     setQuestionFormLoading(true);
     try {
@@ -490,10 +496,10 @@ const EditExam = () => {
 
       const newQuestions = [...questions];
       
-      // Handle image replacement - delete old image if different
+      // Handle image replacement - delete old image if different or removed
       const oldQuestion = index < questions.length ? questions[index] : null;
-      if (oldQuestion && oldQuestion.imageUrl && data.imageUrl && oldQuestion.imageUrl !== data.imageUrl) {
-        // New image is different from old image - delete the old one
+      if (oldQuestion?.imageUrl && data.imageUrl !== oldQuestion.imageUrl) {
+        // New image is different from old image, or new image is null/undefined (removed)
         try {
           const { deleteQuestionImage } = await import("@/lib/image-handler");
           await deleteQuestionImage(oldQuestion.imageUrl);
@@ -546,6 +552,7 @@ const EditExam = () => {
             ...baseQuestion,
             minWords: data.minWords,
             maxWords: data.maxWords,
+            rubricPoints: data.rubricPoints,
           };
           break;
       }
@@ -581,6 +588,7 @@ const EditExam = () => {
       });
     } finally {
       setQuestionFormLoading(false);
+      questionFormSubmittingRef.current = false;
     }
   };
 

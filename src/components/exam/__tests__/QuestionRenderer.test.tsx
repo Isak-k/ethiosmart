@@ -260,6 +260,7 @@ describe('QuestionRenderer', () => {
         { criteria: 'Accuracy', points: 10 },
         { criteria: 'Clarity', points: 10 },
       ],
+      requiresManualGrading: true,
       createdAt: Timestamp.now(),
     };
 
@@ -506,6 +507,7 @@ describe('QuestionRenderer', () => {
         marks: 1,
         orderIndex: 1,
         feedbackType: 'instant' as const,
+        requiresManualGrading: true,
         createdAt: Timestamp.now(),
       };
       render(<QuestionRenderer {...baseProps} question={q} />);

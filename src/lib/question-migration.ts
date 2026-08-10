@@ -7,6 +7,10 @@
 import { Question, MCQQuestion } from "@/integrations/firebase/types";
 import { Timestamp } from "firebase/firestore";
 
+function normalizeType(value: string): string {
+  return value.replace(/_/g, '-');
+}
+
 export interface LegacyQuestion {
   questionId: string;
   examId: string;
@@ -45,7 +49,9 @@ export function migrateLegacyQuestion(
   legacyQuestion: LegacyQuestion | any
 ): Question {
   if (!isLegacyQuestion(legacyQuestion)) {
-    // Already in new format or has questionType field
+    if (legacyQuestion && typeof legacyQuestion === 'object' && legacyQuestion.questionType) {
+      legacyQuestion.questionType = normalizeType(legacyQuestion.questionType);
+    }
     return legacyQuestion;
   }
 
@@ -69,10 +75,10 @@ export function migrateLegacyQuestions(questions: any[]): Question[] {
  */
 export function ensureQuestionType(question: any): Question {
   if (question.questionType) {
+    question.questionType = normalizeType(question.questionType);
     return question;
   }
 
-  // If it has options and correctOptionIndex, it's an MCQ
   if (Array.isArray(question.options) && typeof question.correctOptionIndex === "number") {
     return {
       ...question,
@@ -80,11 +86,10 @@ export function ensureQuestionType(question: any): Question {
     };
   }
 
-  // Fallback - shouldn't reach here in normal operation
   console.warn("Question missing questionType and cannot be auto-detected:", question);
   return {
     ...question,
-    questionType: "mcq", // Assume MCQ as fallback
+    questionType: "mcq",
   };
 }
 

@@ -290,10 +290,27 @@ export async function getPublishedExams(studentDepartmentId?: string): Promise<E
 
 // Question management
 export async function addQuestion(examId: string, questionData: Omit<Question, 'questionId' | 'createdAt'>) {
-  const question = {
+  const question: Record<string, any> = {
     ...questionData,
     createdAt: Timestamp.now()
   };
+  
+  // Remove any undefined values - Firestore doesn't accept undefined
+  Object.keys(question).forEach((key) => {
+    if (question[key] === undefined) {
+      delete question[key];
+    }
+  });
+  
+  // Ensure imageUrl is null not undefined
+  if (!('imageUrl' in question) || question.imageUrl === undefined) {
+    question.imageUrl = null;
+  }
+  
+  // Ensure explanation is null not undefined
+  if (!('explanation' in question) || question.explanation === undefined) {
+    question.explanation = null;
+  }
   
   const docRef = await addDoc(collection(db, 'exams', examId, 'questions'), question);
   
@@ -317,8 +334,17 @@ export async function getQuestions(examId: string): Promise<Question[]> {
 }
 
 export async function updateQuestion(examId: string, questionId: string, updates: Partial<Question>) {
+  const updatePayload: Record<string, any> = { ...updates };
+  
+  // Remove any undefined values - Firestore doesn't accept undefined
+  Object.keys(updatePayload).forEach((key) => {
+    if (updatePayload[key] === undefined) {
+      delete updatePayload[key];
+    }
+  });
+  
   const docRef = doc(db, 'exams', examId, 'questions', questionId);
-  await updateDoc(docRef, updates);
+  await updateDoc(docRef, updatePayload);
   
   // Update exam stats if marks changed
   if (updates.marks !== undefined) {
@@ -338,13 +364,31 @@ export async function saveQuestionsBatch(examId: string, questions: Omit<Questio
   const batch = writeBatch(db);
   
   questions.forEach(questionData => {
-    // Create a reference with an auto-generated ID in the questions subcollection
-    const newDocRef = doc(collection(db, 'exams', examId, 'questions'));
-    
-    batch.set(newDocRef, {
+    const cleanedData: Record<string, any> = {
       ...questionData,
       createdAt: Timestamp.now()
+    };
+    
+    // Remove any undefined values - Firestore doesn't accept undefined
+    Object.keys(cleanedData).forEach((key) => {
+      if (cleanedData[key] === undefined) {
+        delete cleanedData[key];
+      }
     });
+    
+    // Ensure imageUrl is null not undefined
+    if (!('imageUrl' in cleanedData) || cleanedData.imageUrl === undefined) {
+      cleanedData.imageUrl = null;
+    }
+    
+    // Ensure explanation is null not undefined
+    if (!('explanation' in cleanedData) || cleanedData.explanation === undefined) {
+      cleanedData.explanation = null;
+    }
+    
+    // Create a reference with an auto-generated ID in the questions subcollection
+    const newDocRef = doc(collection(db, 'exams', examId, 'questions'));
+    batch.set(newDocRef, cleanedData);
   });
 
   await batch.commit();

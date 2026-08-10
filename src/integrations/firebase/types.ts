@@ -105,26 +105,30 @@ export interface EssayQuestion extends BaseQuestion {
   rubricPoints?: { criteria: string; points: number }[]; // Optional grading rubric
   minWords?: number;
   maxWords?: number;
+  requiresManualGrading: boolean;
 }
 
 // Union type for all question types
 export type Question = MCQQuestion | TrueFalseQuestion | ShortAnswerQuestion | EssayQuestion;
 
-// Type guard functions
+function normalizeQuestionType(value: string): string {
+  return value.replace(/_/g, '-');
+}
+
 export function isMCQQuestion(q: Question): q is MCQQuestion {
-  return q.questionType === 'mcq';
+  return !!q && normalizeQuestionType(q.questionType) === 'mcq';
 }
 
 export function isTrueFalseQuestion(q: Question): q is TrueFalseQuestion {
-  return q.questionType === 'true-false';
+  return !!q && normalizeQuestionType(q.questionType) === 'true-false';
 }
 
 export function isShortAnswerQuestion(q: Question): q is ShortAnswerQuestion {
-  return q.questionType === 'short-answer';
+  return !!q && normalizeQuestionType(q.questionType) === 'short-answer';
 }
 
 export function isEssayQuestion(q: Question): q is EssayQuestion {
-  return q.questionType === 'essay';
+  return !!q && normalizeQuestionType(q.questionType) === 'essay';
 }
 
 export interface ExamAttempt {

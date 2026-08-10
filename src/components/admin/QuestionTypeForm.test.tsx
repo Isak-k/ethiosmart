@@ -48,6 +48,7 @@ const mockEssayQuestion = {
   feedbackType: "instant" as const,
   minWords: 100,
   maxWords: 500,
+  requiresManualGrading: true,
   createdAt: Timestamp.now(),
 };
 
