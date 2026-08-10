@@ -278,7 +278,7 @@ export function QuestionRenderer({
   const renderQuestionImage = () => {
     if (!question.imageUrl) return null;
 
-    const displayMode = question.imageDisplayMode || 'inline';
+    const displayMode = (question.imageDisplayMode || 'inline') as 'inline' | 'background' | 'main';
     const optimizedUrl = optimizeImageUrl(question.imageUrl, {
       maxWidth: displayMode === 'main' ? 1200 : 800,
       quality: 'auto',
@@ -360,7 +360,7 @@ export function QuestionRenderer({
       </div>
 
       {/* Question Image (if inline or main display mode) */}
-      {question.imageUrl && (question.imageDisplayMode === 'inline' || question.imageDisplayMode === 'main') && (
+      {question.imageUrl && (!question.imageDisplayMode || question.imageDisplayMode === 'inline' || question.imageDisplayMode === 'main') && (
         renderQuestionImage()
       )}
 
