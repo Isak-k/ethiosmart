@@ -130,7 +130,10 @@ export function buildOptimizedUrl(
 ): string {
   if (!source) return source;
   const cld = getCloudinaryInstance();
-  if (!cld) return source;
+  if (!cld) {
+    console.log("buildOptimizedUrl: Cloudinary not configured, returning source URL as-is");
+    return source;
+  }
 
   let img: any;
 
@@ -139,15 +142,19 @@ export function buildOptimizedUrl(
     // Fall back to returning the source if parse fails.
     try {
       const publicId = extractPublicId(source);
+      console.log("buildOptimizedUrl: Extracted publicId:", publicId, "from URL:", source);
       if (publicId) {
         img = cld.image(publicId);
       } else {
+        console.warn("buildOptimizedUrl: Could not extract publicId, returning source URL");
         return source;
       }
-    } catch {
+    } catch (err) {
+      console.error("buildOptimizedUrl: Error extracting publicId:", err);
       return source;
     }
   } else {
+    console.log("buildOptimizedUrl: Not a Cloudinary URL, using source as publicId");
     img = cld.image(source);
   }
 
@@ -156,16 +163,44 @@ export function buildOptimizedUrl(
     img = img.resize(auto().width(opts?.maxWidth as any).height(opts?.maxHeight as any).gravity(autoGravity()));
   }
 
-  return img.toURL();
+  const optimizedUrl = img.toURL();
+  console.log("buildOptimizedUrl: Generated optimized URL:", optimizedUrl);
+  return optimizedUrl;
 }
 
 export function extractPublicId(cloudinaryUrl: string): string | null {
   try {
-    // Typical: https://res.cloudinary.com/<cloud>/image/upload/v<ver>/<folder>/<file>.<ext>
-    const re = /\/image\/(?:upload|fetch|authenticated|private)(?:\/v\d+)?\/(.+?)(?:\.[a-zA-Z0-9]+)?(?:\?|$)/;
-    const m = cloudinaryUrl.match(re);
-    return m ? m[1] : null;
-  } catch {
+    // Handle various Cloudinary URL formats:
+    // https://res.cloudinary.com/<cloud>/image/upload/v<ver>/<folder>/<file>.<ext>
+    // https://res.cloudinary.com/<cloud>/image/upload/<folder>/<file>.<ext>
+    // https://res.cloudinary.com/<cloud>/image/upload/w_<width>,h_<height>/<folder>/<file>.<ext>
+    
+    const url = new URL(cloudinaryUrl);
+    const pathParts = url.pathname.split('/');
+    
+    // Find 'upload' index and get everything after it
+    const uploadIndex = pathParts.indexOf('upload');
+    if (uploadIndex === -1) {
+      console.warn("extractPublicId: No 'upload' segment found in URL:", cloudinaryUrl);
+      return null;
+    }
+    
+    // Get all parts after 'upload'
+    const afterUpload = pathParts.slice(uploadIndex + 1);
+    if (afterUpload.length === 0) {
+      console.warn("extractPublicId: No public_id after upload segment");
+      return null;
+    }
+    
+    // Remove version segment if present (e.g., 'v1234')
+    let idParts = afterUpload.filter(p => p && !p.match(/^v\d+$/));
+    
+    // Join and remove file extension if present
+    let publicId = idParts.join('/').split('.')[0];
+    console.log("extractPublicId: Extracted from URL:", cloudinaryUrl, "Result:", publicId);
+    return publicId || null;
+  } catch (err) {
+    console.error("extractPublicId: Error parsing URL:", err);
     return null;
   }
 }
