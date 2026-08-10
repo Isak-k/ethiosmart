@@ -25,11 +25,19 @@ export function ImagePreview({
   questionText,
 }: ImagePreviewProps) {
   const displayClasses = getImageDisplayClasses(displayMode);
+  // For non-Cloudinary URLs (Firebase storage), use the URL directly
+  // optimizeImageUrl will return the original URL if it's not Cloudinary
   const optimizedUrl = optimizeImageUrl(imageUrl, {
     maxWidth: displayMode === "main" ? 1200 : 800,
     quality: "auto",
     format: "auto",
   });
+
+  // Log for debugging
+  React.useEffect(() => {
+    console.log("ImagePreview - Original URL:", imageUrl);
+    console.log("ImagePreview - Optimized URL:", optimizedUrl);
+  }, [imageUrl, optimizedUrl]);
 
   const displayModeOptions: { value: ImageDisplayMode; label: string }[] = [
     { value: "inline", label: "Inline with text" },
@@ -67,10 +75,11 @@ export function ImagePreview({
             <img
               src={optimizedUrl}
               alt="Question preview"
-              className={`${displayClasses} mx-auto`}
+              className="max-w-full h-auto max-h-96 object-contain mx-auto rounded"
               loading="lazy"
               onError={(e) => {
                 console.warn("Failed to load image:", imageUrl);
+                console.error("Image load error event:", e);
               }}
             />
             {questionText && (
@@ -103,10 +112,11 @@ export function ImagePreview({
             <img
               src={optimizedUrl}
               alt="Question preview"
-              className={`${displayClasses} w-full`}
+              className="max-w-full h-auto object-contain rounded"
               loading="lazy"
               onError={(e) => {
                 console.warn("Failed to load image:", imageUrl);
+                console.error("Image load error event:", e);
               }}
             />
             {questionText && (
