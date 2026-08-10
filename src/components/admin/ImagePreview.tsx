@@ -37,7 +37,15 @@ export function ImagePreview({
   React.useEffect(() => {
     console.log("ImagePreview - Original URL:", imageUrl);
     console.log("ImagePreview - Optimized URL:", optimizedUrl);
-  }, [imageUrl, optimizedUrl]);
+    console.log("ImagePreview - Display Mode:", displayMode);
+    
+    // Test if URL is valid by trying to fetch it
+    if (imageUrl) {
+      fetch(imageUrl, { method: 'HEAD' })
+        .then(() => console.log("Image URL is accessible"))
+        .catch((err) => console.error("Image URL is NOT accessible:", err));
+    }
+  }, [imageUrl, optimizedUrl, displayMode]);
 
   const displayModeOptions: { value: ImageDisplayMode; label: string }[] = [
     { value: "inline", label: "Inline with text" },
@@ -76,10 +84,18 @@ export function ImagePreview({
               src={optimizedUrl}
               alt="Question preview"
               className="max-w-full h-auto max-h-96 object-contain mx-auto rounded"
-              loading="lazy"
+              crossOrigin="anonymous"
+              loading="eager"
               onError={(e) => {
-                console.warn("Failed to load image:", imageUrl);
-                console.error("Image load error event:", e);
+                console.error("Failed to load image:", {
+                  imageUrl,
+                  optimizedUrl,
+                  error: e,
+                  target: e.currentTarget,
+                });
+              }}
+              onLoad={() => {
+                console.log("Image loaded successfully:", optimizedUrl);
               }}
             />
             {questionText && (
@@ -113,10 +129,18 @@ export function ImagePreview({
               src={optimizedUrl}
               alt="Question preview"
               className="max-w-full h-auto object-contain rounded"
-              loading="lazy"
+              crossOrigin="anonymous"
+              loading="eager"
               onError={(e) => {
-                console.warn("Failed to load image:", imageUrl);
-                console.error("Image load error event:", e);
+                console.error("Failed to load image:", {
+                  imageUrl,
+                  optimizedUrl,
+                  error: e,
+                  target: e.currentTarget,
+                });
+              }}
+              onLoad={() => {
+                console.log("Image loaded successfully:", optimizedUrl);
               }}
             />
             {questionText && (

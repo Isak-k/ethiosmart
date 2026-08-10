@@ -214,7 +214,7 @@ export async function uploadQuestionImage(
 
   const timestamp = Date.now();
   const fileExtension = file.name.split(".").pop() || "jpg";
-  const storagePath = `exams/${examId}/questions/${questionId}/${timestamp}.${fileExtension}`;
+  const storagePath = `exam-images/${examId}/${timestamp}.${fileExtension}`;
   const imageRef = ref(storage, storagePath);
 
   const snapshot = await withTimeout(
