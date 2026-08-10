@@ -105,19 +105,29 @@ export function ImagePreview({
         )}
 
         {displayMode === "background" && (
-          <div
-            className="p-6 relative"
-            style={{
-              backgroundImage: `url(${optimizedUrl})`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              minHeight: "300px",
-            }}
-          >
-            <div className="absolute inset-0 bg-black/40" />
+          <div className="p-6 relative overflow-hidden rounded" style={{ minHeight: "300px" }}>
+            <img
+              src={optimizedUrl}
+              alt="Background"
+              className="absolute inset-0 w-full h-full object-cover"
+              style={{ opacity: 0.3 }}
+              crossOrigin="anonymous"
+              loading="eager"
+              onError={(e) => {
+                console.error("Failed to load background image:", {
+                  imageUrl,
+                  optimizedUrl,
+                  error: e,
+                });
+              }}
+              onLoad={() => {
+                console.log("Background image loaded successfully:", optimizedUrl);
+              }}
+            />
+            <div className="absolute inset-0 bg-black/20" />
             <div className="relative z-10">
               {questionText && (
-                <p className="text-white font-medium text-lg">{questionText}</p>
+                <p className="text-gray-900 font-medium text-lg">{questionText}</p>
               )}
             </div>
           </div>
