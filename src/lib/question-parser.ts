@@ -36,10 +36,12 @@ export function parseQuestions(text: string, t?: TFunction): ParseResult {
   let currentQuestionText = "";
   let currentOptions: string[] = [];
   let currentCorrectIndex = -1;
+  let currentTrueFalseAnswer: boolean | null = null;
   let currentExplanation = "";
   let questionCounter = 0;
   let answerLineFound = false;
   let explanationLineFound = false;
+  let isTrueFalseQuestion = false;
 
   // Regex patterns
   // Flexible Question Start: Matches "1.", "1)", "1-", "1 ", "Q1.", "Question 1:"
@@ -51,7 +53,8 @@ export function parseQuestions(text: string, t?: TFunction): ParseResult {
   const optionRegex = /^\s*\(?([a-zA-Z])\)?[.:\)\-\s]\s*(.+)/;
   
   // Flexible Answer Line: Matches "Answer: A", "Ans - A", "Correct: A", "Answer A"
-  const answerLineRegex = /^(?:Answer|Ans|Correct)\s*[:\-\s]\s*([a-zA-Z])/i;
+  // Also matches "Answer: True/False"
+  const answerLineRegex = /^(?:Answer|Ans|Correct)\s*[:\-\s]\s*(.+)/i;
 
   // Flexible Explanation Line: Matches "Explanation: ...", "Exp: ...", "Reason: ..."
   // Captures the explanation text in group 1
@@ -62,6 +65,25 @@ export function parseQuestions(text: string, t?: TFunction): ParseResult {
       if (!currentQuestionText) {
         if (t) errors.push(t("admin.exams.bulkImport.errors.missingText", { n: questionCounter }));
         else errors.push(`Question ${questionCounter}: Missing question text.`);
+      } else if (isTrueFalseQuestion) {
+        // True/False question validation
+        if (currentTrueFalseAnswer === null) {
+          if (t) errors.push(t("admin.exams.bulkImport.errors.noCorrect", { n: questionCounter }));
+          else errors.push(`Question ${questionCounter}: No True/False answer detected.`);
+        } else {
+          // Remove quotes from explanation if present
+          let cleanExplanation = currentExplanation.trim();
+          if (cleanExplanation.startsWith('"') && cleanExplanation.endsWith('"')) {
+            cleanExplanation = cleanExplanation.slice(1, -1);
+          }
+
+          questions.push({
+            questionText: currentQuestionText,
+            questionType: 'true-false',
+            correctAnswer: currentTrueFalseAnswer,
+            explanation: cleanExplanation || undefined
+          } as any); // Cast because ParsedQuestion doesn't include true-false type
+        }
       } else if (currentOptions.length < 2) {
         if (t) errors.push(t("admin.exams.bulkImport.errors.minOptions", { n: questionCounter }));
         else errors.push(`Question ${questionCounter}: Must have at least 2 options.`);
@@ -90,7 +112,9 @@ export function parseQuestions(text: string, t?: TFunction): ParseResult {
     currentQuestionText = "";
     currentOptions = [];
     currentCorrectIndex = -1;
+    currentTrueFalseAnswer = null;
     currentExplanation = "";
+    isTrueFalseQuestion = false;
     answerLineFound = false;
     explanationLineFound = false;
   };
@@ -115,12 +139,23 @@ export function parseQuestions(text: string, t?: TFunction): ParseResult {
       continue;
     }
 
-    // Check for Answer Line (e.g., "Answer: B")
+    // Check for Answer Line (e.g., "Answer: B" or "Answer: True")
     const answerMatch = line.match(answerLineRegex);
     if (answerMatch) {
-      const answerChar = answerMatch[1].toUpperCase();
-      const answerIndex = answerChar.charCodeAt(0) - 65; // 'A' -> 0
-      currentCorrectIndex = answerIndex;
+      const answerText = answerMatch[1].trim();
+      
+      // Check if it's a True/False answer
+      if (answerText.toLowerCase() === 'true' || answerText.toLowerCase() === 'false') {
+        currentTrueFalseAnswer = answerText.toLowerCase() === 'true';
+        isTrueFalseQuestion = true;
+      } else {
+        // It's an MCQ answer (letter)
+        const answerChar = answerText.toUpperCase().charAt(0);
+        if (/^[A-Z]$/.test(answerChar)) {
+          const answerIndex = answerChar.charCodeAt(0) - 65; // 'A' -> 0
+          currentCorrectIndex = answerIndex;
+        }
+      }
       answerLineFound = true;
       continue;
     }
@@ -761,18 +796,33 @@ export function parseImportData(
     }
   }
 
-  // Fall back to original text parser for MCQ format
+  // Fall back to original text parser for MCQ and True/False format
   const textResult = parseQuestions(trimmed, t);
   return {
-    questions: textResult.questions.map(q => ({
-      questionType: 'mcq' as const,
-      questionText: q.questionText,
-      options: q.options,
-      correctOptionIndex: q.correctOptionIndex,
-      marks: 1,
-      feedbackType: 'hidden' as const,
-      explanation: q.explanation
-    })),
+    questions: textResult.questions.map(q => {
+      // If it's already a true-false question with questionType set
+      if ('questionType' in q && q.questionType === 'true-false') {
+        return {
+          questionType: 'true-false' as const,
+          questionText: q.questionText,
+          correctAnswer: (q as any).correctAnswer,
+          marks: 1,
+          feedbackType: 'hidden' as const,
+          explanation: q.explanation
+        };
+      }
+      
+      // Otherwise it's MCQ
+      return {
+        questionType: 'mcq' as const,
+        questionText: q.questionText,
+        options: (q as any).options,
+        correctOptionIndex: (q as any).correctOptionIndex,
+        marks: 1,
+        feedbackType: 'hidden' as const,
+        explanation: q.explanation
+      };
+    }),
     errors: textResult.errors,
     successCount: textResult.questions.length,
     errorCount: textResult.errors.length
