@@ -391,21 +391,11 @@ const TakeExam = () => {
   // ============== Mode Selection ==============
 
   const handleModeSelected = (mode: 'practice' | 'exam', customTimeLimit?: number) => {
-    // Validate that practice config exists
-    if (!practiceConfig) {
+    // If no practice config, allow normal exam mode only
+    if (!practiceConfig && mode === 'practice') {
       toast({
-        title: "Configuration Missing",
-        description: "Practice exam configuration is not available",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Validate exam mode requires time limit
-    if (mode === 'exam' && !practiceConfig.timeLimit) {
-      toast({
-        title: "Invalid Configuration",
-        description: "Exam mode requires a time limit to be configured",
+        title: "Practice Mode Not Available",
+        description: "Practice exam is not configured for this exam",
         variant: "destructive",
       });
       return;
