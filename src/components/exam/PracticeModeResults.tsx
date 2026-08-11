@@ -3,11 +3,10 @@
  * Shows detailed results with instant feedback, explanations, and answer review
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   CheckCircle2,
   XCircle,
@@ -17,9 +16,8 @@ import {
   Home,
   RotateCcw,
   Download,
-  BarChart3,
 } from 'lucide-react';
-import { PracticeModeResult, PracticeModeAnswer } from '@/lib/practice-mode-engine';
+import { PracticeModeResult } from '@/lib/practice-mode-engine';
 import { Question } from '@/integrations/firebase/types';
 
 export interface PracticeModeResultsProps {
@@ -135,7 +133,7 @@ export function PracticeModeResults({
 
             const isExpanded = expandedQuestions.has(answer.questionId);
             const isCorrect = answer.isCorrect;
-            const isSkipped = answer.selectedOptionIndex === null || answer.selectedOptionIndex === undefined;
+            const isSkipped = answer.answer === null || answer.answer === undefined;
 
             return (
               <div
@@ -205,56 +203,149 @@ export function PracticeModeResults({
                       </p>
                     </div>
 
-                    {/* Options */}
+                    {/* Answer Details - Dynamic based on question type */}
                     <div>
-                      <p className="text-sm font-semibold mb-2">Options</p>
-                      <div className="space-y-2">
-                        {question.options.map((option, optIdx) => {
-                          const isSelected = answer.selectedOptionIndex === optIdx;
-                          const isCorrectOption = optIdx === question.correctOptionIndex;
+                      <p className="text-sm font-semibold mb-2">
+                        {question.questionType === 'mcq' && 'Your Answer'}
+                        {question.questionType === 'true-false' && 'Your Answer'}
+                        {question.questionType === 'short-answer' && 'Your Answer'}
+                        {question.questionType === 'essay' && 'Your Essay'}
+                      </p>
+                      
+                      {/* MCQ */}
+                      {question.questionType === 'mcq' && (
+                        <div className="space-y-2">
+                          {question.options.map((option, optIdx) => {
+                            const isSelected = answer.answer === optIdx;
+                            const isCorrectOption = optIdx === question.correctOptionIndex;
 
-                          let bgColor = 'bg-gray-50';
-                          let borderColor = 'border-gray-200';
+                            let bgColor = 'bg-gray-50';
+                            let borderColor = 'border-gray-200';
 
-                          if (isCorrectOption) {
-                            bgColor = 'bg-green-50';
-                            borderColor = 'border-green-200';
-                          } else if (isSelected && !isCorrect) {
-                            bgColor = 'bg-red-50';
-                            borderColor = 'border-red-200';
-                          }
+                            if (isCorrectOption) {
+                              bgColor = 'bg-green-50';
+                              borderColor = 'border-green-200';
+                            } else if (isSelected && !isCorrect) {
+                              bgColor = 'bg-red-50';
+                              borderColor = 'border-red-200';
+                            }
 
-                          return (
-                            <div
-                              key={optIdx}
-                              className={`border-2 rounded p-2 text-sm ${bgColor} ${borderColor}`}
-                            >
-                              <div className="flex items-start gap-2">
-                                <div className="flex-shrink-0 pt-0.5">
+                            return (
+                              <div
+                                key={optIdx}
+                                className={`border-2 rounded p-2 text-sm ${bgColor} ${borderColor}`}
+                              >
+                                <div className="flex items-start gap-2">
+                                  <div className="flex-shrink-0 pt-0.5">
+                                    {isCorrectOption && (
+                                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                    )}
+                                    {isSelected && !isCorrect && (
+                                      <XCircle className="h-4 w-4 text-red-600" />
+                                    )}
+                                    {!isCorrectOption && !isSelected && (
+                                      <div className="h-4 w-4 rounded-full border border-gray-300" />
+                                    )}
+                                  </div>
+                                  <span className="flex-1">{option}</span>
                                   {isCorrectOption && (
-                                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                    <Badge className="text-xs">Correct</Badge>
                                   )}
                                   {isSelected && !isCorrect && (
-                                    <XCircle className="h-4 w-4 text-red-600" />
-                                  )}
-                                  {!isCorrectOption && !isSelected && (
-                                    <div className="h-4 w-4 rounded-full border border-gray-300" />
+                                    <Badge variant="destructive" className="text-xs">
+                                      Your Answer
+                                    </Badge>
                                   )}
                                 </div>
-                                <span className="flex-1">{option}</span>
-                                {isCorrectOption && (
-                                  <Badge className="text-xs">Correct</Badge>
-                                )}
-                                {isSelected && !isCorrect && (
-                                  <Badge variant="destructive" className="text-xs">
-                                    Your Answer
-                                  </Badge>
-                                )}
                               </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                      
+                      {/* True/False */}
+                      {question.questionType === 'true-false' && (
+                        <div className="space-y-2">
+                          {[true, false].map((value) => {
+                            const isSelected = answer.answer === value;
+                            const isCorrectOption = value === question.correctAnswer;
+
+                            let bgColor = 'bg-gray-50';
+                            let borderColor = 'border-gray-200';
+
+                            if (isCorrectOption) {
+                              bgColor = 'bg-green-50';
+                              borderColor = 'border-green-200';
+                            } else if (isSelected && !isCorrect) {
+                              bgColor = 'bg-red-50';
+                              borderColor = 'border-red-200';
+                            }
+
+                            return (
+                              <div
+                                key={String(value)}
+                                className={`border-2 rounded p-2 text-sm ${bgColor} ${borderColor}`}
+                              >
+                                <div className="flex items-start gap-2">
+                                  <div className="flex-shrink-0 pt-0.5">
+                                    {isCorrectOption && (
+                                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                    )}
+                                    {isSelected && !isCorrect && (
+                                      <XCircle className="h-4 w-4 text-red-600" />
+                                    )}
+                                    {!isCorrectOption && !isSelected && (
+                                      <div className="h-4 w-4 rounded-full border border-gray-300" />
+                                    )}
+                                  </div>
+                                  <span className="flex-1 font-medium">{value ? 'True' : 'False'}</span>
+                                  {isCorrectOption && (
+                                    <Badge className="text-xs">Correct</Badge>
+                                  )}
+                                  {isSelected && !isCorrect && (
+                                    <Badge variant="destructive" className="text-xs">
+                                      Your Answer
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                      
+                      {/* Short Answer */}
+                      {question.questionType === 'short-answer' && (
+                        <div className="space-y-2">
+                          <div className={`border-2 rounded p-2 text-sm ${isCorrect ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                            <p className="font-medium text-sm mb-1">Your Answer:</p>
+                            <p className="text-sm">{answer.answer || '(No answer)'}</p>
+                          </div>
+                          <div className="bg-blue-50 border-2 border-blue-200 rounded p-2">
+                            <p className="font-medium text-sm mb-1">Accepted Answers:</p>
+                            <ul className="text-sm space-y-1">
+                              {question.correctAnswers.map((correctAns, idx) => (
+                                <li key={idx} className="text-blue-900">• {correctAns}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Essay */}
+                      {question.questionType === 'essay' && (
+                        <div className="space-y-2">
+                          <div className="border-2 border-blue-200 rounded p-3 bg-blue-50">
+                            <p className="font-medium text-sm mb-2">Your Essay:</p>
+                            <p className="text-sm text-blue-900 whitespace-pre-wrap">{answer.answer || '(No essay submitted)'}</p>
+                          </div>
+                          <div className="p-2 bg-amber-50 border border-amber-200 rounded">
+                            <p className="text-sm text-amber-900">
+                              <span className="font-semibold">Note:</span> Essays require manual grading by instructor
+                            </p>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Explanation */}
