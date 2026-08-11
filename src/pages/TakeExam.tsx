@@ -391,14 +391,15 @@ const TakeExam = () => {
   // ============== Mode Selection ==============
 
   const handleModeSelected = (mode: 'practice' | 'exam', customTimeLimit?: number) => {
-    // If no practice config, allow normal exam mode only
-    if (!practiceConfig && mode === 'practice') {
-      toast({
-        title: "Practice Mode Not Available",
-        description: "Practice exam is not configured for this exam",
-        variant: "destructive",
-      });
-      return;
+    // For practice mode, ensure we have a practice config (or create default)
+    if (mode === 'practice' && !practiceConfig) {
+      // Create a default practice config
+      const defaultConfig = {
+        timeLimit: (exam?.durationMinutes || 60) * 60, // Convert to seconds
+        timerEnabled: false,
+        passingScore: 50,
+      };
+      setPracticeConfig(defaultConfig as any);
     }
 
     setPracticeMode(mode);
