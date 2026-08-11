@@ -26,28 +26,40 @@ export function ImagePreview({
 }: ImagePreviewProps) {
   const [imageError, setImageError] = React.useState(false);
   const displayClasses = getImageDisplayClasses(displayMode);
-  const optimizedUrl = optimizeImageUrl(imageUrl, {
-    maxWidth: displayMode === "main" ? 1200 : 800,
-    quality: "auto",
-    format: "auto",
-  });
+  
+  // CRITICAL: Try to optimize, but if it fails, use original URL
+  let optimizedUrl = imageUrl;
+  try {
+    const optUrl = optimizeImageUrl(imageUrl, {
+      maxWidth: displayMode === "main" ? 1200 : 800,
+      quality: "auto",
+      format: "auto",
+    });
+    // Only use optimized if it's different and looks valid
+    if (optUrl && optUrl !== imageUrl && optUrl.length > 10) {
+      optimizedUrl = optUrl;
+    }
+  } catch (err) {
+    console.warn("[IMAGE-PREVIEW] Failed to optimize URL, using original:", err);
+    optimizedUrl = imageUrl;
+  }
 
   // Log for debugging
   React.useEffect(() => {
-    console.log("[IMAGE FLOW] ImagePreview received props:", {
-      imageUrl,
+    console.log("[IMAGE-PREVIEW] ImagePreview received:", {
+      imageUrl: imageUrl?.substring(0, 80) + "...",
       displayMode,
-      optimizedUrl,
+      optimizedUrl: optimizedUrl?.substring(0, 80) + "...",
       isImageUrlEmpty: !imageUrl,
     });
     
     // Test if URL is valid by trying to fetch it
     if (imageUrl) {
       fetch(imageUrl, { method: 'HEAD' })
-        .then(() => console.log("[IMAGE FLOW] Image URL is accessible (HTTP 200)"))
-        .catch((err) => console.error("[IMAGE FLOW] Image URL is NOT accessible:", err.message));
+        .then(() => console.log("[IMAGE-PREVIEW] Original URL is accessible (HTTP 200)"))
+        .catch((err) => console.error("[IMAGE-PREVIEW] Original URL NOT accessible:", err.message));
     }
-  }, [imageUrl, optimizedUrl, displayMode]);
+  }, [imageUrl, displayMode]);
 
   const displayModeOptions: { value: ImageDisplayMode; label: string }[] = [
     { value: "inline", label: "Inline with text" },
@@ -95,15 +107,14 @@ export function ImagePreview({
                 loading="eager"
                 onError={(e) => {
                   setImageError(true);
-                  console.error("[IMAGE FLOW] Image failed to load:", {
-                    imageUrl,
-                    optimizedUrl,
-                    statusText: (e.currentTarget as any).statusText,
+                  console.error("[IMAGE-PREVIEW] Image failed to load:", {
+                    imageUrl: imageUrl?.substring(0, 80) + "...",
+                    optimizedUrl: optimizedUrl?.substring(0, 80) + "...",
                   });
                 }}
                 onLoad={() => {
                   setImageError(false);
-                  console.log("[IMAGE FLOW] Image loaded successfully:", optimizedUrl);
+                  console.log("[IMAGE-PREVIEW] Image loaded successfully");
                 }}
               />
             )}
@@ -129,14 +140,13 @@ export function ImagePreview({
                 loading="eager"
                 onError={(e) => {
                   setImageError(true);
-                  console.error("[IMAGE FLOW] Background image failed to load:", {
-                    imageUrl,
-                    optimizedUrl,
+                  console.error("[IMAGE-PREVIEW] Background image failed to load:", {
+                    imageUrl: imageUrl?.substring(0, 80) + "...",
                   });
                 }}
                 onLoad={() => {
                   setImageError(false);
-                  console.log("[IMAGE FLOW] Background image loaded successfully:", optimizedUrl);
+                  console.log("[IMAGE-PREVIEW] Background image loaded successfully");
                 }}
               />
             )}
@@ -164,14 +174,13 @@ export function ImagePreview({
                 loading="eager"
                 onError={(e) => {
                   setImageError(true);
-                  console.error("[IMAGE FLOW] Main image failed to load:", {
-                    imageUrl,
-                    optimizedUrl,
+                  console.error("[IMAGE-PREVIEW] Main image failed to load:", {
+                    imageUrl: imageUrl?.substring(0, 80) + "...",
                   });
                 }}
                 onLoad={() => {
                   setImageError(false);
-                  console.log("[IMAGE FLOW] Main image loaded successfully:", optimizedUrl);
+                  console.log("[IMAGE-PREVIEW] Main image loaded successfully");
                 }}
               />
             )}
