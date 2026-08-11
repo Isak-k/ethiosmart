@@ -246,7 +246,7 @@ export function QuestionRenderer({
           value={textAnswer}
           onChange={(e) => onAnswerChange(e.target.value)}
           disabled={shouldShowResults}
-          placeholder={t("exam.enterEssayAnswer")}
+          placeholder="Enter Essay Answer"
           className="w-full p-3 border border-border rounded-lg resize-none focus:outline-none focus:ring-2"
           rows={6}
         />
@@ -387,7 +387,7 @@ export function QuestionRenderer({
             className="flex items-center gap-2 text-amber-900 font-medium text-sm"
           >
             <Lightbulb className="w-4 h-4" />
-            {showExplanation ? t("exam.hideExplanation") : t("exam.showExplanation")}
+            {showExplanation ? "Hide explanation" : "Show explanation"}
           </button>
           {showExplanation && (
             <p className="mt-2 text-sm text-amber-800">{question.explanation}</p>

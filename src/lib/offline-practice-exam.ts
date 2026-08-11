@@ -34,6 +34,13 @@ export interface PracticeAnswer {
   textAnswer?: string | null;
   isCorrect: boolean;
   marks: number;
+  earnedMarks?: number;
+  totalMarks?: number;
+  feedback?: string;
+  explanation?: string;
+  answerStatus?: 'answered' | 'pending' | 'graded';
+  rubricScore?: number;
+  graderComment?: string;
 }
 
 export interface PracticeExamResult {
@@ -120,16 +127,21 @@ export async function createPracticeAttempt(
 }
 
 /**
- * Save a practice exam answer
- * Note: Do NOT mark answers as correct/incorrect here.
- * Correctness is calculated only during submission.
+ * Save a practice exam answer with evaluation results
+ * Now stores complete evaluation data for all question types
  */
 export async function savePracticeAnswer(
   attemptId: string,
   questionId: string,
   answer: number | string | boolean | null,
   isCorrect: boolean,
-  marks: number
+  marks: number,
+  evaluation?: {
+    earnedMarks?: number;
+    totalMarks?: number;
+    feedback?: string;
+    explanation?: string;
+  }
 ): Promise<void> {
   const db = await initPracticeStores();
 
@@ -139,8 +151,13 @@ export async function savePracticeAnswer(
     selectedOptionIndex: typeof answer === 'number' ? answer : undefined,
     selectedBoolean: typeof answer === 'boolean' ? answer : undefined,
     textAnswer: typeof answer === 'string' ? answer : undefined,
-    isCorrect: false, // Always store false; correctness calculated on submit
-    marks: 0, // Always store 0; marks calculated on submit
+    isCorrect: false, // Always store false on save; correctness calculated on submit
+    marks: 0, // Always store 0 on save; marks calculated on submit
+    earnedMarks: evaluation?.earnedMarks ?? 0,
+    totalMarks: evaluation?.totalMarks ?? 0,
+    feedback: evaluation?.feedback,
+    explanation: evaluation?.explanation,
+    answerStatus: 'answered', // Will be updated if essay is graded later
   };
 
   return new Promise((resolve, reject) => {
@@ -195,6 +212,7 @@ export async function deletePracticeAnswer(
 /**
  * Submit a practice exam and calculate results
  * Evaluates ALL question types: MCQ, True/False, Short Answer, Essay
+ * Stores complete evaluation results with each answer for later review
  */
 export async function submitPracticeExam(
   attemptId: string,
@@ -224,6 +242,9 @@ export async function submitPracticeExam(
 
   const totalQuestions = questions.length;
 
+  // Store evaluation results to update answers
+  const evaluationResults = new Map<string, { answer: PracticeAnswer; evaluation: ReturnType<typeof evaluateQuestion> }>();
+
   questions.forEach((question) => {
     const storedAnswer = answersMap.get(question.questionId);
     
@@ -250,6 +271,11 @@ export async function submitPracticeExam(
     const evaluation = evaluateQuestion(question, answerValue);
     totalScore += evaluation.earnedMarks;
 
+    // Store evaluation result
+    if (storedAnswer) {
+      evaluationResults.set(question.questionId, { answer: storedAnswer, evaluation });
+    }
+
     // Check if pending (essays awaiting manual grading)
     const isPending = evaluation.feedback?.includes('pending') ?? false;
 
@@ -263,9 +289,34 @@ export async function submitPracticeExam(
     }
   });
 
-  // If any essays are pending review, they were skipped above. Adjust count.
-  // Recalculate to ensure correct categorization.
-  const answeredCount = totalQuestions - skippedAnswers;
+  // Update answers with evaluation results
+  const answerUpdatePromises: Promise<void>[] = [];
+  evaluationResults.forEach(({ answer, evaluation }) => {
+    const updatedAnswer: PracticeAnswer = {
+      ...answer,
+      isCorrect: evaluation.isCorrect,
+      earnedMarks: evaluation.earnedMarks,
+      totalMarks: evaluation.totalMarks,
+      marks: evaluation.earnedMarks,
+      feedback: evaluation.feedback,
+      explanation: evaluation.explanation,
+      answerStatus: evaluation.feedback?.includes('pending') ? 'pending' : 'answered',
+    };
+
+    const updatePromise = new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction(PRACTICE_ANSWERS_STORE, 'readwrite');
+      const store = transaction.objectStore(PRACTICE_ANSWERS_STORE);
+      const request = store.put(updatedAnswer);
+
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve();
+    });
+
+    answerUpdatePromises.push(updatePromise);
+  });
+
+  // Wait for all answer updates to complete
+  await Promise.all(answerUpdatePromises);
 
   const maxScore = attempt.maxScore || questions.reduce((s, q) => s + q.marks, 0);
   const percentage = totalQuestions > 0 ? (totalScore / maxScore) * 100 : 0;

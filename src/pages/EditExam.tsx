@@ -318,6 +318,13 @@ const EditExam = () => {
             imageDisplayMode: q.imageDisplayMode,
           };
 
+          console.log("[SAVE-DEBUG] Question", i, "baseQuestionData:", {
+            hasImageUrl: !!baseQuestionData.imageUrl,
+            imageUrl: baseQuestionData.imageUrl?.substring(0, 60),
+            imageDisplayMode: baseQuestionData.imageDisplayMode,
+            allFields: Object.keys(baseQuestionData),
+          });
+
           let questionData: any = baseQuestionData;
 
           // Add type-specific fields
@@ -355,9 +362,11 @@ const EditExam = () => {
           }
 
           if (q.questionId) {
+            console.log("[SAVE-DEBUG] Updating question", q.questionId, "with imageUrl:", questionData.imageUrl?.substring(0, 60));
             await updateQuestionDb(id, q.questionId, questionData);
             return q;
           } else {
+            console.log("[SAVE-DEBUG] Creating new question with imageUrl:", questionData.imageUrl?.substring(0, 60));
             const newId = await addQuestion(id, questionData);
             return { ...q, questionId: newId };
           }
@@ -522,6 +531,11 @@ const EditExam = () => {
         orderIndex: index,
       };
 
+      console.log("[TRACE-7] Building question object");
+      console.log("[TRACE-7] baseQuestion.imageUrl:", baseQuestion.imageUrl);
+      console.log("[TRACE-7] baseQuestion.imageDisplayMode:", baseQuestion.imageDisplayMode);
+      console.log("[TRACE-7] Are both defined?", !!baseQuestion.imageUrl && !!baseQuestion.imageDisplayMode);
+
       let questionToSave: LocalQuestion = baseQuestion;
 
       // Add type-specific fields
@@ -561,6 +575,13 @@ const EditExam = () => {
       if (index < questions.length && questions[index].questionId) {
         questionToSave.questionId = questions[index].questionId;
       }
+
+      console.log("[TRACE-8] Final questionToSave object:", {
+        questionType: questionToSave.questionType,
+        hasImageUrl: !!questionToSave.imageUrl,
+        imageUrl: questionToSave.imageUrl,
+        imageDisplayMode: questionToSave.imageDisplayMode,
+      });
 
       if (index === questions.length) {
         // Adding new question

@@ -60,6 +60,28 @@ function describeAnswer(question: any, answer: any): string {
   return 'Skipped';
 }
 
+function getAnswerStatus(answer: any): 'correct' | 'incorrect' | 'skipped' | 'pending' {
+  if (!answer) return 'skipped';
+  
+  // Check if it's pending (essay awaiting grading)
+  if (answer.answerStatus === 'pending') return 'pending';
+  if (answer.feedback?.includes('pending')) return 'pending';
+  
+  // Check if skipped
+  const selIdx = answer?.selectedOptionIndex;
+  const selBool = answer?.selectedBoolean;
+  const txt = answer?.textAnswer;
+  
+  const isSkipped = selIdx === null || selIdx === undefined || selIdx === -1 ||
+    selBool === null || selBool === undefined ||
+    !txt || String(txt).trim() === '';
+  
+  if (isSkipped && !answer.feedback?.includes('pending')) return 'skipped';
+  
+  // Use stored isCorrect flag
+  return answer.isCorrect ? 'correct' : 'incorrect';
+}
+
 function describeCorrect(question: any): string | null {
   if (!question) return null;
   switch (question.questionType) {
@@ -384,95 +406,134 @@ export function PracticeExamResults({
                   const chip = questionTypeChip(question);
                   const userAns = describeAnswer(question, answer);
                   const correctAnswerText = describeCorrect(question);
+                  const answerStatus = getAnswerStatus(answer);
                   const isEssay = question?.questionType === 'essay';
-                  const isEssayPending = isEssay && answer.answerStatus !== 'graded';
-                  const isEssayGraded = isEssay && answer.answerStatus === 'graded';
 
+                  // Determine styling based on status
                   let tint = 'border-slate-200 bg-slate-50';
                   let Icon: any = Clock;
                   let iconTone = 'text-slate-500';
+                  let statusBadgeLabel = '';
+                  let statusBadgeVariant = '';
 
-                  if (isEssayPending) {
+                  if (answerStatus === 'pending') {
                     tint = 'border-amber-200 bg-amber-50';
                     Icon = AlertCircle;
                     iconTone = 'text-amber-600';
-                  } else if (isEssayGraded) {
-                    tint = 'border-indigo-200 bg-indigo-50';
-                    Icon = Award;
-                    iconTone = 'text-indigo-600';
-                  } else if (answer.isCorrect) {
+                    statusBadgeLabel = 'Pending Review';
+                    statusBadgeVariant = 'badge-warning';
+                  } else if (answerStatus === 'correct') {
                     tint = 'border-green-200 bg-green-50';
                     Icon = CheckCircle;
                     iconTone = 'text-green-600';
-                  } else if (userAns === 'Skipped') {
+                    statusBadgeLabel = 'Correct';
+                    statusBadgeVariant = 'badge-success';
+                  } else if (answerStatus === 'skipped') {
                     tint = 'border-slate-200 bg-slate-50';
                     Icon = Clock;
                     iconTone = 'text-slate-500';
+                    statusBadgeLabel = 'Skipped';
+                    statusBadgeVariant = 'badge-secondary';
                   } else {
                     tint = 'border-red-200 bg-red-50';
                     Icon = XCircle;
                     iconTone = 'text-red-600';
+                    statusBadgeLabel = 'Incorrect';
+                    statusBadgeVariant = 'badge-destructive';
                   }
 
                   return (
                     <div
                       key={`${answer.attemptId}-${answer.questionId}`}
-                      className={`p-3 border rounded-lg ${tint}`}
+                      className={`p-4 border rounded-lg ${tint}`}
                     >
-                      <div className="flex items-start gap-2">
+                      <div className="flex items-start gap-3">
                         <Icon className={`w-5 h-5 flex-shrink-0 mt-0.5 ${iconTone}`} />
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0 space-y-3">
+                          {/* Header */}
                           <div className="flex flex-wrap items-center gap-2">
-                            <p className="font-medium">Question {index + 1}</p>
+                            <p className="font-semibold">Question {index + 1}</p>
                             <Badge variant="outline" className={chip.variant}>
                               {chip.label}
                             </Badge>
-                            {question?.marks !== undefined && (
+                            {statusBadgeLabel && (
+                              <Badge variant="outline" className={statusBadgeVariant}>
+                                {statusBadgeLabel}
+                              </Badge>
+                            )}
+                            {question?.marks !== undefined && answerStatus !== 'skipped' && (
                               <Badge variant="outline" className="badge-secondary">
-                                {question.marks} marks
-                              </Badge>
-                            )}
-                            {isEssayPending && (
-                              <Badge variant="outline" className="badge-warning">
-                                Pending Review
-                              </Badge>
-                            )}
-                            {isEssayGraded && (
-                              <Badge variant="outline" className="badge-success">
-                                Graded · {answer.rubricScore ?? 0}
-                                {question?.marks ? `/${question.marks}` : ''}
+                                {answer.earnedMarks ?? 0}/{question.marks} marks
                               </Badge>
                             )}
                           </div>
+
+                          {/* Question Text */}
                           {question && (
-                            <>
-                              <p className="text-sm text-muted-foreground mt-1">
-                                {question.questionText}
+                            <p className="text-sm text-muted-foreground">
+                              {question.questionText}
+                            </p>
+                          )}
+
+                          {/* User's Answer */}
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium">Your answer:</p>
+                            <div className={isEssay ? 'block rounded border bg-white dark:bg-slate-900 whitespace-pre-wrap p-2 text-sm' : ''}>
+                              <p className={`text-sm ${isEssay ? '' : ''}`}>
+                                {userAns}
                               </p>
-                              <p className="text-sm mt-2">
-                                <span className="font-medium">Your answer:</span>{' '}
-                                <span className={isEssay ? 'block rounded border bg-white dark:bg-slate-900 whitespace-pre-wrap p-2 mt-1 text-sm' : ''}>
-                                  {userAns}
-                                </span>
+                            </div>
+                          </div>
+
+                          {/* Correct Answer (for non-essay questions and non-skipped) */}
+                          {!isEssay && answerStatus !== 'skipped' && answerStatus !== 'pending' && correctAnswerText !== null && (
+                            <div className="space-y-1 p-2 bg-white dark:bg-slate-900 rounded">
+                              <p className="text-sm font-medium">Correct answer:</p>
+                              <p className="text-sm">
+                                {correctAnswerText}
                               </p>
-                              {!isEssay && correctAnswerText !== null && (
-                                <p className="text-sm mt-1">
-                                  <span className="font-medium">Correct answer:</span>{' '}
-                                  {correctAnswerText}
-                                </p>
+                            </div>
+                          )}
+
+                          {/* Feedback */}
+                          {answer.feedback && answerStatus !== 'skipped' && (
+                            <div className={`space-y-1 p-2 rounded ${
+                              answerStatus === 'correct' ? 'bg-green-100 dark:bg-green-900/30' :
+                              answerStatus === 'incorrect' ? 'bg-red-100 dark:bg-red-900/30' :
+                              'bg-amber-100 dark:bg-amber-900/30'
+                            }`}>
+                              <p className="text-sm font-medium">Feedback:</p>
+                              <p className="text-sm">
+                                {answer.feedback}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Explanation */}
+                          {answer.explanation && answerStatus !== 'skipped' && (
+                            <div className="space-y-1 p-2 bg-blue-50 dark:bg-blue-900/30 rounded">
+                              <p className="text-sm font-medium">Explanation:</p>
+                              <p className="text-sm whitespace-pre-wrap">
+                                {answer.explanation}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Essay Pending Message */}
+                          {answerStatus === 'pending' && isEssay && (
+                            <div className="text-xs text-amber-800 dark:text-amber-200 p-2 rounded bg-amber-100/50">
+                              This essay has been submitted and is awaiting manual grading by your educator. Your score will be updated once grading is complete.
+                            </div>
+                          )}
+
+                          {/* Essay Graded Message */}
+                          {answerStatus === 'correct' && isEssay && answer.rubricScore !== undefined && (
+                            <div className="text-xs text-green-800 dark:text-green-200 p-2 rounded bg-green-100/50">
+                              <p className="font-medium">Graded: {answer.rubricScore}/{question?.marks} marks</p>
+                              {answer.graderComment && (
+                                <p className="mt-1">Comment: {answer.graderComment}</p>
                               )}
-                              {isEssayGraded && (
-                                <p className="text-sm mt-1 text-indigo-900 dark:text-indigo-200">
-                                  <span className="font-medium">Grader comment:</span>{' '}
-                                  {answer.graderComment ?? 'No comment provided.'}
-                                </p>
-                              )}
-                              {isEssayPending && (
-                                <p className="text-xs mt-2 text-amber-800 dark:text-amber-200">
-                                  This essay has been submitted and is awaiting manual grading by your educator.
-                                </p>
-                              )}
-                            </>
+                            </div>
                           )}
                         </div>
                       </div>

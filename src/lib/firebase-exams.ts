@@ -290,6 +290,8 @@ export async function getPublishedExams(studentDepartmentId?: string): Promise<E
 
 // Question management
 export async function addQuestion(examId: string, questionData: Omit<Question, 'questionId' | 'createdAt'>) {
+  console.log("[FIREBASE-EXAMS] addQuestion called with imageUrl:", questionData.imageUrl?.substring(0, 60));
+  
   const question: Record<string, any> = {
     ...questionData,
     createdAt: Timestamp.now()
@@ -311,6 +313,13 @@ export async function addQuestion(examId: string, questionData: Omit<Question, '
   if (!('explanation' in question) || question.explanation === undefined) {
     question.explanation = null;
   }
+  
+  console.log("[FIREBASE-EXAMS] About to save question to Firestore with fields:", {
+    hasImageUrl: !!question.imageUrl,
+    imageUrl: question.imageUrl?.substring(0, 60),
+    hasImageDisplayMode: !!question.imageDisplayMode,
+    allFields: Object.keys(question),
+  });
   
   const docRef = await addDoc(collection(db, 'exams', examId, 'questions'), question);
   

@@ -281,12 +281,15 @@ export async function uploadImageToCloudinary(
 
   const returnUrl = body.secure_url || body.url || "";
   console.log("[CLOUDINARY] Final URL being returned:", returnUrl);
+  console.log("[CLOUDINARY] returnUrl type:", typeof returnUrl);
+  console.log("[CLOUDINARY] returnUrl is truthy:", !!returnUrl);
+  console.log("[CLOUDINARY] returnUrl length:", returnUrl?.length);
 
   if (!returnUrl) {
     console.error("[CLOUDINARY] ERROR: No URL in response!", { body });
   }
 
-  return {
+  const result = {
     url: returnUrl,
     publicId: body.public_id || `${folder}/${publicId}`,
     secureUrl: returnUrl,
@@ -297,6 +300,15 @@ export async function uploadImageToCloudinary(
     format: body.format,
     originalFilename: file.name,
   };
+  
+  console.log("[CLOUDINARY] Returning result object:", {
+    url: result.url,
+    secureUrl: result.secureUrl,
+    urlType: typeof result.url,
+    secureUrlType: typeof result.secureUrl,
+  });
+
+  return result;
 }
 
 export async function deleteCloudinaryImage(cloudinaryUrlOrPublicId: string): Promise<void> {
