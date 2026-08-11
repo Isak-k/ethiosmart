@@ -141,7 +141,7 @@ export function QuestionRenderer({
           >
             <div className="flex items-center justify-between">
               <span className="font-medium">
-                {value ? t("common.true") : t("common.false")}
+                {value ? "True" : "False"}
               </span>
               {shouldShowResults && value === question.correctAnswer && (
                 <Check className="w-5 h-5 text-green-600" />
