@@ -256,15 +256,24 @@ export function QuestionTypeForm({
       console.log("[IMAGE FLOW] Starting upload:", { file: file.name, size: file.size, examId, tempQId });
       
       const result = await uploadQuestionImage(file, examId, tempQId);
-      console.log("[IMAGE FLOW] Upload successful. Result:", { url: result.url, hasDimensions: !!result.dimensions });
+      console.log("[IMAGE FLOW] Upload returned result:", result);
+      console.log("[IMAGE FLOW] result.url value:", result.url);
+      console.log("[IMAGE FLOW] result.url is truthy?", !!result.url);
+      console.log("[IMAGE FLOW] result.url type:", typeof result.url);
+      console.log("[IMAGE FLOW] result.url length:", result.url?.length);
       
       if (!result.url) {
-        console.error("[IMAGE FLOW] ERROR: Upload returned empty URL!", result);
-        throw new Error("Upload succeeded but no URL was returned");
+        console.error("[IMAGE FLOW] ERROR: result.url is falsy!", { result });
+        throw new Error("Upload returned no URL");
       }
       
+      console.log("[IMAGE FLOW] Setting imageUrl state to:", result.url);
       setImageUrl(result.url);
-      console.log("[IMAGE FLOW] State updated. imageUrl is now:", result.url);
+      
+      console.log("[IMAGE FLOW] After setImageUrl, checking state...");
+      setTimeout(() => {
+        console.log("[IMAGE FLOW] Delayed check: imageUrl state should be set now");
+      }, 100);
       
       toast({
         title: "Image uploaded successfully",
