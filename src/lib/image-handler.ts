@@ -204,12 +204,22 @@ export async function uploadQuestionImage(
   }
 
   if (isCloudinaryEnabled()) {
+    console.log("[IMAGE-HANDLER] Cloudinary is enabled, uploading...");
     const result = await withTimeout(
       uploadImageToCloudinary(file, { examId, questionId }, signal),
       DEFAULT_TIMEOUT_MS,
       "Image upload to Cloudinary timed out. Please check your connection and try again."
     );
-    return { url: result.secureUrl || result.url, dimensions };
+    console.log("[IMAGE-HANDLER] Cloudinary result:", result);
+    const finalUrl = result.secureUrl || result.url;
+    console.log("[IMAGE-HANDLER] Using URL:", finalUrl);
+    
+    if (!finalUrl) {
+      console.error("[IMAGE-HANDLER] ERROR: No URL in cloudinary result!", result);
+      throw new Error("Cloudinary upload returned no URL");
+    }
+    
+    return { url: finalUrl, dimensions };
   }
 
   const timestamp = Date.now();

@@ -274,10 +274,22 @@ export async function uploadImageToCloudinary(
     throw new Error(`Cloudinary upload failed: ${msg}`);
   }
 
+  console.log("[CLOUDINARY] Upload response body:", body);
+  console.log("[CLOUDINARY] secure_url:", body.secure_url);
+  console.log("[CLOUDINARY] url:", body.url);
+  console.log("[CLOUDINARY] public_id:", body.public_id);
+
+  const returnUrl = body.secure_url || body.url || "";
+  console.log("[CLOUDINARY] Final URL being returned:", returnUrl);
+
+  if (!returnUrl) {
+    console.error("[CLOUDINARY] ERROR: No URL in response!", { body });
+  }
+
   return {
-    url: body.secure_url || body.url || "",
+    url: returnUrl,
     publicId: body.public_id || `${folder}/${publicId}`,
-    secureUrl: body.secure_url || body.url || "",
+    secureUrl: returnUrl,
     assetId: body.asset_id,
     width: typeof body.width === "number" ? body.width : undefined,
     height: typeof body.height === "number" ? body.height : undefined,
