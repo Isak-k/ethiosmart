@@ -33,9 +33,19 @@ interface BulkImportQuestionsProps {
   currentQuestionCount: number;
 }
 
+type QuestionType = 'mcq' | 'true-false' | 'short-answer' | 'essay' | null;
+
+const QUESTION_TYPES = [
+  { value: 'mcq', label: 'Multiple Choice (MCQ)', description: 'Questions with 2-6 options' },
+  { value: 'true-false', label: 'True/False', description: 'Binary choice questions' },
+  { value: 'short-answer', label: 'Short Answer', description: 'Text-based answers' },
+  { value: 'essay', label: 'Essay', description: 'Long-form answer questions' },
+] as const;
+
 export function BulkImportQuestions({ examId, onImportSuccess, currentQuestionCount }: BulkImportQuestionsProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  const [selectedQuestionType, setSelectedQuestionType] = useState<QuestionType>(null);
   const [text, setText] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -52,15 +62,32 @@ export function BulkImportQuestions({ examId, onImportSuccess, currentQuestionCo
 
   const handleAnalyze = () => {
     if (!text.trim()) return;
+    if (!selectedQuestionType) {
+      toast({
+        title: "Question Type Required",
+        description: "Please select a question type first",
+        variant: "destructive",
+      });
+      return;
+    }
     
     setIsAnalyzing(true);
     try {
       const result: ImportParseResult = parseImportData(text, t);
       
+      // Filter questions to match selected type
+      const filteredQuestions = result.questions.filter(q => q.questionType === selectedQuestionType);
+      const invalidTypeCount = result.questions.length - filteredQuestions.length;
+      
+      const errors = [...result.errors];
+      if (invalidTypeCount > 0) {
+        errors.push(`Found ${invalidTypeCount} question(s) with incorrect type. Only ${selectedQuestionType} questions will be imported.`);
+      }
+      
       setParseResult({
-        count: result.questions.length,
-        errors: result.errors,
-        preview: result.questions
+        count: filteredQuestions.length,
+        errors,
+        preview: filteredQuestions
       });
     } catch (error) {
       console.error("Parsing error:", error);
@@ -255,11 +282,24 @@ ${pdfText.substring(0, 30000)}`; // Limit to 30k chars to avoid token limits
   const handleImport = async () => {
     if (isImporting) return;
     if (!parseResult || parseResult.count === 0 || parseResult.errors.length > 0) return;
+    if (!selectedQuestionType) return; // Extra safety check
 
     setIsImporting(true);
     try {
       const parseResultFresh: ImportParseResult = parseImportData(text, t);
-      const questions = parseResultFresh.questions;
+      const allQuestions = parseResultFresh.questions;
+      
+      // Filter to only import selected question type
+      const questions = allQuestions.filter(q => q.questionType === selectedQuestionType);
+      
+      if (questions.length === 0) {
+        toast({
+          title: "No Questions Found",
+          description: `No ${selectedQuestionType} questions found to import.`,
+          variant: "destructive",
+        });
+        return;
+      }
       
       const questionsToSave: Omit<Question, 'questionId' | 'createdAt'>[] = questions.map((q, index) => {
         const base: Omit<Question, 'questionId' | 'createdAt'> = {
@@ -292,6 +332,7 @@ ${pdfText.substring(0, 30000)}`; // Limit to 30k chars to avoid token limits
       setOpen(false);
       setText("");
       setParseResult(null);
+      setSelectedQuestionType(null);
       onImportSuccess();
     } catch (error) {
       console.error("Import error:", error);
@@ -306,7 +347,15 @@ ${pdfText.substring(0, 30000)}`; // Limit to 30k chars to avoid token limits
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(newOpen) => {
+      setOpen(newOpen);
+      if (!newOpen) {
+        // Reset state when dialog closes
+        setSelectedQuestionType(null);
+        setText("");
+        setParseResult(null);
+      }
+    }}>
       <DialogTrigger asChild>
         <Button variant="outline" className="gap-2">
           <Upload className="h-4 w-4" />
@@ -326,19 +375,59 @@ ${pdfText.substring(0, 30000)}`; // Limit to 30k chars to avoid token limits
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 sm:px-6">
-          <Tabs defaultValue="manual" className="flex flex-col h-full py-4">
-            <TabsList className="grid w-full grid-cols-2 mb-4">
-              <TabsTrigger value="manual" className="flex items-center gap-2 text-xs sm:text-sm">
-                <FileText className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="hidden sm:inline">Manual Input</span>
-                <span className="sm:hidden">Manual</span>
-              </TabsTrigger>
-              <TabsTrigger value="ai" className="flex items-center gap-2 text-xs sm:text-sm">
-                <Sparkles className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="hidden sm:inline">AI Generation</span>
-                <span className="sm:hidden">AI</span>
-              </TabsTrigger>
-            </TabsList>
+          {!selectedQuestionType ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="w-full max-w-2xl space-y-6 py-8">
+                <div className="text-center space-y-2">
+                  <h2 className="text-xl sm:text-2xl font-semibold">Select Question Type</h2>
+                  <p className="text-sm text-muted-foreground">Choose the type of questions you want to import</p>
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {QUESTION_TYPES.map((type) => (
+                    <button
+                      key={type.value}
+                      onClick={() => setSelectedQuestionType(type.value as QuestionType)}
+                      className="p-4 text-left border rounded-lg hover:border-primary hover:bg-primary/5 transition-colors space-y-1"
+                    >
+                      <div className="font-semibold text-sm">{type.label}</div>
+                      <div className="text-xs text-muted-foreground">{type.description}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 mb-4 pt-4">
+                <button
+                  onClick={() => {
+                    setSelectedQuestionType(null);
+                    setText("");
+                    setParseResult(null);
+                  }}
+                  className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1"
+                >
+                  ← Change Type
+                </button>
+                <div className="text-sm font-medium px-3 py-1 rounded-full bg-primary/10 text-primary">
+                  {QUESTION_TYPES.find(t => t.value === selectedQuestionType)?.label}
+                </div>
+              </div>
+
+              <Tabs defaultValue="manual" className="flex flex-col h-full">
+                <TabsList className="grid w-full grid-cols-2 mb-4">
+                  <TabsTrigger value="manual" className="flex items-center gap-2 text-xs sm:text-sm">
+                    <FileText className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <span className="hidden sm:inline">Manual Input</span>
+                    <span className="sm:hidden">Manual</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="ai" className="flex items-center gap-2 text-xs sm:text-sm">
+                    <Sparkles className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <span className="hidden sm:inline">AI Generation</span>
+                    <span className="sm:hidden">AI</span>
+                  </TabsTrigger>
+                </TabsList>
 
             <TabsContent value="manual" className="flex-1 flex flex-col space-y-4 mt-0">
               <div className="flex-1 overflow-hidden flex flex-col gap-4">
@@ -597,7 +686,9 @@ ${pdfText.substring(0, 30000)}`; // Limit to 30k chars to avoid token limits
                 </div>
               </ScrollArea>
             </TabsContent>
-          </Tabs>
+              </Tabs>
+            </>
+          )}
         </div>
 
         {parseResult && (
