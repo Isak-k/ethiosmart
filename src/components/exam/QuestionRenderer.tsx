@@ -286,15 +286,7 @@ export function QuestionRenderer({
 
     const displayMode = (question.imageDisplayMode || 'inline') as 'inline' | 'background' | 'main';
     console.log("[RENDERER] Display mode:", displayMode);
-    console.log("[RENDERER] Image URL to display:", question.imageUrl.substring(0, 100) + "...");
-    
-    const optimizedUrl = optimizeImageUrl(question.imageUrl, {
-      maxWidth: displayMode === 'main' ? 1200 : 800,
-      quality: 'auto',
-      format: 'auto',
-    });
-    
-    console.log("[RENDERER] Optimized URL:", optimizedUrl.substring(0, 100) + "...");
+    console.log("[RENDERER] Using URL directly (no optimization):", question.imageUrl.substring(0, 100) + "...");
 
     // Background mode: render as background with the question content overlaid
     if (displayMode === 'background') {
@@ -302,7 +294,7 @@ export function QuestionRenderer({
         <div
           className="relative rounded-lg overflow-hidden mb-4"
           style={{
-            backgroundImage: `url(${optimizedUrl})`,
+            backgroundImage: `url(${question.imageUrl})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             opacity: 0.2,
@@ -318,16 +310,16 @@ export function QuestionRenderer({
     return (
       <div className={getImageContainerClasses(displayMode)}>
         <img
-          src={optimizedUrl}
+          src={question.imageUrl}
           alt="Question"
           className={cn(getImageDisplayClasses(displayMode), 'rounded-lg')}
           loading="lazy"
           onLoad={() => {
-            console.log("[IMG] Image loaded successfully");
+            console.log("[IMG] ✅ Image loaded successfully");
           }}
           onError={(e) => {
-            console.error('[IMG] Image failed to load from URL:', optimizedUrl);
-            console.error('[IMG] Error:', e);
+            console.error('[IMG] ❌ Image failed to load');
+            console.error('[IMG] URL was:', question.imageUrl?.substring(0, 100) + "...");
           }}
         />
       </div>
@@ -341,7 +333,7 @@ export function QuestionRenderer({
         <div
           className="absolute inset-0 rounded-lg opacity-10 pointer-events-none"
           style={{
-            backgroundImage: `url(${optimizeImageUrl(question.imageUrl, { maxWidth: 1600, quality: 'auto', format: 'auto' })})`,
+            backgroundImage: `url(${question.imageUrl})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
           }}

@@ -27,37 +27,26 @@ export function ImagePreview({
   const [imageError, setImageError] = React.useState(false);
   const displayClasses = getImageDisplayClasses(displayMode);
   
-  // CRITICAL: Try to optimize, but if it fails, use original URL
-  let optimizedUrl = imageUrl;
-  try {
-    const optUrl = optimizeImageUrl(imageUrl, {
-      maxWidth: displayMode === "main" ? 1200 : 800,
-      quality: "auto",
-      format: "auto",
-    });
-    // Only use optimized if it's different and looks valid
-    if (optUrl && optUrl !== imageUrl && optUrl.length > 10) {
-      optimizedUrl = optUrl;
-    }
-  } catch (err) {
-    console.warn("[IMAGE-PREVIEW] Failed to optimize URL, using original:", err);
-    optimizedUrl = imageUrl;
-  }
+  // Use raw URL directly without optimization - Cloudinary URLs already include all needed params
+  const displayUrl = imageUrl;
 
   // Log for debugging
   React.useEffect(() => {
-    console.log("[IMAGE-PREVIEW] ImagePreview received:", {
-      imageUrl: imageUrl?.substring(0, 80) + "...",
+    console.log("[IMAGE-PREVIEW] Received imageUrl:", {
+      url: imageUrl ? imageUrl.substring(0, 80) + "..." : "EMPTY",
       displayMode,
-      optimizedUrl: optimizedUrl?.substring(0, 80) + "...",
-      isImageUrlEmpty: !imageUrl,
+      isEmpty: !imageUrl,
     });
     
-    // Test if URL is valid by trying to fetch it
+    // Test if URL is accessible
     if (imageUrl) {
+      console.log("[IMAGE-PREVIEW] Testing URL accessibility...");
       fetch(imageUrl, { method: 'HEAD' })
-        .then(() => console.log("[IMAGE-PREVIEW] Original URL is accessible (HTTP 200)"))
-        .catch((err) => console.error("[IMAGE-PREVIEW] Original URL NOT accessible:", err.message));
+        .then(() => console.log("[IMAGE-PREVIEW] ✅ URL accessible"))
+        .catch((err) => {
+          console.error("[IMAGE-PREVIEW] ❌ URL NOT accessible:", err.message);
+          console.error("[IMAGE-PREVIEW] Full URL:", imageUrl);
+        });
     }
   }, [imageUrl, displayMode]);
 
@@ -100,21 +89,20 @@ export function ImagePreview({
               </div>
             ) : (
               <img
-                src={optimizedUrl}
+                src={displayUrl}
                 alt="Question preview"
                 className="max-w-full h-auto max-h-96 object-contain mx-auto rounded"
                 crossOrigin="anonymous"
                 loading="eager"
                 onError={(e) => {
                   setImageError(true);
-                  console.error("[IMAGE-PREVIEW] Image failed to load:", {
-                    imageUrl: imageUrl?.substring(0, 80) + "...",
-                    optimizedUrl: optimizedUrl?.substring(0, 80) + "...",
+                  console.error("[IMAGE-PREVIEW] ❌ Image failed to load:", {
+                    url: imageUrl?.substring(0, 100) + "...",
                   });
                 }}
                 onLoad={() => {
                   setImageError(false);
-                  console.log("[IMAGE-PREVIEW] Image loaded successfully");
+                  console.log("[IMAGE-PREVIEW] ✅ Image loaded successfully");
                 }}
               />
             )}
@@ -132,7 +120,7 @@ export function ImagePreview({
               </div>
             ) : (
               <img
-                src={optimizedUrl}
+                src={displayUrl}
                 alt="Background"
                 className="absolute inset-0 w-full h-full object-cover"
                 style={{ opacity: 0.3 }}
@@ -140,13 +128,11 @@ export function ImagePreview({
                 loading="eager"
                 onError={(e) => {
                   setImageError(true);
-                  console.error("[IMAGE-PREVIEW] Background image failed to load:", {
-                    imageUrl: imageUrl?.substring(0, 80) + "...",
-                  });
+                  console.error("[IMAGE-PREVIEW] ❌ Background image failed to load");
                 }}
                 onLoad={() => {
                   setImageError(false);
-                  console.log("[IMAGE-PREVIEW] Background image loaded successfully");
+                  console.log("[IMAGE-PREVIEW] ✅ Background image loaded successfully");
                 }}
               />
             )}
@@ -167,20 +153,18 @@ export function ImagePreview({
               </div>
             ) : (
               <img
-                src={optimizedUrl}
+                src={displayUrl}
                 alt="Question preview"
                 className="max-w-full h-auto object-contain rounded"
                 crossOrigin="anonymous"
                 loading="eager"
                 onError={(e) => {
                   setImageError(true);
-                  console.error("[IMAGE-PREVIEW] Main image failed to load:", {
-                    imageUrl: imageUrl?.substring(0, 80) + "...",
-                  });
+                  console.error("[IMAGE-PREVIEW] ❌ Main image failed to load");
                 }}
                 onLoad={() => {
                   setImageError(false);
-                  console.log("[IMAGE-PREVIEW] Main image loaded successfully");
+                  console.log("[IMAGE-PREVIEW] ✅ Main image loaded successfully");
                 }}
               />
             )}
