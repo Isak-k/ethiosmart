@@ -276,14 +276,25 @@ export function QuestionRenderer({
   };
 
   const renderQuestionImage = () => {
-    if (!question.imageUrl) return null;
+    console.log("[RENDERER] renderQuestionImage called");
+    console.log("[RENDERER] question.imageUrl exists?", !!question.imageUrl);
+    
+    if (!question.imageUrl) {
+      console.log("[RENDERER] No imageUrl, returning null");
+      return null;
+    }
 
     const displayMode = (question.imageDisplayMode || 'inline') as 'inline' | 'background' | 'main';
+    console.log("[RENDERER] Display mode:", displayMode);
+    console.log("[RENDERER] Image URL to display:", question.imageUrl.substring(0, 100) + "...");
+    
     const optimizedUrl = optimizeImageUrl(question.imageUrl, {
       maxWidth: displayMode === 'main' ? 1200 : 800,
       quality: 'auto',
       format: 'auto',
     });
+    
+    console.log("[RENDERER] Optimized URL:", optimizedUrl.substring(0, 100) + "...");
 
     // Background mode: render as background with the question content overlaid
     if (displayMode === 'background') {
@@ -311,8 +322,12 @@ export function QuestionRenderer({
           alt="Question"
           className={cn(getImageDisplayClasses(displayMode), 'rounded-lg')}
           loading="lazy"
+          onLoad={() => {
+            console.log("[IMG] Image loaded successfully");
+          }}
           onError={(e) => {
-            console.error('Error loading image:', e);
+            console.error('[IMG] Image failed to load from URL:', optimizedUrl);
+            console.error('[IMG] Error:', e);
           }}
         />
       </div>

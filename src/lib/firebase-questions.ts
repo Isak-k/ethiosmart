@@ -28,12 +28,12 @@ export async function createQuestion(
   questionData: NewQuestionInput
 ): Promise<Question> {
   try {
-    console.log("[IMAGE FLOW] createQuestion called with:", {
+    console.log("[FIREBASE] Creating question with:", {
       examId,
-      hasImageUrl: !!questionData.imageUrl,
-      imageUrl: questionData.imageUrl,
-      imageDisplayMode: questionData.imageDisplayMode,
       questionType: questionData.questionType,
+      hasImageUrl: !!questionData.imageUrl,
+      imageUrl: questionData.imageUrl ? questionData.imageUrl.substring(0, 80) + "..." : null,
+      imageDisplayMode: questionData.imageDisplayMode,
     });
 
     const questionsSnap = await getDocs(
@@ -62,9 +62,8 @@ export async function createQuestion(
       imageDisplayMode: questionData.imageDisplayMode || "inline",
     };
 
-    console.log("[IMAGE FLOW] baseQuestion prepared:", {
-      hasImageUrl: !!baseQuestion.imageUrl,
-      imageUrl: baseQuestion.imageUrl,
+    console.log("[FIREBASE] Question data to save:", {
+      imageUrl: baseQuestion.imageUrl ? "SET (will save)" : "NOT SET (null/undefined)",
       imageDisplayMode: baseQuestion.imageDisplayMode,
     });
 
@@ -115,15 +114,12 @@ export async function createQuestion(
       ...questionDoc,
     };
 
-    console.log("[IMAGE FLOW] Question saved to Firestore:", {
+    console.log("[FIREBASE] Question saved successfully:", {
       questionId: docRef.id,
-      hasImageUrl: !!questionDoc.imageUrl,
-      imageUrl: questionDoc.imageUrl,
-      imageDisplayMode: questionDoc.imageDisplayMode,
+      imageUrl: questionDoc.imageUrl ? "YES - SAVED" : "NO - NOT SAVED",
     });
 
-    return returnData;
-    } as Question;
+    return returnData as Question;
   } catch (error) {
     console.error("Error creating question:", error);
     throw error;
@@ -132,6 +128,8 @@ export async function createQuestion(
 
 export async function getQuestions(examId: string): Promise<Question[]> {
   try {
+    console.log("[FIREBASE] getQuestions called for examId:", examId);
+    
     const questionsSnap = await getDocs(
       query(
         collection(db, "exams", examId, "questions"),
@@ -139,13 +137,23 @@ export async function getQuestions(examId: string): Promise<Question[]> {
       )
     );
 
+    console.log("[FIREBASE] Retrieved", questionsSnap.docs.length, "questions");
+
     const questions = questionsSnap.docs.map((doc) => {
       const data = doc.data();
+      console.log("[FIREBASE] Loading question", doc.id, ":", {
+        questionType: data.questionType,
+        hasImageUrl: !!data.imageUrl,
+        imageUrl: data.imageUrl ? data.imageUrl.substring(0, 80) + "..." : "NO IMAGE",
+      });
+      
       return {
         questionId: doc.id,
         ...data,
       } as Question;
     });
+
+    console.log("[FIREBASE] All questions loaded, total:", questions.length);
 
     return migrateLegacyQuestions(questions);
   } catch (error) {

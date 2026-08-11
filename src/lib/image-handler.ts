@@ -210,9 +210,16 @@ export async function uploadQuestionImage(
       DEFAULT_TIMEOUT_MS,
       "Image upload to Cloudinary timed out. Please check your connection and try again."
     );
-    console.log("[IMAGE-HANDLER] Cloudinary result:", result);
+    console.log("[IMAGE-HANDLER] Cloudinary response received:", {
+      hasUrl: !!result.url,
+      hasSecureUrl: !!result.secureUrl,
+      url: result.url ? result.url.substring(0, 100) : null,
+      secureUrl: result.secureUrl ? result.secureUrl.substring(0, 100) : null,
+    });
+    
+    // Prefer secureUrl (https), fall back to url
     const finalUrl = result.secureUrl || result.url;
-    console.log("[IMAGE-HANDLER] Using URL:", finalUrl);
+    console.log("[IMAGE-HANDLER] Using final URL:", finalUrl);
     
     if (!finalUrl) {
       console.error("[IMAGE-HANDLER] ERROR: No URL in cloudinary result!", result);

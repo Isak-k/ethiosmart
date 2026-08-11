@@ -253,34 +253,42 @@ export function QuestionTypeForm({
     setUploadingImage(true);
     try {
       const tempQId = question?.questionId || `temp_${Date.now()}`;
-      console.log("[IMAGE FLOW] Starting upload:", { file: file.name, size: file.size, examId, tempQId });
+      console.log("[IMAGE-UPLOAD] Starting Cloudinary upload:", { 
+        fileName: file.name, 
+        fileSize: file.size, 
+        examId, 
+        tempQId 
+      });
       
-      const result = await uploadQuestionImage(file, examId, tempQId);
-      console.log("[IMAGE FLOW] Upload returned result:", result);
-      console.log("[IMAGE FLOW] result.url value:", result.url);
-      console.log("[IMAGE FLOW] result.url is truthy?", !!result.url);
-      console.log("[IMAGE FLOW] result.url type:", typeof result.url);
-      console.log("[IMAGE FLOW] result.url length:", result.url?.length);
+      // Step 1: Upload to Cloudinary
+      const uploadResult = await uploadQuestionImage(file, examId, tempQId);
+      console.log("[IMAGE-UPLOAD] Cloudinary response:", {
+        url: uploadResult.url,
+      });
       
-      if (!result.url) {
-        console.error("[IMAGE FLOW] ERROR: result.url is falsy!", { result });
-        throw new Error("Upload returned no URL");
+      // Step 2: Verify we got a valid URL
+      const cloudinaryUrl = uploadResult.url;
+      console.log("[IMAGE-UPLOAD] Extracted Cloudinary URL:", cloudinaryUrl);
+      console.log("[IMAGE-UPLOAD] URL is valid?", !!cloudinaryUrl);
+      
+      if (!cloudinaryUrl) {
+        console.error("[IMAGE-UPLOAD] ERROR: No URL from Cloudinary!", { uploadResult });
+        throw new Error("Cloudinary upload returned no URL");
       }
       
-      console.log("[IMAGE FLOW] Setting imageUrl state to:", result.url);
-      setImageUrl(result.url);
+      // Step 3: Set imageUrl in component state
+      console.log("[IMAGE-UPLOAD] Setting imageUrl state to:", cloudinaryUrl);
+      setImageUrl(cloudinaryUrl);
       
-      console.log("[IMAGE FLOW] After setImageUrl, checking state...");
-      setTimeout(() => {
-        console.log("[IMAGE FLOW] Delayed check: imageUrl state should be set now");
-      }, 100);
+      // Step 4: Verify state will be used in form submission
+      console.log("[IMAGE-UPLOAD] Will save imageUrl:", cloudinaryUrl);
       
       toast({
         title: "Image uploaded successfully",
         description: `File size: ${formatFileSize(file.size)}`,
       });
     } catch (error) {
-      console.error("[IMAGE FLOW] Upload failed:", error);
+      console.error("[IMAGE-UPLOAD] Upload failed:", error);
       toast({
         title: "Upload failed",
         description: error instanceof Error ? error.message : "Failed to upload image",
@@ -293,6 +301,7 @@ export function QuestionTypeForm({
   };
 
   const handleRemoveImage = () => {
+    console.log("[CRITICAL] Removing image, imageUrl was:", imageUrl);
     setImageUrl(null);
   };
 
@@ -304,22 +313,21 @@ export function QuestionTypeForm({
     setSubmitting(true);
 
     try {
-      const finalImageUrl: string | null = imageUrl || null;
-
-      console.log("[IMAGE FLOW] Form submission. State imageUrl:", imageUrl);
-      console.log("[IMAGE FLOW] Using finalImageUrl:", finalImageUrl);
-      console.log("[IMAGE FLOW] Using imageDisplayMode:", imageDisplayMode);
-
+      console.log("[FORM-SUBMIT] Form submission started");
+      console.log("[FORM-SUBMIT] Current imageUrl state:", imageUrl);
+      console.log("[FORM-SUBMIT] Current imageDisplayMode state:", imageDisplayMode);
+      
+      // Prepare submission data with imageUrl
       const submissionData = {
         ...data,
-        imageUrl: finalImageUrl,
+        imageUrl: imageUrl || null,
         imageDisplayMode,
       } as NewQuestionInput;
 
-      console.log("[IMAGE FLOW] Complete submissionData:", {
+      console.log("[FORM-SUBMIT] Submission data prepared:", {
         questionType: submissionData.questionType,
         hasImageUrl: !!submissionData.imageUrl,
-        imageUrl: submissionData.imageUrl,
+        imageUrl: submissionData.imageUrl ? submissionData.imageUrl.substring(0, 100) + "..." : null,
         imageDisplayMode: submissionData.imageDisplayMode,
       });
       
@@ -336,9 +344,10 @@ export function QuestionTypeForm({
         return;
       }
       
+      console.log("[FORM-SUBMIT] Validation passed, calling onSubmit with imageUrl:", submissionData.imageUrl ? "YES (has value)" : "NO (null/empty)");
       await onSubmit(submissionData);
     } catch (error) {
-      console.error("Error in form submit handler:", error);
+      console.error("[FORM-SUBMIT] Error in form submit handler:", error);
       toast({
         title: "Submission failed",
         description: error instanceof Error ? error.message : "An unexpected error occurred",
