@@ -37,11 +37,13 @@ export function parseQuestions(text: string, t?: TFunction): ParseResult {
   let currentOptions: string[] = [];
   let currentCorrectIndex = -1;
   let currentTrueFalseAnswer: boolean | null = null;
+  let currentShortAnswer: string | null = null;
   let currentExplanation = "";
   let questionCounter = 0;
   let answerLineFound = false;
   let explanationLineFound = false;
   let isTrueFalseQuestion = false;
+  let isShortAnswerQuestion = false;
 
   // Regex patterns
   // Flexible Question Start: Matches "1.", "1)", "1-", "1 ", "Q1.", "Question 1:"
@@ -53,7 +55,7 @@ export function parseQuestions(text: string, t?: TFunction): ParseResult {
   const optionRegex = /^\s*\(?([a-zA-Z])\)?[.:\)\-\s]\s*(.+)/;
   
   // Flexible Answer Line: Matches "Answer: A", "Ans - A", "Correct: A", "Answer A"
-  // Also matches "Answer: True/False"
+  // Also matches "Answer: True/False" or "Answer: text for short answers"
   const answerLineRegex = /^(?:Answer|Ans|Correct)\s*[:\-\s]\s*(.+)/i;
 
   // Flexible Explanation Line: Matches "Explanation: ...", "Exp: ...", "Reason: ..."
@@ -65,6 +67,20 @@ export function parseQuestions(text: string, t?: TFunction): ParseResult {
       if (!currentQuestionText) {
         if (t) errors.push(t("admin.exams.bulkImport.errors.missingText", { n: questionCounter }));
         else errors.push(`Question ${questionCounter}: Missing question text.`);
+      } else if (isShortAnswerQuestion) {
+        // Short answer question validation - answer and explanation are optional
+        // Remove quotes from explanation if present
+        let cleanExplanation = currentExplanation.trim();
+        if (cleanExplanation.startsWith('"') && cleanExplanation.endsWith('"')) {
+          cleanExplanation = cleanExplanation.slice(1, -1);
+        }
+
+        questions.push({
+          questionText: currentQuestionText,
+          questionType: 'short-answer',
+          correctAnswers: currentShortAnswer && currentShortAnswer.trim().length > 0 ? [currentShortAnswer.trim()] : [],
+          explanation: cleanExplanation || undefined
+        } as any); // Cast because ParsedQuestion doesn't include short-answer type
       } else if (isTrueFalseQuestion) {
         // True/False question validation
         if (currentTrueFalseAnswer === null) {
@@ -113,8 +129,10 @@ export function parseQuestions(text: string, t?: TFunction): ParseResult {
     currentOptions = [];
     currentCorrectIndex = -1;
     currentTrueFalseAnswer = null;
+    currentShortAnswer = null;
     currentExplanation = "";
     isTrueFalseQuestion = false;
+    isShortAnswerQuestion = false;
     answerLineFound = false;
     explanationLineFound = false;
   };
@@ -139,7 +157,7 @@ export function parseQuestions(text: string, t?: TFunction): ParseResult {
       continue;
     }
 
-    // Check for Answer Line (e.g., "Answer: B" or "Answer: True")
+    // Check for Answer Line (e.g., "Answer: B" or "Answer: True" or "Answer: text answer")
     const answerMatch = line.match(answerLineRegex);
     if (answerMatch) {
       const answerText = answerMatch[1].trim();
@@ -148,13 +166,14 @@ export function parseQuestions(text: string, t?: TFunction): ParseResult {
       if (answerText.toLowerCase() === 'true' || answerText.toLowerCase() === 'false') {
         currentTrueFalseAnswer = answerText.toLowerCase() === 'true';
         isTrueFalseQuestion = true;
+      } else if (/^[A-Z]$/.test(answerText)) {
+        // It's an MCQ answer (single letter)
+        const answerIndex = answerText.charCodeAt(0) - 65; // 'A' -> 0
+        currentCorrectIndex = answerIndex;
       } else {
-        // It's an MCQ answer (letter)
-        const answerChar = answerText.toUpperCase().charAt(0);
-        if (/^[A-Z]$/.test(answerChar)) {
-          const answerIndex = answerChar.charCodeAt(0) - 65; // 'A' -> 0
-          currentCorrectIndex = answerIndex;
-        }
+        // It's a short answer
+        currentShortAnswer = answerText;
+        isShortAnswerQuestion = true;
       }
       answerLineFound = true;
       continue;
@@ -796,11 +815,23 @@ export function parseImportData(
     }
   }
 
-  // Fall back to original text parser for MCQ and True/False format
+  // Fall back to original text parser for MCQ, True/False, and Short Answer formats
   const textResult = parseQuestions(trimmed, t);
   return {
     questions: textResult.questions.map(q => {
-      // If it's already a true-false question with questionType set
+      // If it's a short-answer question with questionType set
+      if ('questionType' in q && q.questionType === 'short-answer') {
+        return {
+          questionType: 'short-answer' as const,
+          questionText: q.questionText,
+          correctAnswers: (q as any).correctAnswers,
+          marks: 1,
+          feedbackType: 'hidden' as const,
+          explanation: q.explanation
+        };
+      }
+      
+      // If it's a true-false question with questionType set
       if ('questionType' in q && q.questionType === 'true-false') {
         return {
           questionType: 'true-false' as const,
