@@ -123,7 +123,7 @@ export function PracticeModeResults({
         <CardHeader>
           <CardTitle>Review Your Answers</CardTitle>
           <CardDescription>
-            Click on questions to expand and see explanations
+            Click on questions to see what you chose, correct answer, and explanation
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -178,224 +178,73 @@ export function PracticeModeResults({
                   )}
                 </button>
 
-                {/* Expanded Content */}
+                {/* Expanded Content - Simple Review */}
                 {isExpanded && (
                   <div className="border-t p-4 space-y-4 bg-white">
-                    {/* Full Question Text */}
-                    <div className="pb-3 border-b">
-                      <p className="text-sm font-semibold mb-2">Question:</p>
-                      <p className="text-sm text-gray-700 leading-relaxed">{question.questionText}</p>
-                    </div>
-
-                    {/* Status Badge & Score */}
-                    <div className="flex items-center gap-3 justify-between">
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          className={
-                            isCorrect
-                              ? 'bg-green-600'
-                              : isSkipped
-                              ? 'bg-gray-500'
-                              : 'bg-red-600'
-                          }
-                        >
-                          {isCorrect ? 'Correct' : isSkipped ? 'Skipped' : 'Incorrect'}
-                        </Badge>
-                      </div>
-                      <p className="text-sm font-semibold text-gray-700">
-                        {answer.marks}/{question.marks} marks
-                      </p>
-                    </div>
-
-                    {/* Answer Details - Dynamic based on question type */}
+                    {/* Question */}
                     <div>
-                      <p className="text-sm font-semibold mb-2">
-                        {question.questionType === 'mcq' && 'Your Answer'}
-                        {question.questionType === 'true-false' && 'Your Answer'}
-                        {question.questionType === 'short-answer' && 'Your Answer'}
-                        {question.questionType === 'essay' && 'Your Essay'}
-                      </p>
-                      
-                      {/* MCQ */}
+                      <p className="text-sm font-semibold text-gray-700 mb-2">Question:</p>
+                      <p className="text-sm text-gray-800">{question.questionText}</p>
+                    </div>
+
+                    {/* You chose */}
+                    <div>
+                      <p className="text-sm font-semibold text-blue-700 mb-2">You chose:</p>
                       {question.questionType === 'mcq' && (
-                        <div className="space-y-2">
-                          <p className="text-sm font-semibold mb-3">Options:</p>
-                          {question.options.map((option, optIdx) => {
-                            const isSelected = answer.answer === optIdx;
-                            const isCorrectOption = optIdx === question.correctOptionIndex;
-
-                            let bgColor = 'bg-slate-50 dark:bg-slate-800';
-                            let borderColor = 'border-slate-300 dark:border-slate-600';
-                            let textStyle = 'text-slate-700 dark:text-slate-300';
-
-                            if (isCorrectOption) {
-                              bgColor = 'bg-green-50 dark:bg-green-900/30';
-                              borderColor = 'border-green-500 dark:border-green-600';
-                              textStyle = 'text-green-900 dark:text-green-100';
-                            } else if (isSelected && !isCorrect) {
-                              bgColor = 'bg-red-50 dark:bg-red-900/30';
-                              borderColor = 'border-red-500 dark:border-red-600';
-                              textStyle = 'text-red-900 dark:text-red-100';
-                            } else if (isSelected && isCorrect) {
-                              bgColor = 'bg-green-50 dark:bg-green-900/30';
-                              borderColor = 'border-green-500 dark:border-green-600';
-                              textStyle = 'text-green-900 dark:text-green-100';
-                            }
-
-                            return (
-                              <div
-                                key={optIdx}
-                                className={`border-2 rounded-lg p-3 ${bgColor} ${borderColor} transition-all`}
-                              >
-                                <div className="flex items-start gap-3">
-                                  <div className="flex-shrink-0 font-semibold text-sm w-6 h-6 flex items-center justify-center rounded bg-gray-200 dark:bg-gray-600">
-                                    {String.fromCharCode(65 + optIdx)}
-                                  </div>
-                                  <span className={`flex-1 text-sm font-medium ${textStyle}`}>
-                                    {option}
-                                  </span>
-                                  <div className="flex items-center gap-2 flex-shrink-0">
-                                    {isSelected && (
-                                      <Badge variant="outline" className="text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-200 border-blue-300">
-                                        You chose
-                                      </Badge>
-                                    )}
-                                    {isCorrectOption && (
-                                      <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" />
-                                    )}
-                                    {isSelected && !isCorrect && (
-                                      <XCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0" />
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
+                        <p className="text-sm text-gray-800">
+                          {answer.answer !== null && answer.answer !== undefined
+                            ? question.options[(answer.answer as number)]
+                            : 'Skipped'}
+                        </p>
                       )}
-                      
-                      {/* True/False */}
                       {question.questionType === 'true-false' && (
-                        <div className="space-y-2">
-                          <p className="text-sm font-semibold mb-3">Options:</p>
-                          {[true, false].map((value) => {
-                            const isSelected = answer.answer === value;
-                            const isCorrectOption = value === question.correctAnswer;
-
-                            let bgColor = 'bg-slate-50 dark:bg-slate-800';
-                            let borderColor = 'border-slate-300 dark:border-slate-600';
-                            let textStyle = 'text-slate-700 dark:text-slate-300';
-
-                            if (isCorrectOption) {
-                              bgColor = 'bg-green-50 dark:bg-green-900/30';
-                              borderColor = 'border-green-500 dark:border-green-600';
-                              textStyle = 'text-green-900 dark:text-green-100';
-                            } else if (isSelected && !isCorrect) {
-                              bgColor = 'bg-red-50 dark:bg-red-900/30';
-                              borderColor = 'border-red-500 dark:border-red-600';
-                              textStyle = 'text-red-900 dark:text-red-100';
-                            } else if (isSelected && isCorrect) {
-                              bgColor = 'bg-green-50 dark:bg-green-900/30';
-                              borderColor = 'border-green-500 dark:border-green-600';
-                              textStyle = 'text-green-900 dark:text-green-100';
-                            }
-
-                            return (
-                              <div
-                                key={String(value)}
-                                className={`border-2 rounded-lg p-3 ${bgColor} ${borderColor} transition-all`}
-                              >
-                                <div className="flex items-center justify-between">
-                                  <span className={`text-sm font-semibold ${textStyle}`}>
-                                    {value ? 'True' : 'False'}
-                                  </span>
-                                  <div className="flex items-center gap-2">
-                                    {isSelected && (
-                                      <Badge variant="outline" className="text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-200 border-blue-300">
-                                        You chose
-                                      </Badge>
-                                    )}
-                                    {isCorrectOption && (
-                                      <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
-                                    )}
-                                    {isSelected && !isCorrect && (
-                                      <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
+                        <p className="text-sm text-gray-800">
+                          {answer.answer !== null && answer.answer !== undefined
+                            ? (answer.answer as boolean)
+                              ? 'True'
+                              : 'False'
+                            : 'Skipped'}
+                        </p>
                       )}
-                      
-                      {/* Short Answer */}
-                      {question.questionType === 'short-answer' && (
-                        <div className="space-y-3">
-                          <div className={`border-2 rounded-lg p-3 ${isCorrect ? 'bg-green-50 dark:bg-green-900/30 border-green-300 dark:border-green-600' : 'bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-600'}`}>
-                            <p className={`font-semibold text-sm mb-2 ${isCorrect ? 'text-green-900 dark:text-green-100' : 'text-red-900 dark:text-red-100'}`}>
-                              Your Answer:
-                            </p>
-                            <p className={`text-sm ${isCorrect ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'} whitespace-pre-wrap`}>
-                              {answer.answer || '(No answer provided)'}
-                            </p>
-                          </div>
-                          <div className="bg-blue-50 dark:bg-blue-900/30 border-2 border-blue-300 dark:border-blue-600 rounded-lg p-3">
-                            <p className="font-semibold text-sm mb-2 text-blue-900 dark:text-blue-100">
-                              Accepted Answers:
-                            </p>
-                            <ul className="text-sm space-y-1">
-                              {question.correctAnswers.map((correctAns, idx) => (
-                                <li key={idx} className="text-blue-900 dark:text-blue-200 flex items-start gap-2">
-                                  <span className="text-green-600 dark:text-green-400 font-bold">✓</span> {correctAns}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* Essay */}
-                      {question.questionType === 'essay' && (
-                        <div className="space-y-3">
-                          <div className="border-2 border-blue-300 dark:border-blue-600 rounded-lg p-4 bg-blue-50 dark:bg-blue-900/30">
-                            <p className="font-semibold text-sm mb-2 text-blue-900 dark:text-blue-100">Your Essay:</p>
-                            <p className="text-sm text-blue-800 dark:text-blue-200 whitespace-pre-wrap leading-relaxed">
-                              {answer.answer || '(No essay submitted)'}
-                            </p>
-                          </div>
-                          <div className="p-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-600 rounded-lg">
-                            <p className="text-sm text-amber-900 dark:text-amber-100">
-                              <span className="font-semibold">Note:</span> Essays require manual grading by your instructor
-                            </p>
-                          </div>
-                        </div>
+                      {(question.questionType === 'short-answer' || question.questionType === 'essay') && (
+                        <p className="text-sm text-gray-800 whitespace-pre-wrap">
+                          {answer.answer || 'Skipped'}
+                        </p>
                       )}
                     </div>
 
-                    {/* Feedback */}
-                    {answer.feedback && !isSkipped && (
-                      <div className={`p-3 rounded-lg border-l-4 ${
-                        isCorrect
-                          ? 'bg-green-50 dark:bg-green-900/30 border-l-green-500 dark:border-l-green-400'
-                          : 'bg-red-50 dark:bg-red-900/30 border-l-red-500 dark:border-l-red-400'
-                      }`}>
-                        <p className={`text-sm font-semibold mb-1 ${isCorrect ? 'text-green-900 dark:text-green-100' : 'text-red-900 dark:text-red-100'}`}>
-                          Feedback:
-                        </p>
-                        <p className={`text-sm ${isCorrect ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'}`}>
-                          {answer.feedback}
-                        </p>
+                    {/* Correct answer */}
+                    {!isSkipped && (
+                      <div>
+                        <p className="text-sm font-semibold text-green-700 mb-2">Correct answer:</p>
+                        {question.questionType === 'mcq' && (
+                          <p className="text-sm text-gray-800">
+                            {question.options[question.correctOptionIndex]}
+                          </p>
+                        )}
+                        {question.questionType === 'true-false' && (
+                          <p className="text-sm text-gray-800">
+                            {question.correctAnswer ? 'True' : 'False'}
+                          </p>
+                        )}
+                        {question.questionType === 'short-answer' && (
+                          <p className="text-sm text-gray-800">
+                            {question.correctAnswers.join(' / ')}
+                          </p>
+                        )}
+                        {question.questionType === 'essay' && (
+                          <p className="text-sm text-gray-600 italic">
+                            Awaiting manual grading
+                          </p>
+                        )}
                       </div>
                     )}
 
                     {/* Explanation */}
                     {answer.explanation && !isSkipped && (
-                      <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/30 border-l-4 border-l-blue-500 dark:border-l-blue-400">
-                        <p className="text-sm font-semibold mb-1 text-blue-900 dark:text-blue-100">
-                          Explanation:
-                        </p>
-                        <p className="text-sm text-blue-800 dark:text-blue-200 whitespace-pre-wrap leading-relaxed">
+                      <div className="p-3 bg-blue-50 rounded border border-blue-200">
+                        <p className="text-sm font-semibold text-blue-900 mb-2">Explanation:</p>
+                        <p className="text-sm text-blue-800 whitespace-pre-wrap">
                           {answer.explanation}
                         </p>
                       </div>
