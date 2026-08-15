@@ -178,7 +178,7 @@ export function PracticeModeResults({
                   )}
                 </button>
 
-                {/* Expanded Content - Simple Review */}
+                {/* Expanded Content */}
                 {isExpanded && (
                   <div className="border-t p-4 space-y-4 bg-white">
                     {/* Question */}
@@ -242,11 +242,9 @@ export function PracticeModeResults({
 
                     {/* Explanation */}
                     {answer.explanation && !isSkipped && (
-                      <div className="p-3 bg-blue-50 rounded border border-blue-200">
-                        <p className="text-sm font-semibold text-blue-900 mb-2">Explanation:</p>
-                        <p className="text-sm text-blue-800 whitespace-pre-wrap">
-                          {answer.explanation}
-                        </p>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-700 mb-2">Explanation:</p>
+                        <p className="text-sm text-gray-800 whitespace-pre-wrap">{answer.explanation}</p>
                       </div>
                     )}
                   </div>
