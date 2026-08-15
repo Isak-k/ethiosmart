@@ -31,24 +31,26 @@ export function evaluateMCQ(
     throw new Error("Question is not MCQ type");
   }
 
+  const marks = question.marks ?? 0;
+
   if (selectedOptionIndex === null || selectedOptionIndex === undefined) {
     return {
       isCorrect: false,
       earnedMarks: 0,
-      totalMarks: question.marks,
+      totalMarks: marks,
       feedback: "You skipped this question",
     };
   }
 
   const isCorrect = selectedOptionIndex === question.correctOptionIndex;
-  const earnedMarks = isCorrect ? question.marks : 0;
+  const earnedMarks = isCorrect ? marks : 0;
 
   return {
     isCorrect,
     earnedMarks,
-    totalMarks: question.marks,
+    totalMarks: marks,
     feedback: isCorrect
-      ? `Correct! You earned ${earnedMarks} marks`
+      ? (marks > 0 ? `Correct! You earned ${earnedMarks} marks` : "Correct!")
       : `Incorrect. The correct answer is: ${question.options[question.correctOptionIndex]}`,
     explanation: question.explanation,
   };
@@ -65,24 +67,26 @@ export function evaluateTrueFalse(
     throw new Error("Question is not True/False type");
   }
 
+  const marks = question.marks ?? 0;
+
   if (selectedBoolean === null || selectedBoolean === undefined) {
     return {
       isCorrect: false,
       earnedMarks: 0,
-      totalMarks: question.marks,
+      totalMarks: marks,
       feedback: "You skipped this question",
     };
   }
 
   const isCorrect = selectedBoolean === question.correctAnswer;
-  const earnedMarks = isCorrect ? question.marks : 0;
+  const earnedMarks = isCorrect ? marks : 0;
 
   return {
     isCorrect,
     earnedMarks,
-    totalMarks: question.marks,
+    totalMarks: marks,
     feedback: isCorrect
-      ? `Correct! You earned ${earnedMarks} marks`
+      ? (marks > 0 ? `Correct! You earned ${earnedMarks} marks` : "Correct!")
       : `Incorrect. The correct answer is: ${question.correctAnswer ? "True" : "False"}`,
     explanation: question.explanation,
   };
@@ -90,6 +94,8 @@ export function evaluateTrueFalse(
 
 /**
  * Evaluate a Short Answer
+ * If no correct answers provided, any non-empty answer is accepted
+ * If no marks set, returns 0 marks
  */
 export function evaluateShortAnswer(
   question: Question,
@@ -99,12 +105,25 @@ export function evaluateShortAnswer(
     throw new Error("Question is not Short Answer type");
   }
 
+  const marks = question.marks ?? 0;
+
   if (!textAnswer || textAnswer.trim() === "") {
     return {
       isCorrect: false,
       earnedMarks: 0,
-      totalMarks: question.marks,
+      totalMarks: marks,
       feedback: "You skipped this question",
+    };
+  }
+
+  // If no correct answers provided, accept any non-empty answer
+  if (!question.correctAnswers || question.correctAnswers.length === 0) {
+    return {
+      isCorrect: true,
+      earnedMarks: marks,
+      totalMarks: marks,
+      feedback: marks > 0 ? `Correct! You earned ${marks} marks` : "Submitted",
+      explanation: question.explanation,
     };
   }
 
@@ -115,14 +134,14 @@ export function evaluateShortAnswer(
     requireExactMatch: question.requireExactMatch || false,
   });
 
-  const earnedMarks = isCorrect ? question.marks : 0;
+  const earnedMarks = isCorrect ? marks : 0;
 
   return {
     isCorrect,
     earnedMarks,
-    totalMarks: question.marks,
+    totalMarks: marks,
     feedback: isCorrect
-      ? `Correct! You earned ${earnedMarks} marks`
+      ? (marks > 0 ? `Correct! You earned ${marks} marks` : "Correct!")
       : `Incorrect. Expected answers: ${question.correctAnswers.join(", ")}`,
     explanation: question.explanation,
   };
@@ -130,6 +149,7 @@ export function evaluateShortAnswer(
 
 /**
  * Evaluate an Essay (always returns pending - requires manual grading)
+ * If requiresManualGrading not set, defaults to true
  */
 export function evaluateEssay(
   question: Question,
@@ -139,6 +159,9 @@ export function evaluateEssay(
     throw new Error("Question is not Essay type");
   }
 
+  const marks = question.marks ?? 0;
+  const requiresManualGrading = question.requiresManualGrading !== false; // Defaults to true
+
   const wordCount = textAnswer ? textAnswer.trim().split(/\s+/).length : 0;
 
   // Check word count limits
@@ -146,7 +169,7 @@ export function evaluateEssay(
     return {
       isCorrect: false,
       earnedMarks: 0,
-      totalMarks: question.marks,
+      totalMarks: marks,
       feedback: `Your essay is too short. Minimum: ${question.minWords} words, Your: ${wordCount} words`,
     };
   }
@@ -155,17 +178,28 @@ export function evaluateEssay(
     return {
       isCorrect: false,
       earnedMarks: 0,
-      totalMarks: question.marks,
+      totalMarks: marks,
       feedback: `Your essay is too long. Maximum: ${question.maxWords} words, Your: ${wordCount} words`,
     };
   }
 
-  // Essays always return pending - manual grading required
+  // Essays return pending if manual grading required, otherwise just submitted
+  if (requiresManualGrading) {
+    return {
+      isCorrect: false,
+      earnedMarks: 0,
+      totalMarks: marks,
+      feedback: "Your essay has been submitted and is pending review",
+      explanation: question.explanation,
+    };
+  }
+
+  // If manual grading not required, treat as accepted
   return {
-    isCorrect: false, // Set to false until manually graded
-    earnedMarks: 0,
-    totalMarks: question.marks,
-    feedback: "Your essay has been submitted and is pending review",
+    isCorrect: true,
+    earnedMarks: marks,
+    totalMarks: marks,
+    feedback: marks > 0 ? `Submitted! You earned ${marks} marks` : "Submitted",
     explanation: question.explanation,
   };
 }

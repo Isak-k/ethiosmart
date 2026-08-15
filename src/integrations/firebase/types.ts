@@ -68,10 +68,10 @@ export interface BaseQuestion {
   questionId: string;
   examId: string;
   questionText: string;
-  marks: number;
+  marks?: number; // Optional - can be 0 or not set
   orderIndex: number;
   feedbackType: 'instant' | 'hidden';
-  explanation?: string;
+  explanation?: string; // Optional explanation
   imageUrl?: string; // Optional image URL (Firebase Storage)
   imageDisplayMode?: 'inline' | 'background' | 'main'; // How to display image (default: inline)
   createdAt: Timestamp;
@@ -94,7 +94,7 @@ export interface TrueFalseQuestion extends BaseQuestion {
 // Short Answer specific
 export interface ShortAnswerQuestion extends BaseQuestion {
   questionType: 'short-answer';
-  correctAnswers: string[]; // Multiple acceptable answers
+  correctAnswers?: string[]; // Multiple acceptable answers (optional)
   caseSensitive?: boolean; // Default: false
   requireExactMatch?: boolean; // Default: false (allows partial matches)
 }
@@ -105,7 +105,7 @@ export interface EssayQuestion extends BaseQuestion {
   rubricPoints?: { criteria: string; points: number }[]; // Optional grading rubric
   minWords?: number;
   maxWords?: number;
-  requiresManualGrading: boolean;
+  requiresManualGrading?: boolean; // Optional - defaults to true if not set
 }
 
 // Union type for all question types

@@ -461,9 +461,9 @@ export function PracticeExamResults({
                                 {statusBadgeLabel}
                               </Badge>
                             )}
-                            {question?.marks !== undefined && answerStatus !== 'skipped' && (
+                            {(question?.marks ?? 0) > 0 && answerStatus !== 'skipped' && (
                               <Badge variant="outline" className="badge-secondary">
-                                {answer.earnedMarks ?? 0}/{question.marks} marks
+                                {answer.earnedMarks ?? 0}/{question.marks ?? 0} marks
                               </Badge>
                             )}
                           </div>

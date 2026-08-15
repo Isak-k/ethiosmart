@@ -38,35 +38,49 @@ export function parseQuestions(text: string, t?: TFunction): ParseResult {
   let currentCorrectIndex = -1;
   let currentTrueFalseAnswer: boolean | null = null;
   let currentShortAnswer: string | null = null;
+  let currentEssayRubric: Array<{criteria: string; points: number}> = [];
   let currentExplanation = "";
   let questionCounter = 0;
   let answerLineFound = false;
   let explanationLineFound = false;
   let isTrueFalseQuestion = false;
   let isShortAnswerQuestion = false;
+  let isEssayQuestion = false;
 
   // Regex patterns
   // Flexible Question Start: Matches "1.", "1)", "1-", "1 ", "Q1.", "Question 1:"
-  // Also handles "1. " and "1." (if text immediately follows)
   const questionStartRegex = /^(?:Q|Question|Q\.)?\s*(\d+)[\.:\)\-\s]\s*(.+)/i;
   
   // Flexible Option Start: Matches "A.", "a)", "A-", "(A)", "A "
-  // Captures the letter in group 1, and the text in group 2
   const optionRegex = /^\s*\(?([a-zA-Z])\)?[.:\)\-\s]\s*(.+)/;
   
-  // Flexible Answer Line: Matches "Answer: A", "Ans - A", "Correct: A", "Answer A"
-  // Also matches "Answer: True/False" or "Answer: text for short answers"
+  // Flexible Answer Line: Matches "Answer: A", "Answer: True/False", or "Answer: text for short answers"
   const answerLineRegex = /^(?:Answer|Ans|Correct)\s*[:\-\s]\s*(.+)/i;
 
   // Flexible Explanation Line: Matches "Explanation: ...", "Exp: ...", "Reason: ..."
-  // Captures the explanation text in group 1
   const explanationLineRegex = /^(?:Explanation|Exp|Reason)\s*[:\-\s]\s*(.+)/i;
+
+  // Essay-specific: Rubric line format "Rubric: criteria1:points1; criteria2:points2"
+  const rubricLineRegex = /^(?:Rubric|Criteria)\s*[:\-\s]\s*(.+)/i;
 
   const saveCurrentQuestion = () => {
     if (questionCounter > 0) {
       if (!currentQuestionText) {
         if (t) errors.push(t("admin.exams.bulkImport.errors.missingText", { n: questionCounter }));
         else errors.push(`Question ${questionCounter}: Missing question text.`);
+      } else if (isEssayQuestion) {
+        // Essay question - all fields optional
+        let cleanExplanation = currentExplanation.trim();
+        if (cleanExplanation.startsWith('"') && cleanExplanation.endsWith('"')) {
+          cleanExplanation = cleanExplanation.slice(1, -1);
+        }
+
+        questions.push({
+          questionText: currentQuestionText,
+          questionType: 'essay',
+          rubricPoints: currentEssayRubric.length > 0 ? currentEssayRubric : undefined,
+          explanation: cleanExplanation || undefined
+        } as any); // Cast because ParsedQuestion doesn't include essay type
       } else if (isShortAnswerQuestion) {
         // Short answer question validation - answer and explanation are optional
         // Remove quotes from explanation if present
@@ -130,9 +144,11 @@ export function parseQuestions(text: string, t?: TFunction): ParseResult {
     currentCorrectIndex = -1;
     currentTrueFalseAnswer = null;
     currentShortAnswer = null;
+    currentEssayRubric = [];
     currentExplanation = "";
     isTrueFalseQuestion = false;
     isShortAnswerQuestion = false;
+    isEssayQuestion = false;
     answerLineFound = false;
     explanationLineFound = false;
   };
@@ -171,11 +187,33 @@ export function parseQuestions(text: string, t?: TFunction): ParseResult {
         const answerIndex = answerText.charCodeAt(0) - 65; // 'A' -> 0
         currentCorrectIndex = answerIndex;
       } else {
-        // It's a short answer
+        // It's a short answer or essay question - mark as essay for now
         currentShortAnswer = answerText;
+        // Check if this looks like an essay (no Answer line expected) - treat as short answer
         isShortAnswerQuestion = true;
       }
       answerLineFound = true;
+      continue;
+    }
+
+    // Check for Rubric Line - indicates this is an essay question
+    const rubricMatch = line.match(rubricLineRegex);
+    if (rubricMatch) {
+      isEssayQuestion = true;
+      isShortAnswerQuestion = false; // Override short answer if rubric is present
+      const rubricText = rubricMatch[1].trim();
+      
+      // Parse rubric format: "criteria1:points1; criteria2:points2"
+      const rubricItems = rubricText.split(';').map(item => item.trim());
+      for (const item of rubricItems) {
+        const [criteria, pointsStr] = item.split(':').map(s => s.trim());
+        if (criteria && pointsStr) {
+          const points = parseInt(pointsStr);
+          if (!isNaN(points) && points > 0) {
+            currentEssayRubric.push({ criteria, points });
+          }
+        }
+      }
       continue;
     }
 

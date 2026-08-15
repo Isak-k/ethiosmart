@@ -390,8 +390,10 @@ export const getNewQuestionSchema = (t: any) => {
       .max(2000, t("validations.question.textMax")),
     marks: z
       .number()
-      .min(1, t("validations.question.marksMin"))
-      .max(100, t("validations.question.marksMax")),
+      .int()
+      .min(0, t("validations.question.marksMin"))
+      .max(100, t("validations.question.marksMax"))
+      .optional(), // Optional - can be 0 or omitted
     feedbackType: z.enum(["instant", "hidden"]),
     explanation: z.union([z.string().trim().max(2000, "Explanation must be less than 2000 characters"), z.literal(null)]).nullable().optional(),
     imageUrl: z.union([z.string().url("Image URL must be valid"), z.literal(null)]).nullable().optional(),
@@ -419,7 +421,8 @@ export const getNewQuestionSchema = (t: any) => {
     questionType: z.literal("short-answer"),
     correctAnswers: z
       .array(z.string().trim().min(1, "Answer cannot be empty"))
-      .min(1, "At least one correct answer is required"),
+      .min(0) // Optional - can have 0 answers
+      .optional(), // Optional field
     caseSensitive: z.boolean().optional(),
     requireExactMatch: z.boolean().optional(),
   });
