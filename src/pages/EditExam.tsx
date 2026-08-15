@@ -933,12 +933,12 @@ const EditExam = () => {
                 <Card key={question.questionId || qIndex}>
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 flex-1">
                         <GripVertical className="h-5 w-5 text-muted-foreground cursor-move" />
-                        <span className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary">
+                        <span className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary flex-shrink-0">
                           {qIndex + 1}
                         </span>
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
                             {typeInfo && (
                               <Badge variant={typeInfo.variant}>{typeInfo.label}</Badge>
@@ -948,7 +948,7 @@ const EditExam = () => {
                           <p className="text-xs text-muted-foreground">Marks: {question.marks}</p>
                         </div>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-shrink-0">
                         <Button
                           variant="outline"
                           size="sm"
@@ -967,6 +967,108 @@ const EditExam = () => {
                       </div>
                     </div>
                   </CardHeader>
+                  
+                  {/* Answer Preview */}
+                  <CardContent className="pt-0 space-y-3 text-sm border-t">
+                    {/* MCQ Preview */}
+                    {question.questionType === 'mcq' && (question as any).options && (question as any).options.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="font-medium text-xs text-muted-foreground">Options:</p>
+                        <div className="space-y-1.5">
+                          {(question as any).options.map((option: string, optIdx: number) => (
+                            <div 
+                              key={optIdx}
+                              className={`p-2 rounded-md text-xs ${
+                                optIdx === (question as any).correctOptionIndex
+                                  ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border border-green-300 dark:border-green-700'
+                                  : 'bg-muted/50 border border-border'
+                              }`}
+                            >
+                              <span className="font-medium">{String.fromCharCode(65 + optIdx)}.</span> {option}
+                              {optIdx === (question as any).correctOptionIndex && (
+                                <span className="ml-2 text-xs font-semibold">✓ CORRECT</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* True/False Preview */}
+                    {question.questionType === 'true-false' && (
+                      <div className="space-y-2">
+                        <p className="font-medium text-xs text-muted-foreground">Correct Answer:</p>
+                        <div className={`p-2 rounded-md text-xs font-medium ${
+                          (question as any).correctAnswer === true
+                            ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border border-green-300 dark:border-green-700'
+                            : 'bg-muted/50 border border-border'
+                        }`}>
+                          {(question as any).correctAnswer === true ? '✓ TRUE' : 'FALSE'}
+                        </div>
+                        <div className={`p-2 rounded-md text-xs ${
+                          (question as any).correctAnswer === false
+                            ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border border-green-300 dark:border-green-700'
+                            : 'bg-muted/50 border border-border'
+                        }`}>
+                          {(question as any).correctAnswer === false ? '✓ FALSE' : 'TRUE'}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Short Answer Preview */}
+                    {question.questionType === 'short-answer' && (question as any).correctAnswers && (question as any).correctAnswers.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="font-medium text-xs text-muted-foreground">Accepted Answers:</p>
+                        <div className="space-y-1">
+                          {(question as any).correctAnswers.map((answer: string, ansIdx: number) => (
+                            <div 
+                              key={ansIdx}
+                              className="p-2 rounded-md text-xs bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border border-green-300 dark:border-green-700"
+                            >
+                              {answer}
+                            </div>
+                          ))}
+                        </div>
+                        {(question as any).caseSensitive && (
+                          <p className="text-xs text-amber-600 dark:text-amber-400">⚠ Case Sensitive</p>
+                        )}
+                        {(question as any).requireExactMatch && (
+                          <p className="text-xs text-amber-600 dark:text-amber-400">⚠ Exact Match Required</p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Essay Preview */}
+                    {question.questionType === 'essay' && (
+                      <div className="space-y-2">
+                        <p className="font-medium text-xs text-muted-foreground">Essay Requirements:</p>
+                        <div className="text-xs space-y-1">
+                          {(question as any).minWords && (
+                            <p>📝 Min Words: <span className="font-medium">{(question as any).minWords}</span></p>
+                          )}
+                          {(question as any).maxWords && (
+                            <p>📝 Max Words: <span className="font-medium">{(question as any).maxWords}</span></p>
+                          )}
+                          {(question as any).rubricPoints && (question as any).rubricPoints.length > 0 && (
+                            <div className="mt-2">
+                              <p className="font-medium">Rubric Criteria:</p>
+                              {(question as any).rubricPoints.map((rp: any, rpIdx: number) => (
+                                <p key={rpIdx} className="text-xs ml-2">• {rp.criteria} ({rp.points} pts)</p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Explanation */}
+                    {question.explanation && (
+                      <div className="mt-3 pt-3 border-t">
+                        <p className="font-medium text-xs text-muted-foreground mb-1">Explanation:</p>
+                        <p className="text-xs text-foreground/80 italic">{question.explanation}</p>
+                      </div>
+                    )}
+                  </CardContent>
                 </Card>
                 );
               })}
