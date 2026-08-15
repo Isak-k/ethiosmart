@@ -33,30 +33,38 @@ interface PracticeExamResultsProps {
 
 function describeAnswer(question: any, answer: any): string {
   if (!question) return '—';
+  if (!answer) return '—';
+
   const type: string = question.questionType ?? 'mcq';
   const selIdx = answer?.selectedOptionIndex;
   const selBool = answer?.selectedBoolean;
   const txt = answer?.textAnswer;
 
   if (type === 'mcq') {
-    if (selIdx === null || selIdx === undefined || selIdx === -1) return 'Skipped';
-    const opt = question?.options?.[selIdx];
-    return opt ?? `Option ${Number(selIdx) + 1}`;
+    // Check if any valid option index is present
+    if (selIdx !== null && selIdx !== undefined && selIdx !== -1 && typeof selIdx === 'number') {
+      const opt = question?.options?.[selIdx];
+      if (opt) return opt;
+      return `Option ${Number(selIdx) + 1}`;
+    }
+    return 'Skipped';
   }
+
   if (type === 'true-false') {
-    if (selBool === null || selBool === undefined) return 'Skipped';
-    return selBool ? 'True' : 'False';
+    if (selBool !== null && selBool !== undefined && typeof selBool === 'boolean') {
+      return selBool ? 'True' : 'False';
+    }
+    return 'Skipped';
   }
+
   if (type === 'short-answer' || type === 'essay') {
-    if (!txt || String(txt).trim() === '') return 'Skipped';
-    return String(txt);
+    if (txt && String(txt).trim() !== '') {
+      return String(txt);
+    }
+    return 'Skipped';
   }
-  // fallback
-  if (typeof selIdx === 'number' && selIdx >= 0 && question?.options?.[selIdx]) {
-    return question.options[selIdx];
-  }
-  if (typeof selBool === 'boolean') return selBool ? 'True' : 'False';
-  if (typeof txt === 'string' && txt.trim() !== '') return txt;
+
+  // Fallback for unknown type
   return 'Skipped';
 }
 
@@ -67,18 +75,26 @@ function getAnswerStatus(answer: any): 'correct' | 'incorrect' | 'skipped' | 'pe
   if (answer.answerStatus === 'pending') return 'pending';
   if (answer.feedback?.includes('pending')) return 'pending';
   
-  // Check if skipped
+  // Check if skipped - check each field properly
   const selIdx = answer?.selectedOptionIndex;
   const selBool = answer?.selectedBoolean;
   const txt = answer?.textAnswer;
   
-  const isSkipped = selIdx === null || selIdx === undefined || selIdx === -1 ||
-    selBool === null || selBool === undefined ||
-    !txt || String(txt).trim() === '';
+  // For MCQ: check if valid index
+  const hasMCQ = selIdx !== null && selIdx !== undefined && selIdx !== -1 && typeof selIdx === 'number';
   
-  if (isSkipped && !answer.feedback?.includes('pending')) return 'skipped';
+  // For True/False: check if boolean value
+  const hasTrueFalse = selBool !== null && selBool !== undefined && typeof selBool === 'boolean';
   
-  // Use stored isCorrect flag
+  // For Short Answer/Essay: check if text exists and is not empty
+  const hasText = txt && String(txt).trim() !== '';
+  
+  // If no answer provided for any type, it's skipped
+  const isSkipped = !hasMCQ && !hasTrueFalse && !hasText;
+  
+  if (isSkipped) return 'skipped';
+  
+  // Use stored isCorrect flag for non-skipped answers
   return answer.isCorrect ? 'correct' : 'incorrect';
 }
 
