@@ -420,10 +420,8 @@ export function PracticeExamResults({
                 {answers.map((answer, index) => {
                   const question = questions.find((q) => q.questionId === answer.questionId);
                   const chip = questionTypeChip(question);
-                  const userAns = describeAnswer(question, answer);
-                  const correctAnswerText = describeCorrect(question);
                   const answerStatus = getAnswerStatus(answer);
-                  const isEssay = question?.questionType === 'essay';
+                  const isSkipped = answerStatus === 'skipped';
 
                   // Determine styling based on status
                   let tint = 'border-slate-200 bg-slate-50';
@@ -461,13 +459,13 @@ export function PracticeExamResults({
                   return (
                     <div
                       key={`${answer.attemptId}-${answer.questionId}`}
-                      className={`p-4 border rounded-lg ${tint}`}
+                      className={`border rounded-lg overflow-hidden ${tint}`}
                     >
-                      <div className="flex items-start gap-3">
+                      {/* Header - Collapsed */}
+                      <div className="p-4 flex items-start gap-3">
                         <Icon className={`w-5 h-5 flex-shrink-0 mt-0.5 ${iconTone}`} />
-                        <div className="flex-1 min-w-0 space-y-3">
-                          {/* Header */}
-                          <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 mb-2">
                             <p className="font-semibold">Question {index + 1}</p>
                             <Badge variant="outline" className={chip.variant}>
                               {chip.label}
@@ -477,210 +475,84 @@ export function PracticeExamResults({
                                 {statusBadgeLabel}
                               </Badge>
                             )}
-                            {(question?.marks ?? 0) > 0 && answerStatus !== 'skipped' && (
-                              <Badge variant="outline" className="badge-secondary">
-                                {answer.earnedMarks ?? 0}/{question.marks ?? 0} marks
-                              </Badge>
+                          </div>
+                          <p className="text-sm text-gray-600 line-clamp-2">
+                            {question?.questionText}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Expanded Details - Only if not skipped */}
+                      {!isSkipped && (
+                        <div className="border-t p-4 space-y-4 bg-white">
+                          {/* Question */}
+                          <div>
+                            <p className="text-sm font-semibold text-gray-700 mb-2">Question:</p>
+                            <p className="text-sm text-gray-800">{question?.questionText}</p>
+                          </div>
+
+                          {/* You chose */}
+                          <div>
+                            <p className="text-sm font-semibold text-blue-700 mb-2">You chose:</p>
+                            {question?.questionType === 'mcq' && (
+                              <p className="text-sm text-gray-800">
+                                {answer.selectedOptionIndex !== null && answer.selectedOptionIndex !== undefined
+                                  ? question?.options?.[answer.selectedOptionIndex]
+                                  : 'Skipped'}
+                              </p>
+                            )}
+                            {question?.questionType === 'true-false' && (
+                              <p className="text-sm text-gray-800">
+                                {answer.selectedBoolean !== null && answer.selectedBoolean !== undefined
+                                  ? answer.selectedBoolean
+                                    ? 'True'
+                                    : 'False'
+                                  : 'Skipped'}
+                              </p>
+                            )}
+                            {(question?.questionType === 'short-answer' || question?.questionType === 'essay') && (
+                              <p className="text-sm text-gray-800 whitespace-pre-wrap">
+                                {answer.textAnswer || 'Skipped'}
+                              </p>
                             )}
                           </div>
 
-                          {/* Question Text */}
-                          {question && (
-                            <p className="text-sm text-muted-foreground">
-                              {question.questionText}
-                            </p>
-                          )}
-
-                          {/* MCQ Options Display */}
-                          {question?.questionType === 'mcq' && question?.options && (
-                            <div className="space-y-2">
-                              <p className="text-sm font-medium">Options:</p>
-                              <div className="space-y-2">
-                                {question.options.map((option: string, idx: number) => {
-                                  const isSelected = answer.selectedOptionIndex === idx;
-                                  const isCorrect = idx === question.correctOptionIndex;
-                                  const isIncorrect = isSelected && !isCorrect && answerStatus === 'incorrect';
-                                  
-                                  let optionStyle = 'border-slate-300 bg-slate-50 dark:bg-slate-800';
-                                  let textStyle = 'text-slate-700 dark:text-slate-300';
-                                  
-                                  if (isCorrect) {
-                                    optionStyle = 'border-green-500 bg-green-50 dark:bg-green-900/30';
-                                    textStyle = 'text-green-800 dark:text-green-200 font-semibold';
-                                  } else if (isIncorrect) {
-                                    optionStyle = 'border-red-500 bg-red-50 dark:bg-red-900/30';
-                                    textStyle = 'text-red-800 dark:text-red-200 font-semibold';
-                                  } else if (isSelected && answerStatus === 'correct') {
-                                    optionStyle = 'border-green-500 bg-green-50 dark:bg-green-900/30';
-                                    textStyle = 'text-green-800 dark:text-green-200 font-semibold';
-                                  }
-                                  
-                                  return (
-                                    <div
-                                      key={idx}
-                                      className={`p-3 border-2 rounded-md ${optionStyle} cursor-default`}
-                                    >
-                                      <div className="flex items-start gap-2">
-                                        <span className="font-medium text-sm mt-0.5">
-                                          {String.fromCharCode(65 + idx)}.
-                                        </span>
-                                        <span className={`text-sm ${textStyle}`}>
-                                          {option}
-                                        </span>
-                                        <div className="ml-auto flex-shrink-0 flex items-center gap-1">
-                                          {isSelected && (
-                                            <span className="text-xs font-medium px-2 py-1 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-200">
-                                              You chose
-                                            </span>
-                                          )}
-                                          {isCorrect && (
-                                            <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
-                                          )}
-                                          {isIncorrect && (
-                                            <XCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* True/False Options Display */}
-                          {question?.questionType === 'true-false' && (
-                            <div className="space-y-2">
-                              <p className="text-sm font-medium">Options:</p>
-                              <div className="space-y-2">
-                                {[true, false].map((boolValue) => {
-                                  const isSelected = answer.selectedBoolean === boolValue;
-                                  const isCorrect = question.correctAnswer === boolValue;
-                                  const isIncorrect = isSelected && !isCorrect && answerStatus === 'incorrect';
-                                  const label = boolValue ? 'True' : 'False';
-                                  
-                                  let optionStyle = 'border-slate-300 bg-slate-50 dark:bg-slate-800';
-                                  let textStyle = 'text-slate-700 dark:text-slate-300';
-                                  
-                                  if (isCorrect) {
-                                    optionStyle = 'border-green-500 bg-green-50 dark:bg-green-900/30';
-                                    textStyle = 'text-green-800 dark:text-green-200 font-semibold';
-                                  } else if (isIncorrect) {
-                                    optionStyle = 'border-red-500 bg-red-50 dark:bg-red-900/30';
-                                    textStyle = 'text-red-800 dark:text-red-200 font-semibold';
-                                  } else if (isSelected && answerStatus === 'correct') {
-                                    optionStyle = 'border-green-500 bg-green-50 dark:bg-green-900/30';
-                                    textStyle = 'text-green-800 dark:text-green-200 font-semibold';
-                                  }
-                                  
-                                  return (
-                                    <div
-                                      key={String(boolValue)}
-                                      className={`p-3 border-2 rounded-md ${optionStyle} cursor-default`}
-                                    >
-                                      <div className="flex items-center justify-between">
-                                        <span className={`text-sm ${textStyle}`}>
-                                          {label}
-                                        </span>
-                                        <div className="flex items-center gap-2">
-                                          {isSelected && (
-                                            <span className="text-xs font-medium px-2 py-1 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-200">
-                                              You chose
-                                            </span>
-                                          )}
-                                          {isCorrect && (
-                                            <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
-                                          )}
-                                          {isIncorrect && (
-                                            <XCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Short Answer Display */}
-                          {question?.questionType === 'short-answer' && (
-                            <div className="space-y-2">
-                              <p className="text-sm font-medium">Your answer:</p>
-                              <div className="p-3 rounded border border-slate-300 bg-slate-50 dark:bg-slate-800">
-                                <p className="text-sm whitespace-pre-wrap text-slate-700 dark:text-slate-300">
-                                  {userAns}
-                                </p>
-                              </div>
-                              {answerStatus !== 'skipped' && (
-                                <div className="space-y-1">
-                                  <p className="text-sm font-medium">Accepted answers:</p>
-                                  <div className="pl-3 space-y-1 border-l-2 border-green-500">
-                                    {(question.correctAnswers ?? []).map((correct: string, idx: number) => (
-                                      <p key={idx} className="text-sm text-green-700 dark:text-green-300">
-                                        • {correct}
-                                      </p>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Essay Display */}
-                          {isEssay && (
-                            <div className="space-y-2">
-                              <p className="text-sm font-medium">Your essay:</p>
-                              <div className="p-3 rounded border border-slate-300 bg-white dark:bg-slate-900 min-h-[120px] whitespace-pre-wrap">
-                                <p className="text-sm text-slate-700 dark:text-slate-300">
-                                  {userAns}
-                                </p>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Feedback */}
-                          {answer.feedback && answerStatus !== 'skipped' && (
-                            <div className={`space-y-1 p-2 rounded ${
-                              answerStatus === 'correct' ? 'bg-green-100 dark:bg-green-900/30' :
-                              answerStatus === 'incorrect' ? 'bg-red-100 dark:bg-red-900/30' :
-                              'bg-amber-100 dark:bg-amber-900/30'
-                            }`}>
-                              <p className="text-sm font-medium">Feedback:</p>
-                              <p className="text-sm">
-                                {answer.feedback}
+                          {/* Correct answer */}
+                          <div>
+                            <p className="text-sm font-semibold text-green-700 mb-2">Correct answer:</p>
+                            {question?.questionType === 'mcq' && (
+                              <p className="text-sm text-gray-800">
+                                {question?.options?.[question.correctOptionIndex]}
                               </p>
-                            </div>
-                          )}
+                            )}
+                            {question?.questionType === 'true-false' && (
+                              <p className="text-sm text-gray-800">
+                                {question?.correctAnswer ? 'True' : 'False'}
+                              </p>
+                            )}
+                            {question?.questionType === 'short-answer' && (
+                              <p className="text-sm text-gray-800">
+                                {(question?.correctAnswers as any)?.join(' / ')}
+                              </p>
+                            )}
+                            {question?.questionType === 'essay' && (
+                              <p className="text-sm text-gray-600 italic">
+                                Awaiting manual grading
+                              </p>
+                            )}
+                          </div>
 
                           {/* Explanation */}
-                          {answer.explanation && answerStatus !== 'skipped' && (
-                            <div className="space-y-1 p-2 bg-blue-50 dark:bg-blue-900/30 rounded">
-                              <p className="text-sm font-medium">Explanation:</p>
-                              <p className="text-sm whitespace-pre-wrap">
+                          {answer.explanation && (
+                            <div>
+                              <p className="text-sm font-semibold text-gray-700 mb-2">Explanation:</p>
+                              <p className="text-sm text-gray-800 whitespace-pre-wrap">
                                 {answer.explanation}
                               </p>
                             </div>
                           )}
-
-                          {/* Essay Pending Message */}
-                          {answerStatus === 'pending' && isEssay && (
-                            <div className="text-xs text-amber-800 dark:text-amber-200 p-2 rounded bg-amber-100/50">
-                              This essay has been submitted and is awaiting manual grading by your educator. Your score will be updated once grading is complete.
-                            </div>
-                          )}
-
-                          {/* Essay Graded Message */}
-                          {answerStatus === 'correct' && isEssay && answer.rubricScore !== undefined && (
-                            <div className="text-xs text-green-800 dark:text-green-200 p-2 rounded bg-green-100/50">
-                              <p className="font-medium">Graded: {answer.rubricScore}/{question?.marks} marks</p>
-                              {answer.graderComment && (
-                                <p className="mt-1">Comment: {answer.graderComment}</p>
-                              )}
-                            </div>
-                          )}
                         </div>
-                      </div>
+                      )}
                     </div>
                   );
                 })}
