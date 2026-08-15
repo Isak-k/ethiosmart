@@ -422,6 +422,7 @@ export function PracticeExamResults({
                   const chip = questionTypeChip(question);
                   const answerStatus = getAnswerStatus(answer);
                   const isSkipped = answerStatus === 'skipped';
+                  const isCorrect = answerStatus === 'correct';
 
                   // Determine styling based on status
                   let tint = 'border-slate-200 bg-slate-50';
@@ -484,71 +485,75 @@ export function PracticeExamResults({
 
                       {/* Expanded Details - Only if not skipped */}
                       {!isSkipped && (
-                        <div className="border-t p-4 space-y-4 bg-white">
+                        <div className={`border-t p-4 space-y-3 ${
+                          isCorrect 
+                            ? 'bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20' 
+                            : 'bg-gradient-to-r from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20'
+                        }`}>
                           {/* Question */}
-                          <div>
-                            <p className="text-sm font-semibold text-gray-700 mb-2">Question:</p>
-                            <p className="text-sm text-gray-800">{question?.questionText}</p>
+                          <div className="flex flex-wrap gap-2 items-start">
+                            <span className={`text-sm font-bold ${isCorrect ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
+                              Question:
+                            </span>
+                            <span className="text-sm text-gray-800 dark:text-gray-200">{question?.questionText}</span>
                           </div>
 
                           {/* You chose */}
-                          <div>
-                            <p className="text-sm font-semibold text-blue-700 mb-2">You chose:</p>
+                          <div className="flex flex-wrap gap-2 items-start">
+                            <span className="text-sm font-bold text-blue-700 dark:text-blue-300">You chose:</span>
                             {question?.questionType === 'mcq' && (
-                              <p className="text-sm text-gray-800">
+                              <span className="text-sm text-blue-900 dark:text-blue-100 font-medium">
                                 {answer.selectedOptionIndex !== null && answer.selectedOptionIndex !== undefined
                                   ? question?.options?.[answer.selectedOptionIndex]
                                   : 'Skipped'}
-                              </p>
+                              </span>
                             )}
                             {question?.questionType === 'true-false' && (
-                              <p className="text-sm text-gray-800">
+                              <span className="text-sm text-blue-900 dark:text-blue-100 font-medium">
                                 {answer.selectedBoolean !== null && answer.selectedBoolean !== undefined
                                   ? answer.selectedBoolean
                                     ? 'True'
                                     : 'False'
                                   : 'Skipped'}
-                              </p>
+                              </span>
                             )}
                             {(question?.questionType === 'short-answer' || question?.questionType === 'essay') && (
-                              <p className="text-sm text-gray-800 whitespace-pre-wrap">
+                              <span className="text-sm text-blue-900 dark:text-blue-100 font-medium truncate">
                                 {answer.textAnswer || 'Skipped'}
-                              </p>
+                              </span>
                             )}
                           </div>
 
                           {/* Correct answer */}
-                          <div>
-                            <p className="text-sm font-semibold text-green-700 mb-2">Correct answer:</p>
+                          <div className="flex flex-wrap gap-2 items-start">
+                            <span className="text-sm font-bold text-green-700 dark:text-green-300">✓ Correct answer:</span>
                             {question?.questionType === 'mcq' && (
-                              <p className="text-sm text-gray-800">
+                              <span className="text-sm text-green-900 dark:text-green-100 font-medium">
                                 {question?.options?.[question.correctOptionIndex]}
-                              </p>
+                              </span>
                             )}
                             {question?.questionType === 'true-false' && (
-                              <p className="text-sm text-gray-800">
+                              <span className="text-sm text-green-900 dark:text-green-100 font-medium">
                                 {question?.correctAnswer ? 'True' : 'False'}
-                              </p>
+                              </span>
                             )}
                             {question?.questionType === 'short-answer' && (
-                              <p className="text-sm text-gray-800">
+                              <span className="text-sm text-green-900 dark:text-green-100 font-medium">
                                 {(question?.correctAnswers as any)?.join(' / ')}
-                              </p>
+                              </span>
                             )}
                             {question?.questionType === 'essay' && (
-                              <p className="text-sm text-gray-600 italic">
+                              <span className="text-sm text-green-700 dark:text-green-300 italic font-medium">
                                 Awaiting manual grading
-                              </p>
+                              </span>
                             )}
                           </div>
 
                           {/* Explanation */}
                           {answer.explanation && (
-                            <div>
-                              <p className="text-sm font-semibold text-gray-700 mb-2">Explanation:</p>
-                              <p className="text-sm text-gray-800 whitespace-pre-wrap">
-                                {answer.explanation}
-                              </p>
+                            <div className="flex flex-wrap gap-2 items-start">
+                              <span className="text-sm font-bold text-indigo-700 dark:text-indigo-300">💡 Explanation:</span>
+                              <span className="text-sm text-indigo-900 dark:text-indigo-100">{answer.explanation}</span>
                             </div>
                           )}
                         </div>
