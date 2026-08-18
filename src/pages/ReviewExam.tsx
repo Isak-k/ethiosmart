@@ -10,17 +10,8 @@ import { Loader2, ArrowLeft, AlertCircle } from "lucide-react";
 import { QuestionCard } from "@/components/exam/QuestionCard";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-
-interface Question {
-  questionId: string;
-  questionText: string;
-  options: string[];
-  correctOptionIndex: number;
-  marks: number;
-  orderIndex: number;
-  feedbackType: "instant" | "hidden";
-  explanation?: string;
-}
+import { Question, Answer } from "@/integrations/firebase/types";
+import { Card, CardContent } from "@/components/ui/card";
 
 interface AttemptData {
   attemptId: string;
@@ -30,6 +21,11 @@ interface AttemptData {
   maxScore: number;
 }
 
+interface QuestionReviewData {
+  question: Question;
+  answer: Answer | null;
+}
+
 const ReviewExam = () => {
   const { attemptId } = useParams<{ attemptId: string }>();
   const { user } = useAuth();
@@ -37,8 +33,7 @@ const ReviewExam = () => {
   
   const [loading, setLoading] = useState(true);
   const [examTitle, setExamTitle] = useState("");
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [userAnswers, setUserAnswers] = useState<Record<string, number>>({});
+  const [questionsReview, setQuestionsReview] = useState<QuestionReviewData[]>([]);
   const [attemptData, setAttemptData] = useState<AttemptData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -61,9 +56,7 @@ const ReviewExam = () => {
       }
 
       // Security Check: Only the student or admin can view
-      // (Admin check would require role from context, assuming student for now based on route)
       if (attempt.studentId !== user.uid) {
-         // TODO: Add admin bypass if needed, but for now strict
          setError("You are not authorized to view this review.");
          console.error("Unauthorized access attempt by:", user.uid);
          return;
@@ -96,21 +89,26 @@ const ReviewExam = () => {
       // 3. Fetch Questions
       const questionsData = await getQuestions(attempt.examId);
       console.log("Fetched questions:", questionsData.length);
-      // Sort by orderIndex
-      questionsData.sort((a, b) => a.orderIndex - b.orderIndex);
-      setQuestions(questionsData as Question[]);
-
+      
       // 4. Fetch Answers
       const answersData = await getAnswers(attemptId);
       console.log("Fetched answers:", answersData.length);
-      const answersMap: Record<string, number> = {};
+      
+      // Create a map of answers by questionId for quick lookup
+      const answersMap = new Map<string, Answer>();
       answersData.forEach(ans => {
-        // Handle MCQ answers (selectedOptionIndex)
-        if (ans.selectedOptionIndex !== undefined && ans.selectedOptionIndex !== null) {
-          answersMap[ans.questionId] = ans.selectedOptionIndex;
-        }
+        answersMap.set(ans.questionId, ans);
       });
-      setUserAnswers(answersMap);
+
+      // Sort questions by orderIndex and pair with answers
+      questionsData.sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
+      
+      const reviewData: QuestionReviewData[] = questionsData.map(q => ({
+        question: q,
+        answer: answersMap.get(q.questionId) || null
+      }));
+
+      setQuestionsReview(reviewData);
 
     } catch (err) {
       console.error("Error loading review:", err);
@@ -150,7 +148,7 @@ const ReviewExam = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6 animate-fade-in">
-        <div className="flex items-center gap-4 max-w-4xl mx-auto">
+        <div className="flex items-center gap-4 max-w-4xl mx-auto w-full">
           <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard/results")}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
@@ -162,24 +160,101 @@ const ReviewExam = () => {
           </div>
         </div>
 
-        {questions.length > 0 ? (
+        {questionsReview.length > 0 ? (
           <div className="space-y-6">
-            {questions.map((q, index) => (
-              <div key={q.questionId} className="max-w-4xl mx-auto w-full">
-                <QuestionCard
-                  questionNumber={index + 1}
-                  questionText={q.questionText}
-                  options={q.options}
-                  selectedOption={userAnswers[q.questionId] ?? null}
-                  correctOption={q.correctOptionIndex}
-                  feedbackType="hidden" // We force "hidden" so QuestionCard doesn't do its own interactive feedback logic, but uses isSubmitted + correctOption
-                  isSubmitted={true}
-                  onSelectOption={() => {}} // Read-only
-                  marks={q.marks}
-                  explanation={q.explanation}
-                />
-              </div>
-            ))}
+            {questionsReview.map((qr, index) => {
+              const q = qr.question;
+              const answer = qr.answer;
+              
+              // Handle MCQ questions
+              if (q.questionType === 'mcq' && 'options' in q) {
+                return (
+                  <div key={q.questionId} className="max-w-4xl mx-auto w-full">
+                    <QuestionCard
+                      questionNumber={index + 1}
+                      questionText={q.questionText}
+                      options={q.options}
+                      selectedOption={answer?.selectedOptionIndex ?? null}
+                      correctOption={q.correctOptionIndex}
+                      feedbackType="hidden"
+                      isSubmitted={true}
+                      onSelectOption={() => {}}
+                      marks={q.marks}
+                      explanation={q.explanation}
+                    />
+                  </div>
+                );
+              }
+              
+              // Handle True/False questions
+              if (q.questionType === 'true-false') {
+                const options = ['True', 'False'];
+                const correctIdx = q.correctAnswer ? 0 : 1;
+                const selectedIdx = answer?.selectedBoolean !== undefined ? (answer.selectedBoolean ? 0 : 1) : null;
+                
+                return (
+                  <div key={q.questionId} className="max-w-4xl mx-auto w-full">
+                    <QuestionCard
+                      questionNumber={index + 1}
+                      questionText={q.questionText}
+                      options={options}
+                      selectedOption={selectedIdx}
+                      correctOption={correctIdx}
+                      feedbackType="hidden"
+                      isSubmitted={true}
+                      onSelectOption={() => {}}
+                      marks={q.marks}
+                      explanation={q.explanation}
+                    />
+                  </div>
+                );
+              }
+              
+              // Handle Short Answer & Essay questions - display as read-only cards
+              if (q.questionType === 'short-answer' || q.questionType === 'essay') {
+                return (
+                  <Card key={q.questionId} className="max-w-4xl mx-auto w-full">
+                    <CardContent className="pt-6 space-y-4">
+                      <div className="flex items-start justify-between gap-3 sm:gap-4">
+                        <div className="flex gap-3 sm:gap-4">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-display font-semibold">
+                            {index + 1}
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-base font-medium leading-relaxed sm:text-lg">{q.questionText}</p>
+                            <p className="text-sm text-muted-foreground">Marks: {q.marks}</p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-muted/50 p-4 rounded-lg border">
+                        <p className="text-sm font-medium text-muted-foreground mb-2">Your Answer:</p>
+                        <p className="text-base whitespace-pre-wrap">{answer?.textAnswer || "No answer provided"}</p>
+                      </div>
+                      
+                      {q.questionType === 'essay' && (
+                        <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
+                          <p className="text-sm text-blue-800 dark:text-blue-200">
+                            {answer?.answerStatus === 'graded' 
+                              ? `Graded: ${answer.rubricScore} points awarded`
+                              : 'Awaiting manual grading'}
+                          </p>
+                        </div>
+                      )}
+                      
+                      {q.explanation && (
+                        <div className="bg-gradient-to-br from-muted/60 to-background p-4 rounded-lg border">
+                          <p className="text-sm font-medium mb-2">Explanation:</p>
+                          <p className="text-sm text-foreground/90 whitespace-pre-wrap">{q.explanation}</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              }
+              
+              return null;
+            })}
           </div>
         ) : (
           <div className="text-center py-12 max-w-4xl mx-auto">
