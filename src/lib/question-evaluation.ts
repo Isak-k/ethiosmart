@@ -11,6 +11,7 @@ import {
   isEssayQuestion,
   evaluateTextAnswer,
 } from "@/integrations/firebase/types";
+import { evaluateShortAnswerWithMath } from "@/lib/math-answer-evaluator";
 
 export interface EvaluationResult {
   isCorrect: boolean;
@@ -96,6 +97,7 @@ export function evaluateTrueFalse(
  * Evaluate a Short Answer
  * If no correct answers provided, any non-empty answer is accepted
  * If no marks set, returns 0 marks
+ * Uses math-aware evaluation for mathematical answers
  */
 export function evaluateShortAnswer(
   question: Question,
@@ -127,12 +129,9 @@ export function evaluateShortAnswer(
     };
   }
 
-  const isCorrect = evaluateTextAnswer({
-    studentAnswer: textAnswer,
-    correctAnswers: question.correctAnswers,
-    caseSensitive: question.caseSensitive || false,
-    requireExactMatch: question.requireExactMatch || false,
-  });
+  // Use math-aware evaluation for short answers
+  // This automatically detects mathematical content and evaluates accordingly
+  const isCorrect = evaluateShortAnswerWithMath(question, textAnswer);
 
   const earnedMarks = isCorrect ? marks : 0;
 

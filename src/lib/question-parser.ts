@@ -1,5 +1,6 @@
 import { TFunction } from "i18next";
 import { NewQuestionInput } from "./validations";
+import { prepareMathText } from "./math-parser";
 
 export interface ParsedQuestion {
   questionText: string;
@@ -857,43 +858,60 @@ export function parseImportData(
   const textResult = parseQuestions(trimmed, t);
   return {
     questions: textResult.questions.map(q => {
+      // Normalize mathematical content in all questions
+      const normalizedQuestion = normalizeMathematicalContent(q);
+      
       // If it's a short-answer question with questionType set
-      if ('questionType' in q && q.questionType === 'short-answer') {
+      if ('questionType' in normalizedQuestion && normalizedQuestion.questionType === 'short-answer') {
         return {
           questionType: 'short-answer' as const,
-          questionText: q.questionText,
-          correctAnswers: (q as any).correctAnswers,
+          questionText: normalizedQuestion.questionText,
+          correctAnswers: (normalizedQuestion as any).correctAnswers,
           marks: 1,
           feedbackType: 'hidden' as const,
-          explanation: q.explanation
+          explanation: normalizedQuestion.explanation
         };
       }
       
       // If it's a true-false question with questionType set
-      if ('questionType' in q && q.questionType === 'true-false') {
+      if ('questionType' in normalizedQuestion && normalizedQuestion.questionType === 'true-false') {
         return {
           questionType: 'true-false' as const,
-          questionText: q.questionText,
-          correctAnswer: (q as any).correctAnswer,
+          questionText: normalizedQuestion.questionText,
+          correctAnswer: (normalizedQuestion as any).correctAnswer,
           marks: 1,
           feedbackType: 'hidden' as const,
-          explanation: q.explanation
+          explanation: normalizedQuestion.explanation
         };
       }
       
       // Otherwise it's MCQ
       return {
         questionType: 'mcq' as const,
-        questionText: q.questionText,
-        options: (q as any).options,
-        correctOptionIndex: (q as any).correctOptionIndex,
+        questionText: normalizedQuestion.questionText,
+        options: (normalizedQuestion as any).options,
+        correctOptionIndex: (normalizedQuestion as any).correctOptionIndex,
         marks: 1,
         feedbackType: 'hidden' as const,
-        explanation: q.explanation
+        explanation: normalizedQuestion.explanation
       };
     }),
     errors: textResult.errors,
     successCount: textResult.questions.length,
     errorCount: textResult.errors.length
+  };
+}
+
+/**
+ * Normalize mathematical content in a question
+ * Converts Unicode fractions, powers, and other symbols to standard format
+ */
+function normalizeMathematicalContent(q: any): any {
+  return {
+    ...q,
+    questionText: prepareMathText(q.questionText),
+    options: Array.isArray(q.options) ? q.options.map((opt: string) => prepareMathText(opt)) : q.options,
+    correctAnswers: Array.isArray(q.correctAnswers) ? q.correctAnswers.map((ans: string) => prepareMathText(ans)) : q.correctAnswers,
+    explanation: q.explanation ? prepareMathText(q.explanation) : q.explanation,
   };
 }
