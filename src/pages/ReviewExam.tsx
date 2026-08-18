@@ -56,6 +56,7 @@ const ReviewExam = () => {
       const attempt = await getAttempt(attemptId);
       if (!attempt) {
         setError("Attempt not found");
+        console.error("Attempt not found:", attemptId);
         return;
       }
 
@@ -64,6 +65,7 @@ const ReviewExam = () => {
       if (attempt.studentId !== user.uid) {
          // TODO: Add admin bypass if needed, but for now strict
          setError("You are not authorized to view this review.");
+         console.error("Unauthorized access attempt by:", user.uid);
          return;
       }
 
@@ -79,11 +81,13 @@ const ReviewExam = () => {
       const exam = await getExam(attempt.examId);
       if (!exam) {
         setError("Exam not found");
+        console.error("Exam not found:", attempt.examId);
         return;
       }
 
       if (!exam.resultsPublished) {
         setError("Results for this exam have not been published yet.");
+        console.warn("Results not published for exam:", attempt.examId);
         return;
       }
 
@@ -91,21 +95,26 @@ const ReviewExam = () => {
 
       // 3. Fetch Questions
       const questionsData = await getQuestions(attempt.examId);
+      console.log("Fetched questions:", questionsData.length);
       // Sort by orderIndex
       questionsData.sort((a, b) => a.orderIndex - b.orderIndex);
       setQuestions(questionsData as Question[]);
 
       // 4. Fetch Answers
       const answersData = await getAnswers(attemptId);
+      console.log("Fetched answers:", answersData.length);
       const answersMap: Record<string, number> = {};
       answersData.forEach(ans => {
-        answersMap[ans.questionId] = ans.selectedOption;
+        // Handle MCQ answers (selectedOptionIndex)
+        if (ans.selectedOptionIndex !== undefined && ans.selectedOptionIndex !== null) {
+          answersMap[ans.questionId] = ans.selectedOptionIndex;
+        }
       });
       setUserAnswers(answersMap);
 
     } catch (err) {
       console.error("Error loading review:", err);
-      setError("Failed to load exam review.");
+      setError("Failed to load exam review. " + (err instanceof Error ? err.message : ""));
     } finally {
       setLoading(false);
     }
@@ -140,12 +149,12 @@ const ReviewExam = () => {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6 animate-fade-in max-w-4xl mx-auto">
-        <div className="flex items-center gap-4">
+      <div className="space-y-6 animate-fade-in">
+        <div className="flex items-center gap-4 max-w-4xl mx-auto">
           <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard/results")}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div>
+          <div className="flex-1">
             <h1 className="text-2xl font-bold">{examTitle} - Review</h1>
             <p className="text-muted-foreground">
               Score: {attemptData?.totalScore} / {attemptData?.maxScore}
@@ -153,23 +162,30 @@ const ReviewExam = () => {
           </div>
         </div>
 
-        <div className="space-y-6">
-          {questions.map((q, index) => (
-            <QuestionCard
-              key={q.questionId}
-              questionNumber={index + 1}
-              questionText={q.questionText}
-              options={q.options}
-              selectedOption={userAnswers[q.questionId] ?? null}
-              correctOption={q.correctOptionIndex}
-              feedbackType="hidden" // We force "hidden" so QuestionCard doesn't do its own interactive feedback logic, but uses isSubmitted + correctOption
-              isSubmitted={true}
-              onSelectOption={() => {}} // Read-only
-              marks={q.marks}
-              explanation={q.explanation}
-            />
-          ))}
-        </div>
+        {questions.length > 0 ? (
+          <div className="space-y-6">
+            {questions.map((q, index) => (
+              <div key={q.questionId} className="max-w-4xl mx-auto w-full">
+                <QuestionCard
+                  questionNumber={index + 1}
+                  questionText={q.questionText}
+                  options={q.options}
+                  selectedOption={userAnswers[q.questionId] ?? null}
+                  correctOption={q.correctOptionIndex}
+                  feedbackType="hidden" // We force "hidden" so QuestionCard doesn't do its own interactive feedback logic, but uses isSubmitted + correctOption
+                  isSubmitted={true}
+                  onSelectOption={() => {}} // Read-only
+                  marks={q.marks}
+                  explanation={q.explanation}
+                />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12 max-w-4xl mx-auto">
+            <p className="text-muted-foreground">No questions found for this exam.</p>
+          </div>
+        )}
         
         <div className="flex justify-center pt-8">
             <Button onClick={() => navigate("/dashboard/results")} size="lg">

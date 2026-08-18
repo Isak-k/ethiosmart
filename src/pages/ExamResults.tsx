@@ -46,7 +46,6 @@ import {
   type ExamSummary,
 } from "@/lib/export-utils";
 import { useSectionPermissions } from "@/hooks/useSectionPermissions";
-import { Link } from "react-router-dom";
 
 interface AttemptWithStudent {
   id: string;
