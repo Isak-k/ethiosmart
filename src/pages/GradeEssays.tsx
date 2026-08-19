@@ -89,13 +89,22 @@ const GradeEssays = () => {
           submitted.map(async (a) => {
             try {
               const ans = await getAnswers(a.attemptId);
-              const status = computeEssayGradingStatus(ans);
+              // Count questions that need manual grading
+              const manualGradeQs = questions.filter(q => 
+                (isEssayQuestion(q) && q.requiresManualGrading !== false) ||
+                (isShortAnswerQuestion(q) && (q.requiresManualGrading === true || !q.correctAnswers?.length))
+              );
+              const pendingCount = manualGradeQs.filter(q => {
+                const answer = ans.find(a => a.questionId === q.questionId);
+                return answer && !answer.isCorrect && (answer as any).manualScore === undefined;
+              }).length;
+              
               return {
                 value: a.attemptId,
-                label: `${a.studentName} (${a.studentEmail}) — ${status.pendingEssays} pending`,
+                label: `${a.studentName} (${a.studentEmail}) — ${pendingCount} pending`,
                 studentName: a.studentName,
                 studentEmail: a.studentEmail,
-                pendingEssayCount: status.pendingEssays,
+                pendingEssayCount: pendingCount,
               };
             } catch {
               return {
@@ -119,7 +128,7 @@ const GradeEssays = () => {
       }
     };
     loadAttempts();
-  }, [examId]);
+  }, [examId, questions]);
 
   // When attemptId changes, load answers
   useEffect(() => {
@@ -351,10 +360,11 @@ const GradeEssays = () => {
               <Card>
                 <CardContent className="py-16 text-center">
                   <FileSearch className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-                  <h3 className="font-semibold">No essay or short answer questions to grade</h3>
-                  <p className="text-muted-foreground text-sm">
-                    There is nothing to grade here. Add essay or short answer questions to this exam.<br/>
-                    <span className="text-xs">Short answers require either: (1) manual grading enabled, or (2) no correct answers defined</span>
+                  <h3 className="font-semibold">No questions to grade</h3>
+                  <p className="text-muted-foreground text-sm max-w-md mx-auto mt-2">
+                    To enable manual grading:<br/>
+                    <strong>Edit Question → Enable "Require Manual Grading by Teacher"</strong><br/>
+                    <span className="text-xs mt-1 block">OR leave correct answers empty</span>
                   </p>
                 </CardContent>
               </Card>
