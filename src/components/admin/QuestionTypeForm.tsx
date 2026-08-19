@@ -112,6 +112,7 @@ export function QuestionTypeForm({
           minWords: question.minWords,
           maxWords: question.maxWords,
           rubricPoints: question.rubricPoints || [],
+          requiresManualGrading: question.requiresManualGrading !== false,
         };
       }
     }
@@ -228,6 +229,7 @@ export function QuestionTypeForm({
           minWords: question.minWords,
           maxWords: question.maxWords,
           rubricPoints: question.rubricPoints || [],
+          requiresManualGrading: question.requiresManualGrading !== false,
         };
       } else {
         return;
@@ -804,6 +806,35 @@ export function QuestionTypeForm({
                     </div>
                   );
                 })()}
+              </div>
+
+              <div className="p-3 bg-white rounded border border-purple-300 mt-4">
+                <FormField
+                  control={form.control}
+                  name="requiresManualGrading"
+                  render={({ field }) => (
+                    <FormItem className="flex items-start gap-3">
+                      <FormControl>
+                        <input
+                          type="checkbox"
+                          checked={field.value !== false}
+                          onChange={(e) => field.onChange(e.target.checked)}
+                          className="mt-1"
+                          id="essayManualGrading"
+                        />
+                      </FormControl>
+                      <div className="flex-1">
+                        <FormLabel htmlFor="essayManualGrading" className="font-semibold cursor-pointer">
+                          Require Manual Grading by Teacher
+                        </FormLabel>
+                        <FormDescription className="mt-1">
+                          When checked: Teacher reviews and grades each essay manually.<br/>
+                          When unchecked: Essays auto-accept for full marks (requires teacher grading UI to exist, but not enforced).
+                        </FormDescription>
+                      </div>
+                    </FormItem>
+                  )}
+                />
               </div>
             </div>
           )}

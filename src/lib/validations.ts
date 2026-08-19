@@ -441,6 +441,7 @@ export const getNewQuestionSchema = (t: any) => {
         })
       )
       .optional(),
+    requiresManualGrading: z.boolean().optional(),
   });
 
   return z.discriminatedUnion("questionType", [
