@@ -148,8 +148,10 @@ const GradeEssays = () => {
         .filter(q => {
           // Include all essay questions
           if (isEssayQuestion(q)) return true;
-          // Include short answer questions that need manual grading (marked as essay-like)
+          // Include short answer questions that need manual grading
           if (isShortAnswerQuestion(q) && q.requiresManualGrading) return true;
+          // Also include short answers with no correct answers defined (can't auto-grade)
+          if (isShortAnswerQuestion(q) && (!q.correctAnswers || q.correctAnswers.length === 0)) return true;
           return false;
         })
         .sort((a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0)),
@@ -351,7 +353,8 @@ const GradeEssays = () => {
                   <FileSearch className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
                   <h3 className="font-semibold">No essay or short answer questions to grade</h3>
                   <p className="text-muted-foreground text-sm">
-                    There is nothing to grade here. Add essay or short answer questions (with manual grading) to this exam in the editor.
+                    There is nothing to grade here. Add essay or short answer questions to this exam.<br/>
+                    <span className="text-xs">Short answers require either: (1) manual grading enabled, or (2) no correct answers defined</span>
                   </p>
                 </CardContent>
               </Card>
