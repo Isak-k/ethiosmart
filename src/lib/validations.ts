@@ -268,6 +268,7 @@ const shortAnswerBaseSchema = baseQuestionSchema.extend({
     .min(1, "At least one correct answer is required"),
   caseSensitive: z.boolean().optional(),
   requireExactMatch: z.boolean().optional(),
+  requiresManualGrading: z.boolean().optional(),
 });
 
 export const shortAnswerQuestionSchema = shortAnswerBaseSchema.superRefine((data, ctx) => {
@@ -425,6 +426,7 @@ export const getNewQuestionSchema = (t: any) => {
       .optional(), // Optional field
     caseSensitive: z.boolean().optional(),
     requireExactMatch: z.boolean().optional(),
+    requiresManualGrading: z.boolean().optional(),
   });
 
   const essaySchema = baseSchema.extend({

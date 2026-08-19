@@ -26,7 +26,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { getExam } from '@/lib/firebase-exams';
 import { getExamAttempts, getAnswers } from '@/lib/firebase-attempts';
-import { Answer, EssayQuestion, Question, isEssayQuestion } from '@/integrations/firebase/types';
+import { Answer, EssayQuestion, Question, isEssayQuestion, isShortAnswerQuestion } from '@/integrations/firebase/types';
 import { EssayGradingPanel } from '@/components/admin/EssayGradingPanel';
 import {
   GradedEssayPayload,
@@ -145,7 +145,13 @@ const GradeEssays = () => {
   const essayQuestions = useMemo(
     () =>
       questions
-        .filter(isEssayQuestion)
+        .filter(q => {
+          // Include all essay questions
+          if (isEssayQuestion(q)) return true;
+          // Include short answer questions that need manual grading (marked as essay-like)
+          if (isShortAnswerQuestion(q) && q.requiresManualGrading) return true;
+          return false;
+        })
         .sort((a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0)),
     [questions]
   );
@@ -343,9 +349,9 @@ const GradeEssays = () => {
               <Card>
                 <CardContent className="py-16 text-center">
                   <FileSearch className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-                  <h3 className="font-semibold">No essay questions in this exam</h3>
+                  <h3 className="font-semibold">No essay or short answer questions to grade</h3>
                   <p className="text-muted-foreground text-sm">
-                    There is nothing to grade here. Add essay questions to this exam in the editor.
+                    There is nothing to grade here. Add essay or short answer questions (with manual grading) to this exam in the editor.
                   </p>
                 </CardContent>
               </Card>
@@ -358,7 +364,7 @@ const GradeEssays = () => {
                   <div key={eq.questionId} className="space-y-2">
                     <div className="flex items-center justify-between">
                       <Badge variant="outline" className="badge-primary">
-                        Essay Q{idx + 1} · order {eq.orderIndex ?? idx + 1} · {eq.marks} marks
+                        {isEssayQuestion(eq) ? 'Essay' : 'Short Answer'} Q{idx + 1} · order {eq.orderIndex ?? idx + 1} · {eq.marks} marks
                       </Badge>
                       <Badge
                         variant="outline"

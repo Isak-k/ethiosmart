@@ -39,6 +39,7 @@ export interface ShortAnswerQuestion extends BaseQuestion {
   caseSensitive?: boolean;
   requireExactMatch?: boolean;
   charLimit?: number;
+  requiresManualGrading?: boolean;
 }
 
 export interface EssayQuestion extends BaseQuestion {
@@ -94,6 +95,10 @@ export interface ShortAnswerAnswer extends BaseAnswer {
   studentResponse: string | null;
   isCorrect: boolean | null;
   matchedAnswer?: string;
+  manualScore?: number;
+  manualFeedback?: string;
+  graderUserId?: string;
+  gradedAt?: Timestamp;
 }
 
 export interface EssayAnswer extends BaseAnswer {

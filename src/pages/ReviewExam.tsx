@@ -212,6 +212,9 @@ const ReviewExam = () => {
               
               // Handle Short Answer & Essay questions - display as read-only cards
               if (q.questionType === 'short-answer' || q.questionType === 'essay') {
+                const isGraded = answer?.answerStatus === 'graded';
+                const score = isGraded ? answer?.rubricScore : null;
+                
                 return (
                   <Card key={q.questionId} className="max-w-4xl mx-auto w-full">
                     <CardContent className="pt-6 space-y-4">
@@ -222,7 +225,9 @@ const ReviewExam = () => {
                           </div>
                           <div className="space-y-1">
                             <p className="text-base font-medium leading-relaxed sm:text-lg">{q.questionText}</p>
-                            <p className="text-sm text-muted-foreground">Marks: {q.marks}</p>
+                            <p className="text-sm text-muted-foreground">
+                              Marks: {isGraded ? `${score}/${q.marks}` : q.marks}
+                            </p>
                           </div>
                         </div>
                       </div>
@@ -232,13 +237,30 @@ const ReviewExam = () => {
                         <p className="text-base whitespace-pre-wrap">{answer?.textAnswer || "No answer provided"}</p>
                       </div>
                       
-                      {q.questionType === 'essay' && (
-                        <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
-                          <p className="text-sm text-blue-800 dark:text-blue-200">
-                            {answer?.answerStatus === 'graded' 
-                              ? `Graded: ${answer.rubricScore} points awarded`
+                      {(q.questionType === 'essay' || q.questionType === 'short-answer') && (
+                        <div className={`p-3 rounded-lg border ${
+                          isGraded 
+                            ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' 
+                            : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+                        }`}>
+                          <p className={`text-sm ${
+                            isGraded 
+                              ? 'text-green-800 dark:text-green-200' 
+                              : 'text-blue-800 dark:text-blue-200'
+                          }`}>
+                            {isGraded 
+                              ? `✓ Graded: ${score} / ${q.marks} points awarded`
                               : 'Awaiting manual grading'}
                           </p>
+                          {isGraded && answer?.graderComment && (
+                            <p className={`text-xs mt-2 ${
+                              isGraded 
+                                ? 'text-green-700 dark:text-green-300' 
+                                : 'text-blue-700 dark:text-blue-300'
+                            }`}>
+                              <span className="font-medium">Feedback:</span> {answer.graderComment}
+                            </p>
+                          )}
                         </div>
                       )}
                       

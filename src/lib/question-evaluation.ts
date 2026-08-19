@@ -95,6 +95,7 @@ export function evaluateTrueFalse(
 
 /**
  * Evaluate a Short Answer
+ * If manual grading is enabled, returns pending status
  * If no correct answers provided, any non-empty answer is accepted
  * If no marks set, returns 0 marks
  * Uses math-aware evaluation for mathematical answers
@@ -108,6 +109,7 @@ export function evaluateShortAnswer(
   }
 
   const marks = question.marks ?? 0;
+  const requiresManualGrading = question.requiresManualGrading === true;
 
   if (!textAnswer || textAnswer.trim() === "") {
     return {
@@ -115,6 +117,17 @@ export function evaluateShortAnswer(
       earnedMarks: 0,
       totalMarks: marks,
       feedback: "You skipped this question",
+    };
+  }
+
+  // If manual grading is required, return pending
+  if (requiresManualGrading) {
+    return {
+      isCorrect: false,
+      earnedMarks: 0,
+      totalMarks: marks,
+      feedback: "Your answer has been submitted and is pending review",
+      explanation: question.explanation,
     };
   }
 

@@ -31,6 +31,8 @@ export interface GradedEssayPayload {
  * Transitions status from `pending_review` → `graded`. Writes rubric score,
  * optional rubric breakdown, grader identity, grader comment, and server
  * timestamp into the answer document.
+ * 
+ * Also supports grading short answer questions with no provided answer.
  */
 export async function gradeEssayAnswerOnline(
   attemptId: string,
@@ -51,7 +53,7 @@ export async function gradeEssayAnswerOnline(
     graderName: payload.graderName ?? null,
     gradedAt: serverTimestamp(),
     answerStatus: 'graded' as const,
-    isCorrect: true,
+    isCorrect: payload.rubricScore > 0,  // Mark as correct if score > 0
   });
 }
 
@@ -116,6 +118,7 @@ export async function recomputeAndUpdateAttemptScore(
 
 /**
  * Grade an offline IndexedDB practice essay answer and transition to graded.
+ * Also supports short answer questions with no provided answer.
  */
 export async function gradeOfflinePracticeEssay(
   attemptId: string,
@@ -143,7 +146,7 @@ export async function gradeOfflinePracticeEssay(
     graderName: payload.graderName ?? null,
     gradedAt: Date.now(),
     answerStatus: 'graded' as const,
-    isCorrect: true,
+    isCorrect: payload.rubricScore > 0,  // Mark as correct if score > 0
   });
   await tx.done;
 }

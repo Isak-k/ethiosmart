@@ -100,6 +100,7 @@ export function QuestionTypeForm({
           correctAnswers: question.correctAnswers,
           caseSensitive: question.caseSensitive,
           requireExactMatch: question.requireExactMatch,
+          requiresManualGrading: question.requiresManualGrading || false,
         };
       } else if (isEssayQuestion(question)) {
         return {
@@ -165,6 +166,7 @@ export function QuestionTypeForm({
         form.setValue("correctAnswers", [""]);
         form.setValue("caseSensitive", false);
         form.setValue("requireExactMatch", false);
+        form.setValue("requiresManualGrading", false);
         break;
       case "essay":
         form.setValue("minWords", undefined);
@@ -214,6 +216,7 @@ export function QuestionTypeForm({
           correctAnswers: question.correctAnswers,
           caseSensitive: question.caseSensitive,
           requireExactMatch: question.requireExactMatch,
+          requiresManualGrading: question.requiresManualGrading || false,
         };
       } else if (isEssayQuestion(question)) {
         newDefaults = {
@@ -602,6 +605,35 @@ export function QuestionTypeForm({
                     </FormItem>
                   )}
                 />
+
+                <div className="p-3 bg-white rounded border border-green-300 mt-4">
+                  <FormField
+                    control={form.control}
+                    name="requiresManualGrading"
+                    render={({ field }) => (
+                      <FormItem className="flex items-start gap-3">
+                        <FormControl>
+                          <input
+                            type="checkbox"
+                            checked={field.value || false}
+                            onChange={field.onChange}
+                            className="mt-1"
+                            id="requiresManualGrading"
+                          />
+                        </FormControl>
+                        <div className="flex-1">
+                          <FormLabel htmlFor="requiresManualGrading" className="font-semibold cursor-pointer">
+                            Require Manual Grading by Teacher
+                          </FormLabel>
+                          <FormDescription className="mt-1">
+                            If checked: Answers require teacher review instead of automatic evaluation.<br/>
+                            If unchecked: Answers are automatically graded using the correct answers above.
+                          </FormDescription>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </div>
             </div>
           )}
