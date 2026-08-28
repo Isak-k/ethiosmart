@@ -46,6 +46,7 @@ import {
   type ExamSummary,
 } from "@/lib/export-utils";
 import { useSectionPermissions } from "@/hooks/useSectionPermissions";
+import { useGranularPermissions } from "@/hooks/useGranularPermissions";
 
 interface AttemptWithStudent {
   id: string;
@@ -70,6 +71,7 @@ const ExamResults = () => {
   const { role, user, profile } = useAuth();
   const navigate = useNavigate();
   const { canDelete } = useSectionPermissions();
+  const { canGradeExams } = useGranularPermissions();
   const [exam, setExam] = useState<ExamInfo | null>(null);
   const [attempts, setAttempts] = useState<AttemptWithStudent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -446,15 +448,17 @@ const ExamResults = () => {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="text-primary hover:text-primary hover:bg-primary/10 rounded-full"
-                                onClick={() => navigate(`/dashboard/admin/grade/${attempt.id}`)}
-                                title="Grade exam"
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
+                              {canGradeExams() && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-primary hover:text-primary hover:bg-primary/10 rounded-full"
+                                  onClick={() => navigate(`/dashboard/admin/grade/${attempt.id}`)}
+                                  title="Grade exam"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              )}
                               {canDelete('manageExams') && (
                                 <Button
                                   variant="ghost"
