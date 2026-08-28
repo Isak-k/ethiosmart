@@ -50,7 +50,7 @@ import {
   Eye,
   Download,
   Trash2,
-  PenTool,
+  Pencil,
 } from "lucide-react";
 import { formatTimeSpent, exportAllResultsToCSV, exportAllResultsToPDF, ExamResultData } from "@/lib/export-utils";
 import { useToast } from "@/hooks/use-toast";
@@ -456,13 +456,17 @@ const AdminAllResults = () => {
                                     </Link>
                                   </Button>
                                 )}
-                                {canGradeExams() && (
-                                  <Button variant="ghost" size="icon" asChild title="Grade Exam">
-                                    <Link to={`/dashboard/admin/grade/${result.id}`}>
-                                      <PenTool className="h-4 w-4" />
-                                    </Link>
-                                  </Button>
-                                )}
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  asChild 
+                                  title="Grade Exam"
+                                  className="text-primary hover:text-primary hover:bg-primary/10"
+                                >
+                                  <Link to={`/dashboard/admin/grade/${result.id}`}>
+                                    <Pencil className="h-4 w-4" />
+                                  </Link>
+                                </Button>
                                 {canDeleteResults() && (
                                   <Button
                                     variant="ghost"
