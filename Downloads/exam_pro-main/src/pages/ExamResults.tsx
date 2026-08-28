@@ -450,7 +450,7 @@ const ExamResults = () => {
                                 variant="ghost"
                                 size="icon"
                                 className="text-primary hover:text-primary hover:bg-primary/10 rounded-full"
-                                onClick={() => navigate(`/grade-exam/${attempt.id}`)}
+                                onClick={() => navigate(`/dashboard/admin/grade/${attempt.id}`)}
                                 title="Grade exam"
                               >
                                 <Pencil className="h-4 w-4" />
