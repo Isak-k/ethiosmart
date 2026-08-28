@@ -2,14 +2,14 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { getExam } from "@/lib/firebase-exams";
-import { getAttempt, getAnswers, saveAnswerGrade } from "@/lib/firebase-attempts";
+import { getAttempt, getAnswers, saveAnswerGrade, deleteAttempt } from "@/lib/firebase-attempts";
 import { getQuestions } from "@/lib/firebase-exams";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ArrowLeft, AlertCircle, CheckCircle, XCircle } from "lucide-react";
+import { Loader2, ArrowLeft, AlertCircle, CheckCircle, XCircle, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useGranularPermissions } from "@/hooks/useGranularPermissions";
@@ -59,6 +59,8 @@ const AdminGradeExam = () => {
   const [error, setError] = useState<string | null>(null);
   const [gradingInProgress, setGradingInProgress] = useState(false);
   const [editingGrades, setEditingGrades] = useState<Record<string, number>>({});
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!canGradeExams()) {
@@ -183,6 +185,34 @@ const AdminGradeExam = () => {
     }
   };
 
+  const handleDeleteAttempt = async () => {
+    if (!attemptId) return;
+
+    setDeleting(true);
+    try {
+      await deleteAttempt(attemptId);
+      toast({
+        title: "Result deleted",
+        description: `${attemptData?.studentName}'s exam result has been permanently deleted.`,
+      });
+      
+      // Redirect back after successful deletion
+      setTimeout(() => {
+        navigate(-1);
+      }, 1000);
+    } catch (err) {
+      console.error("Error deleting attempt:", err);
+      toast({
+        title: "Error",
+        description: "Failed to delete exam result",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
   const renderQuestionAnswer = (question: QuestionData, answer?: AnswerData) => {
     const isAutoGraded = question.questionType === 'mcq' || question.questionType === 'truefalse';
     
@@ -194,7 +224,7 @@ const AdminGradeExam = () => {
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <Badge variant="outline">{question.questionType.toUpperCase() as any}</Badge>
+                  <Badge variant="outline">{question.questionType.toUpperCase()}</Badge>
                   <Badge variant="secondary">{question.marks} marks</Badge>
                 </div>
                 <p className="text-lg font-semibold mt-2">{question.questionText}</p>
@@ -238,7 +268,7 @@ const AdminGradeExam = () => {
                 </div>
                 {answer?.isCorrect !== null && (
                   <div className="mt-2 p-3 rounded-lg bg-muted">
-                    <Badge variant={answer.isCorrect ? "default" : "destructive" as any}>
+                    <Badge variant={answer.isCorrect ? "default" : "destructive"}>
                       {answer.isCorrect ? "Correct" : "Incorrect"}
                     </Badge>
                   </div>
@@ -269,31 +299,78 @@ const AdminGradeExam = () => {
                 <div className="pt-2">
                   <p className="text-sm font-semibold mb-2">Grade:</p>
                   <div className="flex items-center gap-2">
-                    <Input
-                      type="number"
-                      min="0"
-                      max={question.marks}
-                      value={editingGrades[question.questionId] ?? answer?.manualGrade ?? ""}
-                      onChange={(e) => handleGradeChange(question.questionId, e.target.value)}
-                      placeholder="Enter marks"
-                      className="max-w-[100px]"
-                    />
-                    <span className="text-sm text-muted-foreground">/ {question.marks}</span>
-                    {editingGrades[question.questionId] !== undefined && (
-                      <Button
-                        size="sm"
-                        onClick={() => handleSaveGrade(question.questionId)}
-                        disabled={gradingInProgress}
-                      >
-                        {gradingInProgress ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
-                      </Button>
+                    {editingGrades[question.questionId] === undefined ? (
+                      <>
+                        {answer?.manualGrade !== undefined ? (
+                          <>
+                            <Badge variant="secondary">
+                              {answer.manualGrade}/{question.marks}
+                            </Badge>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                setEditingGrades({
+                                  ...editingGrades,
+                                  [question.questionId]: answer.manualGrade || 0,
+                                })
+                              }
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                          </>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              setEditingGrades({
+                                ...editingGrades,
+                                [question.questionId]: 0,
+                              })
+                            }
+                          >
+                            <Pencil className="w-4 h-4 mr-1" />
+                            Grade
+                          </Button>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <Input
+                          type="number"
+                          min="0"
+                          max={question.marks}
+                          value={editingGrades[question.questionId] ?? ""}
+                          onChange={(e) => handleGradeChange(question.questionId, e.target.value)}
+                          placeholder="Enter marks"
+                          className="max-w-[100px]"
+                          autoFocus
+                        />
+                        <span className="text-sm text-muted-foreground">/ {question.marks}</span>
+                        <Button
+                          size="sm"
+                          onClick={() => handleSaveGrade(question.questionId)}
+                          disabled={gradingInProgress}
+                        >
+                          {gradingInProgress ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            setEditingGrades({
+                              ...editingGrades,
+                              [question.questionId]: undefined,
+                            })
+                          }
+                          disabled={gradingInProgress}
+                        >
+                          Cancel
+                        </Button>
+                      </>
                     )}
                   </div>
-                  {answer?.manualGrade !== undefined && (
-                    <Badge variant="secondary" className="mt-2">
-                      Graded: {answer.manualGrade}/{question.marks}
-                    </Badge>
-                  )}
                 </div>
               </div>
             ) : question.questionType === 'essay' ? (
@@ -306,33 +383,81 @@ const AdminGradeExam = () => {
                 </div>
                 <div>
                   <p className="text-sm font-semibold mb-2">Grade:</p>
-                  <div className="flex flex-col gap-2">
-                    <Input
-                      type="number"
-                      min="0"
-                      max={question.marks}
-                      value={editingGrades[question.questionId] ?? answer?.manualGrade ?? ""}
-                      onChange={(e) => handleGradeChange(question.questionId, e.target.value)}
-                      placeholder="Enter marks"
-                      className="max-w-[100px]"
-                    />
-                    {editingGrades[question.questionId] !== undefined && (
-                      <Button
-                        size="sm"
-                        onClick={() => handleSaveGrade(question.questionId)}
-                        disabled={gradingInProgress}
-                        className="max-w-[100px]"
-                      >
-                        {gradingInProgress ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save Grade"}
-                      </Button>
-                    )}
-                    <span className="text-sm text-muted-foreground">Max: {question.marks} marks</span>
-                    {answer?.manualGrade !== undefined && (
-                      <Badge variant="secondary">
-                        Graded: {answer.manualGrade}/{question.marks}
-                      </Badge>
-                    )}
-                  </div>
+                  {editingGrades[question.questionId] === undefined ? (
+                    <div className="flex items-center gap-2">
+                      {answer?.manualGrade !== undefined ? (
+                        <>
+                          <Badge variant="secondary">
+                            {answer.manualGrade}/{question.marks}
+                          </Badge>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              setEditingGrades({
+                                ...editingGrades,
+                                [question.questionId]: answer.manualGrade || 0,
+                              })
+                            }
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            setEditingGrades({
+                              ...editingGrades,
+                              [question.questionId]: 0,
+                            })
+                          }
+                        >
+                          <Pencil className="w-4 h-4 mr-1" />
+                          Grade
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          min="0"
+                          max={question.marks}
+                          value={editingGrades[question.questionId] ?? ""}
+                          onChange={(e) => handleGradeChange(question.questionId, e.target.value)}
+                          placeholder="Enter marks"
+                          className="max-w-[100px]"
+                          autoFocus
+                        />
+                        <span className="text-sm text-muted-foreground">/ {question.marks}</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => handleSaveGrade(question.questionId)}
+                          disabled={gradingInProgress}
+                        >
+                          {gradingInProgress ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save Grade"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            setEditingGrades({
+                              ...editingGrades,
+                              [question.questionId]: undefined,
+                            })
+                          }
+                          disabled={gradingInProgress}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : null}
@@ -372,17 +497,60 @@ const AdminGradeExam = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6 animate-fade-in max-w-4xl mx-auto">
+        {/* Delete Confirmation Dialog */}
+        {showDeleteConfirm && (
+          <Alert variant="destructive" className="border-2">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Delete Student Result?</AlertTitle>
+            <AlertDescription>
+              <p className="mb-4">
+                Are you sure you want to permanently delete <strong>{attemptData?.studentName}</strong>'s exam result? This action cannot be undone.
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={handleDeleteAttempt}
+                  disabled={deleting}
+                >
+                  {deleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
+                  Delete Result
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setShowDeleteConfirm(false)}
+                  disabled={deleting}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Header */}
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div className="flex-1">
-            <h1 className="text-2xl font-bold">{examTitle} - Grade</h1>
-            <p className="text-muted-foreground">
-              Student: {attemptData?.studentName} ({attemptData?.studentEmail})
-            </p>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div className="flex-1">
+              <h1 className="text-2xl font-bold">{examTitle} - Grade</h1>
+              <p className="text-muted-foreground">
+                Student: {attemptData?.studentName} ({attemptData?.studentEmail})
+              </p>
+            </div>
           </div>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setShowDeleteConfirm(true)}
+            disabled={deleting}
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Delete Result
+          </Button>
         </div>
 
         {/* Questions and Answers */}
