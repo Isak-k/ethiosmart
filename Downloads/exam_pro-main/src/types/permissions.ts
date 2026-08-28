@@ -75,7 +75,7 @@ export const DEFAULT_PERMISSIONS: UserPermissions = {
   viewExamResults: false,
   deleteResults: false,
   exportResults: true,
-  gradeExams: false,
+  gradeExams: true,
   viewFeedback: false,
   replyFeedback: false,
   deleteFeedback: false,
