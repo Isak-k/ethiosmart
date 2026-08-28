@@ -1,0 +1,406 @@
+import { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { getExam } from "@/lib/firebase-exams";
+import { getAttempt, getAnswers, saveAnswerGrade } from "@/lib/firebase-attempts";
+import { getQuestions } from "@/lib/firebase-exams";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, ArrowLeft, AlertCircle, CheckCircle, XCircle } from "lucide-react";
+import { toast } from "sonner";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useGranularPermissions } from "@/hooks/useGranularPermissions";
+
+interface QuestionData {
+  questionId: string;
+  questionText: string;
+  questionType: 'mcq' | 'truefalse' | 'shortanswer' | 'essay';
+  options?: string[];
+  correctOptionIndex?: number;
+  correctAnswer?: string;
+  marks: number;
+  orderIndex: number;
+  explanation?: string;
+}
+
+interface AnswerData {
+  questionId: string;
+  selectedOptionIndex?: number | null;
+  studentAnswer?: string;
+  isCorrect?: boolean | null;
+  manualGrade?: number | null;
+}
+
+interface AttemptData {
+  attemptId: string;
+  examId: string;
+  studentId: string;
+  studentName: string;
+  studentEmail: string;
+  totalScore: number;
+  maxScore: number;
+  submittedAt: any;
+}
+
+const AdminGradeExam = () => {
+  const { attemptId } = useParams<{ attemptId: string }>();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { canGradeExams } = useGranularPermissions();
+  
+  const [loading, setLoading] = useState(true);
+  const [examTitle, setExamTitle] = useState("");
+  const [questions, setQuestions] = useState<QuestionData[]>([]);
+  const [answers, setAnswers] = useState<Record<string, AnswerData>>({});
+  const [attemptData, setAttemptData] = useState<AttemptData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [gradingInProgress, setGradingInProgress] = useState(false);
+  const [editingGrades, setEditingGrades] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (!canGradeExams()) {
+      setError("You do not have permission to grade exams.");
+      setLoading(false);
+      return;
+    }
+
+    if (attemptId && user) {
+      loadGradingData();
+    }
+  }, [attemptId, user]);
+
+  const loadGradingData = async () => {
+    try {
+      if (!attemptId || !user) return;
+
+      // 1. Fetch Attempt
+      const attempt = await getAttempt(attemptId);
+      if (!attempt) {
+        setError("Attempt not found");
+        return;
+      }
+
+      setAttemptData({
+        attemptId: attempt.attemptId,
+        examId: attempt.examId,
+        studentId: attempt.studentId,
+        studentName: attempt.studentName || "Unknown",
+        studentEmail: attempt.studentEmail || "N/A",
+        totalScore: attempt.totalScore || 0,
+        maxScore: attempt.maxScore || 0,
+        submittedAt: attempt.submittedAt,
+      });
+
+      // 2. Fetch Exam
+      const exam = await getExam(attempt.examId);
+      if (!exam) {
+        setError("Exam not found");
+        return;
+      }
+
+      setExamTitle(exam.title);
+
+      // 3. Fetch Questions (ALL types)
+      const questionsData = await getQuestions(attempt.examId);
+      questionsData.sort((a, b) => a.orderIndex - b.orderIndex);
+      setQuestions(questionsData as QuestionData[]);
+
+      // 4. Fetch Answers
+      const answersData = await getAnswers(attemptId);
+      const answersMap: Record<string, AnswerData> = {};
+      answersData.forEach(ans => {
+        answersMap[ans.questionId] = {
+          questionId: ans.questionId,
+          selectedOptionIndex: ans.selectedOptionIndex,
+          studentAnswer: ans.studentAnswer,
+          isCorrect: ans.isCorrect,
+          manualGrade: ans.manualGrade,
+        };
+      });
+      setAnswers(answersMap);
+
+    } catch (err) {
+      console.error("Error loading grading data:", err);
+      setError("Failed to load exam for grading.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGradeChange = (questionId: string, grade: string) => {
+    const marks = parseInt(grade) || 0;
+    const question = questions.find(q => q.questionId === questionId);
+    if (marks <= (question?.marks || 0)) {
+      setEditingGrades({
+        ...editingGrades,
+        [questionId]: marks,
+      });
+    }
+  };
+
+  const handleSaveGrade = async (questionId: string) => {
+    const grade = editingGrades[questionId];
+    if (grade === undefined) return;
+
+    const question = questions.find(q => q.questionId === questionId);
+    if (!question || !attemptId) return;
+
+    setGradingInProgress(true);
+    try {
+      const isCorrect = grade === question.marks;
+      await saveAnswerGrade(attemptId, questionId, grade, isCorrect, user?.uid);
+
+      setAnswers({
+        ...answers,
+        [questionId]: {
+          ...answers[questionId],
+          manualGrade: grade,
+          isCorrect: isCorrect,
+        },
+      });
+
+      setEditingGrades({
+        ...editingGrades,
+        [questionId]: undefined,
+      });
+
+      toast({
+        title: "Grade saved",
+        description: `Question graded with ${grade}/${question.marks} marks`,
+      });
+    } catch (err) {
+      console.error("Error saving grade:", err);
+      toast({
+        title: "Error",
+        description: "Failed to save grade",
+        variant: "destructive",
+      });
+    } finally {
+      setGradingInProgress(false);
+    }
+  };
+
+  const renderQuestionAnswer = (question: QuestionData, answer?: AnswerData) => {
+    const isAutoGraded = question.questionType === 'mcq' || question.questionType === 'truefalse';
+    
+    return (
+      <Card key={question.questionId} className="border border-border">
+        <CardContent className="pt-6">
+          <div className="space-y-4">
+            {/* Question Header */}
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline">{question.questionType.toUpperCase() as any}</Badge>
+                  <Badge variant="secondary">{question.marks} marks</Badge>
+                </div>
+                <p className="text-lg font-semibold mt-2">{question.questionText}</p>
+              </div>
+            </div>
+
+            {/* Question Type Specific Display */}
+            {question.questionType === 'mcq' || question.questionType === 'truefalse' ? (
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-muted-foreground">Options:</p>
+                <div className="space-y-2">
+                  {question.options?.map((option, index) => {
+                    const isSelected = answer?.selectedOptionIndex === index;
+                    const isCorrect = index === question.correctOptionIndex;
+                    const isWrong = isSelected && !isCorrect;
+
+                    return (
+                      <div
+                        key={index}
+                        className={`p-3 rounded-lg border-2 transition-all ${
+                          isCorrect
+                            ? "border-green-500 bg-green-50 dark:bg-green-950/30"
+                            : isWrong
+                            ? "border-red-500 bg-red-50 dark:bg-red-950/30"
+                            : isSelected
+                            ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30"
+                            : "border-border"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">{option}</span>
+                          <div className="flex items-center gap-2">
+                            {isCorrect && <CheckCircle className="w-4 h-4 text-green-600" />}
+                            {isWrong && <XCircle className="w-4 h-4 text-red-600" />}
+                            {isSelected && !isCorrect && <XCircle className="w-4 h-4 text-red-600" />}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {answer?.isCorrect !== null && (
+                  <div className="mt-2 p-3 rounded-lg bg-muted">
+                    <Badge variant={answer.isCorrect ? "default" : "destructive" as any}>
+                      {answer.isCorrect ? "Correct" : "Incorrect"}
+                    </Badge>
+                  </div>
+                )}
+                {question.explanation && (
+                  <div className="mt-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30">
+                    <p className="text-sm font-semibold text-blue-900 dark:text-blue-200">Explanation:</p>
+                    <p className="text-sm text-blue-800 dark:text-blue-300 mt-1">{question.explanation}</p>
+                  </div>
+                )}
+              </div>
+            ) : question.questionType === 'shortanswer' ? (
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground">Student Answer:</p>
+                  <p className="p-3 rounded-lg bg-muted border border-border mt-1">
+                    {answer?.studentAnswer || "No answer provided"}
+                  </p>
+                </div>
+                {question.correctAnswer && (
+                  <div>
+                    <p className="text-sm font-semibold text-muted-foreground">Expected Answer:</p>
+                    <p className="p-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-300 dark:border-green-700 mt-1">
+                      {question.correctAnswer}
+                    </p>
+                  </div>
+                )}
+                <div className="pt-2">
+                  <p className="text-sm font-semibold mb-2">Grade:</p>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min="0"
+                      max={question.marks}
+                      value={editingGrades[question.questionId] ?? answer?.manualGrade ?? ""}
+                      onChange={(e) => handleGradeChange(question.questionId, e.target.value)}
+                      placeholder="Enter marks"
+                      className="max-w-[100px]"
+                    />
+                    <span className="text-sm text-muted-foreground">/ {question.marks}</span>
+                    {editingGrades[question.questionId] !== undefined && (
+                      <Button
+                        size="sm"
+                        onClick={() => handleSaveGrade(question.questionId)}
+                        disabled={gradingInProgress}
+                      >
+                        {gradingInProgress ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
+                      </Button>
+                    )}
+                  </div>
+                  {answer?.manualGrade !== undefined && (
+                    <Badge variant="secondary" className="mt-2">
+                      Graded: {answer.manualGrade}/{question.marks}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            ) : question.questionType === 'essay' ? (
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm font-semibold text-muted-foreground">Student Answer:</p>
+                  <div className="p-3 rounded-lg bg-muted border border-border mt-1 max-h-48 overflow-y-auto">
+                    {answer?.studentAnswer || "No answer provided"}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold mb-2">Grade:</p>
+                  <div className="flex flex-col gap-2">
+                    <Input
+                      type="number"
+                      min="0"
+                      max={question.marks}
+                      value={editingGrades[question.questionId] ?? answer?.manualGrade ?? ""}
+                      onChange={(e) => handleGradeChange(question.questionId, e.target.value)}
+                      placeholder="Enter marks"
+                      className="max-w-[100px]"
+                    />
+                    {editingGrades[question.questionId] !== undefined && (
+                      <Button
+                        size="sm"
+                        onClick={() => handleSaveGrade(question.questionId)}
+                        disabled={gradingInProgress}
+                        className="max-w-[100px]"
+                      >
+                        {gradingInProgress ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save Grade"}
+                      </Button>
+                    )}
+                    <span className="text-sm text-muted-foreground">Max: {question.marks} marks</span>
+                    {answer?.manualGrade !== undefined && (
+                      <Badge variant="secondary">
+                        Graded: {answer.manualGrade}/{question.marks}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <DashboardLayout>
+        <div className="flex flex-col items-center justify-center py-12 gap-4">
+          <Alert variant="destructive" className="max-w-md">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+          <Button onClick={() => navigate(-1)}>
+            Back to Results
+          </Button>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  return (
+    <DashboardLayout>
+      <div className="space-y-6 animate-fade-in max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex-1">
+            <h1 className="text-2xl font-bold">{examTitle} - Grade</h1>
+            <p className="text-muted-foreground">
+              Student: {attemptData?.studentName} ({attemptData?.studentEmail})
+            </p>
+          </div>
+        </div>
+
+        {/* Questions and Answers */}
+        <div className="space-y-4">
+          {questions.map((question) => {
+            const answer = answers[question.questionId];
+            return renderQuestionAnswer(question, answer);
+          })}
+        </div>
+
+        <div className="flex justify-center pt-8">
+          <Button onClick={() => navigate(-1)} size="lg">
+            Back to Results
+          </Button>
+        </div>
+      </div>
+    </DashboardLayout>
+  );
+};
+
+export default AdminGradeExam;
