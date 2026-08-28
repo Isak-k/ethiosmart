@@ -446,32 +446,30 @@ const ExamResults = () => {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-primary hover:text-primary hover:bg-primary/10 rounded-full"
+                                onClick={() => navigate(`/grade-exam/${attempt.id}`)}
+                                title="Grade exam"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
                               {canDelete('manageExams') && (
-                                <>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="text-primary hover:text-primary hover:bg-primary/10 rounded-full"
-                                    onClick={() => window.location.href = `/grade-exam/${attempt.id}`}
-                                    title="Grade exam"
-                                  >
-                                    <Pencil className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full"
-                                    onClick={() => handleDeleteResult(attempt.id)}
-                                    disabled={deletingId === attempt.id}
-                                    title="Delete result"
-                                  >
-                                    {deletingId === attempt.id ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                      <Trash2 className="h-4 w-4" />
-                                    )}
-                                  </Button>
-                                </>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full"
+                                  onClick={() => handleDeleteResult(attempt.id)}
+                                  disabled={deletingId === attempt.id}
+                                  title="Delete result"
+                                >
+                                  {deletingId === attempt.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-4 w-4" />
+                                  )}
+                                </Button>
                               )}
                             </div>
                           </TableCell>
