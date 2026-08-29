@@ -133,7 +133,6 @@ const AdminGradeExam = () => {
     } finally {
       setLoading(false);
     }
-    }
   };
 
   const handleGradeChange = (questionId: string, grade: string) => {
