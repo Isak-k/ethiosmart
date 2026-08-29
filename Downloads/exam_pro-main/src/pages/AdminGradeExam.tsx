@@ -63,12 +63,6 @@ const AdminGradeExam = () => {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    if (!canGradeExams()) {
-      setError("You do not have permission to grade exams.");
-      setLoading(false);
-      return;
-    }
-
     if (attemptId && user) {
       loadGradingData();
     }
@@ -78,10 +72,18 @@ const AdminGradeExam = () => {
     try {
       if (!attemptId || !user) return;
 
+      // Check permission first
+      if (!canGradeExams()) {
+        setError("You do not have permission to grade exams.");
+        setLoading(false);
+        return;
+      }
+
       // 1. Fetch Attempt
       const attempt = await getAttempt(attemptId);
       if (!attempt) {
         setError("Attempt not found");
+        setLoading(false);
         return;
       }
 
@@ -100,6 +102,7 @@ const AdminGradeExam = () => {
       const exam = await getExam(attempt.examId);
       if (!exam) {
         setError("Exam not found");
+        setLoading(false);
         return;
       }
 
@@ -129,6 +132,7 @@ const AdminGradeExam = () => {
       setError("Failed to load exam for grading.");
     } finally {
       setLoading(false);
+    }
     }
   };
 
