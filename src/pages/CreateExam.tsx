@@ -36,6 +36,7 @@ const CreateExam = () => {
     shuffle_options: false,
     allow_offline_download: false,
     exam_type: "normal",
+    default_question_type: "mcq",
     start_time: "",
     end_time: "",
     department_id: "all",
@@ -94,6 +95,7 @@ const CreateExam = () => {
         shuffleOptions: form.shuffle_options,
         allowOfflineDownload: form.allow_offline_download,
         examType: form.exam_type,
+        defaultQuestionType: form.default_question_type,
         startTime: form.start_time ? Timestamp.fromDate(new Date(form.start_time)) : null,
         endTime: form.end_time ? Timestamp.fromDate(new Date(form.end_time)) : null,
         questionCount: 0,
@@ -262,6 +264,27 @@ const CreateExam = () => {
                 <p className="text-sm text-muted-foreground">
                   <strong>Normal:</strong> Fetches questions from Firebase, requires internet to start<br/>
                   <strong>Practice:</strong> Works 100% offline after download, shows explanations by default
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="default_question_type">Default Question Type</Label>
+                <Select 
+                  value={form.default_question_type} 
+                  onValueChange={(v) => setForm({ ...form, default_question_type: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select default question type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="mcq">Multiple Choice</SelectItem>
+                    <SelectItem value="truefalse">True/False</SelectItem>
+                    <SelectItem value="shortanswer">Short Answer</SelectItem>
+                    <SelectItem value="essay">Essay</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-muted-foreground">
+                  This will be the pre-selected type when adding new questions.
                 </p>
               </div>
 

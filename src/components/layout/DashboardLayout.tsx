@@ -1,4 +1,4 @@
-import { ReactNode, useState } from "react";
+import React, { ReactNode, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
@@ -62,15 +62,15 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     navigate("/");
   };
 
-  const studentLinks = [
+  const studentLinks = React.useMemo(() => [
     { href: "/dashboard", label: t("dashboard.menu.dashboard"), icon: LayoutDashboard },
     { href: "/dashboard/exams", label: t("dashboard.menu.availableExams"), icon: ClipboardList },
     { href: "/dashboard/results", label: t("dashboard.menu.myResults"), icon: Trophy },
     { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
     { href: "/dashboard/ai-assistant", label: t("aiAssistant.title", "AI Study Assistant"), icon: Brain, permission: 'viewAIAssistant' },
-  ];
+  ], [t]);
 
-  const allAdminLinks = [
+  const allAdminLinks = React.useMemo(() => [
     { href: "/dashboard", label: t("dashboard.menu.dashboard"), icon: LayoutDashboard, permission: 'viewDashboard' },
     { href: "/dashboard/admin/exams", label: t("dashboard.menu.manageExams"), icon: FileText, permission: 'viewAllExams' },
     { href: "/dashboard/all-results", label: t("dashboard.menu.allResults"), icon: Trophy, permission: 'viewAllResults' },
@@ -80,11 +80,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     { href: "/dashboard/leaderboard-admin", label: "Leaderboard Admin", icon: Trophy, permission: 'viewLeaderboard' },
     { href: "/dashboard/departments", label: t("dashboard.menu.departments"), icon: Building, permission: 'viewDepartments' },
     ...(isSuperAdmin ? [{ href: "/dashboard/super-admin", label: "Super Admin", icon: Shield, permission: 'viewExaminers' }] : []),
-  ];
+  ], [t, isSuperAdmin]);
 
-  const adminLinks = allAdminLinks.filter(link => 
+  const adminLinks = React.useMemo(() => allAdminLinks.filter(link => 
     !link.permission || hasPermission(link.permission as any)
-  );
+  ), [allAdminLinks, hasPermission]);
 
   const links = role === "admin" ? adminLinks : studentLinks;
 

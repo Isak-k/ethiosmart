@@ -65,8 +65,10 @@ export interface Question {
   questionId: string;
   examId: string;
   questionText: string;
-  options: string[];
-  correctOptionIndex: number;
+  questionType: 'mcq' | 'truefalse' | 'shortanswer' | 'essay'; // Question type
+  options?: string[]; // For MCQ and True/False
+  correctOptionIndex?: number; // For MCQ and True/False
+  correctAnswer?: string; // For Short Answer
   marks: number;
   orderIndex: number;
   feedbackType: 'instant' | 'hidden';
@@ -94,10 +96,14 @@ export interface ExamAttempt {
 export interface Answer {
   questionId: string;
   attemptId: string;
-  selectedOptionIndex: number | null;
-  isCorrect: boolean | null;
+  selectedOptionIndex?: number | null; // For MCQ and True/False
+  studentAnswer?: string; // For Short Answer and Essay
+  isCorrect?: boolean | null; // null for essay/short answer until manually graded
+  manualGrade?: number | null; // For manual grading of essay/short answer
   timeSpentSeconds: number | null;
   answeredAt: Timestamp | null;
+  gradedAt?: Timestamp | null; // When manually graded
+  gradedBy?: string; // Admin who graded
 }
 
 // Leaderboard Types

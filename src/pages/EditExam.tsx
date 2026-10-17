@@ -58,8 +58,10 @@ import { BulkImportQuestions } from "@/components/exam/BulkImportQuestions";
 interface Question {
   questionId?: string;
   questionText: string;
+  questionType: 'mcq' | 'truefalse' | 'shortanswer' | 'essay';
   options: string[];
   correctOptionIndex: number;
+  correctAnswer?: string;
   feedbackType: "instant" | "hidden";
   explanation?: string;
   marks: number;
@@ -81,6 +83,7 @@ interface Exam {
   accessPassword?: string | null;
   allowOfflineDownload?: boolean;
   examType?: 'normal' | 'practice';
+  defaultQuestionType?: 'mcq' | 'truefalse' | 'shortanswer' | 'essay';
 }
 
 const EditExam = () => {
@@ -155,7 +158,7 @@ const EditExam = () => {
     // Combine them and re-calculate order indices
     const allQuestions = [...dbQuestions, ...unsavedQuestions].map((q, i) => ({
       ...q,
-      orderIndex: i
+      orderIndex: i,
     }));
 
     setQuestions(allQuestions);
@@ -166,12 +169,15 @@ const EditExam = () => {
       toast({ title: "Permission Denied", description: "You cannot edit exams.", variant: "destructive" });
       return;
     }
+    const defaultType = exam?.defaultQuestionType || "mcq";
     setQuestions([
       ...questions,
       {
         questionText: "",
-        options: ["", "", "", ""],
+        questionType: defaultType,
+        options: defaultType === "mcq" ? ["", "", "", ""] : defaultType === "truefalse" ? ["True", "False"] : [],
         correctOptionIndex: 0,
+        correctAnswer: "",
         feedbackType: "hidden",
         explanation: "",
         marks: 1,
@@ -188,6 +194,16 @@ const EditExam = () => {
     const newQuestions = [...questions];
     newQuestions[index] = { ...newQuestions[index], ...updates };
     setQuestions(newQuestions);
+  };
+
+  const updateQuestionType = (index: number, type: 'mcq' | 'truefalse' | 'shortanswer' | 'essay') => {
+    const updates: Partial<Question> = {
+      questionType: type,
+      options: type === 'mcq' ? ["", "", "", ""] : type === 'truefalse' ? ["True", "False"] : [],
+      correctOptionIndex: 0,
+      correctAnswer: ""
+    };
+    updateQuestionState(index, updates);
   };
 
   const updateOption = (questionIndex: number, optionIndex: number, value: string) => {
@@ -262,13 +278,16 @@ const EditExam = () => {
 
     try {
       // Validate questions
-      const invalidQuestions = questions.filter(
-        (q) =>
-          !q.questionText.trim() ||
-          q.options.some((o) => !o.trim()) ||
-          q.correctOptionIndex < 0 ||
-          q.correctOptionIndex >= q.options.length
-      );
+      const invalidQuestions = questions.filter((q) => {
+        if (!q.questionText.trim()) return true;
+        if (q.questionType === 'mcq' || q.questionType === 'truefalse') {
+          return q.options.some((o) => !o.trim()) || q.correctOptionIndex < 0 || q.correctOptionIndex >= q.options.length;
+        }
+        if (q.questionType === 'shortanswer' && !q.correctAnswer?.trim()) {
+          return true;
+        }
+        return false;
+      });
 
       if (invalidQuestions.length > 0) {
         toast({
@@ -290,6 +309,7 @@ const EditExam = () => {
         shuffleOptions: exam.shuffleOptions,
         allowOfflineDownload: exam.allowOfflineDownload,
         examType: exam.examType,
+        defaultQuestionType: exam.defaultQuestionType,
         startTime: exam.startTime,
         endTime: exam.endTime,
         isPublished: exam.isPublished,
@@ -303,8 +323,10 @@ const EditExam = () => {
         const questionData = {
           examId: id,
           questionText: q.questionText,
+          questionType: q.questionType,
           options: q.options,
           correctOptionIndex: q.correctOptionIndex,
+          correctAnswer: q.correctAnswer || undefined,
           feedbackType: q.feedbackType,
           explanation: q.explanation || undefined,
           marks: q.marks,
@@ -759,6 +781,35 @@ const EditExam = () => {
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Question Type</Label>
+                        <Select
+                          value={question.questionType}
+                          onValueChange={(v: any) => updateQuestionType(qIndex, v)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="mcq">Multiple Choice</SelectItem>
+                            <SelectItem value="truefalse">True/False</SelectItem>
+                            <SelectItem value="shortanswer">Short Answer</SelectItem>
+                            <SelectItem value="essay">Essay</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex items-end pb-1">
+                        <span className="text-xs text-muted-foreground italic">
+                          {question.questionType === "shortanswer" || question.questionType === "essay" 
+                            ? exam?.examType === "practice" 
+                              ? "Auto-graded in this practice exam." 
+                              : "Graded manually by an admin." 
+                            : "Graded automatically."}
+                        </span>
+                      </div>
+                    </div>
+
                     <div className="space-y-2">
                       <Label>{t("admin.exams.questions.questionText")}</Label>
                       <Textarea
@@ -772,27 +823,57 @@ const EditExam = () => {
                       />
                     </div>
 
-                    <div className="space-y-3">
-                      <Label>{t("admin.exams.questions.options")}</Label>
-                      <RadioGroup
-                        value={question.correctOptionIndex.toString()}
-                        onValueChange={(v) =>
-                          updateQuestionState(qIndex, { correctOptionIndex: parseInt(v) })
-                        }
-                      >
-                        {question.options.map((option, oIndex) => (
-                          <div key={oIndex} className="flex items-center gap-3">
-                            <RadioGroupItem value={oIndex.toString()} id={`q${qIndex}-o${oIndex}`} />
-                            <Input
-                              value={option}
-                              onChange={(e) => updateOption(qIndex, oIndex, e.target.value)}
-                              placeholder={t("admin.exams.questions.optionPlaceholder", { number: oIndex + 1 })}
-                              className="input-focus flex-1"
-                            />
-                          </div>
-                        ))}
-                      </RadioGroup>
-                    </div>
+                    {(question.questionType === "mcq" || question.questionType === "truefalse") && (
+                      <div className="space-y-3">
+                        <Label>{t("admin.exams.questions.options")}</Label>
+                        <RadioGroup
+                          value={question.correctOptionIndex.toString()}
+                          onValueChange={(v) =>
+                            updateQuestionState(qIndex, { correctOptionIndex: parseInt(v) })
+                          }
+                        >
+                          {question.options.map((option, oIndex) => (
+                            <div key={oIndex} className="flex items-center gap-3">
+                              <RadioGroupItem value={oIndex.toString()} id={`q${qIndex}-o${oIndex}`} />
+                              <Input
+                                value={option}
+                                onChange={(e) => updateOption(qIndex, oIndex, e.target.value)}
+                                placeholder={t("admin.exams.questions.optionPlaceholder", { number: oIndex + 1 })}
+                                className="input-focus flex-1"
+                                disabled={question.questionType === "truefalse"}
+                              />
+                            </div>
+                          ))}
+                        </RadioGroup>
+                      </div>
+                    )}
+
+                    {question.questionType === "shortanswer" && (
+                      <div className="space-y-2">
+                        <Label>Reference Answer (for auto-grading in practice)</Label>
+                        <Input
+                          value={question.correctAnswer || ""}
+                          onChange={(e) =>
+                            updateQuestionState(qIndex, { correctAnswer: e.target.value })
+                          }
+                          placeholder="Enter the correct answer text..."
+                          className="input-focus"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Student's answer must match this exactly (case-insensitive).
+                        </p>
+                      </div>
+                    )}
+
+                    {question.questionType === "essay" && (
+                      <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                        <p className="text-sm text-amber-800 dark:text-amber-200">
+                          {exam?.examType === "practice" 
+                            ? "Essays in practice exams are marked as correct if the student provides any non-empty response."
+                            : "Essay questions require manual grading by an admin after the student submits the exam."}
+                        </p>
+                      </div>
+                    )}
 
                     <div className="space-y-3">
                       <Label>{t("admin.exams.questions.explanation")}</Label>

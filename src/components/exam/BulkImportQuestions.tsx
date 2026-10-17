@@ -15,8 +15,15 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { FileText, Upload, AlertCircle, CheckCircle2, FileUp, Sparkles, Loader2 } from "lucide-react";
-import { parseQuestions } from "@/lib/question-parser";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
+import { FileText, Upload, AlertCircle, CheckCircle2, FileUp, Sparkles, Loader2, Type } from "lucide-react";
+import { parseQuestions, QuestionType } from "@/lib/question-parser";
 import { saveQuestionsBatch } from "@/lib/firebase-exams";
 import { useToast } from "@/hooks/use-toast";
 import { Question } from "@/integrations/firebase/types";
@@ -37,6 +44,7 @@ export function BulkImportQuestions({ examId, onImportSuccess, currentQuestionCo
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
+  const [selectedType, setSelectedType] = useState<QuestionType>("auto");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -55,7 +63,7 @@ export function BulkImportQuestions({ examId, onImportSuccess, currentQuestionCo
     
     setIsAnalyzing(true);
     try {
-      const result = parseQuestions(text, t);
+      const result = parseQuestions(text, t, selectedType);
       
       setParseResult({
         count: result.questions.length,
@@ -258,16 +266,16 @@ ${pdfText.substring(0, 30000)}`; // Limit to 30k chars to avoid token limits
     setIsImporting(true);
     try {
       // Use the already parsed result instead of re-parsing to ensure consistency
-      // But re-parsing is safer if state is stale. Since we reset on text change, it's fine.
-      // However, let's use the preview data directly if available to match what user saw.
-      const questions = parseResult.preview || parseQuestions(text, t).questions;
+      const questions = parseResult.preview || parseQuestions(text, t, selectedType).questions;
       
       // Map parsed questions to Firestore schema
       const questionsToSave: Omit<Question, 'questionId' | 'createdAt'>[] = questions.map((q, index) => ({
         examId,
         questionText: q.questionText,
-        options: q.options,
+        questionType: q.questionType,
+        options: q.options || [],
         correctOptionIndex: q.correctOptionIndex,
+        correctAnswer: q.correctAnswer || undefined,
         marks: 1, // Default marks
         orderIndex: currentQuestionCount + index + 1, // Append to end
         feedbackType: 'hidden', // Default feedback
@@ -284,6 +292,7 @@ ${pdfText.substring(0, 30000)}`; // Limit to 30k chars to avoid token limits
       setOpen(false);
       setText("");
       setParseResult(null);
+      setSelectedType("auto");
       onImportSuccess();
     } catch (error) {
       console.error("Import error:", error);
@@ -334,6 +343,32 @@ ${pdfText.substring(0, 30000)}`; // Limit to 30k chars to avoid token limits
 
             <TabsContent value="manual" className="flex-1 flex flex-col space-y-4 mt-0">
               <div className="flex-1 overflow-hidden flex flex-col gap-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                  <div className="w-full sm:w-[250px] space-y-2">
+                    <Label className="text-sm font-medium flex items-center gap-2">
+                      <Type className="h-4 w-4" />
+                      Question Type
+                    </Label>
+                    <Select value={selectedType} onValueChange={(val: any) => setSelectedType(val)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto">Auto-detect Type</SelectItem>
+                        <SelectItem value="mcq">Multiple Choice</SelectItem>
+                        <SelectItem value="truefalse">True/False</SelectItem>
+                        <SelectItem value="shortanswer">Short Answer</SelectItem>
+                        <SelectItem value="essay">Essay</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="text-xs text-muted-foreground pt-2 sm:pt-6">
+                    {selectedType === 'auto' 
+                      ? "Automatically identifies types based on options and 'Answer:' tags." 
+                      : `Forces all detected questions to be ${selectedType.toUpperCase()}.`}
+                  </div>
+                </div>
+
                 {!parseResult ? (
                   <Textarea
                     placeholder={t("admin.exams.bulkImport.placeholder")}
@@ -348,30 +383,56 @@ ${pdfText.substring(0, 30000)}`; // Limit to 30k chars to avoid token limits
                      <div className="space-y-4 sm:space-y-6">
                        {parseResult.preview?.map((q, i) => (
                          <div key={i} className="bg-card border rounded-lg p-3 sm:p-4 shadow-sm">
+                           <div className="flex items-center gap-2 mb-2">
+                             <span className="text-xs font-bold uppercase px-2 py-0.5 rounded bg-muted text-muted-foreground">
+                               {q.questionType}
+                             </span>
+                             <span className="text-muted-foreground text-sm font-medium">Question {i + 1}</span>
+                           </div>
                            <div className="font-semibold mb-2 flex gap-2 text-sm sm:text-base">
-                             <span className="text-muted-foreground">{i + 1}.</span>
                              <span>{q.questionText}</span>
                            </div>
-                           <div className="grid gap-2 pl-4 sm:pl-6">
-                             {q.options.map((opt: string, optIndex: number) => (
-                               <div 
-                                 key={optIndex} 
-                                 className={`text-xs sm:text-sm p-2 rounded border flex items-center gap-2 ${
-                                   optIndex === q.correctOptionIndex 
-                                     ? "bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300 font-medium" 
-                                     : "border-transparent bg-muted/50"
-                                 }`}
-                               >
-                                 <span className="w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center rounded-full border text-xs bg-background flex-shrink-0">
-                                   {String.fromCharCode(65 + optIndex)}
-                                 </span>
-                                 <span className="flex-1">{opt}</span>
-                                 {optIndex === q.correctOptionIndex && (
-                                   <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                                 )}
+
+                           {(q.questionType === 'mcq' || q.questionType === 'truefalse') && (
+                             <div className="grid gap-2 pl-4 sm:pl-6">
+                               {q.options.map((opt: string, optIndex: number) => (
+                                 <div 
+                                   key={optIndex} 
+                                   className={`text-xs sm:text-sm p-2 rounded border flex items-center gap-2 ${
+                                     optIndex === q.correctOptionIndex 
+                                       ? "bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300 font-medium" 
+                                       : "border-transparent bg-muted/50"
+                                   }`}
+                                 >
+                                   <span className="w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center rounded-full border text-xs bg-background flex-shrink-0">
+                                     {String.fromCharCode(65 + optIndex)}
+                                   </span>
+                                   <span className="flex-1">{opt}</span>
+                                   {optIndex === q.correctOptionIndex && (
+                                     <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                                   )}
+                                 </div>
+                               ))}
+                             </div>
+                           )}
+
+                           {q.questionType === 'shortanswer' && (
+                             <div className="mt-2 pl-4 sm:pl-6">
+                               <div className="text-xs sm:text-sm p-2 rounded border bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300 font-medium flex items-center gap-2">
+                                 <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                                 <span>Reference Answer: {q.correctAnswer}</span>
                                </div>
-                             ))}
-                           </div>
+                             </div>
+                           )}
+
+                           {q.questionType === 'essay' && (
+                             <div className="mt-2 pl-4 sm:pl-6">
+                               <div className="text-xs sm:text-sm p-2 rounded border bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300 italic">
+                                 Essay question - will require manual grading.
+                               </div>
+                             </div>
+                           )}
+
                            {q.explanation && (
                              <div className="mt-2 text-xs sm:text-sm text-muted-foreground italic pl-4 sm:pl-6 border-l-2 border-muted">
                                <span className="font-semibold not-italic mr-1">{t("admin.exams.bulkImport.explanation")}</span>

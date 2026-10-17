@@ -68,7 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loadingTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   const cleanupListenerRef = React.useRef<(() => void) | null>(null);
 
-  const refreshProfile = async () => {
+  const refreshProfile = React.useCallback(async () => {
     if (!user) return;
     
     const [userProfile, userRole] = await Promise.all([
@@ -78,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     setProfile(userProfile);
     setRole(userRole);
-  };
+  }, [user]);
 
   useEffect(() => {
     // Initialize offline state on app start
@@ -183,19 +183,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []); // Empty dependency array - only run once
 
+  const value = React.useMemo(() => ({ 
+    user, 
+    session, 
+    profile, 
+    role, 
+    loading, 
+    isOfflineMode,
+    offlineModeInfo,
+    refreshProfile 
+  }), [user, session, profile, role, loading, isOfflineMode, offlineModeInfo, refreshProfile]);
+
   return (
-    <AuthContext.Provider 
-      value={{ 
-        user, 
-        session, 
-        profile, 
-        role, 
-        loading, 
-        isOfflineMode,
-        offlineModeInfo,
-        refreshProfile 
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

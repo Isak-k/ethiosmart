@@ -76,6 +76,13 @@ export function useGranularPermissions() {
     return hasPermission('viewAIAssistant');
   };
 
+  /**
+   * Check if user can grade exams
+   */
+  const canGradeExams = (): boolean => {
+    return hasPermission('gradeExams');
+  };
+
   return {
     hasPermission,
     canViewAllResults,
@@ -85,5 +92,6 @@ export function useGranularPermissions() {
     canExportResults,
     canViewFeedback,
     canViewAIAssistant,
+    canGradeExams,
   };
 }

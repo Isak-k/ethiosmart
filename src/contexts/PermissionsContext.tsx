@@ -1,4 +1,4 @@
-import { createContext, useContext, ReactNode } from 'react';
+import React, { createContext, useContext, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { 
   UserPermissions, 
@@ -34,37 +34,37 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
     : (profile?.permissions ?? DEFAULT_PERMISSIONS);
 
   // Check if user has a specific permission
-  const hasPermission = (permission: PermissionKey): boolean => {
+  const hasPermission = React.useCallback((permission: PermissionKey): boolean => {
     if (isSuperAdmin) return true; // Super admin has all permissions
     if (!isAdmin) return false; // Students have no admin permissions
     return permissions[permission] === true;
-  };
+  }, [isSuperAdmin, isAdmin, permissions]);
 
   // Check if user has any of the specified permissions
-  const hasAnyPermission = (permissionKeys: PermissionKey[]): boolean => {
+  const hasAnyPermission = React.useCallback((permissionKeys: PermissionKey[]): boolean => {
     if (isSuperAdmin) return true;
     if (!isAdmin) return false;
     return permissionKeys.some(key => permissions[key] === true);
-  };
+  }, [isSuperAdmin, isAdmin, permissions]);
 
   // Check if user has all of the specified permissions
-  const hasAllPermissions = (permissionKeys: PermissionKey[]): boolean => {
+  const hasAllPermissions = React.useCallback((permissionKeys: PermissionKey[]): boolean => {
     if (isSuperAdmin) return true;
     if (!isAdmin) return false;
     return permissionKeys.every(key => permissions[key] === true);
-  };
+  }, [isSuperAdmin, isAdmin, permissions]);
+
+  const value = React.useMemo(() => ({
+    permissions,
+    hasPermission,
+    hasAnyPermission,
+    hasAllPermissions,
+    isSuperAdmin,
+    isAdmin,
+  }), [permissions, hasPermission, hasAnyPermission, hasAllPermissions, isSuperAdmin, isAdmin]);
 
   return (
-    <PermissionsContext.Provider
-      value={{
-        permissions,
-        hasPermission,
-        hasAnyPermission,
-        hasAllPermissions,
-        isSuperAdmin,
-        isAdmin,
-      }}
-    >
+    <PermissionsContext.Provider value={value}>
       {children}
     </PermissionsContext.Provider>
   );

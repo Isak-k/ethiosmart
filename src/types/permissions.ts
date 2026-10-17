@@ -17,6 +17,7 @@ export interface UserPermissions {
   viewExamResults: boolean;
   deleteResults: boolean;
   exportResults: boolean;
+  gradeExams: boolean;
   
   // Student Management (Full CRUD)
   viewStudents: boolean;
@@ -74,6 +75,7 @@ export const DEFAULT_PERMISSIONS: UserPermissions = {
   viewExamResults: false,
   deleteResults: false,
   exportResults: true,
+  gradeExams: true,
   viewFeedback: false,
   replyFeedback: false,
   deleteFeedback: false,
@@ -109,6 +111,7 @@ export const RESTRICTED_PERMISSIONS: UserPermissions = {
   viewExamResults: false,
   deleteResults: false,
   exportResults: false,
+  gradeExams: false,
   viewFeedback: false,
   replyFeedback: false,
   deleteFeedback: false,
@@ -143,6 +146,7 @@ export const FULL_ADMIN_PERMISSIONS: UserPermissions = {
   viewExamResults: false,
   deleteResults: false,
   exportResults: true,
+  gradeExams: true,
   viewFeedback: false,
   replyFeedback: false,
   deleteFeedback: false,
@@ -171,6 +175,7 @@ export const SUPER_ADMIN_PERMISSIONS: UserPermissions = {
   enableDisableExaminers: true,
   viewExamResults: true,
   deleteResults: true,
+  gradeExams: true,
 };
 
 export const PERMISSION_LABELS: Record<PermissionKey, string> = {
@@ -194,6 +199,7 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   viewExamResults: 'View Exam Results',
   deleteResults: 'Delete Results',
   exportResults: 'Export Results',
+  gradeExams: 'Grade Exams',
   viewFeedback: 'View Feedback',
   replyFeedback: 'Reply to Feedback',
   deleteFeedback: 'Delete Feedback',
@@ -235,6 +241,7 @@ export const PERMISSION_GROUPS = {
     'viewExamResults',
     'deleteResults',
     'exportResults',
+    'gradeExams',
   ] as PermissionKey[],
   'Feedback': [
     'viewFeedback',

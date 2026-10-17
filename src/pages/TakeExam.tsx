@@ -142,19 +142,12 @@ const TakeExam = () => {
     };
   }, []);
 
-  // Load exam on mount
-  useEffect(() => {
-    if (id && user) {
-      loadExamAndCheckAttempts();
-    }
-  }, [id, user]);
-
   // ============== Load & Initialize ==============
 
   /**
    * Load exam and check for existing attempts
    */
-  const loadExamAndCheckAttempts = async () => {
+  const loadExamAndCheckAttempts = useCallback(async () => {
     if (!user || !id) return;
 
     try {
@@ -235,7 +228,14 @@ const TakeExam = () => {
       });
       setLoading(false);
     }
-  };
+  }, [id, user, navigate, toast]);
+
+  // Load exam on mount
+  useEffect(() => {
+    if (id && user) {
+      loadExamAndCheckAttempts();
+    }
+  }, [id, user, loadExamAndCheckAttempts]);
 
   /**
    * Load exam data (offline-first for practice, Firebase-first for normal)

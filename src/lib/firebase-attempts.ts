@@ -236,3 +236,20 @@ export async function deleteAttempt(attemptId: string) {
   const docRef = doc(db, 'examAttempts', attemptId);
   await deleteDoc(docRef);
 }
+
+
+export async function saveAnswerGrade(
+  attemptId: string,
+  questionId: string,
+  manualGrade: number,
+  isCorrect: boolean,
+  gradedBy?: string
+) {
+  const docRef = doc(db, 'examAttempts', attemptId, 'answers', questionId);
+  await updateDoc(docRef, {
+    manualGrade,
+    isCorrect,
+    gradedAt: serverTimestamp(),
+    gradedBy: gradedBy || 'admin'
+  });
+}

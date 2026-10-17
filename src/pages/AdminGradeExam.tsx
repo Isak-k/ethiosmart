@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { getExam } from "@/lib/firebase-exams";
-import { getAttempt, getAnswers, saveAnswerGrade, deleteAttempt } from "@/lib/firebase-attempts";
+import { getAttempt, getAnswers, saveAnswerGrade } from "@/lib/firebase-attempts";
+import { deleteAttemptProtected } from "@/lib/firebase-admin-protected";
 import { getQuestions } from "@/lib/firebase-exams";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
@@ -47,10 +48,13 @@ interface AttemptData {
 
 const AdminGradeExam = () => {
   const { attemptId } = useParams<{ attemptId: string }>();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
   const { canGradeExams } = useGranularPermissions();
   
+  // Any admin can delete results
+  const canDeleteResults = profile?.role === 'admin' || profile?.role === 'superadmin' || user?.email === 'isak@gmail.com';
+
   const [loading, setLoading] = useState(true);
   const [examTitle, setExamTitle] = useState("");
   const [questions, setQuestions] = useState<QuestionData[]>([]);
@@ -189,11 +193,23 @@ const AdminGradeExam = () => {
   };
 
   const handleDeleteAttempt = async () => {
-    if (!attemptId) return;
+    if (!attemptId || !user || !canDeleteResults) return;
 
     setDeleting(true);
     try {
-      await deleteAttempt(attemptId);
+      // Convert profile to UserProfile format for the protected function
+      const userProfile = profile ? {
+        userId: profile.id || user.uid,
+        email: user.email || profile.email || '',
+        fullName: profile.full_name || '',
+        avatarUrl: profile.avatar_url || null,
+        role: profile.role as any,
+        permissions: (profile as any).permissions,
+        createdAt: new Date() as any,
+        updatedAt: new Date() as any,
+      } : null;
+
+      await deleteAttemptProtected(userProfile, attemptId);
       toast({
         title: "Result deleted",
         description: `${attemptData?.studentName}'s exam result has been permanently deleted.`,
@@ -203,11 +219,11 @@ const AdminGradeExam = () => {
       setTimeout(() => {
         navigate(-1);
       }, 1000);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error deleting attempt:", err);
       toast({
         title: "Error",
-        description: "Failed to delete exam result",
+        description: err.message || "Failed to delete exam result",
         variant: "destructive",
       });
     } finally {
@@ -545,15 +561,17 @@ const AdminGradeExam = () => {
               </p>
             </div>
           </div>
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={() => setShowDeleteConfirm(true)}
-            disabled={deleting}
-          >
-            <Trash2 className="w-4 h-4 mr-2" />
-            Delete Result
-          </Button>
+          {canDeleteResults && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={deleting}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete Result
+            </Button>
+          )}
         </div>
 
         {/* Questions and Answers */}

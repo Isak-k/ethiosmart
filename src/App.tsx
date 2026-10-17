@@ -24,6 +24,7 @@ import AdminFeedback from "./pages/AdminFeedback";
 import AdminAnalytics from "./pages/AdminAnalytics";
 import AdminLeaderboardSimple from "./pages/AdminLeaderboardSimple";
 import AdminAllResults from "./pages/AdminAllResults";
+import AdminGradeExam from "./pages/AdminGradeExam";
 import StudentExams from "./pages/StudentExams";
 import StudentResults from "./pages/StudentResults";
 import StudentMessages from "./pages/StudentMessages";
@@ -144,6 +145,11 @@ function AppRoutes() {
         <Route path="/dashboard/all-results" element={
           <ProtectedRoute allowedRoles={["admin"]}>
             <AdminAllResults />
+          </ProtectedRoute>
+        } />
+        <Route path="/dashboard/admin/grade/:attemptId" element={
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <AdminGradeExam />
           </ProtectedRoute>
         } />
         <Route path="/dashboard/analytics" element={
