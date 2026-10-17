@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { User, onAuthStateChanged } from "firebase/auth";
-import { auth } from "@/integrations/firebase/client";
+import { auth, isFirebaseConfigured } from "@/integrations/firebase/client";
 import { getUserRole, getUserProfile, AppRole } from "@/lib/auth";
 import { UserPermissions } from "@/types/permissions";
 import { 
@@ -117,6 +117,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setOfflineModeInfo(getOfflineModeInfo());
         }
       );
+    }
+
+    if (!isFirebaseConfigured || !auth) {
+      console.warn('Firebase is not configured. Continuing in guest mode without auth.');
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
+      }
+      setUser(null);
+      setSession(null);
+      setProfile(null);
+      setRole(null);
+      setLoading(false);
+      globalAuthInitialized = true;
+      return () => {
+        if (loadingTimeoutRef.current) {
+          clearTimeout(loadingTimeoutRef.current);
+        }
+        if (cleanupListenerRef.current) {
+          cleanupListenerRef.current();
+        }
+      };
     }
 
     // Firebase auth state listener
