@@ -342,23 +342,63 @@ export async function deleteQuestion(examId: string, questionId: string) {
   await updateExamStats(examId);
 }
 
-export async function saveQuestionsBatch(examId: string, questions: Omit<Question, 'questionId' | 'createdAt'>[]) {
-  const batch = writeBatch(db);
-  
-  questions.forEach(questionData => {
-    // Create a reference with an auto-generated ID in the questions subcollection
-    const newDocRef = doc(collection(db, 'exams', examId, 'questions'));
-    
-    batch.set(newDocRef, {
-      ...questionData,
-      createdAt: Timestamp.now()
-    });
+function questionImportFingerprint(question: Pick<Question, 'questionText' | 'questionType' | 'options' | 'correctOptionIndex' | 'correctAnswer' | 'explanation'>): string {
+  const normalize = (value: string | undefined) =>
+    (value || '').normalize('NFC').trim().replace(/\s+/g, ' ');
+  return JSON.stringify([
+    normalize(question.questionText),
+    question.questionType,
+    (question.options || []).map(normalize),
+    question.correctOptionIndex ?? null,
+    normalize(question.correctAnswer),
+    normalize(question.explanation),
+  ]);
+}
+
+export async function saveQuestionsBatch(
+  examId: string,
+  questions: Omit<Question, 'questionId' | 'createdAt'>[]
+): Promise<{ addedCount: number; skippedCount: number }> {
+  const existingQuestions = await getQuestions(examId);
+  const fingerprints = new Set(existingQuestions.map(questionImportFingerprint));
+  const uniqueQuestions = questions.filter((question) => {
+    const fingerprint = questionImportFingerprint(question);
+    if (fingerprints.has(fingerprint)) return false;
+    fingerprints.add(fingerprint);
+    return true;
   });
 
-  await batch.commit();
+  if (uniqueQuestions.length === 0) {
+    return { addedCount: 0, skippedCount: questions.length };
+  }
+
+  const nextOrderIndex = existingQuestions.reduce(
+    (max, question) => Math.max(max, Number(question.orderIndex) || 0),
+    0
+  ) + 1;
+  const batchSize = 450;
+  for (let offset = 0; offset < uniqueQuestions.length; offset += batchSize) {
+    const batch = writeBatch(db);
+    const chunk = uniqueQuestions.slice(offset, offset + batchSize);
+
+    chunk.forEach((questionData, index) => {
+      const newDocRef = doc(collection(db, 'exams', examId, 'questions'));
+      const sanitizedQuestion = Object.fromEntries(
+        Object.entries(questionData).filter(([, value]) => value !== undefined)
+      );
+      batch.set(newDocRef, {
+        ...sanitizedQuestion,
+        orderIndex: nextOrderIndex + offset + index,
+        createdAt: Timestamp.now()
+      });
+    });
+
+    await batch.commit();
+  }
   
   // Update exam stats
   await updateExamStats(examId);
+  return { addedCount: uniqueQuestions.length, skippedCount: questions.length - uniqueQuestions.length };
 }
 
 // Helper function to update exam statistics
