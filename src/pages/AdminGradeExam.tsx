@@ -160,16 +160,17 @@ const AdminGradeExam = () => {
     setGradingInProgress(true);
     try {
       const isCorrect = grade === question.marks;
-      await saveAnswerGrade(attemptId, questionId, grade, isCorrect, user?.uid);
+      const updatedScore = await saveAnswerGrade(attemptId, questionId, grade, isCorrect, user?.uid);
+      setAttemptData(current => current ? { ...current, ...updatedScore } : current);
 
-      setAnswers({
-        ...answers,
+      setAnswers(current => ({
+        ...current,
         [questionId]: {
-          ...answers[questionId],
+          ...current[questionId],
           manualGrade: grade,
           isCorrect: isCorrect,
         },
-      });
+      }));
 
       setEditingGrades({
         ...editingGrades,
@@ -558,6 +559,7 @@ const AdminGradeExam = () => {
               <h1 className="text-2xl font-bold">{examTitle} - Grade</h1>
               <p className="text-muted-foreground">
                 Student: {attemptData?.studentName} ({attemptData?.studentEmail})
+                {attemptData && ` · Overall score: ${attemptData.totalScore}/${attemptData.maxScore}`}
               </p>
             </div>
           </div>

@@ -13,10 +13,12 @@ import {
   serverTimestamp,
   getDocFromCache,
   getDocsFromCache,
-  deleteDoc
+  deleteDoc,
+  writeBatch
 } from 'firebase/firestore';
 import { db } from '@/integrations/firebase/client';
 import { ExamAttempt, Answer, Question } from '@/integrations/firebase/types';
+import { getQuestions } from '@/lib/firebase-exams';
 
 export async function createAttempt(
   examId: string,
@@ -215,21 +217,26 @@ export async function submitAttempt(
   });
 }
 
-export async function calculateScore(attemptId: string, questions: Question[]): Promise<{ totalScore: number; maxScore: number }> {
-  const answers = await getAnswers(attemptId);
-  
+export function calculateScoreFromAnswers(questions: Question[], answers: Answer[]): { totalScore: number; maxScore: number } {
   let totalScore = 0;
   let maxScore = 0;
   
   for (const question of questions) {
-    maxScore += question.marks;
+    maxScore += question.marks || 0;
     const answer = answers.find(a => a.questionId === question.questionId);
-    if (answer?.isCorrect) {
-      totalScore += question.marks;
+    if (typeof answer?.manualGrade === 'number') {
+      totalScore += answer.manualGrade;
+    } else if (answer?.isCorrect) {
+      totalScore += question.marks || 0;
     }
   }
   
   return { totalScore, maxScore };
+}
+
+export async function calculateScore(attemptId: string, questions: Question[]): Promise<{ totalScore: number; maxScore: number }> {
+  const answers = await getAnswers(attemptId);
+  return calculateScoreFromAnswers(questions, answers);
 }
 
 export async function deleteAttempt(attemptId: string) {
@@ -244,12 +251,31 @@ export async function saveAnswerGrade(
   manualGrade: number,
   isCorrect: boolean,
   gradedBy?: string
-) {
-  const docRef = doc(db, 'examAttempts', attemptId, 'answers', questionId);
-  await updateDoc(docRef, {
+) : Promise<{ totalScore: number; maxScore: number }> {
+  const attemptRef = doc(db, 'examAttempts', attemptId);
+  const attempt = await getAttempt(attemptId);
+  if (!attempt) throw new Error('Exam attempt not found');
+
+  const [questions, existingAnswers] = await Promise.all([
+    getQuestions(attempt.examId),
+    getAnswers(attemptId),
+  ]);
+  const answers = existingAnswers.filter(answer => answer.questionId !== questionId);
+  answers.push({ questionId, attemptId, manualGrade, isCorrect } as Answer);
+  const score = calculateScoreFromAnswers(questions, answers);
+
+  const batch = writeBatch(db);
+  const answerRef = doc(db, 'examAttempts', attemptId, 'answers', questionId);
+  batch.set(answerRef, {
+    questionId,
+    attemptId,
     manualGrade,
     isCorrect,
     gradedAt: serverTimestamp(),
     gradedBy: gradedBy || 'admin'
-  });
+  }, { merge: true });
+  batch.update(attemptRef, score);
+  await batch.commit();
+
+  return score;
 }
