@@ -291,7 +291,7 @@ export async function getPublishedExams(studentDepartmentId?: string): Promise<E
 // Question management
 export async function addQuestion(examId: string, questionData: Omit<Question, 'questionId' | 'createdAt'>) {
   const question = {
-    ...questionData,
+    ...Object.fromEntries(Object.entries(questionData).filter(([, value]) => value !== undefined)),
     createdAt: Timestamp.now()
   };
   
@@ -318,7 +318,15 @@ export async function getQuestions(examId: string): Promise<Question[]> {
 
 export async function updateQuestion(examId: string, questionId: string, updates: Partial<Question>) {
   const docRef = doc(db, 'exams', examId, 'questions', questionId);
-  await updateDoc(docRef, updates);
+  const payload: Record<string, any> = {};
+  Object.entries(updates).forEach(([key, value]) => {
+    if (value !== undefined) {
+      payload[key] = value;
+    } else if (['correctAnswer', 'explanation', 'options', 'correctOptionIndex'].includes(key)) {
+      payload[key] = deleteField();
+    }
+  });
+  await updateDoc(docRef, payload);
   
   // Update exam stats if marks changed
   if (updates.marks !== undefined) {
