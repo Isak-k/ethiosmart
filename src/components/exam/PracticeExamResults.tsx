@@ -293,12 +293,12 @@ export function PracticeExamResults({
                             </p>
                             <p className="text-sm mt-2">
                               <span className="font-medium">Your answer:</span>{' '}
-                              {question.options[answer.selectedOptionIndex]}
+                              {answer.studentAnswer || question.options?.[answer.selectedOptionIndex] || 'No answer provided'}
                             </p>
-                            {!answer.isCorrect && (
+                            {!answer.isCorrect && question.questionType !== 'shortanswer' && question.questionType !== 'essay' && (
                               <p className="text-sm mt-1">
                                 <span className="font-medium">Correct answer:</span>{' '}
-                                {question.options[question.correctOptionIndex]}
+                                {question.options?.[question.correctOptionIndex] || 'Not available'}
                               </p>
                             )}
                           </>

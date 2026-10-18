@@ -27,6 +27,7 @@ export interface PracticeAnswer {
   attemptId: string;
   questionId: string;
   selectedOptionIndex: number;
+  studentAnswer?: string;
   isCorrect: boolean;
   marks: number;
 }
@@ -120,7 +121,8 @@ export async function savePracticeAnswer(
   questionId: string,
   selectedOptionIndex: number,
   isCorrect: boolean,
-  marks: number
+  marks: number,
+  studentAnswer?: string
 ): Promise<void> {
   const db = await initPracticeStores();
 
@@ -130,12 +132,26 @@ export async function savePracticeAnswer(
     selectedOptionIndex,
     isCorrect,
     marks,
+    ...(studentAnswer !== undefined && { studentAnswer }),
   };
 
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(PRACTICE_ANSWERS_STORE, 'readwrite');
     const store = transaction.objectStore(PRACTICE_ANSWERS_STORE);
     const request = store.put(answer);
+
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve();
+  });
+}
+
+export async function deletePracticeAnswer(attemptId: string, questionId: string): Promise<void> {
+  const db = await initPracticeStores();
+
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(PRACTICE_ANSWERS_STORE, 'readwrite');
+    const store = transaction.objectStore(PRACTICE_ANSWERS_STORE);
+    const request = store.delete([attemptId, questionId]);
 
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve();

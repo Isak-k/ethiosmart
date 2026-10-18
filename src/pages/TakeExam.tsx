@@ -20,7 +20,7 @@ import {
   saveOfflineAnswer, 
   initOfflineDB 
 } from "@/lib/offline-storage";
-import { submitPracticeExam, savePracticeAnswer, createPracticeAttempt } from "@/lib/offline-practice-exam";
+import { submitPracticeExam, savePracticeAnswer, getPracticeAnswers, deletePracticeAnswer, createPracticeAttempt } from "@/lib/offline-practice-exam";
 import { 
   calculatePracticeModeResult, 
   convertToPracticeQuestions 
@@ -38,6 +38,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -105,7 +106,7 @@ const TakeExam = () => {
   
   // Exam progression
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [answers, setAnswers] = useState<Map<string, number | null>>(new Map());
+  const [answers, setAnswers] = useState<Map<string, number | string | null>>(new Map());
   const [flaggedQuestions, setFlaggedQuestions] = useState<Set<string>>(new Set());
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [startedAt, setStartedAt] = useState<Date | null>(null);
@@ -182,7 +183,7 @@ const TakeExam = () => {
         }
 
         // Load previous answers
-        await loadPreviousAnswers(incompleteAttempt.attemptId);
+        await loadPreviousAnswers(incompleteAttempt.attemptId, loadedExam.examType === 'practice');
         setViewMode('exam');
       } else {
         // New exam - start with empty answers
@@ -312,13 +313,27 @@ const TakeExam = () => {
   /**
    * Load previous answers for resumed attempt
    */
-  const loadPreviousAnswers = async (attemptIdParam: string) => {
+  const loadPreviousAnswers = async (attemptIdParam: string, isPractice: boolean) => {
     try {
+      if (isPractice) {
+        const practiceAnswers = await getPracticeAnswers(attemptIdParam);
+        const answersMap = new Map<string, number | string | null>();
+        practiceAnswers.forEach((answer) => {
+          if (answer.studentAnswer !== undefined) {
+            answersMap.set(answer.questionId, answer.studentAnswer);
+          } else if (answer.selectedOptionIndex >= 0) {
+            answersMap.set(answer.questionId, answer.selectedOptionIndex);
+          }
+        });
+        setAnswers(answersMap);
+        return;
+      }
+
       const existingAnswers = await getAnswers(attemptIdParam);
-      const answersMap = new Map<string, number | null>();
+      const answersMap = new Map<string, number | string | null>();
       
       existingAnswers?.forEach((a: any) => {
-        answersMap.set(a.questionId, a.selectedOptionIndex ?? null);
+        answersMap.set(a.questionId, a.studentAnswer ?? a.selectedOptionIndex ?? null);
       });
       
       setAnswers(answersMap);
@@ -326,10 +341,10 @@ const TakeExam = () => {
       console.warn("Failed to load previous answers:", error);
       try {
         const offlineAnswers = await getOfflineAnswers(attemptIdParam);
-        const answersMap = new Map<string, number | null>();
+        const answersMap = new Map<string, number | string | null>();
         
         offlineAnswers?.forEach((a: any) => {
-          answersMap.set(a.questionId, a.selectedOptionIndex ?? null);
+          answersMap.set(a.questionId, a.studentAnswer ?? a.selectedOptionIndex ?? null);
         });
         
         setAnswers(answersMap);
@@ -505,6 +520,39 @@ const TakeExam = () => {
     }
   }, [attemptId, answers, questions, examType]);
 
+  const handleTextAnswerChange = useCallback((questionId: string, answer: string) => {
+    setAnswers((previous) => new Map(previous).set(questionId, answer));
+  }, []);
+
+  const saveTextAnswer = useCallback(async (questionId: string, answer: string) => {
+    if (!attemptId) return;
+
+    const question = questions.find((item) => item.questionId === questionId);
+    if (examType === 'practice') {
+      if (answer.trim()) {
+        await savePracticeAnswer(attemptId, questionId, -1, false, question?.marks || 0, answer);
+      } else {
+        await deletePracticeAnswer(attemptId, questionId);
+      }
+      return;
+    }
+
+    const answerData = {
+      selectedOptionIndex: null,
+      studentAnswer: answer,
+      isCorrect: null,
+      timeSpentSeconds: null,
+      answeredAt: null,
+    };
+
+    try {
+      await saveAnswer(attemptId, questionId, answerData);
+    } catch (error) {
+      console.warn("Firebase save failed, saving offline:", error);
+      await saveOfflineAnswer(attemptId, questionId, answerData);
+    }
+  }, [attemptId, examType, questions]);
+
   // ============== Submit Exam ==============
 
   const submitExam = async () => {
@@ -513,6 +561,13 @@ const TakeExam = () => {
     setSubmitting(true);
 
     try {
+      await Promise.all(questions.map(async (question) => {
+        const answer = answers.get(question.questionId);
+        if ((question.questionType === 'shortanswer' || question.questionType === 'essay') && typeof answer === 'string') {
+          await saveTextAnswer(question.questionId, answer);
+        }
+      }));
+
       const timeSpent = Math.floor((new Date().getTime() - startedAt.getTime()) / 1000);
 
       if (examType === 'practice') {
@@ -644,6 +699,7 @@ const TakeExam = () => {
         try {
           await saveAnswer(attemptId, questionId, {
             selectedOptionIndex: null,
+            studentAnswer: "",
             isCorrect: false,
             timeSpentSeconds: null,
             answeredAt: null
@@ -652,6 +708,7 @@ const TakeExam = () => {
           console.warn("Firebase save failed, saving offline:", error);
           await saveOfflineAnswer(attemptId, questionId, {
             selectedOptionIndex: null,
+            studentAnswer: "",
             isCorrect: false,
             timeSpentSeconds: null,
             answeredAt: null
@@ -692,7 +749,9 @@ const TakeExam = () => {
   if (!exam) return null;
 
   const currentQuestion = questions[currentIndex];
-  const answeredCount = Array.from(answers.values()).filter(v => v !== null).length;
+  const answeredCount = Array.from(answers.values()).filter((value) =>
+    typeof value === 'string' ? value.trim().length > 0 : value !== null
+  ).length;
   const progress = (answeredCount / questions.length) * 100;
 
   return (
@@ -818,19 +877,47 @@ const TakeExam = () => {
             <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
               <div className="flex-1 min-w-0">
                 {/* Question Card */}
-                <QuestionCard
-                  questionNumber={currentIndex + 1}
-                  questionText={currentQuestion.questionText}
-                  options={currentQuestion.options}
-                  selectedOption={answers.get(currentQuestion.questionId) ?? null}
-                  correctOption={currentQuestion.correctOptionIndex}
-                  feedbackType={currentQuestion.feedbackType}
-                  isSubmitted={false}
-                  onSelectOption={(index) => handleSelectOption(currentQuestion.questionId, index)}
-                  marks={currentQuestion.marks}
-                  explanation={currentQuestion.explanation}
-                  mode={practiceMode || 'exam'}  // For normal exams (practiceMode is null), use 'exam' (no feedback)
-                />
+                {currentQuestion.questionType === 'shortanswer' || currentQuestion.questionType === 'essay' ? (
+                  <div className="animate-fade-in space-y-5 border-y bg-card px-3 py-5 sm:space-y-6 sm:rounded-xl sm:border sm:p-6">
+                    <div className="flex items-start gap-3 sm:gap-4">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 font-display font-semibold text-primary">
+                        {currentIndex + 1}
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-base font-medium leading-relaxed sm:text-lg">{currentQuestion.questionText}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {t("student.exam.card.marks", { count: currentQuestion.marks })}
+                          {' · '}{currentQuestion.questionType === 'essay' ? 'Essay' : 'Short answer'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="space-y-2 sm:pl-14">
+                      <Label htmlFor={`answer-${currentQuestion.questionId}`}>Your answer</Label>
+                      <Textarea
+                        id={`answer-${currentQuestion.questionId}`}
+                        value={typeof answers.get(currentQuestion.questionId) === 'string' ? answers.get(currentQuestion.questionId) as string : ''}
+                        onChange={(event) => handleTextAnswerChange(currentQuestion.questionId, event.target.value)}
+                        onBlur={(event) => saveTextAnswer(currentQuestion.questionId, event.target.value).catch((error) => console.error("Error saving written answer:", error))}
+                        placeholder={currentQuestion.questionType === 'essay' ? 'Write your essay here...' : 'Type your answer here...'}
+                        className={currentQuestion.questionType === 'essay' ? 'min-h-48 resize-y' : 'min-h-28 resize-y'}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <QuestionCard
+                    questionNumber={currentIndex + 1}
+                    questionText={currentQuestion.questionText}
+                    options={currentQuestion.options || []}
+                    selectedOption={typeof answers.get(currentQuestion.questionId) === 'number' ? answers.get(currentQuestion.questionId) as number : null}
+                    correctOption={currentQuestion.correctOptionIndex}
+                    feedbackType={currentQuestion.feedbackType}
+                    isSubmitted={false}
+                    onSelectOption={(index) => handleSelectOption(currentQuestion.questionId, index)}
+                    marks={currentQuestion.marks}
+                    explanation={currentQuestion.explanation}
+                    mode={practiceMode || 'exam'}
+                  />
+                )}
 
                 {/* Clear Answer Button - Hidden in practice mode, 30% smaller, 7px gap to Previous */}
                 {examType !== 'practice' || practiceMode !== 'practice' ? (
