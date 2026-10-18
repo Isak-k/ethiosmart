@@ -1,28 +1,20 @@
 import { describe, it, expect } from 'vitest';
 import { getFirebaseConfig } from './client';
 
-describe('Firebase configuration guard', () => {
-  it('returns null when Firebase environment variables are missing', () => {
-    const originalEnv = { ...import.meta.env };
+describe('Firebase configuration', () => {
+  it('uses the supplied project config when environment variables are missing', () => {
+    expect(getFirebaseConfig({})).toEqual({
+      apiKey: 'AIzaSyA5UNpm_8VghlXdPuvo0UhETORUKitJmo4',
+      authDomain: 'online-exam-f443c.firebaseapp.com',
+      projectId: 'online-exam-f443c',
+      storageBucket: 'online-exam-f443c.firebasestorage.app',
+      messagingSenderId: '644701231968',
+      appId: '1:644701231968:web:b0fda80164111cbd11dc05',
+    });
+  });
 
-    try {
-      // @ts-expect-error override for test
-      import.meta.env.VITE_FIREBASE_API_KEY = 'undefined';
-      // @ts-expect-error override for test
-      import.meta.env.VITE_FIREBASE_AUTH_DOMAIN = 'undefined';
-      // @ts-expect-error override for test
-      import.meta.env.VITE_FIREBASE_PROJECT_ID = 'undefined';
-      // @ts-expect-error override for test
-      import.meta.env.VITE_FIREBASE_STORAGE_BUCKET = 'undefined';
-      // @ts-expect-error override for test
-      import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID = 'undefined';
-      // @ts-expect-error override for test
-      import.meta.env.VITE_FIREBASE_APP_ID = 'undefined';
-
-      expect(getFirebaseConfig()).toBeNull();
-      expect(Boolean(getFirebaseConfig())).toBe(false);
-    } finally {
-      Object.assign(import.meta.env, originalEnv);
-    }
+  it('prefers Firebase environment values when provided', () => {
+    expect(getFirebaseConfig({ VITE_FIREBASE_PROJECT_ID: 'override-project' }).projectId)
+      .toBe('override-project');
   });
 });

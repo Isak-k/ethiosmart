@@ -3,29 +3,34 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore, enableIndexedDbPersistence, enableMultiTabIndexedDbPersistence } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
-export const getFirebaseConfig = () => {
-  const config = {
-    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-    appId: import.meta.env.VITE_FIREBASE_APP_ID,
+const fallbackFirebaseConfig = {
+  apiKey: 'AIzaSyA5UNpm_8VghlXdPuvo0UhETORUKitJmo4',
+  authDomain: 'online-exam-f443c.firebaseapp.com',
+  projectId: 'online-exam-f443c',
+  storageBucket: 'online-exam-f443c.firebasestorage.app',
+  messagingSenderId: '644701231968',
+  appId: '1:644701231968:web:b0fda80164111cbd11dc05',
+};
+
+type FirebaseConfigKey = keyof typeof fallbackFirebaseConfig;
+
+export const getFirebaseConfig = (environment: Record<string, string | undefined> = import.meta.env) => {
+  const getValue = (key: FirebaseConfigKey) => {
+    const envKey = `VITE_FIREBASE_${key.replace(/[A-Z]/g, (letter) => `_${letter}`).toUpperCase()}`;
+    const value = environment[envKey];
+    return value && value !== 'undefined' && value !== 'null' && value.trim()
+      ? value
+      : fallbackFirebaseConfig[key];
   };
 
-  const isMissing = (value: string | undefined) =>
-    !value || value === 'undefined' || value === 'null' || value.trim() === '';
-
-  const missing = Object.entries(config)
-    .filter(([, value]) => isMissing(value as string | undefined))
-    .map(([key]) => key);
-
-  if (missing.length > 0) {
-    console.warn('Firebase config missing:', missing.join(', '));
-    return null;
-  }
-
-  return config;
+  return {
+    apiKey: getValue('apiKey'),
+    authDomain: getValue('authDomain'),
+    projectId: getValue('projectId'),
+    storageBucket: getValue('storageBucket'),
+    messagingSenderId: getValue('messagingSenderId'),
+    appId: getValue('appId'),
+  };
 };
 
 export const firebaseConfig = getFirebaseConfig();
@@ -41,15 +46,15 @@ console.log('Firebase Config:', {
   appId: firebaseConfig?.appId ? '✓ Loaded' : '✗ Missing'
 });
 
-// Initialize Firebase only when all required environment variables are present.
-const app = firebaseConfig ? initializeApp(firebaseConfig) : null;
+// Environment values override the public project defaults when provided.
+const app = initializeApp(firebaseConfig);
 
 // Initialize Firebase services
-export const auth = app ? getAuth(app) : null as any;
-export const db = app ? getFirestore(app) : null as any;
-export const storage = app ? getStorage(app) : null as any;
+export const auth = getAuth(app);
+export const db = getFirestore(app);
+export const storage = getStorage(app);
 
-if (app && db) {
+{
   // Enable offline persistence for Firestore with multi-tab support
   // Try multi-tab first, fallback to single-tab if needed
   enableMultiTabIndexedDbPersistence(db)
