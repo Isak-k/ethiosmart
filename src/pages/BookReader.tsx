@@ -138,8 +138,14 @@ export default function BookReader() {
         fetch(`/api/drive/download?fileId=${encodeURIComponent(data.driveFileId)}`)
           .then(async (res) => {
             if (res.ok) {
-              const blob = await res.blob();
-              setPdfBlob(blob);
+              const contentType = res.headers.get('content-type') || '';
+              if (!contentType.includes('text/html')) {
+                const blob = await res.blob();
+                const head = new Uint8Array(await blob.slice(0, 5).arrayBuffer());
+                if (head[0] === 0x25 && head[1] === 0x50 && head[2] === 0x44 && head[3] === 0x46) {
+                  setPdfBlob(blob);
+                }
+              }
               setIframeLoading(false);
             }
           })

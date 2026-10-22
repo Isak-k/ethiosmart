@@ -210,12 +210,21 @@ export async function downloadAndSaveBookOffline(
     const proxyUrl = `/api/drive/download?fileId=${encodeURIComponent(book.driveFileId)}`;
     const res = await fetch(proxyUrl);
     if (res.ok) {
-      blob = await res.blob();
-      const disposition = res.headers.get('content-disposition');
-      if (disposition) {
-        const match = disposition.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)["']?/i);
-        if (match && match[1]) {
-          resolvedFileName = decodeURIComponent(match[1]);
+      const contentType = res.headers.get('content-type') || '';
+      if (!contentType.includes('text/html')) {
+        const potentialBlob = await res.blob();
+        if (potentialBlob.size > 50) {
+          const head = new Uint8Array(await potentialBlob.slice(0, 5).arrayBuffer());
+          if (head[0] === 0x25 && head[1] === 0x50 && head[2] === 0x44 && head[3] === 0x46) {
+            blob = potentialBlob;
+            const disposition = res.headers.get('content-disposition');
+            if (disposition) {
+              const match = disposition.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)["']?/i);
+              if (match && match[1]) {
+                resolvedFileName = decodeURIComponent(match[1]);
+              }
+            }
+          }
         }
       }
     }
@@ -240,6 +249,13 @@ export async function downloadAndSaveBookOffline(
     throw new Error(
       'Could not download file from Google Drive. Please ensure the file is shared with "Anyone with the link can view".'
     );
+  }
+
+  // Ensure downloaded payload is valid PDF binary
+  const headBytes = new Uint8Array(await blob.slice(0, 5).arrayBuffer());
+  const isPdf = headBytes[0] === 0x25 && headBytes[1] === 0x50 && headBytes[2] === 0x44 && headBytes[3] === 0x46;
+  if (!isPdf) {
+    throw new Error('The downloaded content is not a valid PDF file. Please ensure public access permissions are enabled on the Google Drive file.');
   }
 
   onProgress?.('Saving to local storage for offline browsing...');
