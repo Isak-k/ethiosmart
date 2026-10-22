@@ -88,8 +88,8 @@ export function PracticeExamResultsPage() {
   };
 
   return (
-    <DashboardLayout>
-      <div className="container mx-auto px-4 py-8">
+    <DashboardLayout contentClassName="px-0 sm:px-6 lg:p-8 pt-3 sm:pt-6 pb-20">
+      <div className="w-full max-w-4xl mx-auto py-2 sm:py-6">
         <PracticeExamResults
           result={result}
           examTitle={location.state?.examTitle || attempt.examTitle || 'Practice Exam'}

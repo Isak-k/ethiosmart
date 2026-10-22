@@ -1,0 +1,1434 @@
+import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
+import * as pdfjsLib from 'pdfjs-dist';
+import { Book } from '@/types/book';
+import { Button } from '@/components/ui/button';
+import {
+  ArrowLeft,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  HardDrive,
+  Loader2,
+  AlertCircle,
+  Type,
+  Sun,
+  Moon,
+  BookOpen,
+  SlidersHorizontal,
+  X,
+  Crop,
+  ChevronUp,
+  ChevronDown,
+} from 'lucide-react';
+
+// Configure PDF.js worker to use local public worker
+if (typeof window !== 'undefined' && pdfjsLib.GlobalWorkerOptions) {
+  if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+  }
+}
+
+interface MobileVerticalReaderProps {
+  book: Book;
+  pdfData: Blob | ArrayBuffer | Uint8Array | null;
+  isSavedOffline: boolean;
+  onBack: () => void;
+  onSaveOffline?: () => Promise<void>;
+  isDownloadingOffline?: boolean;
+}
+
+type ViewMode = 'page' | 'text';
+type ThemeMode = 'dark' | 'sepia' | 'light';
+type FontStyle = 'sans' | 'serif' | 'mono';
+
+// --------------------------------------------------------------------------
+// Lazy-rendered Single PDF Page Component for continuous vertical touch scroll
+// High-DPI crisp rendering matching physical device pixels
+// --------------------------------------------------------------------------
+interface PageItemProps {
+  pageNum: number;
+  pdfDoc: any;
+  zoomFactor: number;
+  containerWidth: number;
+  defaultAspectRatio: number;
+  onVisible: (pageNum: number) => void;
+  onAspectRatioCalculated: (ratio: number) => void;
+  theme: ThemeMode;
+}
+
+const LazyPdfPage = memo(function LazyPdfPage({
+  pageNum,
+  pdfDoc,
+  zoomFactor,
+  containerWidth,
+  defaultAspectRatio,
+  onVisible,
+  onAspectRatioCalculated,
+  theme,
+}: PageItemProps) {
+  const pageRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const renderTaskRef = useRef<any>(null);
+
+  const [isInViewport, setIsInViewport] = useState(false);
+  const [isRendered, setIsRendered] = useState(false);
+  const [aspectRatio, setAspectRatio] = useState<number>(defaultAspectRatio);
+
+  // 1. Observe intersection with generous margin so upcoming pages render before user scrolls into them
+  useEffect(() => {
+    const el = pageRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setIsInViewport(true);
+            onVisible(pageNum);
+          } else {
+            // Check bounding distance: if scrolled more than 1500px away, release canvas to save mobile RAM
+            const rect = entry.boundingClientRect;
+            const screenHeight = window.innerHeight;
+            if (rect.bottom < -1500 || rect.top > screenHeight + 1500) {
+              setIsInViewport(false);
+              setIsRendered(false);
+              if (renderTaskRef.current) {
+                try {
+                  renderTaskRef.current.cancel();
+                } catch {
+                  // ignore cancellation error
+                }
+                renderTaskRef.current = null;
+              }
+            }
+          }
+        });
+      },
+      {
+        root: null,
+        rootMargin: '900px 0px 900px 0px',
+        threshold: [0, 0.25, 0.5, 0.75, 1],
+      }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [pageNum, onVisible]);
+
+  // 2. Render Page onto Canvas when in viewport with Ultra-Crisp High DPI
+  useEffect(() => {
+    if (!isInViewport || !pdfDoc) return;
+
+    let isCancelled = false;
+
+    async function renderPage() {
+      if (renderTaskRef.current) {
+        try {
+          renderTaskRef.current.cancel();
+        } catch {
+          // ignore
+        }
+        renderTaskRef.current = null;
+      }
+
+      try {
+        const page = await pdfDoc.getPage(pageNum);
+        if (isCancelled) return;
+
+        const unscaledViewport = page.getViewport({ scale: 1.0 });
+        const ratio = unscaledViewport.height / unscaledViewport.width;
+        setAspectRatio(ratio);
+        onAspectRatioCalculated(ratio);
+
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        // Exact CSS dimensions
+        const targetCssWidth = Math.round(containerWidth * zoomFactor);
+        const targetCssHeight = Math.round(targetCssWidth * ratio);
+
+        // ULTRA-CRISP RESOLUTION: match physical device pixel ratio (up to 3.5x for Retina/AMOLED phones)
+        const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 2 : 2;
+        const pixelRatio = Math.min(Math.max(dpr, 2.0), 3.5);
+
+        const renderScale = (targetCssWidth / unscaledViewport.width) * pixelRatio;
+        const scaledViewport = page.getViewport({ scale: renderScale });
+
+        canvas.width = Math.round(scaledViewport.width);
+        canvas.height = Math.round(scaledViewport.height);
+        canvas.style.width = `${targetCssWidth}px`;
+        canvas.style.height = `${targetCssHeight}px`;
+
+        const ctx = canvas.getContext('2d', {
+          alpha: false,
+          willReadFrequently: false,
+        });
+
+        if (!ctx) return;
+
+        // High quality image smoothing
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+
+        const renderContext = {
+          canvasContext: ctx,
+          viewport: scaledViewport,
+          intent: 'display',
+        };
+
+        const task = page.render(renderContext);
+        renderTaskRef.current = task;
+        await task.promise;
+
+        if (!isCancelled) {
+          setIsRendered(true);
+        }
+      } catch (err: any) {
+        if (!isCancelled && err?.name !== 'RenderingCancelledException') {
+          console.error(`Page ${pageNum} render error:`, err);
+        }
+      }
+    }
+
+    renderPage();
+
+    return () => {
+      isCancelled = true;
+      if (renderTaskRef.current) {
+        try {
+          renderTaskRef.current.cancel();
+        } catch {
+          // ignore
+        }
+        renderTaskRef.current = null;
+      }
+    };
+  }, [isInViewport, pdfDoc, pageNum, zoomFactor, containerWidth, onAspectRatioCalculated]);
+
+  const estimatedHeight = Math.round(containerWidth * zoomFactor * aspectRatio);
+
+  return (
+    <div
+      ref={pageRef}
+      data-page-number={pageNum}
+      className={`relative w-full flex justify-center items-center select-none overflow-hidden ${
+        theme === 'dark' ? 'bg-[#0f1117]' : theme === 'sepia' ? 'bg-[#f4ecd8]' : 'bg-[#e5e7eb]'
+      }`}
+      style={{
+        minHeight: `${estimatedHeight}px`,
+        marginBottom: zoomFactor > 1.2 ? '14px' : '8px',
+      }}
+    >
+      {/* High-Resolution Canvas with crisp font contrast */}
+      <canvas
+        ref={canvasRef}
+        className={`block transition-opacity duration-200 ${
+          isRendered ? 'opacity-100 shadow-md' : 'opacity-0'
+        }`}
+        style={{
+          width: `${Math.round(containerWidth * zoomFactor)}px`,
+          height: `${Math.round(containerWidth * zoomFactor * aspectRatio)}px`,
+          maxWidth: 'none',
+          imageRendering: '-webkit-optimize-contrast',
+        }}
+      />
+
+      {/* Loading Skeleton / Page Number Placeholder while waiting for render */}
+      {!isRendered && (
+        <div
+          className="absolute inset-0 flex flex-col items-center justify-center gap-2"
+          style={{ height: `${estimatedHeight}px` }}
+        >
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/50 backdrop-blur-xs text-xs text-white/90 font-medium">
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+            <span>Page {pageNum}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Subtle Bottom Page Label */}
+      <div className="absolute bottom-1 right-2 pointer-events-none text-[9px] font-mono text-black/30 dark:text-white/30 px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/5">
+        p. {pageNum}
+      </div>
+    </div>
+  );
+});
+
+// --------------------------------------------------------------------------
+// Mobile Reflowable Text Component
+// --------------------------------------------------------------------------
+interface TextModeViewerProps {
+  pdfDoc: any;
+  totalPages: number;
+  currentPage: number;
+  fontSize: number;
+  fontStyle: FontStyle;
+  theme: ThemeMode;
+  onPageScrolled: (pageNum: number) => void;
+}
+
+function MobileTextReader({
+  pdfDoc,
+  totalPages,
+  currentPage,
+  fontSize,
+  fontStyle,
+  theme,
+  onPageScrolled,
+}: TextModeViewerProps) {
+  const [pagesText, setPagesText] = useState<{ [pageNum: number]: string }>({});
+
+  useEffect(() => {
+    if (!pdfDoc) return;
+    let isCancelled = false;
+
+    async function loadPageText(pageNumber: number) {
+      if (pagesText[pageNumber] !== undefined || pageNumber < 1 || pageNumber > totalPages) {
+        return;
+      }
+
+      try {
+        const page = await pdfDoc.getPage(pageNumber);
+        const textContent = await page.getTextContent();
+        let lastY: number | null = null;
+        let textLines: string[] = [];
+        let currentLine = '';
+
+        for (const item of textContent.items) {
+          if ('str' in item) {
+            const y = item.transform ? item.transform[5] : 0;
+            if (lastY !== null && Math.abs(y - lastY) > 8) {
+              if (currentLine.trim()) {
+                textLines.push(currentLine.trim());
+              }
+              currentLine = item.str;
+            } else {
+              currentLine += (currentLine.endsWith(' ') || item.str.startsWith(' ') ? '' : ' ') + item.str;
+            }
+            lastY = y;
+          }
+        }
+        if (currentLine.trim()) {
+          textLines.push(currentLine.trim());
+        }
+
+        const finalText = textLines.join('\n\n');
+        if (!isCancelled) {
+          setPagesText((prev) => ({ ...prev, [pageNumber]: finalText }));
+        }
+      } catch (err) {
+        console.warn(`Text extraction for page ${pageNumber} failed:`, err);
+        if (!isCancelled) {
+          setPagesText((prev) => ({ ...prev, [pageNumber]: 'Could not extract text for this page.' }));
+        }
+      }
+    }
+
+    loadPageText(currentPage);
+    if (currentPage + 1 <= totalPages) loadPageText(currentPage + 1);
+    if (currentPage - 1 >= 1) loadPageText(currentPage - 1);
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [pdfDoc, currentPage, totalPages, pagesText]);
+
+  const fontClass =
+    fontStyle === 'serif'
+      ? 'font-serif'
+      : fontStyle === 'mono'
+      ? 'font-mono'
+      : 'font-sans';
+
+  const themeClasses =
+    theme === 'dark'
+      ? 'bg-[#0d0f14] text-[#e2e8f0]'
+      : theme === 'sepia'
+      ? 'bg-[#fbf0d9] text-[#433422]'
+      : 'bg-[#ffffff] text-[#1e293b]';
+
+  return (
+    <div className={`w-full min-h-full px-5 py-6 ${themeClasses} ${fontClass} transition-colors duration-200 select-text`}>
+      <div className="max-w-xl mx-auto space-y-6">
+        {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((pageNum) => {
+          const isNear = Math.abs(pageNum - currentPage) <= 2;
+          if (!isNear && !pagesText[pageNum]) return null;
+
+          const content = pagesText[pageNum];
+
+          return (
+            <div
+              key={pageNum}
+              data-text-page={pageNum}
+              className="pb-8 border-b border-current/10 last:border-b-0 space-y-4"
+            >
+              <div className="flex items-center justify-between text-xs opacity-50 font-mono select-none pt-2">
+                <span>Page {pageNum}</span>
+                <span>ExamPro Reader</span>
+              </div>
+
+              {content === undefined ? (
+                <div className="py-12 flex flex-col items-center justify-center gap-2 opacity-60">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-xs">Extracting page {pageNum} text...</span>
+                </div>
+              ) : content.trim().length === 0 ? (
+                <div className="py-6 text-center italic text-xs opacity-60">
+                  (No selectable text found on this page. May contain scanned diagram or image.)
+                </div>
+              ) : (
+                <div
+                  className="leading-relaxed whitespace-pre-line tracking-wide"
+                  style={{ fontSize: `${fontSize}px` }}
+                >
+                  {content}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// --------------------------------------------------------------------------
+// Main Mobile Vertical Reader
+// --------------------------------------------------------------------------
+export function MobileVerticalReader({
+  book,
+  pdfData,
+  isSavedOffline,
+  onBack,
+  onSaveOffline,
+  isDownloadingOffline = false,
+}: MobileVerticalReaderProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const pagesContainerRef = useRef<HTMLDivElement>(null);
+  const verticalTrackRef = useRef<HTMLDivElement>(null);
+
+  const [pdfDoc, setPdfDoc] = useState<any>(null);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(0);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Settings & Customization
+  const [viewMode, setViewMode] = useState<ViewMode>('page');
+  
+  // Default zoom is 1.40 (Fit Text - automatically trims white margins so text is large & bold)
+  const [zoomFactor, setZoomFactor] = useState<number>(1.40);
+  const [livePinchScale, setLivePinchScale] = useState<number | null>(null);
+  const [livePinchPercent, setLivePinchPercent] = useState<number | null>(null);
+
+  const [fontSize, setFontSize] = useState<number>(20);
+  const [fontStyle, setFontStyle] = useState<FontStyle>('serif');
+  const [theme, setTheme] = useState<ThemeMode>('dark');
+  const [showSettingsSheet, setShowSettingsSheet] = useState<boolean>(false);
+  
+  // Reading mode state: auto-hides controls after inactivity or on double touch
+  const [showControls, setShowControls] = useState<boolean>(true);
+  const [showScrollStick, setShowScrollStick] = useState<boolean>(true);
+  const [showPageIndicator, setShowPageIndicator] = useState<boolean>(true);
+  
+  const autoHideTimerRef = useRef<any>(null);
+
+  const [viewportWidth, setViewportWidth] = useState<number>(() => {
+    if (typeof window !== 'undefined') return window.innerWidth;
+    return 390;
+  });
+  const [defaultAspectRatio, setDefaultAspectRatio] = useState<number>(1.414);
+
+  // Vertical Right-Edge Scroll Stick States
+  const [scrollProgress, setScrollProgress] = useState<number>(0); // 0.0 to 1.0
+  const [isDraggingThumb, setIsDraggingThumb] = useState<boolean>(false);
+
+  // Auto-hide timer: when reading and idle for 2.4s, hide header, footer, stick, and indicators
+  const resetAutoHideTimer = useCallback(() => {
+    if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
+    autoHideTimerRef.current = setTimeout(() => {
+      setShowControls(false);
+      setShowScrollStick(false);
+      setShowPageIndicator(false);
+    }, 2400);
+  }, []);
+
+  // Initial auto-hide timer on mount
+  useEffect(() => {
+    resetAutoHideTimer();
+    return () => {
+      if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
+    };
+  }, [resetAutoHideTimer]);
+
+  // Resize listener
+  useEffect(() => {
+    const handleResize = () => {
+      if (typeof window !== 'undefined') {
+        setViewportWidth(window.innerWidth);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // 1. Fetch PDF Data if not provided directly
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function resolvePdfData() {
+      if (pdfData) {
+        loadDocument(pdfData);
+        return;
+      }
+
+      if (book?.driveFileId) {
+        setLoading(true);
+        setError(null);
+        try {
+          const res = await fetch(`/api/drive/download?fileId=${encodeURIComponent(book.driveFileId)}`);
+          if (!res.ok) {
+            throw new Error(`Failed to load document (${res.status})`);
+          }
+          const blob = await res.blob();
+          if (!isCancelled) {
+            loadDocument(blob);
+          }
+        } catch (err: any) {
+          if (!isCancelled) {
+            console.error('Mobile PDF fetch error:', err);
+            setError(err.message || 'Could not load PDF document.');
+            setLoading(false);
+          }
+        }
+      } else {
+        setLoading(false);
+        setError('No document source available.');
+      }
+    }
+
+    resolvePdfData();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [pdfData, book?.driveFileId]);
+
+  // 2. Load PDF with pdfjsLib and local standard font files
+  const loadDocument = async (sourceData: Blob | ArrayBuffer | Uint8Array) => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      let arrayBuffer: ArrayBuffer;
+      if (sourceData instanceof Blob) {
+        arrayBuffer = await sourceData.arrayBuffer();
+      } else if (sourceData instanceof Uint8Array) {
+        arrayBuffer = sourceData.buffer as ArrayBuffer;
+      } else {
+        arrayBuffer = sourceData;
+      }
+
+      const loadingTask = pdfjsLib.getDocument({
+        data: arrayBuffer,
+        cMapUrl: '/cmaps/',
+        cMapPacked: true,
+        standardFontDataUrl: '/standard_fonts/',
+      });
+
+      const doc = await loadingTask.promise;
+      setPdfDoc(doc);
+      setTotalPages(doc.numPages);
+      setCurrentPage(1);
+
+      try {
+        const firstPage = await doc.getPage(1);
+        const vp = firstPage.getViewport({ scale: 1.0 });
+        if (vp.width && vp.height) {
+          setDefaultAspectRatio(vp.height / vp.width);
+        }
+      } catch (err) {
+        // use default aspect ratio
+      }
+    } catch (err: any) {
+      console.error('Error parsing PDF document in MobileVerticalReader:', err);
+      setError(err.message || 'Could not parse PDF.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --------------------------------------------------------------------------
+  // TWO-FINGER PINCH-TO-ZOOM ENGINE WITH SCROLL LOCKING
+  // --------------------------------------------------------------------------
+  const pinchStateRef = useRef<{
+    isPinching: boolean;
+    initialDistance: number;
+    initialZoom: number;
+    midX: number;
+    midY: number;
+    lockedScrollTop: number;
+  }>({
+    isPinching: false,
+    initialDistance: 0,
+    initialZoom: 1.4,
+    midX: 0,
+    midY: 0,
+    lockedScrollTop: 0,
+  });
+
+  const lastTapRef = useRef<number>(0);
+
+  useEffect(() => {
+    const scrollEl = scrollContainerRef.current;
+    if (!scrollEl) return;
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length >= 2) {
+        // Intercept 2-finger gesture and immediately cancel browser scrolling
+        if (e.cancelable) e.preventDefault();
+
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+        const midX = (t1.clientX + t2.clientX) / 2;
+        const midY = (t1.clientY + t2.clientY) / 2;
+
+        pinchStateRef.current = {
+          isPinching: true,
+          initialDistance: dist,
+          initialZoom: zoomFactor,
+          midX,
+          midY,
+          lockedScrollTop: scrollEl.scrollTop,
+        };
+
+        // LOCK OVERFLOW: prevents native scroll engine from scrolling while pinching!
+        scrollEl.style.overflow = 'hidden';
+      } else {
+        pinchStateRef.current.isPinching = false;
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length >= 2 && pinchStateRef.current.isPinching) {
+        if (e.cancelable) e.preventDefault();
+
+        // Ensure vertical scroll doesn't budge
+        scrollEl.scrollTop = pinchStateRef.current.lockedScrollTop;
+
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        const currentDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+
+        if (pinchStateRef.current.initialDistance > 10) {
+          const scaleChange = currentDist / pinchStateRef.current.initialDistance;
+          const targetZoom = Math.min(3.5, Math.max(1.0, +(pinchStateRef.current.initialZoom * scaleChange).toFixed(2)));
+          
+          setLivePinchScale(scaleChange);
+          setLivePinchPercent(Math.round(targetZoom * 100));
+        }
+      }
+    };
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (pinchStateRef.current.isPinching && e.touches.length < 2) {
+        pinchStateRef.current.isPinching = false;
+        
+        // Restore normal scrolling on the container
+        scrollEl.style.overflow = 'auto';
+
+        if (livePinchPercent) {
+          const finalZoom = Math.min(3.5, Math.max(1.0, +(livePinchPercent / 100).toFixed(2)));
+          const zoomRatio = finalZoom / pinchStateRef.current.initialZoom;
+          const oldScrollTop = pinchStateRef.current.lockedScrollTop;
+          const newScrollTop = Math.max(0, (oldScrollTop + pinchStateRef.current.midY) * zoomRatio - pinchStateRef.current.midY);
+
+          setZoomFactor(finalZoom);
+          requestAnimationFrame(() => {
+            scrollEl.scrollTop = newScrollTop;
+          });
+        }
+
+        setLivePinchScale(null);
+        setLivePinchPercent(null);
+        resetAutoHideTimer();
+      }
+    };
+
+    scrollEl.addEventListener('touchstart', onTouchStart, { passive: false });
+    scrollEl.addEventListener('touchmove', onTouchMove, { passive: false });
+    scrollEl.addEventListener('touchend', onTouchEnd, { passive: false });
+    scrollEl.addEventListener('touchcancel', onTouchEnd, { passive: false });
+
+    return () => {
+      scrollEl.removeEventListener('touchstart', onTouchStart);
+      scrollEl.removeEventListener('touchmove', onTouchMove);
+      scrollEl.removeEventListener('touchend', onTouchEnd);
+      scrollEl.removeEventListener('touchcancel', onTouchEnd);
+    };
+  }, [zoomFactor, livePinchPercent, resetAutoHideTimer]);
+
+  // Handle single tap (toggle controls) and double touch/tap (HIDE IMMEDIATELY)
+  const handleContentTouchEnd = (e: React.TouchEvent) => {
+    if (pinchStateRef.current.isPinching || isDraggingThumb) return;
+
+    if (e.changedTouches.length === 1) {
+      const now = Date.now();
+      if (now - lastTapRef.current < 320) {
+        // DOUBLE TOUCH / DOUBLE TAP: Hide everything immediately for pure reading!
+        setShowControls(false);
+        setShowScrollStick(false);
+        setShowPageIndicator(false);
+        if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
+        lastTapRef.current = 0;
+      } else {
+        lastTapRef.current = now;
+        // SINGLE TAP: Toggle controls on/off
+        setShowControls((prev) => {
+          const next = !prev;
+          if (next) {
+            setShowScrollStick(true);
+            setShowPageIndicator(true);
+            resetAutoHideTimer();
+          } else {
+            setShowScrollStick(false);
+            setShowPageIndicator(false);
+          }
+          return next;
+        });
+      }
+    }
+  };
+
+  // Scroll listener on main container: tracks progress & keeps vertical stick in sync
+  const handleContainerScroll = () => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+
+    const maxScroll = el.scrollHeight - el.clientHeight;
+    if (maxScroll > 0) {
+      const progress = el.scrollTop / maxScroll;
+      setScrollProgress(Math.min(1, Math.max(0, progress)));
+    }
+
+    // Show stick and page indicator while scrolling, then auto-hide after 2.4s of inactivity
+    setShowScrollStick(true);
+    setShowPageIndicator(true);
+    resetAutoHideTimer();
+  };
+
+  // Track active page during scroll
+  const handlePageVisible = useCallback((pageNum: number) => {
+    setCurrentPage(pageNum);
+  }, []);
+
+  const handleAspectRatioCalculated = useCallback((ratio: number) => {
+    if (ratio > 0.5 && ratio < 2.5) {
+      setDefaultAspectRatio(ratio);
+    }
+  }, []);
+
+  // --------------------------------------------------------------------------
+  // VERTICAL STICK INTERACTION: DRAG TO SCROLL UP/DOWN & TAP TO SCROLL UP
+  // --------------------------------------------------------------------------
+  const updateScrollFromTouchY = (clientY: number) => {
+    const trackEl = verticalTrackRef.current;
+    const scrollEl = scrollContainerRef.current;
+    if (!trackEl || !scrollEl) return;
+
+    const rect = trackEl.getBoundingClientRect();
+    const handleHeight = 48;
+    const availableHeight = rect.height - handleHeight;
+    if (availableHeight <= 0) return;
+
+    const relativeY = clientY - rect.top - handleHeight / 2;
+    const ratio = Math.max(0, Math.min(1, relativeY / availableHeight));
+
+    setScrollProgress(ratio);
+    const maxScroll = scrollEl.scrollHeight - scrollEl.clientHeight;
+    scrollEl.scrollTop = ratio * maxScroll;
+  };
+
+  const handleStickTouchStart = (e: React.TouchEvent) => {
+    e.stopPropagation();
+    setIsDraggingThumb(true);
+    setShowScrollStick(true);
+    if (e.touches.length > 0) {
+      updateScrollFromTouchY(e.touches[0].clientY);
+    }
+  };
+
+  const handleStickTouchMove = (e: React.TouchEvent) => {
+    e.stopPropagation();
+    if (e.cancelable) e.preventDefault();
+    if (e.touches.length > 0) {
+      updateScrollFromTouchY(e.touches[0].clientY);
+    }
+  };
+
+  const handleStickTouchEnd = (e: React.TouchEvent) => {
+    e.stopPropagation();
+    setIsDraggingThumb(false);
+    resetAutoHideTimer();
+  };
+
+  // Scroll Up action
+  const handleScrollUp = (e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
+    const scrollEl = scrollContainerRef.current;
+    if (!scrollEl) return;
+
+    const scrollStep = scrollEl.clientHeight * 0.75;
+    scrollEl.scrollBy({ top: -scrollStep, behavior: 'smooth' });
+    setShowScrollStick(true);
+    resetAutoHideTimer();
+  };
+
+  // Scroll to Top action
+  const handleScrollToTop = (e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
+    const scrollEl = scrollContainerRef.current;
+    if (!scrollEl) return;
+
+    scrollEl.scrollTo({ top: 0, behavior: 'smooth' });
+    setShowScrollStick(true);
+    resetAutoHideTimer();
+  };
+
+  // Scroll Down action
+  const handleScrollDown = (e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
+    const scrollEl = scrollContainerRef.current;
+    if (!scrollEl) return;
+
+    const scrollStep = scrollEl.clientHeight * 0.75;
+    scrollEl.scrollBy({ top: scrollStep, behavior: 'smooth' });
+    setShowScrollStick(true);
+    resetAutoHideTimer();
+  };
+
+  // Zoom control presets
+  const handleZoomIn = () => {
+    setZoomFactor((prev) => Math.min(3.5, +(prev + 0.25).toFixed(2)));
+    resetAutoHideTimer();
+  };
+
+  const handleZoomOut = () => {
+    setZoomFactor((prev) => Math.max(1.0, +(prev - 0.25).toFixed(2)));
+    resetAutoHideTimer();
+  };
+
+  const handleFitText = () => {
+    setZoomFactor(1.45);
+    resetAutoHideTimer();
+  };
+
+  const handleFitPage = () => {
+    setZoomFactor(1.0);
+    resetAutoHideTimer();
+  };
+
+  const themeBgClass =
+    theme === 'dark'
+      ? 'bg-[#0a0c10] text-white'
+      : theme === 'sepia'
+      ? 'bg-[#f4ecd8] text-[#3d2f20]'
+      : 'bg-[#f1f3f7] text-[#111827]';
+
+  return (
+    <div
+      ref={containerRef}
+      className={`fixed inset-0 z-50 h-[100dvh] w-screen flex flex-col overflow-hidden select-none ${themeBgClass}`}
+    >
+      {/* ---------------- Top Floating Header (Auto-hides on reading / double touch) ---------------- */}
+      <header
+        className={`shrink-0 z-30 transition-all duration-300 ease-in-out px-3 py-2 flex items-center justify-between border-b backdrop-blur-md ${
+          theme === 'dark'
+            ? 'bg-[#0f1117]/95 border-white/10 text-white'
+            : theme === 'sepia'
+            ? 'bg-[#f8f1e3]/95 border-[#e2d4bd] text-[#3d2f20]'
+            : 'bg-white/95 border-gray-200 text-gray-900'
+        } ${showControls ? 'translate-y-0 opacity-100 pointer-events-auto' : '-translate-y-full opacity-0 pointer-events-none absolute top-0 inset-x-0'}`}
+      >
+        {/* Left: Back & Title */}
+        <div className="flex items-center gap-2 min-w-0 mr-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onBack}
+            className="h-9 w-9 p-0 rounded-full shrink-0"
+            title="Back"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+
+          <div className="min-w-0">
+            <h1 className="text-xs font-bold truncate max-w-[170px] leading-tight">
+              {book.title}
+            </h1>
+            <div className="flex items-center gap-1.5 text-[10px] opacity-75">
+              <span>{totalPages > 0 ? `${currentPage} / ${totalPages}` : 'Loading...'}</span>
+              {isSavedOffline && (
+                <span className="inline-flex items-center text-emerald-500 font-semibold gap-0.5">
+                  • <HardDrive className="h-2.5 w-2.5" /> Offline
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Right: Actions */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* Quick Fit Text / Fit Page Toggle */}
+          {viewMode === 'page' && (
+            <Button
+              variant={zoomFactor > 1.2 ? 'default' : 'outline'}
+              size="sm"
+              onClick={zoomFactor > 1.2 ? handleFitPage : handleFitText}
+              className="h-8 px-2 text-[11px] font-bold rounded-lg flex items-center gap-1"
+              title={zoomFactor > 1.2 ? 'Show Entire Page' : 'Fit Text (Crop Margins)'}
+            >
+              <Crop className="h-3 w-3" />
+              <span>{zoomFactor > 1.2 ? 'Full Page' : 'Fit Text'}</span>
+            </Button>
+          )}
+
+          {/* View Mode Toggle: Page (Canvas) vs Text Mode */}
+          <Button
+            variant={viewMode === 'text' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => {
+              setViewMode((prev) => (prev === 'page' ? 'text' : 'page'));
+              resetAutoHideTimer();
+            }}
+            className={`h-8 w-8 p-0 rounded-lg flex items-center justify-center ${
+              viewMode === 'text' ? 'bg-primary text-primary-foreground' : ''
+            }`}
+            title={viewMode === 'page' ? 'Switch to Large Reflowable Text' : 'Switch to Original PDF Page View'}
+          >
+            {viewMode === 'page' ? (
+              <Type className="h-4 w-4" />
+            ) : (
+              <BookOpen className="h-4 w-4" />
+            )}
+          </Button>
+
+          {/* Aa Customization Settings */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setShowSettingsSheet((prev) => !prev);
+              resetAutoHideTimer();
+            }}
+            className="h-8 w-8 p-0 rounded-lg"
+            title="Reading Appearance & Text Size"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+          </Button>
+        </div>
+      </header>
+
+      {/* ---------------- Main Content Body: Continuous Vertical Touch Scroll ---------------- */}
+      <main className="flex-1 w-full h-full relative overflow-hidden">
+        {loading && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-background/85 backdrop-blur-xs">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm font-semibold text-foreground">Preparing reader...</p>
+            <p className="text-xs text-muted-foreground">Rendering pages</p>
+          </div>
+        )}
+
+        {error && (
+          <div className="absolute inset-4 z-20 flex flex-col items-center justify-center text-center p-6 bg-card border rounded-2xl shadow-xl gap-4">
+            <AlertCircle className="h-10 w-10 text-destructive" />
+            <div className="space-y-1">
+              <h3 className="font-bold text-base">Unable to open document</h3>
+              <p className="text-xs text-muted-foreground">{error}</p>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={() => window.location.reload()} size="sm" className="rounded-xl">
+                Retry
+              </Button>
+              <Button onClick={onBack} variant="outline" size="sm" className="rounded-xl">
+                Go Back
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Live Pinch Zoom HUD Badge */}
+        {livePinchPercent !== null && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 pointer-events-none animate-scale-in">
+            <div className="px-4 py-2 rounded-full bg-primary text-primary-foreground font-bold text-sm shadow-2xl flex items-center gap-2">
+              <ZoomIn className="h-4 w-4" />
+              <span>Zoom: {livePinchPercent}%</span>
+            </div>
+          </div>
+        )}
+
+        {/* VIEW MODE 1: Continuous Vertical Canvas Touch Scroll with Pinch-to-Zoom */}
+        {viewMode === 'page' && pdfDoc && (
+          <div
+            ref={scrollContainerRef}
+            onTouchEnd={handleContentTouchEnd}
+            onScroll={handleContainerScroll}
+            className="w-full h-full overflow-y-auto overflow-x-auto m-0 p-0 overscroll-y-contain"
+            style={{
+              WebkitOverflowScrolling: 'touch',
+              touchAction: 'pan-x pan-y',
+            }}
+          >
+            {/* Pages vertically stacked edge-to-edge */}
+            <div
+              ref={pagesContainerRef}
+              className="w-full flex flex-col items-center m-0 p-0 transition-transform duration-75 origin-top"
+              style={{
+                width: zoomFactor > 1.0 ? `${Math.round(viewportWidth * zoomFactor)}px` : '100%',
+                minWidth: '100%',
+                transform: livePinchScale ? `scale(${livePinchScale})` : undefined,
+                transformOrigin: 'top center',
+              }}
+            >
+              {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((pageNum) => (
+                <LazyPdfPage
+                  key={pageNum}
+                  pageNum={pageNum}
+                  pdfDoc={pdfDoc}
+                  zoomFactor={zoomFactor}
+                  containerWidth={viewportWidth}
+                  defaultAspectRatio={defaultAspectRatio}
+                  onVisible={handlePageVisible}
+                  onAspectRatioCalculated={handleAspectRatioCalculated}
+                  theme={theme}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* VIEW MODE 2: Reflowable Large Text Reader (Increase text size & change font style) */}
+        {viewMode === 'text' && pdfDoc && (
+          <div
+            ref={scrollContainerRef}
+            onTouchEnd={handleContentTouchEnd}
+            onScroll={handleContainerScroll}
+            className="w-full h-full overflow-y-auto overflow-x-hidden overscroll-y-contain"
+            style={{ WebkitOverflowScrolling: 'touch' }}
+          >
+            <MobileTextReader
+              pdfDoc={pdfDoc}
+              totalPages={totalPages}
+              currentPage={currentPage}
+              fontSize={fontSize}
+              fontStyle={fontStyle}
+              theme={theme}
+              onPageScrolled={handlePageVisible}
+            />
+          </div>
+        )}
+
+        {/* ---------------- VERTICAL SCROLL STICK ON THE RIGHT SCREEN EDGE ---------------- */}
+        {/* Completely hides when reading / idle / double touch */}
+        {totalPages > 1 && (
+          <aside
+            className={`fixed right-1 sm:right-2 top-20 bottom-24 z-40 flex flex-col items-center transition-all duration-300 ${
+              (showScrollStick || isDraggingThumb)
+                ? 'opacity-100 pointer-events-auto translate-x-0'
+                : 'opacity-0 pointer-events-none translate-x-4'
+            }`}
+            style={{ width: '38px', touchAction: 'none' }}
+          >
+            {/* Scroll Up Stick Button (Quick tap to scroll up by a page / double-tap to jump to top) */}
+            <button
+              onClick={handleScrollUp}
+              onDoubleClick={handleScrollToTop}
+              className="h-8 w-8 rounded-full bg-primary/90 text-primary-foreground shadow-lg flex items-center justify-center mb-1.5 active:scale-90 transition-all backdrop-blur-md border border-white/20 shrink-0"
+              title="Scroll Up (Double-tap for Top)"
+            >
+              <ChevronUp className="h-5 w-5" />
+            </button>
+
+            {/* Vertical Guide Track & Draggable Stick */}
+            <div
+              ref={verticalTrackRef}
+              onTouchStart={handleStickTouchStart}
+              onTouchMove={handleStickTouchMove}
+              onTouchEnd={handleStickTouchEnd}
+              onTouchCancel={handleStickTouchEnd}
+              onClick={(e) => {
+                updateScrollFromTouchY(e.clientY);
+                resetAutoHideTimer();
+              }}
+              className="relative flex-1 w-full flex justify-center items-stretch cursor-pointer py-1"
+            >
+              {/* Subtle Vertical Rail / Track */}
+              <div className="w-1 h-full rounded-full bg-black/20 dark:bg-white/20 backdrop-blur-xs transition-colors" />
+
+              {/* The Draggable "Stick" / Handle */}
+              <div
+                className={`absolute rounded-full transition-all duration-75 flex items-center justify-center shadow-lg ${
+                  isDraggingThumb
+                    ? 'w-4 bg-primary ring-2 ring-primary/40 scale-110 shadow-primary/30'
+                    : 'w-2.5 bg-primary/90 dark:bg-white/80 hover:w-3.5 hover:bg-primary'
+                }`}
+                style={{
+                  height: '48px',
+                  top: `calc(${scrollProgress * 100}% - ${scrollProgress * 48}px)`,
+                  touchAction: 'none',
+                }}
+              >
+                {/* Visual Stick Ribs */}
+                <div className="flex flex-col gap-0.5 items-center pointer-events-none opacity-80">
+                  <div className="w-1.5 h-0.5 rounded-full bg-white dark:bg-black" />
+                  <div className="w-1.5 h-0.5 rounded-full bg-white dark:bg-black" />
+                  <div className="w-1.5 h-0.5 rounded-full bg-white dark:bg-black" />
+                </div>
+
+                {/* Floating Page Number Bubble on Left of Stick while dragging */}
+                {isDraggingThumb && (
+                  <div className="absolute right-7 px-3 py-1.5 rounded-xl bg-black/90 text-white text-xs font-bold whitespace-nowrap shadow-2xl border border-white/20 animate-fade-in pointer-events-none flex items-center gap-1.5 backdrop-blur-md">
+                    <span>Page {currentPage}</span>
+                    <span className="opacity-60 text-[10px]">of {totalPages}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Scroll Down Button at bottom of stick */}
+            <button
+              onClick={handleScrollDown}
+              className="h-7 w-7 rounded-full bg-black/40 dark:bg-white/20 text-foreground shadow-md flex items-center justify-center mt-1.5 active:scale-90 transition-all backdrop-blur-md opacity-75 hover:opacity-100 shrink-0"
+              title="Scroll Down"
+            >
+              <ChevronDown className="h-4 w-4" />
+            </button>
+          </aside>
+        )}
+
+        {/* Floating Page Number Pill (at bottom center while scrolling normally, auto-hides when idle) */}
+        <div
+          className={`absolute bottom-16 left-1/2 -translate-x-1/2 pointer-events-none transition-all duration-300 z-30 ${
+            showPageIndicator && livePinchPercent === null && !isDraggingThumb ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+          }`}
+        >
+          <div className="px-3.5 py-1.5 rounded-full bg-black/80 backdrop-blur-md text-white text-xs font-semibold shadow-lg border border-white/10 flex items-center gap-1.5">
+            <span>Page {currentPage} of {totalPages}</span>
+            <span className="text-[10px] text-primary font-mono">({Math.round(zoomFactor * 100)}%)</span>
+          </div>
+        </div>
+      </main>
+
+      {/* ---------------- Bottom Floating Toolbar / Zoom Bar (Auto-hides on reading / double touch) ---------------- */}
+      <footer
+        className={`shrink-0 z-30 transition-all duration-300 ease-in-out px-4 py-2 border-t backdrop-blur-md ${
+          theme === 'dark'
+            ? 'bg-[#0f1117]/95 border-white/10 text-white'
+            : theme === 'sepia'
+            ? 'bg-[#f8f1e3]/95 border-[#e2d4bd] text-[#3d2f20]'
+            : 'bg-white/95 border-gray-200 text-gray-900'
+        } ${showControls ? 'translate-y-0 opacity-100 pointer-events-auto' : 'translate-y-full opacity-0 pointer-events-none absolute bottom-0 inset-x-0'}`}
+      >
+        <div className="flex items-center justify-between max-w-lg mx-auto">
+          {/* Zoom Controls */}
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleZoomOut}
+              disabled={zoomFactor <= 1.0}
+              className="h-8 w-8 p-0 rounded-lg"
+              title="Zoom Out"
+            >
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+            <span className="text-xs font-mono px-1 font-bold">
+              {Math.round(zoomFactor * 100)}%
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleZoomIn}
+              disabled={zoomFactor >= 3.5}
+              className="h-8 w-8 p-0 rounded-lg"
+              title="Zoom In"
+            >
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+
+            {zoomFactor !== 1.45 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleFitText}
+                className="h-7 px-2 text-[11px] rounded-md font-semibold text-primary"
+                title="Crop margins to make text large"
+              >
+                Fit Text
+              </Button>
+            )}
+
+            {zoomFactor !== 1.0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleFitPage}
+                className="h-7 px-2 text-[11px] rounded-md font-semibold opacity-75"
+                title="Fit whole page width"
+              >
+                100%
+              </Button>
+            )}
+          </div>
+
+          {/* Quick Page Info & Right-Stick hint */}
+          <div className="flex items-center gap-2 text-xs">
+            <span className="font-mono opacity-80">
+              p. {currentPage} / {totalPages}
+            </span>
+          </div>
+        </div>
+      </footer>
+
+      {/* ---------------- Aa Settings Sheet (Font Size, Font Style, Theme, Zoom) ---------------- */}
+      {showSettingsSheet && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex flex-col justify-end animate-fade-in"
+          onClick={() => {
+            setShowSettingsSheet(false);
+            resetAutoHideTimer();
+          }}
+        >
+          <div
+            className={`w-full rounded-t-3xl p-5 border-t shadow-2xl max-h-[85vh] overflow-y-auto ${
+              theme === 'dark'
+                ? 'bg-[#151821] border-white/10 text-white'
+                : theme === 'sepia'
+                ? 'bg-[#f7efe0] border-[#d8c8af] text-[#3d2f20]'
+                : 'bg-white border-gray-200 text-gray-900'
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-current/10">
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="h-4 w-4 text-primary" />
+                <h3 className="font-bold text-sm">Reading & Appearance Settings</h3>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowSettingsSheet(false);
+                  resetAutoHideTimer();
+                }}
+                className="h-8 w-8 p-0 rounded-full"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="space-y-5 pt-4">
+              {/* Reading Mode Selector */}
+              <div className="space-y-2">
+                <label className="text-xs font-semibold opacity-75">Reading Mode</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => {
+                      setViewMode('page');
+                      resetAutoHideTimer();
+                    }}
+                    className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors ${
+                      viewMode === 'page'
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-current/20 opacity-70'
+                    }`}
+                  >
+                    <BookOpen className="h-3.5 w-3.5" />
+                    Original PDF (Edge-to-Edge)
+                  </button>
+                  <button
+                    onClick={() => {
+                      setViewMode('text');
+                      resetAutoHideTimer();
+                    }}
+                    className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors ${
+                      viewMode === 'text'
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-current/20 opacity-70'
+                    }`}
+                  >
+                    <Type className="h-3.5 w-3.5" />
+                    Reflowable Text (Aa)
+                  </button>
+                </div>
+              </div>
+
+              {/* Edge-to-Edge Zoom Controls (For Page Mode) */}
+              {viewMode === 'page' && (
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-semibold opacity-75">PDF Page Zoom & Margins</span>
+                    <span className="font-mono font-bold text-primary">
+                      {Math.round(zoomFactor * 100)}%
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2">
+                    <button
+                      onClick={() => {
+                        setZoomFactor(1.0);
+                        resetAutoHideTimer();
+                      }}
+                      className={`py-2 rounded-xl border text-xs font-semibold transition-all ${
+                        zoomFactor === 1.0
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-current/20 opacity-70'
+                      }`}
+                    >
+                      Fit Page
+                    </button>
+                    <button
+                      onClick={() => {
+                        setZoomFactor(1.45);
+                        resetAutoHideTimer();
+                      }}
+                      className={`py-2 rounded-xl border text-xs font-semibold transition-all ${
+                        zoomFactor === 1.45
+                          ? 'border-primary bg-primary/10 text-primary ring-1 ring-primary'
+                          : 'border-current/20 opacity-70'
+                      }`}
+                    >
+                      Fit Text (Crop)
+                    </button>
+                    <button
+                      onClick={() => {
+                        setZoomFactor(1.75);
+                        resetAutoHideTimer();
+                      }}
+                      className={`py-2 rounded-xl border text-xs font-semibold transition-all ${
+                        zoomFactor === 1.75
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-current/20 opacity-70'
+                      }`}
+                    >
+                      Large (175%)
+                    </button>
+                    <button
+                      onClick={() => {
+                        setZoomFactor(2.2);
+                        resetAutoHideTimer();
+                      }}
+                      className={`py-2 rounded-xl border text-xs font-semibold transition-all ${
+                        zoomFactor === 2.2
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-current/20 opacity-70'
+                      }`}
+                    >
+                      220%
+                    </button>
+                  </div>
+                  <p className="text-[11px] opacity-60">
+                    💡 Pinch with 2 fingers anywhere to zoom freely. Double-tap screen to hide bars while reading!
+                  </p>
+                </div>
+              )}
+
+              {/* Font Style Selection */}
+              <div className="space-y-2">
+                <label className="text-xs font-semibold opacity-75">Font Style</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onClick={() => {
+                      setFontStyle('serif');
+                      resetAutoHideTimer();
+                    }}
+                    className={`py-2 rounded-xl border font-serif text-xs font-semibold transition-all ${
+                      fontStyle === 'serif'
+                        ? 'border-primary bg-primary/10 text-primary ring-1 ring-primary'
+                        : 'border-current/20 opacity-70'
+                    }`}
+                  >
+                    Serif (Book)
+                  </button>
+                  <button
+                    onClick={() => {
+                      setFontStyle('sans');
+                      resetAutoHideTimer();
+                    }}
+                    className={`py-2 rounded-xl border font-sans text-xs font-semibold transition-all ${
+                      fontStyle === 'sans'
+                        ? 'border-primary bg-primary/10 text-primary ring-1 ring-primary'
+                        : 'border-current/20 opacity-70'
+                    }`}
+                  >
+                    Sans-Serif
+                  </button>
+                  <button
+                    onClick={() => {
+                      setFontStyle('mono');
+                      resetAutoHideTimer();
+                    }}
+                    className={`py-2 rounded-xl border font-mono text-xs font-semibold transition-all ${
+                      fontStyle === 'mono'
+                        ? 'border-primary bg-primary/10 text-primary ring-1 ring-primary'
+                        : 'border-current/20 opacity-70'
+                    }`}
+                  >
+                    Monospace
+                  </button>
+                </div>
+              </div>
+
+              {/* Background Theme */}
+              <div className="space-y-2">
+                <label className="text-xs font-semibold opacity-75">Reading Color Theme</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onClick={() => {
+                      setTheme('dark');
+                      resetAutoHideTimer();
+                    }}
+                    className={`py-2.5 px-3 rounded-xl border flex items-center justify-center gap-1.5 text-xs font-semibold bg-[#0d1017] text-white transition-all ${
+                      theme === 'dark' ? 'ring-2 ring-primary border-primary' : 'border-white/10'
+                    }`}
+                  >
+                    <Moon className="h-3.5 w-3.5 text-indigo-400" />
+                    Dark
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setTheme('sepia');
+                      resetAutoHideTimer();
+                    }}
+                    className={`py-2.5 px-3 rounded-xl border flex items-center justify-center gap-1.5 text-xs font-semibold bg-[#f8f1e3] text-[#433422] transition-all ${
+                      theme === 'sepia' ? 'ring-2 ring-amber-500 border-amber-600' : 'border-amber-300/40'
+                    }`}
+                  >
+                    <Sun className="h-3.5 w-3.5 text-amber-600" />
+                    Sepia
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setTheme('light');
+                      resetAutoHideTimer();
+                    }}
+                    className={`py-2.5 px-3 rounded-xl border flex items-center justify-center gap-1.5 text-xs font-semibold bg-white text-gray-900 transition-all ${
+                      theme === 'light' ? 'ring-2 ring-blue-500 border-blue-500' : 'border-gray-200'
+                    }`}
+                  >
+                    <Sun className="h-3.5 w-3.5 text-amber-500" />
+                    Light
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

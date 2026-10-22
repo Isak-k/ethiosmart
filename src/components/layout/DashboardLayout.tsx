@@ -40,14 +40,18 @@ import {
   User,
   MessageSquare,
   Brain,
+  BookOpen,
+  Library,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface DashboardLayoutProps {
   children: ReactNode;
+  contentClassName?: string;
 }
 
-export function DashboardLayout({ children }: DashboardLayoutProps) {
+export function DashboardLayout({ children, contentClassName }: DashboardLayoutProps) {
   const { profile, role } = useAuth();
   const { hasPermission, isSuperAdmin } = usePermissions();
   const { canView } = useSectionPermissions();
@@ -63,9 +67,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   };
 
   const studentLinks = React.useMemo(() => [
+    { href: "/dashboard/exams", label: "Exams", icon: ClipboardList },
     { href: "/dashboard", label: t("dashboard.menu.dashboard"), icon: LayoutDashboard },
-    { href: "/dashboard/exams", label: t("dashboard.menu.availableExams"), icon: ClipboardList },
     { href: "/dashboard/results", label: t("dashboard.menu.myResults"), icon: Trophy },
+    { href: "/dashboard/books", label: "Books", icon: BookOpen },
     { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
     { href: "/dashboard/ai-assistant", label: t("aiAssistant.title", "AI Study Assistant"), icon: Brain, permission: 'viewAIAssistant' },
   ], [t]);
@@ -73,12 +78,15 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const allAdminLinks = React.useMemo(() => [
     { href: "/dashboard", label: t("dashboard.menu.dashboard"), icon: LayoutDashboard, permission: 'viewDashboard' },
     { href: "/dashboard/admin/exams", label: t("dashboard.menu.manageExams"), icon: FileText, permission: 'viewAllExams' },
+    { href: "/dashboard/admin/ai-generator", label: "AI Exam Generator", icon: Sparkles, permission: 'viewAllExams' },
+    { href: "/dashboard/admin/books", label: "Books", icon: Library, permission: 'viewAllExams' },
     { href: "/dashboard/all-results", label: t("dashboard.menu.allResults"), icon: Trophy, permission: 'viewAllResults' },
     { href: "/dashboard/students", label: t("dashboard.menu.students"), icon: Users, permission: 'viewStudents' },
     { href: "/dashboard/feedback", label: "Feedback", icon: MessageSquare, permission: 'viewStudents' },
     { href: "/dashboard/ai-assistant", label: t("aiAssistant.title", "AI Study Assistant"), icon: Brain, permission: 'viewAIAssistant' },
     { href: "/dashboard/leaderboard-admin", label: "Leaderboard Admin", icon: Trophy, permission: 'viewLeaderboard' },
-    { href: "/dashboard/departments", label: t("dashboard.menu.departments"), icon: Building, permission: 'viewDepartments' },
+    { href: "/dashboard/admin/subjects", label: "Subjects", icon: BookOpen },
+    { href: "/dashboard/departments", label: t("dashboard.menu.departments", "Departments"), icon: Building, permission: 'viewDepartments' },
     ...(isSuperAdmin ? [{ href: "/dashboard/super-admin", label: "Super Admin", icon: Shield, permission: 'viewExaminers' }] : []),
   ], [t, isSuperAdmin]);
 
@@ -115,7 +123,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           >
             {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
-          <Link to="/dashboard" className="flex items-center gap-2">
+          <Link to={role === "admin" ? "/dashboard" : "/dashboard/exams"} className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
               <GraduationCap className="h-5 w-5 text-primary-foreground" />
             </div>
@@ -160,7 +168,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="h-20 flex items-center gap-3 px-6 border-b border-white/10 bg-gradient-to-r from-cyan-600 to-teal-600">
+          <Link
+            to={role === "admin" ? "/dashboard" : "/dashboard/exams"}
+            className="h-20 flex items-center gap-3 px-6 border-b border-white/10 bg-gradient-to-r from-cyan-600 to-teal-600 hover:opacity-95 transition-opacity"
+          >
             <div className="h-10 w-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-md">
               <GraduationCap className="h-6 w-6 text-white" />
             </div>
@@ -172,7 +183,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 Student Portal
               </span>
             </div>
-          </div>
+          </Link>
 
           {/* Navigation */}
           <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
@@ -250,76 +261,86 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Main content */}
       <main className="lg:ml-64 min-h-screen pt-16 lg:pt-16 pb-20 lg:pb-0">
-        <div className="p-6 lg:p-8">{children}</div>
+        <div className={cn("p-6 lg:p-8", contentClassName)}>{children}</div>
       </main>
 
       {/* Mobile Bottom Navigation */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 shadow-lg">
-        <div className="grid grid-cols-4 gap-1 px-2 py-2">
-          {links.slice(0, 3).map((link) => {
-            const isActive = location.pathname === link.href;
-            return (
+        <div className={cn("grid gap-1 px-2 py-2", role === "admin" ? "grid-cols-4" : "grid-cols-5")}>
+          {role === "admin" ? (
+            <>
+              {links.slice(0, 3).map((link) => {
+                const isActive = location.pathname === link.href;
+                return (
+                  <Link
+                    key={link.href}
+                    to={link.href}
+                    className={cn(
+                      "flex flex-col items-center justify-center gap-1 py-2 px-2 rounded-xl transition-all",
+                      isActive
+                        ? "bg-primary/10 text-primary"
+                        : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    )}
+                  >
+                    <link.icon className={cn(
+                      "h-6 w-6",
+                      isActive && "scale-110"
+                    )} />
+                    <span className="text-[10px] font-medium truncate max-w-full">
+                      {link.label}
+                    </span>
+                    {isActive && (
+                      <div className="w-1 h-1 rounded-full bg-primary mt-0.5" />
+                    )}
+                  </Link>
+                );
+              })}
+              
               <Link
-                key={link.href}
-                to={link.href}
+                to="/dashboard/students"
                 className={cn(
                   "flex flex-col items-center justify-center gap-1 py-2 px-2 rounded-xl transition-all",
-                  isActive
+                  location.pathname === "/dashboard/students"
                     ? "bg-primary/10 text-primary"
                     : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
                 )}
               >
-                <link.icon className={cn(
-                  "h-6 w-6",
-                  isActive && "scale-110"
-                )} />
+                <Users className="h-6 w-6" />
                 <span className="text-[10px] font-medium truncate max-w-full">
-                  {link.label}
+                  {t("dashboard.menu.students")}
                 </span>
-                {isActive && (
+                {location.pathname === "/dashboard/students" && (
                   <div className="w-1 h-1 rounded-full bg-primary mt-0.5" />
                 )}
               </Link>
-            );
-          })}
-          
-          {/* Shortcut: Admin → Students, Student → Messages */}
-          {role === "admin" ? (
-            <Link
-              to="/dashboard/students"
-              className={cn(
-                "flex flex-col items-center justify-center gap-1 py-2 px-2 rounded-xl transition-all",
-                location.pathname === "/dashboard/students"
-                  ? "bg-primary/10 text-primary"
-                  : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
-              )}
-            >
-              <Users className="h-6 w-6" />
-              <span className="text-[10px] font-medium truncate max-w-full">
-                {t("dashboard.menu.students")}
-              </span>
-              {location.pathname === "/dashboard/students" && (
-                <div className="w-1 h-1 rounded-full bg-primary mt-0.5" />
-              )}
-            </Link>
+            </>
           ) : (
-            <Link
-              to="/dashboard/messages"
-              className={cn(
-                "flex flex-col items-center justify-center gap-1 py-2 px-2 rounded-xl transition-all",
-                location.pathname === "/dashboard/messages"
-                  ? "bg-primary/10 text-primary"
-                  : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
-              )}
-            >
-              <MessageSquare className="h-6 w-6" />
-              <span className="text-[10px] font-medium truncate max-w-full">
-                Messages
-              </span>
-              {location.pathname === "/dashboard/messages" && (
-                <div className="w-1 h-1 rounded-full bg-primary mt-0.5" />
-              )}
-            </Link>
+            links.slice(0, 5).map((link) => {
+              const isActive = location.pathname === link.href;
+              return (
+                <Link
+                  key={link.href}
+                  to={link.href}
+                  className={cn(
+                    "flex flex-col items-center justify-center gap-1 py-1.5 px-1 rounded-xl transition-all",
+                    isActive
+                      ? "bg-primary/10 text-primary"
+                      : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  )}
+                >
+                  <link.icon className={cn(
+                    "h-5 w-5",
+                    isActive && "scale-110"
+                  )} />
+                  <span className="text-[9px] font-medium truncate max-w-full">
+                    {link.label}
+                  </span>
+                  {isActive && (
+                    <div className="w-1 h-1 rounded-full bg-primary mt-0.5" />
+                  )}
+                </Link>
+              );
+            })
           )}
         </div>
       </nav>

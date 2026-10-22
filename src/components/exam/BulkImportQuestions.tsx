@@ -49,7 +49,7 @@ export function BulkImportQuestions({ examId, onImportSuccess, currentQuestionCo
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [questionCount, setQuestionCount] = useState(20); // Default 20 questions
-  const [apiKey, setApiKey] = useState(""); // User-provided API key
+  const [apiKey, setApiKey] = useState(import.meta.env.VITE_GEMINI_API_KEY || ""); // Loaded from .env or entered by user
   const [parseResult, setParseResult] = useState<ParseResult | null>(null);
   const { toast } = useToast();
 
@@ -310,6 +310,7 @@ ${pdfText.substring(0, 30000)}`; // Limit to 30k chars to avoid token limits
         orderIndex: currentQuestionCount + index + 1, // Append to end
         feedbackType: 'hidden', // Default feedback
         explanation: q.explanation.trim() || undefined,
+        imageUrl: q.imageUrl || undefined,
       }));
 
       const importResult = await saveQuestionsBatch(examId, questionsToSave);

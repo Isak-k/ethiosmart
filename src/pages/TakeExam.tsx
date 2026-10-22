@@ -30,6 +30,7 @@ import {
   convertToExamQuestions 
 } from "@/lib/exam-mode-engine";
 import { QuestionCard } from "@/components/exam/QuestionCard";
+import { QuestionImageDisplay } from "@/components/exam/QuestionImageDisplay";
 import { ExamTimer } from "@/components/exam/ExamTimer";
 import { PracticeModeDialog } from "@/components/exam/PracticeModeSelector";
 import { KeyboardShortcutsHelp } from "@/components/exam/KeyboardShortcutsHelp";
@@ -891,6 +892,13 @@ const TakeExam = () => {
                         </p>
                       </div>
                     </div>
+                    {currentQuestion.imageUrl && (
+                      <QuestionImageDisplay
+                        imageUrl={currentQuestion.imageUrl}
+                        alt={`Question ${currentIndex + 1} illustration`}
+                        className="sm:pl-14"
+                      />
+                    )}
                     <div className="space-y-2 sm:pl-14">
                       <Label htmlFor={`answer-${currentQuestion.questionId}`}>Your answer</Label>
                       <Textarea
@@ -907,6 +915,7 @@ const TakeExam = () => {
                   <QuestionCard
                     questionNumber={currentIndex + 1}
                     questionText={currentQuestion.questionText}
+                    imageUrl={currentQuestion.imageUrl}
                     options={currentQuestion.options || []}
                     selectedOption={typeof answers.get(currentQuestion.questionId) === 'number' ? answers.get(currentQuestion.questionId) as number : null}
                     correctOption={currentQuestion.correctOptionIndex}
@@ -916,6 +925,7 @@ const TakeExam = () => {
                     marks={currentQuestion.marks}
                     explanation={currentQuestion.explanation}
                     mode={practiceMode || 'exam'}
+                    isPracticeExam={examType === 'practice'}
                   />
                 )}
 

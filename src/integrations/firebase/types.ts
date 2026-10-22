@@ -22,6 +22,8 @@ export interface Department {
   createdAt: Timestamp;
 }
 
+export * from '@/types/subject';
+
 export type ExamType = 'normal' | 'practice';
 export type PracticeModeType = 'practice' | 'exam';
 
@@ -38,6 +40,9 @@ export interface Exam {
   examId: string;
   title: string;
   description: string | null;
+  subjectId?: string; // Association with Subject
+  chapterId?: string; // Optional association with Chapter
+  chapterTitle?: string;
   departmentId?: string; // Legacy single department support
   departmentIds?: string[]; // New multiple departments support
   createdBy: string;
@@ -66,6 +71,7 @@ export interface Question {
   examId: string;
   questionText: string;
   questionType: 'mcq' | 'truefalse' | 'shortanswer' | 'essay'; // Question type
+  imageUrl?: string; // Optional image URL for image-based questions (Cloudinary or direct upload)
   options?: string[]; // For MCQ and True/False
   correctOptionIndex?: number; // For MCQ and True/False
   correctAnswer?: string; // For Short Answer
@@ -73,6 +79,10 @@ export interface Question {
   orderIndex: number;
   feedbackType: 'instant' | 'hidden';
   explanation?: string;
+  subject?: string;
+  topic?: string;
+  difficulty?: 'Easy' | 'Medium' | 'Hard';
+  generatedByAI?: boolean;
   createdAt: Timestamp;
 }
 

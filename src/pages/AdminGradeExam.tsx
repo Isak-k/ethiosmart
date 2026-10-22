@@ -10,15 +10,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ArrowLeft, AlertCircle, CheckCircle, XCircle, Pencil, Trash2 } from "lucide-react";
+import { Loader2, ArrowLeft, AlertCircle, CheckCircle, XCircle, Pencil, Trash2, Lightbulb } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { QuestionImageDisplay } from "@/components/exam/QuestionImageDisplay";
 import { useGranularPermissions } from "@/hooks/useGranularPermissions";
 
 interface QuestionData {
   questionId: string;
   questionText: string;
   questionType: 'mcq' | 'truefalse' | 'shortanswer' | 'essay';
+  imageUrl?: string;
   options?: string[];
   correctOptionIndex?: number;
   correctAnswer?: string;
@@ -159,7 +161,7 @@ const AdminGradeExam = () => {
 
     setGradingInProgress(true);
     try {
-      const isCorrect = grade === question.marks;
+      const isCorrect = grade > 0;
       const updatedScore = await saveAnswerGrade(attemptId, questionId, grade, isCorrect, user?.uid);
       setAttemptData(current => current ? { ...current, ...updatedScore } : current);
 
@@ -172,21 +174,19 @@ const AdminGradeExam = () => {
         },
       }));
 
-      setEditingGrades({
-        ...editingGrades,
-        [questionId]: undefined,
+      setEditingGrades(prev => {
+        const next = { ...prev };
+        delete next[questionId];
+        return next;
       });
 
-      toast({
-        title: "Grade saved",
+      toast.success("Grade saved", {
         description: `Question graded with ${grade}/${question.marks} marks`,
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error saving grade:", err);
-      toast({
-        title: "Error",
-        description: "Failed to save grade",
-        variant: "destructive",
+      toast.error("Failed to save grade", {
+        description: err?.message || "Could not save grade",
       });
     } finally {
       setGradingInProgress(false);
@@ -211,8 +211,7 @@ const AdminGradeExam = () => {
       } : null;
 
       await deleteAttemptProtected(userProfile, attemptId);
-      toast({
-        title: "Result deleted",
+      toast.success("Result deleted", {
         description: `${attemptData?.studentName}'s exam result has been permanently deleted.`,
       });
       
@@ -222,10 +221,8 @@ const AdminGradeExam = () => {
       }, 1000);
     } catch (err: any) {
       console.error("Error deleting attempt:", err);
-      toast({
-        title: "Error",
-        description: err.message || "Failed to delete exam result",
-        variant: "destructive",
+      toast.error("Failed to delete exam result", {
+        description: err?.message || "Permission denied or network error",
       });
     } finally {
       setDeleting(false);
@@ -248,6 +245,12 @@ const AdminGradeExam = () => {
                   <Badge variant="secondary">{question.marks} marks</Badge>
                 </div>
                 <p className="text-lg font-semibold mt-2">{question.questionText}</p>
+                {question.imageUrl && (
+                  <QuestionImageDisplay
+                    imageUrl={question.imageUrl}
+                    alt="Question Diagram"
+                  />
+                )}
               </div>
             </div>
 
@@ -294,9 +297,12 @@ const AdminGradeExam = () => {
                   </div>
                 )}
                 {question.explanation && (
-                  <div className="mt-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30">
-                    <p className="text-sm font-semibold text-blue-900 dark:text-blue-200">Explanation:</p>
-                    <p className="text-sm text-blue-800 dark:text-blue-300 mt-1">{question.explanation}</p>
+                  <div className="mt-3 p-4 sm:p-5 rounded-2xl bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 text-foreground">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <Lightbulb className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <p className="text-sm sm:text-base font-semibold text-foreground">Pedagogical Explanation</p>
+                    </div>
+                    <p className="text-base sm:text-lg leading-relaxed whitespace-pre-wrap">{question.explanation}</p>
                   </div>
                 )}
               </div>
@@ -314,6 +320,15 @@ const AdminGradeExam = () => {
                     <p className="p-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-300 dark:border-green-700 mt-1">
                       {question.correctAnswer}
                     </p>
+                  </div>
+                )}
+                {question.explanation && (
+                  <div className="mt-3 p-4 sm:p-5 rounded-2xl bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 text-foreground">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <Lightbulb className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <p className="text-sm sm:text-base font-semibold text-foreground">Pedagogical Explanation</p>
+                    </div>
+                    <p className="text-base sm:text-lg leading-relaxed whitespace-pre-wrap">{question.explanation}</p>
                   </div>
                 )}
                 <div className="pt-2">
@@ -401,6 +416,15 @@ const AdminGradeExam = () => {
                     {answer?.studentAnswer || "No answer provided"}
                   </div>
                 </div>
+                {question.explanation && (
+                  <div className="mt-3 p-4 sm:p-5 rounded-2xl bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 text-foreground">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <Lightbulb className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <p className="text-sm sm:text-base font-semibold text-foreground">Pedagogical Explanation / Rubric</p>
+                    </div>
+                    <p className="text-base sm:text-lg leading-relaxed whitespace-pre-wrap">{question.explanation}</p>
+                  </div>
+                )}
                 <div>
                   <p className="text-sm font-semibold mb-2">Grade:</p>
                   {editingGrades[question.questionId] === undefined ? (

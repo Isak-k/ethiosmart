@@ -31,6 +31,11 @@ export function useStudentRank(
   const [previousRank, setPreviousRank] = useState<number | null>(null);
   
   const unsubscribeRef = useRef<Unsubscribe | null>(null);
+  const rankRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    rankRef.current = rank;
+  }, [rank]);
 
   const fetchStudentRank = useCallback(async () => {
     if (!departmentId || !studentId) {
@@ -43,18 +48,13 @@ export function useStudentRank(
       setLoading(true);
       setError(null);
 
-      // Fetch leaderboard data (uses cache-first approach)
       const response = await getLeaderboard(departmentId);
-
-      // Find the student in the leaderboard entries
       const studentEntry = response.entries.find(
         (entry: LeaderboardEntry) => entry.studentId === studentId
       );
 
       if (studentEntry) {
-        // Store previous rank for animation detection
-        setPreviousRank(rank);
-        
+        setPreviousRank((current) => current ?? rankRef.current);
         setRank(studentEntry.rankPosition);
         setTotalPoints(studentEntry.totalPoints);
         setAverageScore(studentEntry.averageScore);
@@ -62,8 +62,7 @@ export function useStudentRank(
         setError(null);
         setIsConnected(true);
       } else {
-        // Student not found in leaderboard (no exams taken yet)
-        setPreviousRank(rank);
+        setPreviousRank((current) => current ?? rankRef.current);
         setRank(null);
         setTotalPoints(0);
         setAverageScore(0);
@@ -75,8 +74,7 @@ export function useStudentRank(
       console.error('Error fetching student rank:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch student rank');
       setIsConnected(false);
-      // Don't clear data on error - keep showing cached data
-      if (rank === null) {
+      if (rankRef.current === null) {
         setRank(null);
         setTotalPoints(0);
         setAverageScore(0);
@@ -85,7 +83,7 @@ export function useStudentRank(
     } finally {
       setLoading(false);
     }
-  }, [departmentId, studentId, rank]);
+  }, [departmentId, studentId]);
 
   // Initial fetch on mount or when dependencies change
   useEffect(() => {
@@ -98,7 +96,6 @@ export function useStudentRank(
       return;
     }
 
-    // Clean up previous listener if exists
     if (unsubscribeRef.current) {
       unsubscribeRef.current();
       unsubscribeRef.current = null;
@@ -107,30 +104,22 @@ export function useStudentRank(
     try {
       const db = getFirestore();
       const cacheRef = doc(db, 'leaderboardCache', departmentId);
-
-      // Set up real-time listener
       const unsubscribe = onSnapshot(
         cacheRef,
         (snapshot) => {
           if (snapshot.exists()) {
             const cacheData = snapshot.data();
-            
-            // Check if cache is still valid
             const now = Date.now();
             const expiresAt = cacheData.expiresAt?.toMillis();
-            
+
             if (expiresAt && expiresAt >= now) {
               const entries = cacheData.entries || [];
-              
-              // Find the student in the updated entries
               const studentEntry = entries.find(
                 (entry: LeaderboardEntry) => entry.studentId === studentId
               );
 
               if (studentEntry) {
-                // Store previous rank for animation detection
-                setPreviousRank(rank);
-                
+                setPreviousRank((current) => current ?? rankRef.current);
                 setRank(studentEntry.rankPosition);
                 setTotalPoints(studentEntry.totalPoints);
                 setAverageScore(studentEntry.averageScore);
@@ -139,8 +128,7 @@ export function useStudentRank(
                 setIsConnected(true);
                 setLoading(false);
               } else {
-                // Student not found in updated leaderboard
-                setPreviousRank(rank);
+                setPreviousRank((current) => current ?? rankRef.current);
                 setRank(null);
                 setTotalPoints(0);
                 setAverageScore(0);
@@ -154,19 +142,16 @@ export function useStudentRank(
         },
         (err) => {
           console.error('Error in student rank listener:', err);
-          // Only set error if it's not a Firebase initialization error (test environment)
           if (!err.message?.includes('No Firebase App')) {
             setError('Real-time connection lost');
             setIsConnected(false);
           }
-          // Don't clear data on listener error - keep showing cached data
         }
       );
 
       unsubscribeRef.current = unsubscribe;
     } catch (err) {
       console.error('Error setting up student rank listener:', err);
-      // Only set error if it's not a Firebase initialization error (test environment)
       const errorMessage = err instanceof Error ? err.message : '';
       if (!errorMessage.includes('No Firebase App')) {
         setError('Failed to set up real-time updates');
@@ -174,14 +159,13 @@ export function useStudentRank(
       }
     }
 
-    // Cleanup listener on unmount or when dependencies change
     return () => {
       if (unsubscribeRef.current) {
         unsubscribeRef.current();
         unsubscribeRef.current = null;
       }
     };
-  }, [departmentId, studentId, enableRealtime, rank]);
+  }, [departmentId, studentId, enableRealtime]);
 
   // Refetch function for manual refresh
   const refetch = useCallback(() => {

@@ -14,7 +14,7 @@ const Index = () => {
 
   useEffect(() => {
     if (!loading && user && role) {
-      navigate("/dashboard");
+      navigate(role === "admin" ? "/dashboard" : "/dashboard/exams");
     }
   }, [user, role, loading, navigate]);
 

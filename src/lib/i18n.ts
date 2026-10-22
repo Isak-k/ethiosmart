@@ -407,7 +407,7 @@ const resources = {
           "examiners": "Examiners",
           "departments": "Departments",
           "myResults": "My Results",
-          "availableExams": "Available Exams"
+          "availableExams": "Exams"
         },
         "stats": {
           "totalExams": "Total Exams",

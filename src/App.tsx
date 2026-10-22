@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { PermissionsProvider } from "@/contexts/PermissionsContext";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { GradingErrorBoundary } from "@/components/admin/GradingErrorBoundary";
 import { GraduationCap } from "lucide-react";
 import "./lib/i18n";
 import Index from "./pages/Index";
@@ -43,6 +44,14 @@ import SuperAdmin from "./pages/SuperAdmin";
 import PermissionTest from "./pages/PermissionTest";
 import AIStudyAssistant from "./pages/AIStudyAssistant";
 import PracticeExamResultsPage from "./pages/PracticeExamResultsPage";
+import StudentSubjects from "./pages/StudentSubjects";
+import AdminSubjects from "./pages/AdminSubjects";
+import AdminAIGenerator from "./pages/AdminAIGenerator";
+import AdminBooks from "./pages/AdminBooks";
+import AdminShortnotesStudio from "./pages/AdminShortnotesStudio";
+import StudentBooks from "./pages/StudentBooks";
+import BookDetails from "./pages/BookDetails";
+import BookReader from "./pages/BookReader";
 
 const queryClient = new QueryClient();
 
@@ -82,6 +91,7 @@ function AppRoutes() {
         <Route path="/" element={<Index />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/about" element={<About />} />
+        <Route path="/subjects" element={<StudentSubjects />} />
         <Route path="/firebase-test" element={<FirebaseTest />} />
         <Route path="/firebase-diagnostic" element={<FirebaseDiagnostic />} />
         <Route path="/admin-setup" element={<AdminSetup />} />
@@ -100,6 +110,7 @@ function AppRoutes() {
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           
         {/* Admin Routes - Restricted to Admins; fine-grained via permissions where needed */}
+        <Route path="/dashboard/admin/ai-generator" element={<ProtectedRoute allowedRoles={["admin"]}><AdminAIGenerator /></ProtectedRoute>} />
         <Route path="/dashboard/admin/exams" element={
           <ProtectedRoute allowedRoles={["admin"]}>
             <AdminExams />
@@ -137,6 +148,26 @@ function AppRoutes() {
             <ManageExaminers />
           </ProtectedRoute>
         } />
+        <Route path="/dashboard/admin/subjects" element={
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <AdminSubjects />
+          </ProtectedRoute>
+        } />
+        <Route path="/dashboard/admin/books" element={
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <AdminBooks />
+          </ProtectedRoute>
+        } />
+        <Route path="/dashboard/admin/shortnotes/create" element={
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <AdminShortnotesStudio />
+          </ProtectedRoute>
+        } />
+        <Route path="/dashboard/admin/shortnotes/edit/:id" element={
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <AdminShortnotesStudio />
+          </ProtectedRoute>
+        } />
         <Route path="/dashboard/departments" element={
           <ProtectedRoute allowedRoles={["admin"]}>
             <ManageDepartments />
@@ -149,7 +180,9 @@ function AppRoutes() {
         } />
         <Route path="/dashboard/admin/grade/:attemptId" element={
           <ProtectedRoute allowedRoles={["admin"]}>
-            <AdminGradeExam />
+            <GradingErrorBoundary>
+              <AdminGradeExam />
+            </GradingErrorBoundary>
           </ProtectedRoute>
         } />
         <Route path="/dashboard/analytics" element={
@@ -174,9 +207,29 @@ function AppRoutes() {
         } />
         
         {/* Student Routes */}
+        <Route path="/dashboard/subjects" element={
+          <ProtectedRoute allowedRoles={["student", "admin"]}>
+            <StudentSubjects />
+          </ProtectedRoute>
+        } />
         <Route path="/dashboard/exams" element={
           <ProtectedRoute allowedRoles={["student"]}>
             <StudentExams />
+          </ProtectedRoute>
+        } />
+        <Route path="/dashboard/books" element={
+          <ProtectedRoute allowedRoles={["student", "admin"]}>
+            <StudentBooks />
+          </ProtectedRoute>
+        } />
+        <Route path="/dashboard/books/:bookId" element={
+          <ProtectedRoute allowedRoles={["student", "admin"]}>
+            <BookDetails />
+          </ProtectedRoute>
+        } />
+        <Route path="/dashboard/books/:bookId/read" element={
+          <ProtectedRoute allowedRoles={["student", "admin"]}>
+            <BookReader />
           </ProtectedRoute>
         } />
         <Route path="/dashboard/results" element={

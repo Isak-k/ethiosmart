@@ -7,6 +7,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PracticeExamResult, getPracticeAnswers } from '@/lib/offline-practice-exam';
 import { getOfflineQuestions } from '@/lib/offline-storage';
+import { getQuestions } from '@/lib/firebase-exams';
+import { getAnswers } from '@/lib/firebase-attempts';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -18,8 +20,10 @@ import {
   Award,
   ArrowLeft,
   Download,
+  Lightbulb,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { QuestionImageDisplay } from "@/components/exam/QuestionImageDisplay";
 
 interface PracticeExamResultsProps {
   result: PracticeExamResult;
@@ -44,11 +48,26 @@ export function PracticeExamResults({
   useEffect(() => {
     const loadReviewData = async () => {
       try {
-        const practiceAnswers = await getPracticeAnswers(attemptId);
-        setAnswers(practiceAnswers);
+        let practiceAnswers = await getPracticeAnswers(attemptId);
+        if (!practiceAnswers || practiceAnswers.length === 0) {
+          try {
+            const fbAnswers = await getAnswers(attemptId);
+            practiceAnswers = fbAnswers as any[];
+          } catch (e) {
+            console.warn('Could not fetch practice answers from Firebase:', e);
+          }
+        }
+        setAnswers(practiceAnswers || []);
 
-        const offlineQuestions = await getOfflineQuestions(result.examId);
-        setQuestions(offlineQuestions);
+        let loadedQuestions = await getOfflineQuestions(result.examId);
+        if (!loadedQuestions || loadedQuestions.length === 0) {
+          try {
+            loadedQuestions = await getQuestions(result.examId);
+          } catch (e) {
+            console.warn('Could not fetch questions from Firebase:', e);
+          }
+        }
+        setQuestions(loadedQuestions || []);
 
         setLoading(false);
       } catch (error) {
@@ -59,6 +78,39 @@ export function PracticeExamResults({
 
     loadReviewData();
   }, [attemptId, result.examId]);
+
+  const getUserAnswerText = (ans: any, q: any): string => {
+    if (ans?.studentAnswer && String(ans.studentAnswer).trim().length > 0) {
+      return String(ans.studentAnswer).trim();
+    }
+    const optIdx = typeof ans?.selectedOptionIndex === 'number'
+      ? ans.selectedOptionIndex
+      : typeof ans?.selectedOption === 'number'
+      ? ans.selectedOption
+      : null;
+
+    if (optIdx !== null && optIdx >= 0 && q?.options && q.options[optIdx]) {
+      return q.options[optIdx];
+    }
+    if (optIdx !== null && optIdx >= 0) {
+      return `Option ${String.fromCharCode(65 + optIdx)}`;
+    }
+    return 'No answer provided / Skipped';
+  };
+
+  const getCorrectAnswerText = (q: any): string => {
+    if (!q) return 'Not available';
+    if (q.options && typeof q.correctOptionIndex === 'number' && q.options[q.correctOptionIndex]) {
+      return q.options[q.correctOptionIndex];
+    }
+    if (q.correctAnswer && String(q.correctAnswer).trim().length > 0) {
+      return String(q.correctAnswer).trim();
+    }
+    if (typeof q.correctOptionIndex === 'number' && q.correctOptionIndex >= 0) {
+      return `Option ${String.fromCharCode(65 + q.correctOptionIndex)}`;
+    }
+    return 'Not specified';
+  };
 
   const formatTime = (seconds: number): string => {
     const hours = Math.floor(seconds / 3600);
@@ -132,43 +184,47 @@ export function PracticeExamResults({
   const isPassed = result.percentage >= passPercentage;
 
   return (
-    <div className="md:container md:mx-auto w-screen md:w-auto mx-[calc(-50vw+50%)] md:mx-auto space-y-6 px-4">
+    <div className="w-full space-y-4 sm:space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between px-3.5 sm:px-0">
         <Button
           variant="ghost"
           size="sm"
           onClick={() => navigate(-1)}
-          className="gap-2"
+          className="gap-1.5 rounded-xl text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
         </Button>
-        <h1 className="text-3xl font-bold">{examTitle}</h1>
-        <div className="w-20" /> {/* Spacer for alignment */}
+        <h1 className="text-xl sm:text-2xl font-display font-bold text-center truncate max-w-[70%] text-foreground">{examTitle}</h1>
+        <div className="w-16" /> {/* Spacer for alignment */}
       </div>
 
-      {/* Result Summary Card */}
-      <Card className={isPassed ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50'}>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      {/* Result Summary Card (Edge-to-edge on mobile for clean reading) */}
+      <Card className={`rounded-none sm:rounded-2xl border-x-0 sm:border shadow-none sm:shadow-sm ${
+        isPassed
+          ? 'border-emerald-500/30 bg-emerald-500/10 text-foreground dark:bg-emerald-950/20'
+          : 'border-amber-500/30 bg-amber-500/10 text-foreground dark:bg-amber-950/20'
+      }`}>
+        <CardHeader className="px-3.5 sm:px-6 pt-5 pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg sm:text-xl font-display font-bold">
             {isPassed ? (
               <>
-                <CheckCircle className="w-6 h-6 text-green-600" />
-                <span className="text-green-600">Excellent! You Passed!</span>
+                <CheckCircle className="w-6 h-6 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span className="text-emerald-700 dark:text-emerald-400">Excellent! You Passed!</span>
               </>
             ) : (
               <>
-                <Award className="w-6 h-6 text-amber-600" />
-                <span className="text-amber-600">Keep Practicing!</span>
+                <Award className="w-6 h-6 text-amber-600 dark:text-amber-400 shrink-0" />
+                <span className="text-amber-700 dark:text-amber-400">Keep Practicing!</span>
               </>
             )}
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 px-3.5 sm:px-6 pb-5">
           {/* Motivational Message */}
           {!isPassed && (
-            <p className="text-sm text-amber-700 font-medium">
+            <p className="text-xs sm:text-sm text-amber-700 dark:text-amber-400/90 font-medium">
               Great effort! You're on the right track. Review your answers and practice again to improve your score.
             </p>
           )}
@@ -176,131 +232,181 @@ export function PracticeExamResults({
           {/* Score Display */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-sm text-muted-foreground mb-1">Total Score</p>
-              <p className="text-3xl font-bold">
+              <p className="text-xs sm:text-sm text-muted-foreground mb-1">Total Score</p>
+              <p className="text-2xl sm:text-3xl font-display font-bold text-foreground">
                 {result.totalScore}/{result.maxScore}
               </p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground mb-1">Percentage</p>
-              <p className="text-3xl font-bold">{result.percentage.toFixed(1)}%</p>
+              <p className="text-xs sm:text-sm text-muted-foreground mb-1">Percentage</p>
+              <p className="text-2xl sm:text-3xl font-display font-bold text-foreground">{result.percentage.toFixed(1)}%</p>
             </div>
           </div>
 
           {/* Progress Bar */}
           <div>
-            <Progress value={result.percentage} className="h-2" />
+            <Progress value={result.percentage} className="h-2 rounded-full" />
           </div>
 
           {/* Passing Threshold */}
-          <p className="text-sm text-muted-foreground">
-            Passing threshold: {passPercentage}%
+          <p className="text-xs sm:text-sm text-muted-foreground">
+            Passing threshold: <span className="font-semibold text-foreground">{passPercentage}%</span>
           </p>
         </CardContent>
       </Card>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="px-3.5 sm:px-0 grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4">
         {/* Correct Answers */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-green-600" />
-              Correct Answers
+        <Card className="rounded-2xl border shadow-xs bg-card">
+          <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium flex items-center gap-1.5 text-muted-foreground">
+              <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
+              Correct
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-green-600">{result.correctAnswers}</p>
+          <CardContent className="p-3 sm:p-4 pt-0">
+            <p className="text-xl sm:text-2xl font-bold font-display text-emerald-600 dark:text-emerald-400">{result.correctAnswers}</p>
           </CardContent>
         </Card>
 
         {/* Incorrect Answers */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <XCircle className="w-4 h-4 text-red-600" />
-              Incorrect Answers
+        <Card className="rounded-2xl border shadow-xs bg-card">
+          <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium flex items-center gap-1.5 text-muted-foreground">
+              <XCircle className="w-4 h-4 text-rose-500 shrink-0" />
+              Incorrect
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-red-600">{result.incorrectAnswers}</p>
+          <CardContent className="p-3 sm:p-4 pt-0">
+            <p className="text-xl sm:text-2xl font-bold font-display text-rose-600 dark:text-rose-400">{result.incorrectAnswers}</p>
           </CardContent>
         </Card>
 
         {/* Skipped Answers */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Clock className="w-4 h-4 text-gray-600" />
-              Skipped Answers
+        <Card className="rounded-2xl border shadow-xs bg-card">
+          <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium flex items-center gap-1.5 text-muted-foreground">
+              <Clock className="w-4 h-4 text-slate-500 shrink-0" />
+              Skipped
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-gray-600">{result.skippedAnswers}</p>
+          <CardContent className="p-3 sm:p-4 pt-0">
+            <p className="text-xl sm:text-2xl font-bold font-display text-slate-600 dark:text-slate-400">{result.skippedAnswers}</p>
           </CardContent>
         </Card>
 
         {/* Time Spent */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Clock className="w-4 h-4 text-blue-600" />
+        <Card className="rounded-2xl border shadow-xs bg-card">
+          <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium flex items-center gap-1.5 text-muted-foreground">
+              <Clock className="w-4 h-4 text-primary shrink-0" />
               Time Spent
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-blue-600">
+          <CardContent className="p-3 sm:p-4 pt-0">
+            <p className="text-xl sm:text-2xl font-bold font-display text-primary">
               {formatTime(result.timeSpentSeconds)}
             </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Answer Review Section */}
-      {!loading && answers.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Award className="w-5 h-5" />
+      {/* Answer Review Section (Reaches edge of screen on mobile for optimal reading) */}
+      {!loading && (questions.length > 0 || answers.length > 0) && (
+        <Card className="rounded-none sm:rounded-2xl border-x-0 sm:border shadow-none sm:shadow-sm bg-card">
+          <CardHeader className="px-3.5 sm:px-6 pt-5 pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl font-display font-bold">
+              <Award className="w-5 h-5 text-primary" />
               Answer Review
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {answers.map((answer, index) => {
-                const question = questions.find((q) => q.questionId === answer.questionId);
+          <CardContent className="px-0 sm:px-6 pb-6">
+            <div className="space-y-3 sm:space-y-4">
+              {(questions.length > 0
+                ? questions.map((q, idx) => ({
+                    question: q,
+                    answer: answers.find((a) => a.questionId === q.questionId),
+                    index: idx,
+                  }))
+                : answers.map((a, idx) => ({
+                    question: questions.find((q) => q.questionId === a.questionId),
+                    answer: a,
+                    index: idx,
+                  }))
+              ).map(({ question, answer, index }) => {
+                const isCorrect = Boolean(answer?.isCorrect);
+                const userAnswer = getUserAnswerText(answer, question);
+                const correctAnswer = getCorrectAnswerText(question);
+
                 return (
                   <div
-                    key={`${answer.attemptId}-${answer.questionId}`}
-                    className={`p-3 border rounded-lg ${
-                      answer.isCorrect
-                        ? 'border-green-200 bg-green-50'
-                        : 'border-red-200 bg-red-50'
+                    key={`${answer?.attemptId || attemptId}-${question?.questionId || index}`}
+                    className={`border-y sm:border sm:rounded-2xl p-3.5 sm:p-5 transition-all ${
+                      isCorrect
+                        ? 'border-emerald-500/25 bg-emerald-500/5 dark:bg-emerald-950/20'
+                        : 'border-rose-500/25 bg-rose-500/5 dark:bg-rose-950/20'
                     }`}
                   >
-                    <div className="flex items-start gap-2">
-                      {answer.isCorrect ? (
-                        <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex items-start gap-3">
+                      {isCorrect ? (
+                        <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0 mt-0.5" />
                       ) : (
-                        <XCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                        <XCircle className="w-5 h-5 text-rose-600 dark:text-rose-400 flex-shrink-0 mt-0.5" />
                       )}
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium">Question {index + 1}</p>
+                      <div className="flex-1 min-w-0 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-bold text-xs sm:text-sm uppercase tracking-wide text-foreground">
+                            Question {index + 1}
+                          </p>
+                          {isCorrect ? (
+                            <span className="px-2 py-0.5 text-xs font-semibold rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                              ✓ Correct
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 text-xs font-semibold rounded-md bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                              ✗ Incorrect
+                            </span>
+                          )}
+                        </div>
+
                         {question && (
                           <>
-                            <p className="text-sm text-muted-foreground mt-1">
+                            <p className="text-sm sm:text-base font-medium leading-relaxed text-foreground">
                               {question.questionText}
                             </p>
-                            <p className="text-sm mt-2">
-                              <span className="font-medium">Your answer:</span>{' '}
-                              {answer.studentAnswer || question.options?.[answer.selectedOptionIndex] || 'No answer provided'}
-                            </p>
-                            {!answer.isCorrect && question.questionType !== 'shortanswer' && question.questionType !== 'essay' && (
-                              <p className="text-sm mt-1">
-                                <span className="font-medium">Correct answer:</span>{' '}
-                                {question.options?.[question.correctOptionIndex] || 'Not available'}
-                              </p>
+                            {question.imageUrl && (
+                              <QuestionImageDisplay
+                                imageUrl={question.imageUrl}
+                                alt={`Question ${index + 1} illustration`}
+                                maxHeightClass="max-h-56"
+                              />
                             )}
+                            <div className="mt-3 pt-2.5 border-t border-border/60 space-y-2 text-xs sm:text-sm">
+                              <p className="flex flex-wrap items-baseline gap-1.5">
+                                <span className="font-semibold text-muted-foreground">Your answer:</span>{' '}
+                                <span className={isCorrect ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-rose-600 dark:text-rose-400 font-semibold'}>
+                                  {userAnswer}
+                                </span>
+                              </p>
+                              <p className="flex flex-wrap items-baseline gap-1.5">
+                                <span className="font-semibold text-muted-foreground">Correct answer:</span>{' '}
+                                <span className="text-emerald-700 dark:text-emerald-400 font-semibold">
+                                  {correctAnswer}
+                                </span>
+                              </p>
+                              {question.explanation && (
+                                <div className="mt-3.5 p-4 sm:p-5 rounded-2xl bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 dark:border-amber-500/30 text-base sm:text-lg text-foreground leading-relaxed sm:leading-8 shadow-sm">
+                                  <div className="flex items-center gap-2 mb-2 font-semibold text-amber-900 dark:text-amber-200 text-sm sm:text-base">
+                                    <Lightbulb className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                                    <span>Explanation</span>
+                                  </div>
+                                  <div className="whitespace-pre-wrap font-normal">
+                                    {question.explanation}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                           </>
                         )}
                       </div>

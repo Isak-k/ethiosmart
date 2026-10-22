@@ -34,6 +34,9 @@ interface ExamWithStats {
   is_published: boolean;
   question_count: number;
   attempt_count: number;
+  subjectId?: string;
+  chapterTitle?: string;
+  chapterId?: string;
 }
 
 const AdminExams = () => {
@@ -75,6 +78,9 @@ const AdminExams = () => {
             is_published: exam.isPublished,
             question_count: exam.questionCount,
             attempt_count: attempts.length,
+            subjectId: exam.subjectId,
+            chapterTitle: exam.chapterTitle,
+            chapterId: exam.chapterId,
           };
         })
       );

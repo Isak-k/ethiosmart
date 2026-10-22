@@ -39,5 +39,16 @@ service firebase.storage {
                      isImageFile() &&
                      isValidSize();
     }
+
+    // Subject cover images
+    match /subject-covers/{allPaths=**} {
+      // Publicly readable so students can view covers on dashboard and cards
+      allow read: if true;
+      
+      // Authenticated users can upload subject covers
+      allow write: if isAuthenticated() &&
+                     isImageFile() &&
+                     isValidSize();
+    }
   }
 }

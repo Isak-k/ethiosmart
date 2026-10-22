@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { signIn, signUp, AppRole } from "@/lib/auth";
+import { signIn, signUp, getUserRole, AppRole } from "@/lib/auth";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { loginSchema, signupSchema, getLoginSchema, getSignupSchema } from "@/lib/validations";
@@ -94,12 +94,13 @@ export function AuthForm() {
     setLoading(true);
 
     try {
-      await signIn(loginEmail, loginPassword);
+      const { user } = await signIn(loginEmail, loginPassword);
       toast({
         title: "Welcome back!",
         description: "You have been signed in successfully.",
       });
-      navigate("/dashboard");
+      const userRole = await getUserRole(user.uid);
+      navigate(userRole === "admin" ? "/dashboard" : "/dashboard/exams");
     } catch (error: any) {
       toast({
         title: "Sign in failed",
@@ -150,7 +151,7 @@ export function AuthForm() {
         title: "Account created!",
         description: "Welcome to ExamPro!",
       });
-      navigate("/dashboard");
+      navigate(signupRole === "admin" ? "/dashboard" : "/dashboard/exams");
     } catch (error: any) {
       toast({
         title: "Sign up failed",
@@ -179,11 +180,12 @@ export function AuthForm() {
       } else {
         // Existing user - redirect to dashboard
         await refreshProfile();
+        const userRole = await getUserRole(result.user.uid);
         toast({
           title: "Welcome back!",
           description: "You have been signed in with Google.",
         });
-        navigate("/dashboard");
+        navigate(userRole === "admin" ? "/dashboard" : "/dashboard/exams");
       }
     } catch (error: any) {
       setLoading(false);
@@ -214,7 +216,7 @@ export function AuthForm() {
         title: "Profile completed!",
         description: "Welcome to ExamPro!",
       });
-      navigate("/dashboard");
+      navigate("/dashboard/exams");
     } catch (error: any) {
       toast({
         title: "Profile setup failed",

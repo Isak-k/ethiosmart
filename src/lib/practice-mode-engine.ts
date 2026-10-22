@@ -21,6 +21,7 @@ export interface PracticeQuestion {
   explanation?: string;
   feedbackType: 'instant' | 'hidden';
   orderIndex: number;
+  imageUrl?: string;
 }
 
 export interface PracticeModeAnswer {
@@ -176,11 +177,12 @@ export function convertToPracticeQuestions(questions: Question[]): PracticeQuest
   return questions.map((q) => ({
     questionId: q.questionId,
     questionText: q.questionText,
-    options: q.options,
-    correctOptionIndex: q.correctOptionIndex,
+    options: q.options || [],
+    correctOptionIndex: q.correctOptionIndex ?? 0,
     marks: q.marks,
     explanation: q.explanation,
     feedbackType: q.feedbackType,
     orderIndex: q.orderIndex,
+    imageUrl: q.imageUrl,
   }));
 }

@@ -1,7 +1,8 @@
 import { ReactNode, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import type { PermissionKey } from "@/types/permissions";
 
@@ -70,23 +71,81 @@ export function ProtectedRoute({ children, allowedRoles, requireAnyPermissions, 
   }
 
   if (!user) {
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground text-sm">Authenticating...</p>
+        </div>
+      </div>
+    );
   }
 
   if (allowedRoles && role && !allowedRoles.includes(role)) {
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="max-w-md w-full p-6 sm:p-8 rounded-3xl border bg-card text-center space-y-4 shadow-sm animate-fade-in">
+          <div className="h-12 w-12 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto">
+            <AlertCircle className="h-6 w-6" />
+          </div>
+          <h2 className="text-xl font-bold font-display">Access Restricted</h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Your current account role does not have permission to access this page.
+          </p>
+          <Button onClick={() => navigate("/dashboard")} className="rounded-xl">
+            Go to Dashboard
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   if (requireSuperAdmin && !isSuperAdmin) {
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="max-w-md w-full p-6 sm:p-8 rounded-3xl border bg-card text-center space-y-4 shadow-sm animate-fade-in">
+          <div className="h-12 w-12 rounded-2xl bg-destructive/10 text-destructive flex items-center justify-center mx-auto">
+            <AlertCircle className="h-6 w-6" />
+          </div>
+          <h2 className="text-xl font-bold font-display">Super Admin Required</h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            This administration section requires super admin privileges.
+          </p>
+          <Button onClick={() => navigate("/dashboard")} className="rounded-xl">
+            Go to Dashboard
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   // Permission checks for render path as well
   if ((requireAnyPermissions && requireAnyPermissions.length > 0) || (requireAllPermissions && requireAllPermissions.length > 0)) {
-    if (role !== "admin") return null;
+    if (role !== "admin") return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="max-w-md w-full p-6 rounded-2xl border text-center space-y-3">
+          <p className="text-sm text-muted-foreground">Admin permissions required.</p>
+          <Button onClick={() => navigate("/dashboard")} className="rounded-xl">Go to Dashboard</Button>
+        </div>
+      </div>
+    );
     if (!isSuperAdmin) {
-      if (requireAllPermissions && !hasAllPermissions(requireAllPermissions)) return null;
-      if (requireAnyPermissions && !hasAnyPermission(requireAnyPermissions)) return null;
+      if (requireAllPermissions && !hasAllPermissions(requireAllPermissions)) return (
+        <div className="min-h-screen flex items-center justify-center bg-background p-4">
+          <div className="max-w-md w-full p-6 rounded-2xl border text-center space-y-3">
+            <p className="text-sm text-muted-foreground">Additional permissions required.</p>
+            <Button onClick={() => navigate("/dashboard")} className="rounded-xl">Go to Dashboard</Button>
+          </div>
+        </div>
+      );
+      if (requireAnyPermissions && !hasAnyPermission(requireAnyPermissions)) return (
+        <div className="min-h-screen flex items-center justify-center bg-background p-4">
+          <div className="max-w-md w-full p-6 rounded-2xl border text-center space-y-3">
+            <p className="text-sm text-muted-foreground">Additional permissions required.</p>
+            <Button onClick={() => navigate("/dashboard")} className="rounded-xl">Go to Dashboard</Button>
+          </div>
+        </div>
+      );
     }
   }
 

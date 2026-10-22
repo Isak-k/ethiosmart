@@ -780,6 +780,7 @@ const TakeExam = () => {
                   marks={currentQuestion.marks}
                   explanation={currentQuestion.explanation}
                   mode={practiceMode || 'practice'}
+                  isPracticeExam={examType === 'practice'}
                 />
 
                 {/* Flag Button */}

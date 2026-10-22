@@ -51,14 +51,25 @@ import {
   EyeOff,
   GripVertical,
   Users,
+  BookOpen,
+  Layers,
+  Sparkles,
 } from "lucide-react";
 
+import { useAuth } from "@/contexts/AuthContext";
+import { getSubjects, createSubject, addDepartmentToSubject, getChapters } from "@/lib/subjects";
+import { Subject, Chapter } from "@/types/subject";
+import { SubjectChaptersDialog } from "@/components/subject/SubjectChaptersDialog";
+import { SubjectFormDialog } from "@/components/subject/SubjectFormDialog";
+import { getSubjectCover } from "@/lib/subject-covers";
 import { BulkImportQuestions } from "@/components/exam/BulkImportQuestions";
+import { QuestionImageAttachment } from "@/components/exam/QuestionImageAttachment";
 
 interface Question {
   questionId?: string;
   questionText: string;
   questionType: 'mcq' | 'truefalse' | 'shortanswer' | 'essay';
+  imageUrl?: string;
   options: string[];
   correctOptionIndex: number;
   correctAnswer?: string;
@@ -84,6 +95,11 @@ interface Exam {
   allowOfflineDownload?: boolean;
   examType?: 'normal' | 'practice';
   defaultQuestionType?: 'mcq' | 'truefalse' | 'shortanswer' | 'essay';
+  subjectId?: string;
+  chapterTitle?: string;
+  chapterId?: string;
+  departmentId?: string;
+  departmentIds?: string[];
 }
 
 const EditExam = () => {
@@ -94,6 +110,12 @@ const EditExam = () => {
   const { canEdit, canDelete } = useSectionPermissions();
   const canEditExams = canEdit('manageExams');
   const canDeleteExams = canDelete('manageExams');
+  const { user } = useAuth();
+
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [createSubjectModalOpen, setCreateSubjectModalOpen] = useState(false);
+  const [subjectChapters, setSubjectChapters] = useState<Chapter[]>([]);
+  const [chaptersDialogOpen, setChaptersDialogOpen] = useState(false);
 
   const [exam, setExam] = useState<Exam | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -106,6 +128,53 @@ const EditExam = () => {
   const [questionToDelete, setQuestionToDelete] = useState<number | null>(null);
   const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
 
+  const toDateSafe = (val: any): Date | null => {
+    if (!val) return null;
+    if (typeof val.toDate === "function") return val.toDate();
+    if (val instanceof Date) return val;
+    if (typeof val.seconds === "number") return new Date(val.seconds * 1000);
+    if (typeof val === "string" || typeof val === "number") {
+      const parsed = new Date(val);
+      return isNaN(parsed.getTime()) ? null : parsed;
+    }
+    return null;
+  };
+
+  const formatDateForInput = (val: any): string => {
+    const d = toDateSafe(val);
+    if (!d || isNaN(d.getTime())) return "";
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  };
+
+  const normalizeQuestions = (data: any[]): Question[] => {
+    return (data || []).map((q, idx) => {
+      const qType = (q.questionType as Question['questionType']) || "mcq";
+      let opts = Array.isArray(q.options) ? q.options : [];
+      if (qType === "truefalse" && opts.length === 0) {
+        opts = ["True", "False"];
+      } else if (qType === "mcq" && opts.length === 0) {
+        opts = ["", "", "", ""];
+      }
+
+      const rawIndex = Number(q.correctOptionIndex);
+      const correctIdx = !isNaN(rawIndex) && rawIndex >= 0 ? rawIndex : 0;
+
+      return {
+        questionId: q.questionId || q.id,
+        questionText: q.questionText || "",
+        questionType: qType,
+        imageUrl: q.imageUrl || undefined,
+        options: opts,
+        correctOptionIndex: correctIdx,
+        correctAnswer: q.correctAnswer || "",
+        feedbackType: (q.feedbackType === "instant" || q.feedbackType === "hidden") ? q.feedbackType : "instant",
+        explanation: q.explanation || "",
+        marks: Number(q.marks) || 1,
+        orderIndex: Number(q.orderIndex) ?? idx,
+      };
+    });
+  };
+
   useEffect(() => {
     const fetchExam = async () => {
       try {
@@ -115,9 +184,13 @@ const EditExam = () => {
         if (!examData) throw new Error("Exam not found");
         
         setExam(examData);
+        if (examData.subjectId && examData.subjectId !== 'none') {
+          getChapters(examData.subjectId).then(setSubjectChapters).catch(() => setSubjectChapters([]));
+        }
   
         const questionsData = await getQuestions(id);
-        setQuestions(questionsData.sort((a, b) => a.orderIndex - b.orderIndex));
+        const cleanQuestions = normalizeQuestions(questionsData);
+        setQuestions(cleanQuestions.sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0)));
       } catch (error: any) {
         console.error("Error fetching exam:", error);
         toast({
@@ -143,8 +216,19 @@ const EditExam = () => {
     if (id) {
       fetchExam();
       fetchDepartments();
+      getSubjects().then(setSubjects).catch(console.error);
     }
   }, [id, t, navigate]);
+
+  useEffect(() => {
+    if (exam?.subjectId && exam.subjectId !== 'none') {
+      getChapters(exam.subjectId).then(setSubjectChapters).catch(() => setSubjectChapters([]));
+    } else {
+      setSubjectChapters([]);
+    }
+  }, [exam?.subjectId]);
+
+  const selectedSubject = subjects.find((s) => s.id === exam?.subjectId);
 
   const handleImportSuccess = async () => {
     if (!id) return;
@@ -155,10 +239,12 @@ const EditExam = () => {
     // Get fresh questions from DB (including the newly imported ones)
     const dbQuestions = await getQuestions(id);
     
-    // Combine them and re-calculate order indices
-    const allQuestions = [...dbQuestions, ...unsavedQuestions].map((q, i) => ({
+    // Combine them, normalize and re-calculate order indices
+    const cleanQuestions = normalizeQuestions([...dbQuestions, ...unsavedQuestions]);
+    const allQuestions = cleanQuestions.map((q, i) => ({
       ...q,
       orderIndex: i,
+      imageUrl: q.imageUrl || undefined,
     }));
 
     setQuestions(allQuestions);
@@ -212,7 +298,9 @@ const EditExam = () => {
       return;
     }
     const newQuestions = [...questions];
-    newQuestions[questionIndex].options[optionIndex] = value;
+    const opts = [...(newQuestions[questionIndex].options || [])];
+    opts[optionIndex] = value;
+    newQuestions[questionIndex] = { ...newQuestions[questionIndex], options: opts };
     setQuestions(newQuestions);
   };
 
@@ -279,9 +367,10 @@ const EditExam = () => {
     try {
       // Validate questions
       const invalidQuestions = questions.filter((q) => {
-        if (!q.questionText.trim()) return true;
+        if (!q.questionText?.trim()) return true;
         if (q.questionType === 'mcq' || q.questionType === 'truefalse') {
-          return q.options.some((o) => !o.trim()) || q.correctOptionIndex < 0 || q.correctOptionIndex >= q.options.length;
+          const opts = q.options || [];
+          return opts.some((o) => !o?.trim()) || (q.correctOptionIndex ?? 0) < 0 || (q.correctOptionIndex ?? 0) >= opts.length;
         }
         if (q.questionType === 'shortanswer' && !q.correctAnswer?.trim()) {
           return true;
@@ -299,6 +388,12 @@ const EditExam = () => {
         return;
       }
 
+
+
+      const selectedSubjectId = exam.subjectId && exam.subjectId !== 'none' ? exam.subjectId : undefined;
+      const selectedChapterTitle = selectedSubjectId && exam.chapterTitle?.trim() ? exam.chapterTitle.trim() : undefined;
+      const selectedChapterId = selectedSubjectId && exam.chapterId ? exam.chapterId : undefined;
+
       // Update exam
       await updateExam(id, {
         title: exam.title,
@@ -309,12 +404,14 @@ const EditExam = () => {
         shuffleOptions: exam.shuffleOptions,
         allowOfflineDownload: exam.allowOfflineDownload,
         examType: exam.examType,
-        defaultQuestionType: exam.defaultQuestionType,
         startTime: exam.startTime,
         endTime: exam.endTime,
         isPublished: exam.isPublished,
         resultsPublished: exam.resultsPublished,
-        accessPassword: exam.accessPassword?.trim() || null
+        accessPassword: exam.accessPassword?.trim() || null,
+        subjectId: selectedSubjectId,
+        chapterTitle: selectedChapterTitle,
+        chapterId: selectedChapterId
       });
 
       // Update questions
@@ -331,6 +428,7 @@ const EditExam = () => {
           explanation: q.explanation || undefined,
           marks: q.marks,
           orderIndex: i,
+          imageUrl: q.imageUrl || undefined,
         };
 
         if (q.questionId) {
@@ -345,6 +443,20 @@ const EditExam = () => {
       
       // Update local state with new IDs to prevent duplicates on subsequent saves
       setQuestions(updatedQuestions);
+
+      if (selectedSubjectId) {
+        const depts = exam.departmentIds || (exam.departmentId ? [exam.departmentId] : []);
+        for (const deptId of depts) {
+          await addDepartmentToSubject(selectedSubjectId, deptId).catch(console.warn);
+        }
+      }
+
+      if (selectedSubjectId) {
+        const depts = exam.departmentIds || (exam.departmentId ? [exam.departmentId] : []);
+        for (const deptId of depts) {
+          await addDepartmentToSubject(selectedSubjectId, deptId).catch(console.warn);
+        }
+      }
 
       toast({
         title: t("admin.exams.toasts.examSaved"),
@@ -417,6 +529,12 @@ const EditExam = () => {
       };
 
       await updateExam(id, updates);
+
+      if (exam.subjectId && exam.subjectId !== 'none' && selectedDepartments.length > 0) {
+        for (const deptId of selectedDepartments) {
+          await addDepartmentToSubject(exam.subjectId, deptId).catch(console.warn);
+        }
+      }
       setExam({ ...exam, ...updates });
       setPublishDialogOpen(false);
       
@@ -578,7 +696,7 @@ const EditExam = () => {
                 <Label>{t("admin.exams.form.startTime")}</Label>
                 <Input
                   type="datetime-local"
-                  value={exam.startTime ? new Date(exam.startTime.toDate().getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 16) : ""}
+                  value={formatDateForInput(exam.startTime)}
                   onChange={(e) =>
                     setExam({
                       ...exam,
@@ -592,7 +710,7 @@ const EditExam = () => {
                 <Label>{t("admin.exams.form.endTime")}</Label>
                 <Input
                   type="datetime-local"
-                  value={exam.endTime ? new Date(exam.endTime.toDate().getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 16) : ""}
+                  value={formatDateForInput(exam.endTime)}
                   onChange={(e) =>
                     setExam({
                       ...exam,
@@ -611,6 +729,201 @@ const EditExam = () => {
                 className="input-focus"
                 rows={2}
               />
+            </div>
+
+            {/* Academic Subject & Chapter Assignment */}
+            <div className="space-y-3 p-4 rounded-xl bg-muted/30 border border-border/80">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="h-4 w-4 text-primary" />
+                  <Label htmlFor="subject-select" className="text-sm font-semibold">
+                    Academic Subject Assignment
+                  </Label>
+                </div>
+                {canEditExams && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setCreateSubjectModalOpen(true)}
+                    className="h-7 text-xs text-primary font-semibold hover:bg-primary/10 rounded-lg"
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1" />
+                    Create New Subject
+                  </Button>
+                )}
+              </div>
+
+              <Select
+                value={exam.subjectId || "none"}
+                onValueChange={(val) => {
+                  if (!canEditExams) return;
+                  if (val === "__new__") {
+                    setCreateSubjectModalOpen(true);
+                  } else if (val === "none") {
+                    setExam({
+                      ...exam,
+                      subjectId: undefined,
+                      chapterTitle: undefined,
+                      chapterId: undefined,
+                    });
+                    setSubjectChapters([]);
+                  } else {
+                    setExam({
+                      ...exam,
+                      subjectId: val,
+                      chapterTitle: undefined,
+                      chapterId: undefined,
+                    });
+                    getChapters(val).then(setSubjectChapters).catch(() => setSubjectChapters([]));
+                  }
+                }}
+                disabled={!canEditExams}
+              >
+                <SelectTrigger id="subject-select" className="bg-card">
+                  <SelectValue placeholder="Select an academic subject..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__new__" className="text-primary font-semibold cursor-pointer">
+                    + Create New Subject
+                  </SelectItem>
+                  <SelectItem value="none">None (General Exam / Unassigned)</SelectItem>
+                  {subjects.map((sub) => (
+                    <SelectItem key={sub.id} value={sub.id}>
+                      {sub.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Selected Subject Preview Card */}
+              {selectedSubject && (
+                <div className="flex items-center gap-3 p-2.5 rounded-lg border bg-card/60 shadow-xs animate-fade-in">
+                  <div className="h-10 w-14 shrink-0 rounded-md overflow-hidden bg-muted border">
+                    <img
+                      src={getSubjectCover(selectedSubject.name, selectedSubject.coverImageUrl).url}
+                      alt={selectedSubject.name}
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-foreground truncate">{selectedSubject.name}</p>
+                    <p className="text-[11px] text-muted-foreground truncate">
+                      {selectedSubject.description || "Academic Subject"}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <p className="text-xs text-muted-foreground">
+                Assigning this exam to a subject organizes it under that subject in students' dashboards and unit progress tracking.
+              </p>
+
+              {/* Chapter / Unit Association */}
+              {exam.subjectId && exam.subjectId !== "none" && (
+                <div className="space-y-3 pt-3 border-t border-border/60 animate-fade-in">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="chapter-select" className="text-xs font-semibold flex items-center gap-1.5">
+                      <Layers className="h-3.5 w-3.5 text-primary" />
+                      Chapter / Curriculum Unit (Optional)
+                    </Label>
+                    {canEditExams && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setChaptersDialogOpen(true)}
+                        className="h-7 text-xs text-primary font-semibold hover:bg-primary/10 rounded-lg"
+                      >
+                        <Plus className="h-3.5 w-3.5 mr-1" />
+                        Manage Subject Chapters
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Select
+                      value={
+                        exam.chapterId && subjectChapters.some((c) => c.id === exam.chapterId)
+                          ? exam.chapterId
+                          : exam.chapterTitle &&
+                            subjectChapters.some(
+                              (c) => c.title.toLowerCase() === exam.chapterTitle?.toLowerCase()
+                            )
+                          ? subjectChapters.find(
+                              (c) => c.title.toLowerCase() === exam.chapterTitle?.toLowerCase()
+                            )!.id
+                          : exam.chapterTitle
+                          ? "__custom__"
+                          : "__none__"
+                      }
+                      onValueChange={(val) => {
+                        if (!canEditExams) return;
+                        if (val === "__none__") {
+                          setExam({ ...exam, chapterTitle: undefined, chapterId: undefined });
+                        } else if (val === "__custom__") {
+                          setExam({ ...exam, chapterId: undefined });
+                        } else {
+                          const foundChap = subjectChapters.find((c) => c.id === val);
+                          setExam({
+                            ...exam,
+                            chapterId: foundChap?.id,
+                            chapterTitle: foundChap?.title,
+                          });
+                        }
+                      }}
+                      disabled={!canEditExams}
+                    >
+                      <SelectTrigger id="chapter-select" className="bg-card text-xs h-9">
+                        <SelectValue placeholder="Choose a chapter from this subject..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">
+                          No specific chapter (General Subject Exam)
+                        </SelectItem>
+                        {subjectChapters.map((ch) => (
+                          <SelectItem key={ch.id} value={ch.id} className="text-xs">
+                            Unit {ch.chapterNumber ?? ""}: {ch.title}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="__custom__" className="text-muted-foreground italic text-xs">
+                          + Custom Chapter Title...
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    {(exam.chapterId === undefined && exam.chapterTitle) ||
+                    (!subjectChapters.some((c) => c.id === exam.chapterId) && exam.chapterTitle) ? (
+                      <Input
+                        id="chapter_title"
+                        value={exam.chapterTitle || ""}
+                        onChange={(e) =>
+                          canEditExams && setExam({ ...exam, chapterTitle: e.target.value })
+                        }
+                        placeholder="Type custom chapter title..."
+                        className="input-focus text-xs h-9"
+                        disabled={!canEditExams}
+                      />
+                    ) : null}
+
+                    {subjectChapters.length === 0 && (
+                      <p className="text-[11px] text-muted-foreground flex items-center justify-between">
+                        <span>No chapters created yet for this subject.</span>
+                        <button
+                          type="button"
+                          onClick={() => setChaptersDialogOpen(true)}
+                          className="text-primary hover:underline font-semibold"
+                        >
+                          Create first chapter
+                        </button>
+                      </p>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Assigning this exam to a chapter groups it neatly under that chapter in the student syllabus and progress bar.
+                  </p>
+                </div>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="access_password">
@@ -735,6 +1048,20 @@ const EditExam = () => {
                  </div>
               </div>
               {exam && id && (
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    navigate(
+                      `/dashboard/admin/ai-generator?source=book&deptId=${exam.departmentId || ''}&subjectId=${exam.subjectId && exam.subjectId !== 'none' ? exam.subjectId : ''}&examId=${id}`
+                    )
+                  }
+                  className="rounded-xl border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                >
+                  <Sparkles className="h-4 w-4 mr-1.5 text-amber-500" />
+                  Generate questions from a resource
+                </Button>
+              )}
+              {exam && id && (
                 <BulkImportQuestions
                   examId={id}
                   currentQuestionCount={questions.length}
@@ -823,16 +1150,24 @@ const EditExam = () => {
                       />
                     </div>
 
+                    {/* Question Image Attachment (Upload directly or Cloudinary link) */}
+                    <QuestionImageAttachment
+                      imageUrl={question.imageUrl}
+                      onChange={(url) => updateQuestionState(qIndex, { imageUrl: url })}
+                      examId={id}
+                      disabled={!canEditExams}
+                    />
+
                     {(question.questionType === "mcq" || question.questionType === "truefalse") && (
                       <div className="space-y-3">
                         <Label>{t("admin.exams.questions.options")}</Label>
                         <RadioGroup
-                          value={question.correctOptionIndex.toString()}
+                          value={(question.correctOptionIndex ?? 0).toString()}
                           onValueChange={(v) =>
                             updateQuestionState(qIndex, { correctOptionIndex: parseInt(v) })
                           }
                         >
-                          {question.options.map((option, oIndex) => (
+                          {(question.options || []).map((option, oIndex) => (
                             <div key={oIndex} className="flex items-center gap-3">
                               <RadioGroupItem value={oIndex.toString()} id={`q${qIndex}-o${oIndex}`} />
                               <Input
@@ -876,17 +1211,17 @@ const EditExam = () => {
                     )}
 
                     <div className="space-y-3">
-                      <Label>{t("admin.exams.questions.explanation")}</Label>
+                      <Label className="text-sm font-semibold">{t("admin.exams.questions.explanation")}</Label>
                       <Textarea
                         value={question.explanation || ""}
                         onChange={(e) =>
                           updateQuestionState(qIndex, { explanation: e.target.value })
                         }
                         placeholder={t("admin.exams.questions.explanationPlaceholder")}
-                        className="input-focus"
-                        rows={2}
+                        className="input-focus text-sm sm:text-base leading-relaxed"
+                        rows={3}
                       />
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs sm:text-sm text-muted-foreground">
                         {t("admin.exams.questions.explanationHelp")}
                       </p>
                     </div>
@@ -1035,6 +1370,38 @@ const EditExam = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        {/* Inline Create Subject Modal */}
+        <SubjectFormDialog
+          open={createSubjectModalOpen}
+          onOpenChange={setCreateSubjectModalOpen}
+          defaultDepartmentId={
+            exam?.departmentIds?.[0] || exam?.departmentId || undefined
+          }
+          onSave={async (subData) => {
+            const newId = await createSubject(subData, user?.uid);
+            const freshSubs = await getSubjects();
+            setSubjects(freshSubs);
+            if (exam) {
+              setExam({ ...exam, subjectId: newId });
+            }
+            toast({
+              title: "Subject created!",
+              description: `"${subData.name}" has been created and assigned to this exam.`,
+            });
+          }}
+        />
+
+        {/* Chapters Dialog */}
+        <SubjectChaptersDialog
+          open={chaptersDialogOpen}
+          onOpenChange={setChaptersDialogOpen}
+          subject={subjects.find((s) => s.id === exam?.subjectId) || null}
+          onChaptersChange={() => {
+            if (exam?.subjectId && exam.subjectId !== "none") {
+              getChapters(exam.subjectId).then(setSubjectChapters).catch(() => 0);
+            }
+          }}
+        />
       </div>
     </DashboardLayout>
   );

@@ -1,6 +1,7 @@
 /**
  * Practice Mode Selector Component
  * Allows user to choose between Practice mode and Exam mode
+ * Fully responsive on mobile & desktop, and fully compatible with light/dark modes
  */
 
 import React from 'react';
@@ -16,48 +17,53 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Lightbulb, Clock, CheckCircle2, Eye, EyeOff } from 'lucide-react';
+import { Lightbulb, Clock, CheckCircle2, Check, X, Sparkles, Info } from 'lucide-react';
 import { ExamTimePicker } from './ExamTimePicker';
 
 export type PracticeModeType = 'practice' | 'exam';
 
+export interface PracticeModeFeature {
+  text: string;
+  type: 'check' | 'cross' | 'clock';
+}
+
 export interface PracticeModeOption {
   mode: PracticeModeType;
   title: string;
+  tagline: string;
   description: string;
-  features: string[];
+  features: PracticeModeFeature[];
   icon: React.ReactNode;
-  color: string;
-  badge?: string;
+  badge: string;
 }
 
 export const PRACTICE_MODE_OPTIONS: PracticeModeOption[] = [
   {
     mode: 'practice',
     title: 'Practice Mode',
-    description: 'Get instant feedback on each answer with explanations',
+    tagline: 'Interactive Learning',
+    description: 'Get instant feedback on each question with full explanations',
     features: [
-      '✓ Instant feedback (correct/incorrect)',
-      '✓ Show explanations',
-      '✓ No time limit',
-      '✓ Learn at your own pace',
+      { text: 'Instant answer validation (Correct/Incorrect)', type: 'check' },
+      { text: 'Comprehensive step-by-step explanations', type: 'check' },
+      { text: 'Untimed session (learn at your own pace)', type: 'check' },
+      { text: 'Review and correct mistakes immediately', type: 'check' },
     ],
     icon: <Lightbulb className="h-6 w-6" />,
-    color: 'bg-blue-50',
-    badge: 'Recommended for Learning',
+    badge: 'Recommended for Study',
   },
   {
     mode: 'exam',
     title: 'Exam Mode',
-    description: 'Timed exam with no feedback until completion',
+    tagline: 'Real Assessment',
+    description: 'Simulate a real test with a countdown timer and delayed results',
     features: [
-      '⏱ Custom countdown timer',
-      '✗ No instant feedback',
-      '✗ No explanations shown',
-      '✓ Summary on completion (Correct/Wrong/Skipped)',
+      { text: 'Customizable countdown timer', type: 'clock' },
+      { text: 'Strict exam simulation conditions', type: 'check' },
+      { text: 'No instant answers or hints during test', type: 'cross' },
+      { text: 'Detailed score summary upon final submission', type: 'check' },
     ],
     icon: <Clock className="h-6 w-6" />,
-    color: 'bg-amber-50',
     badge: 'Test Your Knowledge',
   },
 ];
@@ -75,7 +81,7 @@ export interface PracticeModeDialogProps {
  */
 export function PracticeModeDialog({
   open,
-  examTitle = 'Exam',
+  examTitle = 'Assessment',
   durationMinutes = 60,
   onSelect,
   onCancel,
@@ -101,17 +107,18 @@ export function PracticeModeDialog({
   if (showTimePicker) {
     return (
       <AlertDialog open={open}>
-        <AlertDialogContent className="max-w-md">
+        <AlertDialogContent className="w-[95vw] sm:max-w-md rounded-3xl p-5 sm:p-7 bg-card border border-border shadow-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl">
+            <AlertDialogTitle className="text-xl sm:text-2xl font-display font-bold text-foreground flex items-center gap-2">
+              <Clock className="w-5 h-5 text-primary" />
               Exam Time Setup
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              Set your custom time limit for <strong>{examTitle}</strong>
+            <AlertDialogDescription className="text-xs sm:text-sm text-muted-foreground">
+              Configure your time limit for <strong className="text-foreground">{examTitle}</strong>
             </AlertDialogDescription>
           </AlertDialogHeader>
 
-          <div className="py-4">
+          <div className="py-2">
             <ExamTimePicker
               defaultMinutes={customTimeLimit}
               onConfirm={handleTimeConfirm}
@@ -125,89 +132,150 @@ export function PracticeModeDialog({
 
   return (
     <AlertDialog open={open}>
-      <AlertDialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
-        <AlertDialogHeader>
-          <AlertDialogTitle className="text-2xl">
-            Choose Exam Mode
-          </AlertDialogTitle>
-          <AlertDialogDescription className="text-base">
-            Select how you want to take <strong>{examTitle}</strong>
+      <AlertDialogContent className="w-[95vw] sm:max-w-2xl max-h-[92vh] flex flex-col p-4 sm:p-7 rounded-3xl bg-card border border-border/80 shadow-2xl overflow-hidden">
+        <AlertDialogHeader className="space-y-1.5 pb-2 text-left">
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+              <Sparkles className="h-4 w-4" />
+            </div>
+            <AlertDialogTitle className="text-xl sm:text-2xl font-display font-bold text-foreground">
+              Choose Study Mode
+            </AlertDialogTitle>
+          </div>
+          <AlertDialogDescription className="text-xs sm:text-sm text-muted-foreground">
+            Select how you would like to tackle <strong className="text-foreground">{examTitle}</strong>
           </AlertDialogDescription>
         </AlertDialogHeader>
 
         {/* Scrollable Content Area */}
-        <div className="flex-1 overflow-y-auto pr-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
-            {PRACTICE_MODE_OPTIONS.map((option) => (
-              <div
-                key={option.mode}
-                onClick={() => setSelectedMode(option.mode)}
-                className="cursor-pointer"
-              >
-                <Card
-                  className={`transition-all ${
-                    selectedMode === option.mode
-                      ? 'ring-2 ring-primary border-primary'
-                      : 'border-gray-200'
-                  } ${option.color}`}
+        <div className="flex-1 overflow-y-auto pr-1 py-2 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
+            {PRACTICE_MODE_OPTIONS.map((option) => {
+              const isSelected = selectedMode === option.mode;
+              const isPractice = option.mode === 'practice';
+
+              return (
+                <div
+                  key={option.mode}
+                  onClick={() => setSelectedMode(option.mode)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelectedMode(option.mode);
+                    }
+                  }}
+                  className={`group relative flex flex-col justify-between p-4 sm:p-5 rounded-2xl border transition-all duration-200 cursor-pointer text-left select-none outline-none ${
+                    isSelected
+                      ? isPractice
+                        ? 'ring-2 ring-primary border-primary bg-primary/5 dark:bg-primary/10 shadow-md'
+                        : 'ring-2 ring-amber-500 border-amber-500 bg-amber-500/5 dark:bg-amber-500/10 shadow-md'
+                      : 'border-border/80 bg-card hover:border-primary/40 hover:bg-muted/40 shadow-xs'
+                  }`}
                 >
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="text-primary">{option.icon}</div>
+                  <div className="space-y-3">
+                    {/* Header: Icon, Title, and Radio pill */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <div
+                          className={`p-2 rounded-xl transition-colors shrink-0 ${
+                            isPractice
+                              ? isSelected
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-primary/10 text-primary group-hover:bg-primary/20'
+                              : isSelected
+                              ? 'bg-amber-500 text-white'
+                              : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 group-hover:bg-amber-500/20'
+                          }`}
+                        >
+                          {option.icon}
+                        </div>
                         <div>
-                          <CardTitle className="text-lg">{option.title}</CardTitle>
-                          {option.badge && (
-                            <Badge variant="secondary" className="mt-1">
-                              {option.badge}
-                            </Badge>
-                          )}
+                          <h3 className="font-display font-bold text-base sm:text-lg text-foreground leading-tight">
+                            {option.title}
+                          </h3>
+                          <Badge
+                            variant="outline"
+                            className={`text-[10px] font-semibold mt-0.5 px-1.5 py-0 border ${
+                              isPractice
+                                ? 'border-primary/30 text-primary bg-primary/5'
+                                : 'border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/5'
+                            }`}
+                          >
+                            {option.badge}
+                          </Badge>
                         </div>
                       </div>
-                      <div className="flex-shrink-0">
-                        <input
-                          type="radio"
-                          name="mode"
-                          value={option.mode}
-                          checked={selectedMode === option.mode}
-                          onChange={() => setSelectedMode(option.mode)}
-                          className="h-4 w-4 accent-primary"
-                        />
+
+                      {/* Interactive Radio Pill */}
+                      <div className="shrink-0 mt-0.5">
+                        {isSelected ? (
+                          <div
+                            className={`h-5 w-5 rounded-full flex items-center justify-center text-white shadow-xs ${
+                              isPractice ? 'bg-primary' : 'bg-amber-500'
+                            }`}
+                          >
+                            <Check className="h-3.5 w-3.5 stroke-[3]" />
+                          </div>
+                        ) : (
+                          <div className="h-5 w-5 rounded-full border-2 border-muted-foreground/30 group-hover:border-primary/50 transition-colors" />
+                        )}
                       </div>
                     </div>
-                  </CardHeader>
 
-                  <CardContent className="space-y-3">
-                    <CardDescription>{option.description}</CardDescription>
+                    {/* Tagline / Description */}
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      {option.description}
+                    </p>
 
-                    <ul className="space-y-2 text-sm">
-                      {option.features.map((feature, idx) => (
-                        <li key={idx} className="flex items-start gap-2">
-                          <span className="text-gray-400 flex-shrink-0">•</span>
-                          <span>{feature}</span>
+                    {/* Feature bullet list */}
+                    <ul className="space-y-2 pt-2 border-t border-border/60 text-xs sm:text-sm">
+                      {option.features.map((feat, idx) => (
+                        <li key={idx} className="flex items-start gap-2 text-foreground/80 leading-snug">
+                          {feat.type === 'check' ? (
+                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0 mt-0.5" />
+                          ) : feat.type === 'clock' ? (
+                            <Clock className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
+                          ) : (
+                            <X className="h-3.5 w-3.5 text-rose-500 shrink-0 mt-0.5" />
+                          )}
+                          <span className="text-xs text-muted-foreground">{feat.text}</span>
                         </li>
                       ))}
                     </ul>
-                  </CardContent>
-                </Card>
-              </div>
-            ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
-          <AlertDialogDescription className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <strong>💡 Tip:</strong> You can always restart in a different mode if you change your mind.
-          </AlertDialogDescription>
+          {/* Theme-neutral Information Tip */}
+          <div className="bg-muted/50 border border-border/80 rounded-2xl p-3 flex items-start gap-2.5 text-xs text-muted-foreground">
+            <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+            <p>
+              <strong className="text-foreground">Pro-tip:</strong> Practice mode helps you learn course topics with explanations. Switch to Exam mode when you want to simulate real test timing.
+            </p>
+          </div>
         </div>
 
-        <div className="flex gap-3 justify-end mt-4">
-          <AlertDialogCancel onClick={onCancel} className="border-gray-300">
+        {/* Footer Buttons */}
+        <div className="flex items-center gap-2.5 justify-end pt-3 border-t border-border/60 mt-1">
+          <AlertDialogCancel
+            onClick={onCancel}
+            className="rounded-xl border-border/80 hover:bg-muted text-xs sm:text-sm font-medium"
+          >
             Cancel
           </AlertDialogCancel>
           <AlertDialogAction
             onClick={handleModeSelection}
-            className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+            className={`rounded-xl font-semibold shadow-xs text-xs sm:text-sm px-4 sm:px-5 h-9 sm:h-10 ${
+              selectedMode === 'practice'
+                ? 'bg-primary hover:bg-primary/90 text-primary-foreground'
+                : 'bg-amber-500 hover:bg-amber-600 text-white'
+            }`}
           >
-            {selectedMode === 'exam' ? 'Set Time & Continue' : 'Continue in Practice Mode'}
+            {selectedMode === 'exam' ? 'Set Timer & Continue' : 'Continue in Practice Mode'}
           </AlertDialogAction>
         </div>
       </AlertDialogContent>
@@ -231,7 +299,7 @@ export function PracticeModeSelector({ onSelect, selectedMode }: PracticeModeSel
           key={option.mode}
           variant={selectedMode === option.mode ? 'default' : 'outline'}
           onClick={() => onSelect(option.mode)}
-          className="flex flex-col items-center gap-2 h-auto py-3"
+          className="flex flex-col items-center gap-2 h-auto py-3 rounded-xl border-border/80"
         >
           {option.icon}
           <span className="text-sm font-medium">{option.title}</span>

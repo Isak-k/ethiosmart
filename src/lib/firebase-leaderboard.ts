@@ -40,14 +40,23 @@ export async function calculateDepartmentLeaderboard(
       LeaderboardResponse
     >(functions, 'calculateDepartmentLeaderboard');
 
-    const result = await callable({ departmentId, forceRefresh, limit, offset });
+    const payload: { departmentId: string; forceRefresh?: boolean; limit?: number; offset?: number } = {
+      departmentId,
+      forceRefresh
+    };
+
+    if (limit !== 50 || offset !== 0) {
+      payload.limit = limit;
+      payload.offset = offset;
+    }
+
+    const result = await callable(payload);
     return result.data;
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     console.error('Error calculating department leaderboard:', error);
     throw new Error(
-      `Failed to calculate leaderboard: ${
-        error instanceof Error ? error.message : String(error)
-      }`
+      `Failed to calculate leaderboard: ${message}`
     );
   }
 }
@@ -297,44 +306,48 @@ export async function adminRefreshLeaderboardCache(
   try {
     const functions = getFunctions();
     const callable = httpsCallable(functions, 'adminRefreshLeaderboardCache');
-
     const result = await callable({ departmentId });
     return result.data as any;
   } catch (error) {
-    const db = getFirestore();
-    const results: Array<{ departmentId: string; success: boolean; totalStudents?: number; error?: string }> = [];
-    const refreshOne = async (deptId: string) => {
-      try {
-        const resp = await calculateClientSideLeaderboard(deptId, 100, 0);
-        const expiresAt = Timestamp.fromMillis(Date.now() + 6 * 60 * 60 * 1000);
-        await setDoc(doc(db, 'leaderboardCache', deptId), {
-          departmentId: deptId,
-          entries: resp.entries,
-          totalStudents: resp.totalStudents,
-          lastUpdated: Timestamp.now(),
-          expiresAt
-        }, { merge: true });
-        results.push({ departmentId: deptId, success: true, totalStudents: resp.totalStudents });
-      } catch (e: any) {
-        results.push({ departmentId: deptId, success: false, error: e?.message || String(e) });
+    const message = error instanceof Error ? error.message : String(error);
+    try {
+      const db = getFirestore();
+      const results: Array<{ departmentId: string; success: boolean; totalStudents?: number; error?: string }> = [];
+      const refreshOne = async (deptId: string) => {
+        try {
+          const resp = await calculateClientSideLeaderboard(deptId, 100, 0);
+          const expiresAt = Timestamp.fromMillis(Date.now() + 6 * 60 * 60 * 1000);
+          await setDoc(doc(db, 'leaderboardCache', deptId), {
+            departmentId: deptId,
+            entries: resp.entries,
+            totalStudents: resp.totalStudents,
+            lastUpdated: Timestamp.now(),
+            expiresAt
+          }, { merge: true });
+          results.push({ departmentId: deptId, success: true, totalStudents: resp.totalStudents });
+        } catch (e: any) {
+          results.push({ departmentId: deptId, success: false, error: e?.message || String(e) });
+        }
+      };
+
+      if (departmentId) {
+        await refreshOne(departmentId);
+        return {
+          success: results[0]?.success ?? false,
+          message: results[0]?.success ? 'Cache refreshed' : `Failed: ${results[0]?.error || 'unknown'}`,
+          departmentId,
+          totalStudents: results[0]?.totalStudents,
+          refreshedCount: results[0]?.success ? 1 : 0,
+          timestamp: Timestamp.now()
+        } as any;
       }
-    };
-    if (departmentId) {
-      await refreshOne(departmentId);
-      return {
-        success: results[0]?.success ?? false,
-        message: results[0]?.success ? 'Cache refreshed' : `Failed: ${results[0]?.error || 'unknown'}`,
-        departmentId,
-        totalStudents: results[0]?.totalStudents,
-        refreshedCount: results[0]?.success ? 1 : 0,
-        timestamp: Timestamp.now()
-      } as any;
-    } else {
+
       const deptsSnap = await getDocs(collection(db, 'departments'));
       const deptIds = deptsSnap.docs.map(d => d.id);
       for (const dId of deptIds) {
         await refreshOne(dId);
       }
+
       return {
         success: results.every(r => r.success),
         message: 'Cache refresh completed',
@@ -343,6 +356,12 @@ export async function adminRefreshLeaderboardCache(
         results,
         timestamp: Timestamp.now()
       } as any;
+    } catch (fallbackError) {
+      const fallbackMessage = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+      if (fallbackMessage.includes('No Firebase App') || fallbackMessage.includes('has not been called')) {
+        throw new Error(`Failed to refresh leaderboard cache: ${message}`);
+      }
+      throw fallbackError;
     }
   }
 }
@@ -374,41 +393,51 @@ export async function adminRecalculateRankings(): Promise<{
   try {
     const functions = getFunctions();
     const callable = httpsCallable(functions, 'adminRecalculateRankings');
-
     const result = await callable({});
     return result.data as any;
   } catch (error) {
-    const db = getFirestore();
-    const deptsSnap = await getDocs(collection(db, 'departments'));
-    const deptIds = deptsSnap.docs.map(d => d.id);
-    const results: Array<{ departmentId: string; success: boolean; totalStudents?: number; entriesCount?: number; error?: string }> = [];
-    let totalStudents = 0;
-    for (const dId of deptIds) {
-      try {
-        const resp = await calculateClientSideLeaderboard(dId, 100, 0);
-        const expiresAt = Timestamp.fromMillis(Date.now() + 6 * 60 * 60 * 1000);
-        await setDoc(doc(db, 'leaderboardCache', dId), {
-          departmentId: dId,
-          entries: resp.entries,
-          totalStudents: resp.totalStudents,
-          lastUpdated: Timestamp.now(),
-          expiresAt
-        }, { merge: true });
-        totalStudents += resp.totalStudents;
-        results.push({ departmentId: dId, success: true, totalStudents: resp.totalStudents, entriesCount: resp.entries.length });
-      } catch (e: any) {
-        results.push({ departmentId: dId, success: false, error: e?.message || String(e) });
+    const message = error instanceof Error ? error.message : String(error);
+    try {
+      const db = getFirestore();
+      const deptsSnap = await getDocs(collection(db, 'departments'));
+      const deptIds = deptsSnap.docs.map(d => d.id);
+      const results: Array<{ departmentId: string; success: boolean; totalStudents?: number; entriesCount?: number; error?: string }> = [];
+      let totalStudents = 0;
+
+      for (const dId of deptIds) {
+        try {
+          const resp = await calculateClientSideLeaderboard(dId, 100, 0);
+          const expiresAt = Timestamp.fromMillis(Date.now() + 6 * 60 * 60 * 1000);
+          await setDoc(doc(db, 'leaderboardCache', dId), {
+            departmentId: dId,
+            entries: resp.entries,
+            totalStudents: resp.totalStudents,
+            lastUpdated: Timestamp.now(),
+            expiresAt
+          }, { merge: true });
+          totalStudents += resp.totalStudents;
+          results.push({ departmentId: dId, success: true, totalStudents: resp.totalStudents, entriesCount: resp.entries.length });
+        } catch (e: any) {
+          results.push({ departmentId: dId, success: false, error: e?.message || String(e) });
+        }
       }
+
+      return {
+        success: results.every(r => r.success),
+        message: 'Recalculation completed',
+        recalculatedCount: results.filter(r => r.success).length,
+        totalDepartments: deptIds.length,
+        totalStudents,
+        results,
+        timestamp: Timestamp.now()
+      } as any;
+    } catch (fallbackError) {
+      const fallbackMessage = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+      if (fallbackMessage.includes('No Firebase App') || fallbackMessage.includes('has not been called')) {
+        throw new Error(`Failed to recalculate rankings: ${message}`);
+      }
+      throw fallbackError;
     }
-    return {
-      success: results.every(r => r.success),
-      message: 'Recalculation completed',
-      recalculatedCount: results.filter(r => r.success).length,
-      totalDepartments: deptIds.length,
-      totalStudents,
-      results,
-      timestamp: Timestamp.now()
-    } as any;
   }
 }
 
@@ -436,18 +465,26 @@ export async function adminResetLeaderboard(
   try {
     const functions = getFunctions();
     const callable = httpsCallable(functions, 'adminResetLeaderboard');
-
     const result = await callable({ departmentId });
     return result.data as any;
   } catch (error) {
-    const db = getFirestore();
-    await deleteDoc(doc(db, 'leaderboardCache', departmentId));
-    return {
-      success: true,
-      message: 'Leaderboard cache cleared',
-      departmentId,
-      timestamp: Timestamp.now()
-    } as any;
+    const message = error instanceof Error ? error.message : String(error);
+    try {
+      const db = getFirestore();
+      await deleteDoc(doc(db, 'leaderboardCache', departmentId));
+      return {
+        success: true,
+        message: 'Leaderboard cache cleared',
+        departmentId,
+        timestamp: Timestamp.now()
+      } as any;
+    } catch (fallbackError) {
+      const fallbackMessage = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+      if (fallbackMessage.includes('No Firebase App') || fallbackMessage.includes('has not been called')) {
+        throw new Error(`Failed to reset leaderboard: ${message}`);
+      }
+      throw fallbackError;
+    }
   }
 }
 
@@ -485,51 +522,61 @@ export async function adminGetLeaderboardStatus(): Promise<{
   try {
     const functions = getFunctions();
     const callable = httpsCallable(functions, 'adminGetLeaderboardStatus');
-
     const result = await callable({});
     return result.data as any;
   } catch (error) {
-    const db = getFirestore();
-    const deptsSnap = await getDocs(collection(db, 'departments'));
-    const deptIds = deptsSnap.docs.map(d => d.id);
-    const studentsSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'student')));
-    const attemptsSnap = await getDocs(collection(db, 'examAttempts'));
-    const cacheDocs = await Promise.all(deptIds.map(dId => getDoc(doc(db, 'leaderboardCache', dId))));
-    let totalCachedStudents = 0;
-    let valid = 0;
-    let expired = 0;
-    const cacheDetails: Array<{ departmentId: string; totalStudents: number; lastUpdated: any; expiresAt: any; isExpired: boolean; }> = [];
-    cacheDocs.forEach((snap, idx) => {
-      if (snap.exists()) {
-        const data = snap.data() as any;
-        const expiresAtMillis = data.expiresAt?.toMillis?.() ?? 0;
-        const isExpired = !expiresAtMillis || expiresAtMillis < Date.now();
-        if (isExpired) expired++; else valid++;
-        totalCachedStudents += (Array.isArray(data.entries) ? data.entries.length : 0);
-        cacheDetails.push({
-          departmentId: deptIds[idx],
-          totalStudents: data.totalStudents || 0,
-          lastUpdated: data.lastUpdated,
-          expiresAt: data.expiresAt,
-          isExpired
-        });
-      }
-    });
-    return {
-      success: true,
-      status: {
-        totalDepartments: deptIds.length,
-        totalStudents: studentsSnap.size,
-        totalExamAttempts: attemptsSnap.size,
-        cache: {
-          total: cacheDocs.length,
-          valid,
-          expired,
-          totalCachedStudents
+    const message = error instanceof Error ? error.message : String(error);
+    try {
+      const db = getFirestore();
+      const deptsSnap = await getDocs(collection(db, 'departments'));
+      const deptIds = deptsSnap.docs.map(d => d.id);
+      const studentsSnap = await getDocs(query(collection(db, 'users'), where('role', '==', 'student')));
+      const attemptsSnap = await getDocs(collection(db, 'examAttempts'));
+      const cacheDocs = await Promise.all(deptIds.map(dId => getDoc(doc(db, 'leaderboardCache', dId))));
+      let totalCachedStudents = 0;
+      let valid = 0;
+      let expired = 0;
+      const cacheDetails: Array<{ departmentId: string; totalStudents: number; lastUpdated: any; expiresAt: any; isExpired: boolean; }> = [];
+
+      cacheDocs.forEach((snap, idx) => {
+        if (snap.exists()) {
+          const data = snap.data() as any;
+          const expiresAtMillis = data.expiresAt?.toMillis?.() ?? 0;
+          const isExpired = !expiresAtMillis || expiresAtMillis < Date.now();
+          if (isExpired) expired++; else valid++;
+          totalCachedStudents += (Array.isArray(data.entries) ? data.entries.length : 0);
+          cacheDetails.push({
+            departmentId: deptIds[idx],
+            totalStudents: data.totalStudents || 0,
+            lastUpdated: data.lastUpdated,
+            expiresAt: data.expiresAt,
+            isExpired
+          });
+        }
+      });
+
+      return {
+        success: true,
+        status: {
+          totalDepartments: deptIds.length,
+          totalStudents: studentsSnap.size,
+          totalExamAttempts: attemptsSnap.size,
+          cache: {
+            total: cacheDocs.length,
+            valid,
+            expired,
+            totalCachedStudents
+          },
+          cacheDetails
         },
-        cacheDetails
-      },
-      timestamp: Timestamp.now()
-    } as any;
+        timestamp: Timestamp.now()
+      } as any;
+    } catch (fallbackError) {
+      const fallbackMessage = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+      if (fallbackMessage.includes('No Firebase App') || fallbackMessage.includes('has not been called')) {
+        throw new Error(`Failed to get leaderboard status: ${message}`);
+      }
+      throw fallbackError;
+    }
   }
 }

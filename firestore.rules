@@ -30,7 +30,19 @@ service cloud.firestore {
     // --- Users Collection ---
     match /users/{userId} {
       allow read: if isUser(userId) || isAdmin();
-      allow write: if isUser(userId) || isAdmin();
+      allow create: if isAdmin() || (
+        isUser(userId) &&
+        request.resource.data.role == 'student' &&
+        !request.resource.data.keys().hasAny(['permissions', 'sectionPermissions', 'disabled'])
+      );
+      allow update: if isAdmin() || (
+        isUser(userId) &&
+        request.resource.data.role == resource.data.role &&
+        request.resource.data.get('permissions', null) == resource.data.get('permissions', null) &&
+        request.resource.data.get('sectionPermissions', null) == resource.data.get('sectionPermissions', null) &&
+        request.resource.data.get('disabled', null) == resource.data.get('disabled', null)
+      );
+      allow delete: if isAdmin();
     }
 
     // --- Exams Collection ---
@@ -48,8 +60,16 @@ service cloud.firestore {
         function isParentExamCreator() {
           return isAuthenticated() && get(/databases/$(database)/documents/exams/$(examId)).data.createdBy == request.auth.uid;
         }
+        function canSaveQuestionData() {
+          return request.resource.data.get('generatedByAI', false) != true ||
+            (
+              isAdmin() &&
+              get(/databases/$(database)/documents/exams/$(examId)).data.get('isPublished', false) != true
+            );
+        }
         allow read: if isAuthenticated();
-        allow write: if isAdmin() || isParentExamCreator();
+        allow create, update: if (isAdmin() || isParentExamCreator()) && canSaveQuestionData();
+        allow delete: if isAdmin() || isParentExamCreator();
       }
 
       match /blockedStudents/{studentId} {
@@ -81,7 +101,18 @@ service cloud.firestore {
     // --- Departments Collection ---
     match /departments/{departmentId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isAdminOrSuper() || isAdmin();
+    }
+
+    // --- Subjects Collection ---
+    match /subjects/{subjectId} {
+      allow read: if true;
+      allow write: if isAuthenticated() || isAdminOrSuper();
+
+      match /chapters/{chapterId} {
+        allow read: if true;
+        allow write: if isAuthenticated() || isAdminOrSuper();
+      }
     }
 
     // --- Leaderboard Collections ---
@@ -138,6 +169,42 @@ service cloud.firestore {
         // Only admins can update/delete replies
         allow update, delete: if isAdmin();
       }
+    }
+
+    // --- Digital Book Library Collection ---
+    match /books/{bookId} {
+      // Authenticated users (students & admins) can read books
+      allow read: if isAuthenticated();
+      // Allow admins, superadmins, or authenticated creators to create books
+      allow create: if isAuthenticated() && (
+        isAdminOrSuper() ||
+        request.resource.data.createdBy == request.auth.uid
+      );
+      // Allow admins, the creator, or counters update (views/downloads)
+      allow update: if isAuthenticated() && (
+        isAdminOrSuper() ||
+        resource.data.createdBy == request.auth.uid ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewCount', 'downloadCount'])
+      );
+      // Allow admins or the creator to delete
+      allow delete: if isAuthenticated() && (
+        isAdminOrSuper() ||
+        resource.data.createdBy == request.auth.uid
+      );
+    }
+
+    // --- Book Bookmarks Collection ---
+    match /bookBookmarks/{bookmarkId} {
+      // Authenticated users can read and write their own bookmarks
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdminOrSuper()
+      );
+      allow create, update: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdminOrSuper()
+      );
     }
   }
 }

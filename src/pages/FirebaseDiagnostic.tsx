@@ -1,4 +1,5 @@
 import React from 'react';
+import type { User } from 'firebase/auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { auth, db, storage } from '@/integrations/firebase/client';
 
@@ -82,10 +83,9 @@ export default function FirebaseDiagnostic() {
 }
 
 function UserStatus() {
-  const [user, setUser] = React.useState<any>(null);
+  const [user, setUser] = React.useState<User | null>(null);
   const [role, setRole] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
-  const [status, setStatus] = React.useState("");
 
   React.useEffect(() => {
     return auth.onAuthStateChanged(async (u) => {
@@ -109,25 +109,6 @@ function UserStatus() {
     });
   }, []);
 
-  const makeAdmin = async () => {
-    if (!user) return;
-    setStatus("Updating...");
-    try {
-      const { doc, setDoc, Timestamp } = await import("firebase/firestore");
-      const userRef = doc(db, "users", user.uid);
-      await setDoc(userRef, { 
-        role: "admin", 
-        updatedAt: Timestamp.now(),
-        email: user.email,
-        userId: user.uid
-      }, { merge: true });
-      setRole("admin");
-      setStatus("Success! You are now an admin.");
-    } catch (e: any) {
-      setStatus("Error: " + e.message);
-    }
-  };
-
   if (loading) return <div>Loading user...</div>;
   if (!user) return <div>Not logged in</div>;
 
@@ -142,16 +123,10 @@ function UserStatus() {
         </span>
       </div>
       {role !== 'admin' && (
-        <div className="mt-2">
-          <button 
-            onClick={makeAdmin}
-            className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-xs"
-          >
-            Fix Permissions (Make Me Admin)
-          </button>
+        <div className="mt-2 text-sm text-muted-foreground">
+          Administrator roles must be assigned by a trusted Firebase project operator.
         </div>
       )}
-      {status && <div className="text-xs mt-1 text-blue-600">{status}</div>}
     </div>
   );
 }

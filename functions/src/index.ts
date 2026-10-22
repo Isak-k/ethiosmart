@@ -11,3 +11,13 @@ export {
   onUserProfileUpdate,
   refreshStaleCaches
 } from './leaderboard';
+
+export {
+  generateAIExamBatch,
+  getAIProviderStatus
+} from './ai-generator';
+
+export {
+  validateGoogleDriveResource
+} from './books';
+

@@ -17,11 +17,13 @@ export interface ParsedQuestion {
   correctOptionIndex: number;
   sourceErrors: string[];
   errors: string[];
+  imageUrl?: string;
 }
 
 export interface ParseResult {
   questions: ParsedQuestion[];
   errors: string[];
+  imageUrl?: string;
 }
 
 const questionHeadingRegex = /^\s*(\d+)\.\s*(.*)$/;

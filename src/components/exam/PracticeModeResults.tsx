@@ -18,6 +18,7 @@ import {
   RotateCcw,
   Download,
   BarChart3,
+  Lightbulb,
 } from 'lucide-react';
 import { PracticeModeResult, PracticeModeAnswer } from '@/lib/practice-mode-engine';
 import { Question } from '@/integrations/firebase/types';
@@ -205,63 +206,88 @@ export function PracticeModeResults({
                       </p>
                     </div>
 
-                    {/* Options */}
-                    <div>
-                      <p className="text-sm font-semibold mb-2">Options</p>
-                      <div className="space-y-2">
-                        {question.options.map((option, optIdx) => {
-                          const isSelected = answer.selectedOptionIndex === optIdx;
-                          const isCorrectOption = optIdx === question.correctOptionIndex;
+                    {/* Options / Answer */}
+                    {question.options && question.options.length > 0 ? (
+                      <div>
+                        <p className="text-sm font-semibold mb-2">Options</p>
+                        <div className="space-y-2">
+                          {question.options.map((option, optIdx) => {
+                            const isSelected = answer.selectedOptionIndex === optIdx;
+                            const isCorrectOption = optIdx === question.correctOptionIndex;
 
-                          let bgColor = 'bg-gray-50';
-                          let borderColor = 'border-gray-200';
+                            let bgColor = 'bg-gray-50';
+                            let borderColor = 'border-gray-200';
 
-                          if (isCorrectOption) {
-                            bgColor = 'bg-green-50';
-                            borderColor = 'border-green-200';
-                          } else if (isSelected && !isCorrect) {
-                            bgColor = 'bg-red-50';
-                            borderColor = 'border-red-200';
-                          }
+                            if (isCorrectOption) {
+                              bgColor = 'bg-green-50';
+                              borderColor = 'border-green-200';
+                            } else if (isSelected && !isCorrect) {
+                              bgColor = 'bg-red-50';
+                              borderColor = 'border-red-200';
+                            }
 
-                          return (
-                            <div
-                              key={optIdx}
-                              className={`border-2 rounded p-2 text-sm ${bgColor} ${borderColor}`}
-                            >
-                              <div className="flex items-start gap-2">
-                                <div className="flex-shrink-0 pt-0.5">
-                                  {isCorrectOption && (
-                                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            return (
+                              <div
+                                key={optIdx}
+                                className={`border-2 rounded p-2 text-sm ${bgColor} ${borderColor}`}
+                              >
+                                <div className="flex items-start gap-2">
+                                  <div className="flex-shrink-0 pt-0.5">
+                                    {isCorrectOption && (
+                                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                    )}
+                                    {isSelected && !isCorrect && (
+                                      <XCircle className="h-4 w-4 text-red-600" />
+                                    )}
+                                    {!isCorrectOption && !isSelected && (
+                                      <div className="h-4 w-4 rounded-full border border-gray-300" />
+                                    )}
+                                  </div>
+                                  <span className="flex-1">{option}</span>
+                                  {isSelected && isCorrectOption && (
+                                    <Badge className="text-xs bg-green-600">
+                                      Your Answer (Correct)
+                                    </Badge>
                                   )}
-                                  {isSelected && !isCorrect && (
-                                    <XCircle className="h-4 w-4 text-red-600" />
+                                  {!isSelected && isCorrectOption && (
+                                    <Badge className="text-xs bg-green-600">
+                                      Correct Answer
+                                    </Badge>
                                   )}
-                                  {!isCorrectOption && !isSelected && (
-                                    <div className="h-4 w-4 rounded-full border border-gray-300" />
+                                  {isSelected && !isCorrectOption && (
+                                    <Badge variant="destructive" className="text-xs">
+                                      Your Answer
+                                    </Badge>
                                   )}
                                 </div>
-                                <span className="flex-1">{option}</span>
-                                {isCorrectOption && (
-                                  <Badge className="text-xs">Correct</Badge>
-                                )}
-                                {isSelected && !isCorrect && (
-                                  <Badge variant="destructive" className="text-xs">
-                                    Your Answer
-                                  </Badge>
-                                )}
                               </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="space-y-2 p-3 bg-gray-50 rounded border">
+                        <div>
+                          <p className="text-xs font-semibold text-gray-500">Your Answer:</p>
+                          <p className="text-sm font-medium">{answer.studentAnswer || 'No answer provided / Skipped'}</p>
+                        </div>
+                        {question.correctAnswer && (
+                          <div className="pt-2 border-t">
+                            <p className="text-xs font-semibold text-green-700">Correct Answer:</p>
+                            <p className="text-sm font-medium text-green-800">{question.correctAnswer}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Explanation */}
                     {answer.explanation && (
-                      <div className="p-3 bg-blue-50 border border-blue-200 rounded">
-                        <p className="text-sm font-semibold text-blue-900">Explanation</p>
-                        <p className="text-sm text-blue-800 mt-1">{answer.explanation}</p>
+                      <div className="mt-3.5 p-4 sm:p-5 rounded-2xl bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 dark:border-amber-500/30 text-base sm:text-lg text-foreground leading-relaxed sm:leading-8 shadow-sm">
+                        <div className="flex items-center gap-2 mb-2 font-semibold text-amber-900 dark:text-amber-200 text-sm sm:text-base">
+                          <Lightbulb className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                          <span>Explanation</span>
+                        </div>
+                        <p className="whitespace-pre-wrap font-normal">{answer.explanation}</p>
                       </div>
                     )}
                   </div>

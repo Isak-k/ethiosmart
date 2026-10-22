@@ -77,7 +77,7 @@ export async function updateExam(examId: string, updates: Partial<Exam>) {
     if (value !== undefined) {
       payload[key] = value;
     } else {
-      if (key === 'departmentId' || key === 'departmentIds') {
+      if (key === 'departmentId' || key === 'departmentIds' || key === 'subjectId' || key === 'chapterTitle' || key === 'chapterId') {
         payload[key] = deleteField();
       }
     }
@@ -288,6 +288,66 @@ export async function getPublishedExams(studentDepartmentId?: string): Promise<E
   }
 }
 
+/**
+ * Fetch all exams associated with a given academic subject
+ */
+export async function getExamsBySubject(subjectId: string): Promise<Exam[]> {
+  const q = query(
+    collection(db, 'exams'),
+    where('subjectId', '==', subjectId)
+  );
+  try {
+    const querySnapshot = await getDocs(q);
+    const exams = querySnapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        examId: data.examId || doc.id,
+        ...data
+      } as Exam;
+    });
+
+    return exams.sort((a, b) => {
+      const timeA = a.createdAt?.seconds || 0;
+      const timeB = b.createdAt?.seconds || 0;
+      return timeB - timeA;
+    });
+  } catch (error) {
+    console.warn('Error fetching exams by subject, trying cache/scan fallback:', error);
+    try {
+      const cached = await getDocsFromCache(q);
+      if (!cached.empty) {
+        return cached.docs.map(doc => ({
+          examId: doc.data().examId || doc.id,
+          ...doc.data()
+        } as Exam));
+      }
+    } catch {
+      // ignore cache error
+    }
+
+    try {
+      const all = await getAllExams();
+      return all.filter(e => e.subjectId === subjectId);
+    } catch {
+      return [];
+    }
+  }
+}
+
+/**
+ * Assign or unassign an exam to a subject chapter
+ */
+export async function assignExamToChapter(
+  examId: string,
+  chapterId?: string | null,
+  chapterTitle?: string | null
+): Promise<void> {
+  await updateExam(examId, {
+    chapterId: chapterId || undefined,
+    chapterTitle: chapterTitle || undefined,
+  });
+}
+
 // Question management
 export async function addQuestion(examId: string, questionData: Omit<Question, 'questionId' | 'createdAt'>) {
   const question = {
@@ -322,7 +382,7 @@ export async function updateQuestion(examId: string, questionId: string, updates
   Object.entries(updates).forEach(([key, value]) => {
     if (value !== undefined) {
       payload[key] = value;
-    } else if (['correctAnswer', 'explanation', 'options', 'correctOptionIndex'].includes(key)) {
+    } else if (['correctAnswer', 'explanation', 'options', 'correctOptionIndex', 'imageUrl'].includes(key)) {
       payload[key] = deleteField();
     }
   });

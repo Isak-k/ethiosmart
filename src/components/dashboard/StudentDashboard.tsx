@@ -5,7 +5,7 @@ import { getStudentAttempts } from "@/lib/firebase-attempts";
 import { SimpleLeaderboard } from "@/components/SimpleLeaderboard";
 import { StatCard } from "./StatCard";
 import { ExamCard } from "@/components/exam/ExamCard";
-import { ClipboardList, Trophy, Clock, CheckCircle } from "lucide-react";
+import { ClipboardList, Trophy, Clock, CheckCircle, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -36,7 +36,6 @@ export function StudentDashboard() {
     averageScore: 0,
     upcomingExams: 0,
   });
-  const [availableExams, setAvailableExams] = useState<ExamData[]>([]);
   const [upcomingExams, setUpcomingExams] = useState<ExamData[]>([]);
   const [attemptedExamIds, setAttemptedExamIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -89,7 +88,6 @@ export function StudentDashboard() {
           upcomingExams: upcoming.length,
         });
 
-        setAvailableExams(active.slice(0, 4));
         setUpcomingExams(upcoming.slice(0, 4));
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
@@ -104,19 +102,28 @@ export function StudentDashboard() {
   }, [user, profile]);
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-8 animate-fade-in pb-12">
+      {/* Welcome Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl lg:text-3xl font-display font-bold">
+          <h1 className="text-2xl lg:text-3xl font-display font-bold text-foreground">
             {t("dashboard.welcome", { name: profile?.full_name?.split(" ")[0] })}
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-muted-foreground mt-1 text-sm sm:text-base">
             {t("dashboard.studentSubtitle")}
           </p>
         </div>
+
+        <Button variant="outline" asChild className="rounded-xl self-start sm:self-auto shadow-xs">
+          <Link to="/dashboard/exams">
+            <ClipboardList className="h-4 w-4 mr-2 text-primary" />
+            Exams
+          </Link>
+        </Button>
       </div>
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
         <StatCard
           title={t("dashboard.stats.availableExams")}
           value={stats.availableExams}
@@ -143,97 +150,34 @@ export function StudentDashboard() {
         />
       </div>
 
-      {/* Leaderboard Section - Only show if no permission errors */}
+      {/* Leaderboard Section */}
       {profile?.departmentId && (
         <div className="w-full">
           <SimpleLeaderboard departmentId={profile.departmentId} />
         </div>
       )}
 
-      <div className="grid gap-6 md:grid-cols-2">
+      {/* Upcoming Scheduled Exams (only if any are scheduled for future dates) */}
+      {!loading && upcomingExams.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-display font-bold flex items-center gap-2">
-              <ClipboardList className="h-5 w-5 text-primary" />
-              {t("dashboard.availableExams")}
-            </h2>
-            <Button variant="ghost" size="sm" asChild className="text-primary hover:text-primary/80">
-              <Link to="/dashboard/exams">{t("common.viewAll")}</Link>
-            </Button>
-          </div>
-
-          {loading ? (
-            <div className="grid gap-4">
-              {[1, 2].map((i) => (
-                <div
-                  key={i}
-                  className="h-32 rounded-xl bg-muted animate-pulse"
-                />
-              ))}
-            </div>
-          ) : availableExams.length > 0 ? (
-            <div className="grid gap-4">
-              {availableExams.map((exam) => (
-                <ExamCard
-                  key={exam.id}
-                  exam={exam}
-                  hasAttempted={attemptedExamIds.has(exam.id)}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12 bg-muted/30 rounded-2xl border border-dashed border-muted-foreground/20">
-              <div className="h-16 w-16 bg-muted/50 rounded-full flex items-center justify-center mx-auto mb-4">
-                <ClipboardList className="h-8 w-8 text-muted-foreground" />
-              </div>
-              <h3 className="font-medium mb-1">{t("dashboard.noAvailableExams")}</h3>
-              <p className="text-muted-foreground text-sm max-w-[250px] mx-auto">
-                {t("dashboard.checkBackLater")}
-              </p>
-            </div>
-          )}
-        </div>
-
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-display font-bold flex items-center gap-2">
+            <h2 className="text-xl font-display font-bold flex items-center gap-2 text-foreground">
               <Clock className="h-5 w-5 text-primary" />
               {t("dashboard.upcomingExams")}
             </h2>
           </div>
 
-          {loading ? (
-            <div className="grid gap-4">
-              {[1, 2].map((i) => (
-                <div
-                  key={i}
-                  className="h-32 rounded-xl bg-muted animate-pulse"
-                />
-              ))}
-            </div>
-          ) : upcomingExams.length > 0 ? (
-            <div className="grid gap-4">
-              {upcomingExams.map((exam) => (
-                <ExamCard
-                  key={exam.id}
-                  exam={exam}
-                  hasAttempted={false}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12 bg-muted/30 rounded-2xl border border-dashed border-muted-foreground/20">
-              <div className="h-16 w-16 bg-muted/50 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Clock className="h-8 w-8 text-muted-foreground" />
-              </div>
-              <h3 className="font-medium mb-1">{t("dashboard.noUpcomingExams")}</h3>
-              <p className="text-muted-foreground text-sm max-w-[250px] mx-auto">
-                {t("dashboard.checkBackLater")}
-              </p>
-            </div>
-          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
+            {upcomingExams.map((exam) => (
+              <ExamCard
+                key={exam.id}
+                exam={exam}
+                hasAttempted={false}
+              />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

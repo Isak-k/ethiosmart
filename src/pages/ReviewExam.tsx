@@ -14,12 +14,22 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 interface Question {
   questionId: string;
   questionText: string;
-  options: string[];
-  correctOptionIndex: number;
+  imageUrl?: string;
+  options?: string[];
+  correctOptionIndex?: number;
+  correctAnswer?: string;
+  questionType?: 'mcq' | 'truefalse' | 'shortanswer' | 'essay';
   marks: number;
   orderIndex: number;
   feedbackType: "instant" | "hidden";
   explanation?: string;
+}
+
+interface ReviewAnswer {
+  selectedOptionIndex: number | null;
+  studentAnswer: string | null;
+  isCorrect: boolean | null;
+  manualGrade?: number | null;
 }
 
 interface AttemptData {
@@ -38,7 +48,7 @@ const ReviewExam = () => {
   const [loading, setLoading] = useState(true);
   const [examTitle, setExamTitle] = useState("");
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [userAnswers, setUserAnswers] = useState<Record<string, number>>({});
+  const [userAnswers, setUserAnswers] = useState<Record<string, ReviewAnswer>>({});
   const [attemptData, setAttemptData] = useState<AttemptData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,9 +70,7 @@ const ReviewExam = () => {
       }
 
       // Security Check: Only the student or admin can view
-      // (Admin check would require role from context, assuming student for now based on route)
       if (attempt.studentId !== user.uid) {
-         // TODO: Add admin bypass if needed, but for now strict
          setError("You are not authorized to view this review.");
          return;
       }
@@ -91,15 +99,25 @@ const ReviewExam = () => {
 
       // 3. Fetch Questions
       const questionsData = await getQuestions(attempt.examId);
-      // Sort by orderIndex
       questionsData.sort((a, b) => a.orderIndex - b.orderIndex);
       setQuestions(questionsData as Question[]);
 
-      // 4. Fetch Answers
+      // 4. Fetch Answers and normalize selectedOptionIndex / studentAnswer
       const answersData = await getAnswers(attemptId);
-      const answersMap: Record<string, number> = {};
-      answersData.forEach(ans => {
-        answersMap[ans.questionId] = ans.selectedOption;
+      const answersMap: Record<string, ReviewAnswer> = {};
+      answersData.forEach((ans: any) => {
+        const selectedIndex = typeof ans.selectedOptionIndex === 'number'
+          ? ans.selectedOptionIndex
+          : typeof ans.selectedOption === 'number'
+          ? ans.selectedOption
+          : null;
+
+        answersMap[ans.questionId] = {
+          selectedOptionIndex: selectedIndex,
+          studentAnswer: ans.studentAnswer ?? null,
+          isCorrect: typeof ans.isCorrect === 'boolean' ? ans.isCorrect : null,
+          manualGrade: typeof ans.manualGrade === 'number' ? ans.manualGrade : null,
+        };
       });
       setUserAnswers(answersMap);
 
@@ -139,40 +157,51 @@ const ReviewExam = () => {
   }
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6 animate-fade-in max-w-4xl mx-auto">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard/results")}>
-            <ArrowLeft className="h-4 w-4" />
+    <DashboardLayout contentClassName="px-0 sm:px-6 lg:p-8 pt-3 sm:pt-6 pb-20">
+      <div className="space-y-4 sm:space-y-6 animate-fade-in max-w-4xl mx-auto w-full">
+        {/* Header (compact padding on mobile) */}
+        <div className="px-3.5 sm:px-0 flex items-center gap-3 sm:gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard/results")} className="rounded-xl shrink-0">
+            <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold">{examTitle} - Review</h1>
-            <p className="text-muted-foreground">
-              Score: {attemptData?.totalScore} / {attemptData?.maxScore}
+            <h1 className="text-xl sm:text-2xl font-bold font-display leading-tight">{examTitle} - Review</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+              Score: <span className="font-semibold text-foreground">{attemptData?.totalScore}</span> / {attemptData?.maxScore}
             </p>
           </div>
         </div>
 
-        <div className="space-y-6">
-          {questions.map((q, index) => (
-            <QuestionCard
-              key={q.questionId}
-              questionNumber={index + 1}
-              questionText={q.questionText}
-              options={q.options}
-              selectedOption={userAnswers[q.questionId] ?? null}
-              correctOption={q.correctOptionIndex}
-              feedbackType="hidden" // We force "hidden" so QuestionCard doesn't do its own interactive feedback logic, but uses isSubmitted + correctOption
-              isSubmitted={true}
-              onSelectOption={() => {}} // Read-only
-              marks={q.marks}
-              explanation={q.explanation}
-            />
-          ))}
+        {/* Questions List (Edge-to-edge on mobile for optimal reading) */}
+        <div className="space-y-3 sm:space-y-6">
+          {questions.map((q, index) => {
+            const userAns = userAnswers[q.questionId];
+            return (
+              <QuestionCard
+                key={q.questionId}
+                questionNumber={index + 1}
+                questionText={q.questionText}
+                imageUrl={q.imageUrl}
+                options={q.options || []}
+                selectedOption={userAns?.selectedOptionIndex ?? null}
+                studentAnswer={userAns?.studentAnswer ?? null}
+                correctOption={q.correctOptionIndex}
+                correctAnswerText={q.correctAnswer}
+                manualGrade={userAns?.manualGrade}
+                isCorrect={userAns?.isCorrect}
+                questionType={q.questionType || (q.options && q.options.length > 0 ? 'mcq' : 'shortanswer')}
+                feedbackType="hidden"
+                isSubmitted={true}
+                onSelectOption={() => {}}
+                marks={q.marks}
+                explanation={q.explanation}
+              />
+            );
+          })}
         </div>
         
-        <div className="flex justify-center pt-8">
-            <Button onClick={() => navigate("/dashboard/results")} size="lg">
+        <div className="flex justify-center pt-4 sm:pt-8 px-4">
+            <Button onClick={() => navigate("/dashboard/results")} size="lg" className="rounded-xl shadow-sm">
                 Back to Results
             </Button>
         </div>

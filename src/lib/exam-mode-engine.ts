@@ -14,6 +14,7 @@ export interface ExamQuestion {
   marks: number;
   orderIndex: number;
   feedbackType: 'instant' | 'hidden';
+  imageUrl?: string;
 }
 
 export interface ExamAnswer {
@@ -182,11 +183,12 @@ export function convertToExamQuestions(questions: Question[]): ExamQuestion[] {
   return questions.map((q) => ({
     questionId: q.questionId,
     questionText: q.questionText,
-    options: q.options,
-    correctOptionIndex: q.correctOptionIndex,
+    options: q.options || [],
+    correctOptionIndex: q.correctOptionIndex ?? 0,
     marks: q.marks,
     orderIndex: q.orderIndex,
     feedbackType: q.feedbackType,
+    imageUrl: q.imageUrl,
   }));
 }
 
