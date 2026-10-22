@@ -12,9 +12,17 @@ export function InstallPrompt() {
   useEffect(() => {
     // Check if it's iOS
     const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-    // Check if it's not in standalone mode (not already installed)
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone;
+    // Check if it's already installed (standalone mode or previous install recorded)
+    const isStandalone =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (navigator as any).standalone ||
+      localStorage.getItem('pwa_installed') === 'true';
     
+    if (isStandalone) {
+      setIsVisible(false);
+      return;
+    }
+
     if (isIOSDevice && !isStandalone) {
       setIsIOS(true);
       // Show prompt after a delay on iOS
@@ -31,10 +39,17 @@ export function InstallPrompt() {
       setIsVisible(true);
     };
 
+    const installedHandler = () => {
+      setIsVisible(false);
+      localStorage.setItem('pwa_installed', 'true');
+    };
+
     window.addEventListener("beforeinstallprompt", handler);
+    window.addEventListener("appinstalled", installedHandler);
 
     return () => {
       window.removeEventListener("beforeinstallprompt", handler);
+      window.removeEventListener("appinstalled", installedHandler);
     };
   }, []);
 
@@ -46,6 +61,9 @@ export function InstallPrompt() {
 
     // Wait for the user to respond to the prompt
     const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === "accepted") {
+      localStorage.setItem('pwa_installed', 'true');
+    }
     
     // We've used the prompt, and can't use it again, throw it away
     setDeferredPrompt(null);

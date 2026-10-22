@@ -37,9 +37,19 @@ const Index = () => {
   const { t } = useTranslation();
   const { toast } = useToast();
 
-  // PWA Install States
+  // PWA Install States - Visible before installed, hidden immediately once installed
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [isStandalone, setIsStandalone] = useState(false);
+  const [isInstalled, setIsInstalled] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    const standaloneMode =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      (window.navigator as any).standalone === true ||
+      window.matchMedia("(display-mode: fullscreen)").matches ||
+      window.matchMedia("(display-mode: minimal-ui)").matches ||
+      document.referrer.startsWith("android-app://");
+    const storedInstalled = localStorage.getItem("pwa_installed") === "true";
+    return Boolean(standaloneMode || storedInstalled);
+  });
   const [isIOS, setIsIOS] = useState(false);
   const [installModalOpen, setInstallModalOpen] = useState(false);
 
@@ -50,36 +60,81 @@ const Index = () => {
   }, [user, role, loading, navigate]);
 
   useEffect(() => {
-    // Check if running in standalone mode (already installed as PWA)
-    const standaloneMode =
+    const checkStandalone = () =>
       window.matchMedia("(display-mode: standalone)").matches ||
-      (window.navigator as any).standalone === true;
-    setIsStandalone(Boolean(standaloneMode));
+      (window.navigator as any).standalone === true ||
+      window.matchMedia("(display-mode: fullscreen)").matches ||
+      window.matchMedia("(display-mode: minimal-ui)").matches ||
+      document.referrer.startsWith("android-app://");
+
+    if (checkStandalone() || localStorage.getItem("pwa_installed") === "true") {
+      setIsInstalled(true);
+    }
+
+    // Check modern browser installed apps API
+    if ("getInstalledRelatedApps" in navigator) {
+      (navigator as any).getInstalledRelatedApps().then((apps: any[]) => {
+        if (apps && apps.length > 0) {
+          setIsInstalled(true);
+          localStorage.setItem("pwa_installed", "true");
+        }
+      }).catch(() => {});
+    }
 
     // Check if iOS device
     const iOSDevice =
       /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
     setIsIOS(Boolean(iOSDevice));
 
+    // Listen to standalone display mode change
+    const mediaQuery = window.matchMedia("(display-mode: standalone)");
+    const handleDisplayChange = (e: MediaQueryListEvent) => {
+      if (e.matches) {
+        setIsInstalled(true);
+        localStorage.setItem("pwa_installed", "true");
+      }
+    };
+    mediaQuery.addEventListener?.("change", handleDisplayChange);
+
     // Capture PWA install prompt
-    const handler = (e: Event) => {
+    const beforeInstallHandler = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e);
+      // If beforeinstallprompt fired, the app is not currently running as an installed PWA
+      if (!checkStandalone()) {
+        setIsInstalled(false);
+        localStorage.removeItem("pwa_installed");
+      }
     };
 
-    window.addEventListener("beforeinstallprompt", handler);
+    // Listen for device app installation event (fires immediately when user installs)
+    const appInstalledHandler = () => {
+      setIsInstalled(true);
+      localStorage.setItem("pwa_installed", "true");
+      setDeferredPrompt(null);
+      setInstallModalOpen(false);
+      toast({
+        title: "ExamPro Installed!",
+        description: "The application is now installed on your device and ready to use offline.",
+      });
+    };
+
+    window.addEventListener("beforeinstallprompt", beforeInstallHandler);
+    window.addEventListener("appinstalled", appInstalledHandler);
 
     return () => {
-      window.removeEventListener("beforeinstallprompt", handler);
+      window.removeEventListener("beforeinstallprompt", beforeInstallHandler);
+      window.removeEventListener("appinstalled", appInstalledHandler);
+      mediaQuery.removeEventListener?.("change", handleDisplayChange);
     };
-  }, []);
+  }, [toast]);
 
   // Handle Install Action across both Desktop and Mobile devices
   const handleInstallClick = async () => {
-    if (isStandalone) {
+    if (isInstalled) {
       toast({
         title: "App Already Installed",
-        description: "ExamPro is already installed on this device as a standalone application.",
+        description: "ExamPro is already installed on this device.",
       });
       return;
     }
@@ -88,7 +143,10 @@ const Index = () => {
       try {
         deferredPrompt.prompt();
         const choiceResult = await deferredPrompt.userChoice;
-        if (choiceResult.outcome === "accepted") {
+        if (choiceResult && choiceResult.outcome === "accepted") {
+          setIsInstalled(true);
+          localStorage.setItem("pwa_installed", "true");
+          setInstallModalOpen(false);
           toast({
             title: "Installation Started",
             description: "ExamPro is being installed on your device.",
@@ -163,16 +221,18 @@ const Index = () => {
 
             {/* Navigation Actions */}
             <div className="flex items-center gap-1.5 sm:gap-3">
-              {/* Install Button in Top Nav - Visible on BOTH Screen Sizes */}
-              <Button
-                variant="ghost"
-                onClick={handleInstallClick}
-                className="text-white bg-white/15 backdrop-blur-md border border-white/30 hover:bg-white/25 shadow-md hover:shadow-lg rounded-xl h-9 px-2.5 sm:px-3.5 text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95"
-                title="Install ExamPro on your device"
-              >
-                <Download className="h-4 w-4" />
-                <span className="inline">{isStandalone ? "Installed" : "Install App"}</span>
-              </Button>
+              {/* Install Button in Top Nav - Visible before installed, hidden immediately once installed */}
+              {!isInstalled && (
+                <Button
+                  variant="ghost"
+                  onClick={handleInstallClick}
+                  className="text-white bg-white/15 backdrop-blur-md border border-white/30 hover:bg-white/25 shadow-md hover:shadow-lg rounded-xl h-9 px-2.5 sm:px-3.5 text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95"
+                  title="Install ExamPro on your device"
+                >
+                  <Download className="h-4 w-4" />
+                  <span className="inline">Install App</span>
+                </Button>
+              )}
 
               <div className="[&_button]:text-white [&_button]:bg-white/10 [&_button]:backdrop-blur-sm [&_button]:border-white/20 [&_button]:hover:bg-white/20 [&_button]:shadow-lg">
                 <LanguageToggle />
@@ -232,16 +292,18 @@ const Index = () => {
                   <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                 </Button>
 
-                {/* 2. Primary Install App Button - Always accessible on both screen sizes */}
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="h-13 sm:h-14 px-6 text-base sm:text-lg font-bold rounded-2xl bg-white/20 hover:bg-white/30 text-white border-2 border-white/60 backdrop-blur-md transition-all duration-300 hover:scale-105 active:scale-95 shadow-xl flex-1 flex items-center justify-center gap-2"
-                  onClick={handleInstallClick}
-                >
-                  <Download className="h-5 w-5 text-white" />
-                  <span>{isStandalone ? "App Installed" : "Install App"}</span>
-                </Button>
+                {/* 2. Primary Install App Button - Visible before installed, hidden immediately once installed */}
+                {!isInstalled && (
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="h-13 sm:h-14 px-6 text-base sm:text-lg font-bold rounded-2xl bg-white/20 hover:bg-white/30 text-white border-2 border-white/60 backdrop-blur-md transition-all duration-300 hover:scale-105 active:scale-95 shadow-xl flex-1 flex items-center justify-center gap-2"
+                    onClick={handleInstallClick}
+                  >
+                    <Download className="h-5 w-5 text-white" />
+                    <span>Install App</span>
+                  </Button>
+                )}
 
                 {/* 3. Learn More (Desktop & Mobile) */}
                 <Button
@@ -264,10 +326,12 @@ const Index = () => {
                   <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                   <span>Free for All Students</span>
                 </div>
-                <div className="flex items-center gap-1.5 sm:gap-2">
-                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
-                  <span>Fast 1-Click Install</span>
-                </div>
+                {!isInstalled && (
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+                    <span>Fast 1-Click Install</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -336,15 +400,17 @@ const Index = () => {
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
 
-              <Button
-                size="lg"
-                variant="outline"
-                className="w-full sm:w-auto h-13 sm:h-14 px-8 text-base sm:text-lg font-bold rounded-2xl border-2 border-white/80 text-white bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all duration-300 hover:scale-105 active:scale-95 flex items-center justify-center gap-2"
-                onClick={handleInstallClick}
-              >
-                <Download className="h-5 w-5" />
-                <span>{isStandalone ? "App Installed" : "Install ExamPro"}</span>
-              </Button>
+              {!isInstalled && (
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="w-full sm:w-auto h-13 sm:h-14 px-8 text-base sm:text-lg font-bold rounded-2xl border-2 border-white/80 text-white bg-white/10 hover:bg-white/20 backdrop-blur-sm transition-all duration-300 hover:scale-105 active:scale-95 flex items-center justify-center gap-2"
+                  onClick={handleInstallClick}
+                >
+                  <Download className="h-5 w-5" />
+                  <span>Install ExamPro</span>
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -358,16 +424,16 @@ const Index = () => {
               {isIOS ? <Smartphone className="h-6 w-6" /> : <Monitor className="h-6 w-6" />}
             </div>
             <DialogTitle className="text-xl font-bold font-display">
-              {isStandalone ? "ExamPro is Installed" : isIOS ? "Install ExamPro on iPhone / iPad" : "Install ExamPro on Your Device"}
+              {isInstalled ? "ExamPro is Installed" : isIOS ? "Install ExamPro on iPhone / iPad" : "Install ExamPro on Your Device"}
             </DialogTitle>
             <DialogDescription className="text-xs sm:text-sm text-muted-foreground">
-              {isStandalone
+              {isInstalled
                 ? "You already have ExamPro installed as an application. You can launch it directly from your home screen or apps menu."
                 : "Install ExamPro for fast 1-click access, full-screen reading, and 100% offline study capability."}
             </DialogDescription>
           </DialogHeader>
 
-          {isStandalone ? (
+          {isInstalled ? (
             <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 flex items-center gap-3">
               <CheckCircle2 className="h-6 w-6 text-emerald-500 shrink-0" />
               <p className="text-xs font-semibold">
@@ -420,7 +486,11 @@ const Index = () => {
                   onClick={async () => {
                     try {
                       deferredPrompt.prompt();
-                      await deferredPrompt.userChoice;
+                      const choice = await deferredPrompt.userChoice;
+                      if (choice && choice.outcome === "accepted") {
+                        setIsInstalled(true);
+                        localStorage.setItem("pwa_installed", "true");
+                      }
                       setDeferredPrompt(null);
                       setInstallModalOpen(false);
                     } catch {}
