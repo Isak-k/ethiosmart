@@ -32,6 +32,72 @@
     <meta name="twitter:title" content="ExamPro - Online Examination Platform">
     <meta name="twitter:description" content="Secure online examination platform with offline support">
     <meta name="twitter:image" content="https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/15f2c462-4e2d-4cc5-8654-e3a51d024a36/id-preview-7cd3db5f--b432e849-94bf-4fac-8def-7763e8ed9a18.lovable.app-1770575293453.png">
+
+    <!-- Hide Vercel Toolbar on Mobile Screen -->
+    <style>
+      @media (max-width: 768px) {
+        vercel-live-feedback,
+        vercel-toolbar,
+        #vercel-toolbar,
+        #vercel-live-feedback-host,
+        [data-vercel-toolbar],
+        [data-testid="vercel-toolbar"],
+        [id*="vercel-live-feedback"],
+        [class*="vercel-toolbar"],
+        iframe[src*="vercel.live"],
+        iframe[title*="Vercel"] {
+          display: none !important;
+          visibility: hidden !important;
+          opacity: 0 !important;
+          pointer-events: none !important;
+          width: 0 !important;
+          height: 0 !important;
+          position: absolute !important;
+          left: -9999px !important;
+          bottom: -9999px !important;
+          z-index: -9999 !important;
+        }
+      }
+    </style>
+    <script>
+      (function() {
+        function checkAndHideVercelToolbar() {
+          var isMobileScreen = window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+          if (isMobileScreen) {
+            var selectors = [
+              'vercel-live-feedback',
+              'vercel-toolbar',
+              '#vercel-toolbar',
+              '#vercel-live-feedback-host',
+              '[data-vercel-toolbar]',
+              '[data-testid="vercel-toolbar"]',
+              'iframe[src*="vercel.live"]'
+            ];
+            selectors.forEach(function(sel) {
+              var elements = document.querySelectorAll(sel);
+              for (var i = 0; i < elements.length; i++) {
+                elements[i].style.setProperty('display', 'none', 'important');
+                elements[i].style.setProperty('visibility', 'hidden', 'important');
+                elements[i].style.setProperty('pointer-events', 'none', 'important');
+              }
+            });
+          }
+        }
+
+        if (typeof window !== 'undefined') {
+          window.addEventListener('DOMContentLoaded', checkAndHideVercelToolbar);
+          window.addEventListener('load', checkAndHideVercelToolbar);
+          window.addEventListener('resize', checkAndHideVercelToolbar);
+
+          if (typeof MutationObserver !== 'undefined') {
+            var observer = new MutationObserver(function() {
+              checkAndHideVercelToolbar();
+            });
+            observer.observe(document.documentElement, { childList: true, subtree: true });
+          }
+        }
+      })();
+    </script>
   </head>
 
   <body>
