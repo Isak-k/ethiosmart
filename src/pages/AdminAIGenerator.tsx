@@ -1104,129 +1104,132 @@ export default function AdminAIGenerator() {
   };
 
   return (
-    <DashboardLayout>
-      <div className="container mx-auto py-6 space-y-6 max-w-6xl">
+    <DashboardLayout contentClassName="p-0 sm:px-6 lg:px-8 py-2 sm:py-6">
+      <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 lg:px-6 py-2 sm:py-4 space-y-3.5 sm:space-y-6">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b">
-          <div>
-            <div className="flex items-center gap-2.5">
-              <div className="p-2.5 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-2xl text-white shadow-md shadow-purple-500/10">
-                <Sparkles className="h-6 w-6" />
-              </div>
-              <div>
-                <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">AI Exam Generator</h1>
-                <p className="text-muted-foreground text-xs sm:text-sm mt-0.5">
-                  Generate curriculum-aligned exam questions instantly from digital library books, PDFs, or syllabus topics.
-                </p>
-              </div>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/60">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="p-2 sm:p-2.5 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-xl sm:rounded-2xl text-white shadow-md shadow-purple-500/10 shrink-0">
+              <Sparkles className="h-5 w-5 sm:h-6 sm:w-6" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight truncate">
+                AI Exam Generator
+              </h1>
+              <p className="text-muted-foreground text-xs sm:text-sm mt-0.5 line-clamp-1 sm:line-clamp-none">
+                Generate curriculum-aligned exam questions instantly from books, PDFs, or topics.
+              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
             <Badge
               variant="outline"
-              className="py-1 px-3 text-xs bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-500/30 text-emerald-700 dark:text-emerald-400 font-medium flex items-center gap-1.5 cursor-pointer shadow-sm"
+              className="py-1 px-2.5 text-[11px] sm:text-xs bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-500/30 text-emerald-700 dark:text-emerald-400 font-medium flex items-center gap-1.5 cursor-pointer shadow-sm"
               onClick={refreshStatuses}
               title="Click to re-verify AI provider health"
             >
               <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              4 AI Engines Ready
+              <span>4 AI Engines Ready</span>
             </Badge>
 
-            <Button asChild variant="outline" size="sm" className="rounded-xl text-xs font-medium">
+            <Button asChild variant="outline" size="sm" className="rounded-xl text-xs font-medium h-7 sm:h-8 px-2.5 sm:px-3">
               <Link to="/dashboard/admin/exams">Manage Exams</Link>
             </Button>
           </div>
         </div>
 
         {/* Navigation Tabs */}
-        <Tabs value={activeTab} onValueChange={(val: any) => setActiveTab(val)} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 max-w-xl p-1 bg-muted/60 rounded-xl">
-            <TabsTrigger value="configure" className="gap-2 rounded-lg text-xs sm:text-sm font-semibold">
-              <Layers className="h-4 w-4" />
-              Configure
+        <Tabs value={activeTab} onValueChange={(val: any) => setActiveTab(val)} className="space-y-3.5 sm:space-y-6">
+          <TabsList className="grid grid-cols-4 w-full max-w-2xl p-1 bg-muted/60 rounded-xl sm:rounded-2xl gap-0.5 sm:gap-1">
+            <TabsTrigger value="configure" className="px-1 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[11px] sm:text-xs md:text-sm font-semibold flex items-center justify-center gap-1 sm:gap-1.5 transition-all">
+              <Layers className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+              <span className="hidden sm:inline">Configure</span>
+              <span className="sm:hidden">Setup</span>
             </TabsTrigger>
-            <TabsTrigger value="progress" className="gap-2 rounded-lg text-xs sm:text-sm font-semibold" disabled={!isGenerating && generationLogs.length === 0}>
-              <RefreshCw className={`h-4 w-4 ${isGenerating ? 'animate-spin text-purple-600' : ''}`} />
-              Progress
-              {isGenerating && <span className="h-2 w-2 rounded-full bg-purple-500 animate-pulse" />}
+            <TabsTrigger value="progress" className="px-1 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[11px] sm:text-xs md:text-sm font-semibold flex items-center justify-center gap-1 sm:gap-1.5 transition-all" disabled={!isGenerating && generationLogs.length === 0}>
+              <RefreshCw className={cn("h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0", isGenerating && "animate-spin text-purple-600")} />
+              <span className="hidden sm:inline">Progress</span>
+              <span className="sm:hidden">Status</span>
+              {isGenerating && <span className="h-1.5 w-1.5 rounded-full bg-purple-500 animate-pulse" />}
             </TabsTrigger>
-            <TabsTrigger value="review" className="gap-2 rounded-lg text-xs sm:text-sm font-semibold">
-              <CheckCircle2 className="h-4 w-4" />
-              Review ({generatedQuestions.length})
+            <TabsTrigger value="review" className="px-1 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[11px] sm:text-xs md:text-sm font-semibold flex items-center justify-center gap-1 sm:gap-1.5 transition-all">
+              <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+              <span className="truncate">Review ({generatedQuestions.length})</span>
             </TabsTrigger>
-            <TabsTrigger value="history" className="gap-2 rounded-lg text-xs sm:text-sm font-semibold">
-              <History className="h-4 w-4" />
-              Recent Jobs
+            <TabsTrigger value="history" className="px-1 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[11px] sm:text-xs md:text-sm font-semibold flex items-center justify-center gap-1 sm:gap-1.5 transition-all">
+              <History className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+              <span className="hidden sm:inline">Recent Jobs</span>
+              <span className="sm:hidden">History</span>
             </TabsTrigger>
           </TabsList>
 
           {/* TAB 1: CONFIGURE & GENERATE */}
-          <TabsContent value="configure" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <TabsContent value="configure" className="space-y-3.5 sm:space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-6 items-start">
               {/* Left Column: Source Material & AI Instructions (7 cols) */}
-              <div className="lg:col-span-7 space-y-6">
+              <div className="lg:col-span-7 space-y-3.5 sm:space-y-6">
                 {/* 1. Source Material */}
-                <Card className="border-border shadow-sm rounded-2xl overflow-hidden">
-                  <CardHeader className="pb-3 border-b bg-muted/20">
+                <Card className="border-border shadow-sm rounded-xl sm:rounded-2xl overflow-hidden">
+                  <CardHeader className="p-3.5 sm:p-5 pb-2.5 sm:pb-3 border-b bg-muted/20">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-base font-bold flex items-center gap-2">
+                      <CardTitle className="text-sm sm:text-base font-bold flex items-center gap-2">
                         <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
                           <BookOpen className="h-4 w-4" />
                         </div>
                         1. Select Material Source
                       </CardTitle>
-                      <Badge variant="outline" className="text-[11px] font-normal text-muted-foreground">
+                      <Badge variant="outline" className="text-[10px] sm:text-[11px] font-normal text-muted-foreground">
                         Step 1 of 2
                       </Badge>
                     </div>
-                    <CardDescription className="text-xs">
+                    <CardDescription className="text-xs mt-1">
                       Choose where the AI should extract syllabus topics, factual concepts, and textbook questions.
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-4 pt-4">
+                  <CardContent className="p-3 sm:p-5 space-y-3.5 sm:space-y-4">
                     {/* Source Mode Segmented Switch */}
                     <div className="flex p-1 bg-muted/60 rounded-xl gap-1">
                       <button
                         type="button"
                         onClick={() => setSourceType('book')}
                         className={cn(
-                          "flex-1 flex items-center justify-center gap-1.5 py-2 px-2 text-xs sm:text-sm font-semibold rounded-lg transition-all",
+                          "flex-1 flex items-center justify-center gap-1 sm:gap-1.5 py-1.5 sm:py-2 px-1 sm:px-2 text-[11px] sm:text-xs md:text-sm font-semibold rounded-lg transition-all",
                           sourceType === 'book'
                             ? "bg-background text-foreground shadow-sm"
                             : "text-muted-foreground hover:text-foreground"
                         )}
                       >
-                        <BookOpen className="h-4 w-4 text-primary shrink-0" />
-                        <span>Digital Library</span>
+                        <BookOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary shrink-0" />
+                        <span className="truncate">Digital Library</span>
                       </button>
 
                       <button
                         type="button"
                         onClick={() => setSourceType('upload')}
                         className={cn(
-                          "flex-1 flex items-center justify-center gap-1.5 py-2 px-2 text-xs sm:text-sm font-semibold rounded-lg transition-all",
+                          "flex-1 flex items-center justify-center gap-1 sm:gap-1.5 py-1.5 sm:py-2 px-1 sm:px-2 text-[11px] sm:text-xs md:text-sm font-semibold rounded-lg transition-all",
                           sourceType === 'upload'
                             ? "bg-background text-foreground shadow-sm"
                             : "text-muted-foreground hover:text-foreground"
                         )}
                       >
-                        <Upload className="h-4 w-4 text-primary shrink-0" />
-                        <span>Upload File</span>
+                        <Upload className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary shrink-0" />
+                        <span className="truncate">Upload File</span>
                       </button>
 
                       <button
                         type="button"
                         onClick={() => setSourceType('topic')}
                         className={cn(
-                          "flex-1 flex items-center justify-center gap-1.5 py-2 px-2 text-xs sm:text-sm font-semibold rounded-lg transition-all",
+                          "flex-1 flex items-center justify-center gap-1 sm:gap-1.5 py-1.5 sm:py-2 px-1 sm:px-2 text-[11px] sm:text-xs md:text-sm font-semibold rounded-lg transition-all",
                           sourceType === 'topic'
                             ? "bg-background text-foreground shadow-sm"
                             : "text-muted-foreground hover:text-foreground"
                         )}
                       >
-                        <FileText className="h-4 w-4 text-primary shrink-0" />
-                        <span>Topic & Notes</span>
+                        <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary shrink-0" />
+                        <span className="truncate">Topic & Notes</span>
                       </button>
                     </div>
 
@@ -1549,31 +1552,31 @@ export default function AdminAIGenerator() {
                 </Card>
 
                 {/* 2. AI Command / Prompt */}
-                <Card className="border-border shadow-sm rounded-2xl overflow-hidden">
-                  <CardHeader className="pb-3 border-b bg-muted/20">
+                <Card className="border-border shadow-sm rounded-xl sm:rounded-2xl overflow-hidden">
+                  <CardHeader className="p-3.5 sm:p-5 pb-2.5 sm:pb-3 border-b bg-muted/20">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-base font-bold flex items-center gap-2">
+                      <CardTitle className="text-sm sm:text-base font-bold flex items-center gap-2">
                         <div className="p-1.5 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400">
                           <Sparkles className="h-4 w-4" />
                         </div>
                         2. Prompt & Exam Instructions
                       </CardTitle>
-                      <Badge variant="outline" className="text-[11px] font-normal text-muted-foreground">
+                      <Badge variant="outline" className="text-[10px] sm:text-[11px] font-normal text-muted-foreground">
                         Step 2 of 2
                       </Badge>
                     </div>
-                    <CardDescription className="text-xs">
+                    <CardDescription className="text-xs mt-1">
                       Instruct the AI on question style, academic level, and areas of emphasis.
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-3 pt-4">
+                  <CardContent className="p-3 sm:p-5 space-y-3 sm:space-y-3.5">
                     {/* Prompt Presets */}
                     <div className="flex items-center justify-between pb-1 flex-wrap gap-2">
                       <Label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
                         <Sparkles className="h-3.5 w-3.5 text-purple-500" />
                         Pedagogical Standards & Presets:
                       </Label>
-                      <div className="flex items-center gap-1.5 flex-wrap">
+                      <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
                         {PROMPT_PRESETS.map((preset) => (
                           <button
                             key={preset.id}
@@ -1581,7 +1584,7 @@ export default function AdminAIGenerator() {
                             onClick={() => setPrompt(preset.text)}
                             title={preset.description}
                             className={cn(
-                              "px-2.5 py-1 rounded-lg text-xs font-medium transition border",
+                              "px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-medium transition border",
                               prompt === preset.text
                                 ? "bg-purple-600 text-white border-purple-600 shadow-sm"
                                 : "bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground border-border"
@@ -1603,7 +1606,7 @@ export default function AdminAIGenerator() {
 
                     {/* Prompt Intelligence Scope Badge */}
                     {detectedScope.hasDetectedScope && (
-                      <div className="flex items-center gap-2.5 p-3 rounded-xl border border-purple-500/30 bg-purple-500/10 text-purple-900 dark:text-purple-200 text-xs">
+                      <div className="flex items-center gap-2.5 p-2.5 sm:p-3 rounded-xl border border-purple-500/30 bg-purple-500/10 text-purple-900 dark:text-purple-200 text-xs">
                         <Sparkles className="h-4 w-4 shrink-0 text-purple-600 dark:text-purple-400" />
                         <div className="flex-1">
                           <span className="font-semibold text-purple-950 dark:text-purple-100">Prompt Scope Identified: </span>
@@ -1624,7 +1627,7 @@ export default function AdminAIGenerator() {
                         <Sparkles className="h-3 w-3 text-purple-500" />
                         Quick prompt enhancers (click to toggle):
                       </span>
-                      <div className="flex flex-wrap gap-1.5">
+                      <div className="flex flex-wrap gap-1 sm:gap-1.5">
                         {PROMPT_INSTRUCTION_CHIPS.map((chip, idx) => {
                           const isSelected = prompt.includes(chip.text);
                           return (
@@ -1633,7 +1636,7 @@ export default function AdminAIGenerator() {
                               type="button"
                               onClick={() => togglePromptChip(chip.text)}
                               className={cn(
-                                "inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all border",
+                                "inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-medium transition-all border",
                                 isSelected
                                   ? "bg-purple-600 text-white border-purple-600 shadow-sm"
                                   : "bg-muted/50 hover:bg-muted text-foreground border-border"
@@ -1651,11 +1654,11 @@ export default function AdminAIGenerator() {
               </div>
 
               {/* Right Column: Destination, Question Distribution & Primary CTA (5 cols) */}
-              <div className="lg:col-span-5 space-y-6">
-                <Card className="border-border shadow-sm rounded-2xl overflow-hidden sticky top-6">
-                  <CardHeader className="pb-3 border-b bg-gradient-to-r from-primary/5 via-primary/10 to-transparent">
+              <div className="lg:col-span-5 space-y-3.5 sm:space-y-6">
+                <Card className="border-border shadow-sm rounded-xl sm:rounded-2xl overflow-hidden lg:sticky lg:top-6">
+                  <CardHeader className="p-3.5 sm:p-5 pb-2.5 sm:pb-3 border-b bg-gradient-to-r from-primary/5 via-primary/10 to-transparent">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-base font-bold flex items-center gap-2">
+                      <CardTitle className="text-sm sm:text-base font-bold flex items-center gap-2">
                         <Layers className="h-4 w-4 text-primary" />
                         Exam Setup & Breakdown
                       </CardTitle>
@@ -1663,11 +1666,11 @@ export default function AdminAIGenerator() {
                         {totalCount} Total
                       </Badge>
                     </div>
-                    <CardDescription className="text-xs">
+                    <CardDescription className="text-xs mt-1">
                       Configure question counts, target exam, and launch.
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-4 pt-4">
+                  <CardContent className="p-3 sm:p-5 space-y-3.5 sm:space-y-4">
                     {/* Destination: Mode Toggle */}
                     <div className="flex p-1 bg-muted/60 rounded-xl gap-1">
                       <button
@@ -2016,7 +2019,7 @@ export default function AdminAIGenerator() {
                         type="button"
                         onClick={() => handleStartGeneration()}
                         disabled={isGenerating}
-                        className="w-full h-11 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-700 hover:to-pink-700 text-white font-bold text-sm shadow-md shadow-purple-500/20 rounded-xl transition-all cursor-pointer"
+                        className="w-full h-11 sm:h-12 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-700 hover:to-pink-700 text-white font-bold text-sm sm:text-base shadow-md shadow-purple-500/20 rounded-xl transition-all cursor-pointer active:scale-[0.98]"
                       >
                         <Sparkles className="h-4 w-4 mr-2" />
                         Generate {totalCount} Exam Questions
@@ -2089,35 +2092,35 @@ export default function AdminAIGenerator() {
           </TabsContent>
 
           {/* TAB 2: LIVE GENERATION PROGRESS */}
-          <TabsContent value="progress" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
+          <TabsContent value="progress" className="space-y-4 sm:space-y-6">
+            <Card className="border-border shadow-sm rounded-xl sm:rounded-2xl overflow-hidden">
+              <CardHeader className="p-3.5 sm:p-6 pb-2.5 sm:pb-4 border-b">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                   <div>
-                    <CardTitle className="text-xl flex items-center gap-2">
-                      <RefreshCw className={`h-5 w-5 text-purple-600 ${isGenerating ? 'animate-spin' : ''}`} />
-                      Live Generation Job: {currentJobId || 'Pending'}
+                    <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
+                      <RefreshCw className={cn("h-4 w-4 sm:h-5 sm:w-5 text-purple-600 shrink-0", isGenerating && "animate-spin")} />
+                      <span className="truncate">Live Generation Job: {currentJobId || 'Pending'}</span>
                     </CardTitle>
-                    <CardDescription>
+                    <CardDescription className="text-xs mt-0.5">
                       Progress, fallback monitoring, and batch execution state.
                     </CardDescription>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
                     {isGenerating ? (
-                      <Badge variant="default" className="bg-emerald-600 animate-pulse">
+                      <Badge variant="default" className="bg-emerald-600 animate-pulse text-xs">
                         Generating...
                       </Badge>
                     ) : generatedQuestions.length >= totalCount ? (
-                      <Badge variant="default" className="bg-emerald-600">
+                      <Badge variant="default" className="bg-emerald-600 text-xs">
                         Job Completed
                       </Badge>
                     ) : (
-                      <Badge variant="outline">Idle</Badge>
+                      <Badge variant="outline" className="text-xs">Idle</Badge>
                     )}
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="p-3.5 sm:p-6 space-y-4 sm:space-y-6">
                 {/* Fallback Banner */}
                 {fallbackBanner && (
                   <Alert className="bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200">
@@ -2152,7 +2155,7 @@ export default function AdminAIGenerator() {
                 {/* Live Console Output */}
                 <div className="space-y-2">
                   <Label className="text-xs font-semibold text-muted-foreground">Execution & Audit Logs</Label>
-                  <div className="bg-slate-950 text-slate-100 p-4 rounded-lg font-mono text-xs max-h-72 overflow-y-auto space-y-1 shadow-inner">
+                  <div className="bg-slate-950 text-slate-100 p-3 sm:p-4 rounded-xl font-mono text-[11px] sm:text-xs max-h-56 sm:max-h-72 overflow-y-auto space-y-1 shadow-inner">
                     {generationLogs.length === 0 ? (
                       <div className="text-slate-500 italic">No logs yet. Start generation to monitor execution.</div>
                     ) : (
@@ -2166,15 +2169,16 @@ export default function AdminAIGenerator() {
                 </div>
 
                 {/* Controls */}
-                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2">
                   <div className="flex items-center gap-2">
                     {isGenerating && (
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={handleTogglePause}
+                        className="rounded-xl text-xs font-semibold h-8"
                       >
-                        {isPaused ? <Play className="h-4 w-4 mr-1.5" /> : <Pause className="h-4 w-4 mr-1.5" />}
+                        {isPaused ? <Play className="h-3.5 w-3.5 mr-1.5" /> : <Pause className="h-3.5 w-3.5 mr-1.5" />}
                         {isPaused ? 'Resume Job' : 'Pause Job'}
                       </Button>
                     )}
@@ -2183,9 +2187,9 @@ export default function AdminAIGenerator() {
                         variant="outline"
                         size="sm"
                         onClick={() => handleStartGeneration({ resume: true })}
-                        className="text-primary border-primary/30"
+                        className="text-primary border-primary/30 rounded-xl text-xs font-semibold h-8"
                       >
-                        <RefreshCw className="h-4 w-4 mr-1.5" />
+                        <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
                         Resume Remaining ({totalCount - generatedQuestions.length})
                       </Button>
                     )}
@@ -2194,11 +2198,11 @@ export default function AdminAIGenerator() {
                   {generatedQuestions.length > 0 && (
                     <Button
                       onClick={() => setActiveTab('review')}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold h-8"
                       size="sm"
                     >
                       Proceed to Review Questions ({generatedQuestions.length})
-                      <ArrowRight className="h-4 w-4 ml-1.5" />
+                      <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
                     </Button>
                   )}
                 </div>
@@ -2207,31 +2211,31 @@ export default function AdminAIGenerator() {
           </TabsContent>
 
           {/* TAB 3: REVIEW & EDIT QUESTIONS */}
-          <TabsContent value="review" className="space-y-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-2">
+          <TabsContent value="review" className="space-y-4 sm:space-y-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-2">
               <div>
-                <h2 className="text-xl font-bold flex items-center gap-2">
+                <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2">
                   Question Review & Quality Editor
-                  <Badge variant="secondary">{generatedQuestions.length} Questions</Badge>
+                  <Badge variant="secondary" className="text-xs">{generatedQuestions.length} Questions</Badge>
                 </h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Carefully edit question text, answer options, explanations, and marks before publishing to students.
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                <Button variant="outline" size="sm" onClick={handleAddManualQuestion}>
-                  <Plus className="h-4 w-4 mr-1" /> Add Question
+              <div className="grid grid-cols-3 sm:flex sm:flex-wrap items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
+                <Button variant="outline" size="sm" onClick={handleAddManualQuestion} className="h-8 text-xs font-semibold rounded-xl">
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Add
                 </Button>
-                <Button variant="outline" size="sm" onClick={handleExportJson}>
-                  <Download className="h-4 w-4 mr-1" /> Export JSON
+                <Button variant="outline" size="sm" onClick={handleExportJson} className="h-8 text-xs font-semibold rounded-xl">
+                  <Download className="h-3.5 w-3.5 mr-1" /> JSON
                 </Button>
                 <Button
                   onClick={handleSaveToExam}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold h-8 text-xs rounded-xl"
                   size="sm"
                 >
-                  <Save className="h-4 w-4 mr-1.5" /> Save Questions to Exam
+                  <Save className="h-3.5 w-3.5 mr-1.5" /> Save
                 </Button>
               </div>
             </div>
@@ -2264,16 +2268,16 @@ export default function AdminAIGenerator() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 {/* Filter & Search Toolbar */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 rounded-2xl border bg-card/60 shadow-sm">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 p-2.5 sm:p-3 rounded-xl sm:rounded-2xl border bg-card/60 shadow-sm">
                   {/* Type Filter Pills */}
-                  <div className="flex flex-wrap items-center gap-1.5">
+                  <div className="flex flex-wrap items-center gap-1 sm:gap-1.5">
                     <button
                       type="button"
                       onClick={() => setReviewTypeFilter('all')}
                       className={cn(
-                        "px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all",
+                        "px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-semibold border transition-all",
                         reviewTypeFilter === 'all'
                           ? "bg-primary text-primary-foreground border-primary shadow-sm"
                           : "bg-muted/40 hover:bg-muted text-muted-foreground border-border"
@@ -2285,19 +2289,19 @@ export default function AdminAIGenerator() {
                       type="button"
                       onClick={() => setReviewTypeFilter('truefalse')}
                       className={cn(
-                        "px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all",
+                        "px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-semibold border transition-all",
                         reviewTypeFilter === 'truefalse'
                           ? "bg-primary text-primary-foreground border-primary shadow-sm"
                           : "bg-muted/40 hover:bg-muted text-muted-foreground border-border"
                       )}
                     >
-                      True / False ({generatedQuestions.filter(q => q.questionType === 'truefalse').length})
+                      T/F ({generatedQuestions.filter(q => q.questionType === 'truefalse').length})
                     </button>
                     <button
                       type="button"
                       onClick={() => setReviewTypeFilter('mcq')}
                       className={cn(
-                        "px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all",
+                        "px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-semibold border transition-all",
                         reviewTypeFilter === 'mcq'
                           ? "bg-primary text-primary-foreground border-primary shadow-sm"
                           : "bg-muted/40 hover:bg-muted text-muted-foreground border-border"
@@ -2309,31 +2313,31 @@ export default function AdminAIGenerator() {
                       type="button"
                       onClick={() => setReviewTypeFilter('shortanswer')}
                       className={cn(
-                        "px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all",
+                        "px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-semibold border transition-all",
                         reviewTypeFilter === 'shortanswer'
                           ? "bg-primary text-primary-foreground border-primary shadow-sm"
                           : "bg-muted/40 hover:bg-muted text-muted-foreground border-border"
                       )}
                     >
-                      Short Answer ({generatedQuestions.filter(q => q.questionType === 'shortanswer').length})
+                      Short ({generatedQuestions.filter(q => q.questionType === 'shortanswer').length})
                     </button>
                   </div>
 
                   {/* Search Filter */}
-                  <div className="relative sm:w-64">
+                  <div className="relative w-full sm:w-64">
                     <Search className="h-3.5 w-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                     <Input
                       placeholder="Search questions & answers..."
                       value={reviewSearchQuery}
                       onChange={(e) => setReviewSearchQuery(e.target.value)}
-                      className="pl-8 h-8 text-xs rounded-xl bg-card"
+                      className="pl-8 h-8 text-xs rounded-xl bg-card w-full"
                     />
                   </div>
                 </div>
 
                 {filteredReviewQuestions.length === 0 ? (
-                  <Card className="text-center py-8 rounded-2xl">
-                    <CardContent className="space-y-2">
+                  <Card className="text-center py-8 rounded-xl sm:rounded-2xl border-dashed">
+                    <CardContent className="space-y-2 p-4">
                       <p className="text-xs text-muted-foreground">No questions match the current filter or search query.</p>
                       <Button
                         variant="ghost"
@@ -2353,62 +2357,71 @@ export default function AdminAIGenerator() {
                   return (
                     <Card
                       key={q.id || qIndex}
-                      className={`relative transition ${isDuplicate ? 'border-amber-400 bg-amber-50/20' : ''}`}
+                      className={cn(
+                        "relative transition rounded-xl sm:rounded-2xl border-border shadow-sm overflow-hidden",
+                        isDuplicate && "border-amber-400 bg-amber-50/20"
+                      )}
                     >
-                      <CardHeader className="p-4 pb-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-bold text-sm bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
-                              Q{qIndex + 1}
-                            </span>
-                            <Badge variant="outline" className="text-xs capitalize">
-                              {q.questionType === 'mcq' ? 'Multiple Choice' : q.questionType === 'truefalse' ? 'True / False' : 'Short Answer'}
-                            </Badge>
-                            <Badge variant="secondary" className="text-xs">
-                              {q.difficulty}
-                            </Badge>
-                            <Badge variant="outline" className="text-[10px] text-muted-foreground">
-                              via {q.providerUsed}
-                            </Badge>
-                            {isDuplicate && (
-                              <Badge variant="destructive" className="text-[10px]">
-                                Potential Duplicate
+                      <CardHeader className="p-3 sm:p-4 pb-2.5 border-b bg-muted/10">
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                              <span className="font-bold text-xs sm:text-sm bg-primary/10 text-primary px-2 py-0.5 rounded-md">
+                                Q{qIndex + 1}
+                              </span>
+                              <Badge variant="outline" className="text-[10px] sm:text-xs capitalize">
+                                {q.questionType === 'mcq' ? 'MCQ' : q.questionType === 'truefalse' ? 'True / False' : 'Short Answer'}
                               </Badge>
-                            )}
-                            {q.sourceReference?.bookTitle && (
-                              <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary border-primary/20 flex items-center gap-1">
-                                <BookOpen className="h-3 w-3" />
-                                Source: {q.sourceReference.bookTitle}
-                                {q.sourceReference.pageRange ? ` (p. ${q.sourceReference.pageRange})` : ''}
-                                {q.sourceReference.chapter ? ` (${q.sourceReference.chapter})` : ''}
+                              <Badge variant="secondary" className="text-[10px] sm:text-xs">
+                                {q.difficulty}
                               </Badge>
-                            )}
+                              {isDuplicate && (
+                                <Badge variant="destructive" className="text-[10px]">
+                                  Duplicate
+                                </Badge>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <div className="flex items-center gap-1 text-xs">
+                                <Label className="text-[10px] sm:text-[11px] text-muted-foreground">Pts:</Label>
+                                <Input
+                                  type="number"
+                                  className="w-11 sm:w-12 h-7 text-xs px-1 text-center rounded-lg"
+                                  min={1}
+                                  value={q.marks || 1}
+                                  onChange={(e) => handleUpdateQuestion(qIndex, { marks: parseInt(e.target.value, 10) || 1 })}
+                                />
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                                onClick={() => handleDeleteQuestion(qIndex)}
+                                title="Delete Question"
+                              >
+                                <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                              </Button>
+                            </div>
                           </div>
 
-                          <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-1 text-xs">
-                              <Label className="text-[11px] text-muted-foreground">Marks:</Label>
-                              <Input
-                                type="number"
-                                className="w-14 h-7 text-xs px-2"
-                                min={1}
-                                value={q.marks || 1}
-                                onChange={(e) => handleUpdateQuestion(qIndex, { marks: parseInt(e.target.value, 10) || 1 })}
-                              />
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                              onClick={() => handleDeleteQuestion(qIndex)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                          {/* Secondary meta info row */}
+                          <div className="flex items-center gap-1.5 flex-wrap text-[10px] text-muted-foreground">
+                            <Badge variant="outline" className="text-[10px] text-muted-foreground px-1.5 py-0">
+                              via {q.providerUsed}
+                            </Badge>
+                            {q.sourceReference?.bookTitle && (
+                              <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary border-primary/20 flex items-center gap-1 max-w-[260px] truncate px-1.5 py-0">
+                                <BookOpen className="h-2.5 w-2.5 shrink-0" />
+                                <span className="truncate">{q.sourceReference.bookTitle}</span>
+                                {q.sourceReference.pageRange ? ` (p. ${q.sourceReference.pageRange})` : ''}
+                              </Badge>
+                            )}
                           </div>
                         </div>
                       </CardHeader>
 
-                      <CardContent className="p-4 pt-2 space-y-3">
+                      <CardContent className="p-3 sm:p-4 space-y-3">
                         {/* Question Text */}
                         <div className="space-y-1">
                           <Label className="text-xs font-semibold text-muted-foreground">Question Stem</Label>
@@ -2416,7 +2429,7 @@ export default function AdminAIGenerator() {
                             rows={2}
                             value={q.questionText}
                             onChange={(e) => handleUpdateQuestion(qIndex, { questionText: e.target.value })}
-                            className="font-medium text-sm"
+                            className="font-medium text-xs sm:text-sm leading-relaxed rounded-xl"
                           />
                         </div>
 
@@ -2434,7 +2447,7 @@ export default function AdminAIGenerator() {
                                 return (
                                   <div
                                     key={optIndex}
-                                    className={`flex items-center gap-2 p-2 rounded-lg border transition ${
+                                    className={`flex items-center gap-2 p-2 sm:p-2.5 rounded-xl border transition ${
                                       isCorrect
                                         ? 'border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/20'
                                         : 'bg-background hover:border-slate-300'
@@ -2464,7 +2477,7 @@ export default function AdminAIGenerator() {
                                           correctAnswer: isCorrect ? e.target.value : q.correctAnswer
                                         });
                                       }}
-                                      className="h-8 text-xs border-0 bg-transparent focus-visible:ring-1"
+                                      className="h-7 sm:h-8 text-xs sm:text-sm border-0 bg-transparent focus-visible:ring-1 flex-1 min-w-0"
                                     />
                                   </div>
                                 );
@@ -2477,12 +2490,12 @@ export default function AdminAIGenerator() {
                         {q.questionType === 'truefalse' && (
                           <div className="space-y-1.5 pt-1">
                             <Label className="text-xs font-semibold text-muted-foreground">Correct Answer</Label>
-                            <div className="flex gap-3">
+                            <div className="flex gap-2 sm:gap-3">
                               <Button
                                 type="button"
                                 size="sm"
                                 variant={q.correctOptionIndex === 0 ? 'default' : 'outline'}
-                                className={q.correctOptionIndex === 0 ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
+                                className={`flex-1 rounded-xl h-8 text-xs font-semibold ${q.correctOptionIndex === 0 ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}`}
                                 onClick={() => handleUpdateQuestion(qIndex, { correctOptionIndex: 0, correctAnswer: 'True' })}
                               >
                                 True
@@ -2491,7 +2504,7 @@ export default function AdminAIGenerator() {
                                 type="button"
                                 size="sm"
                                 variant={q.correctOptionIndex === 1 ? 'default' : 'outline'}
-                                className={q.correctOptionIndex === 1 ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
+                                className={`flex-1 rounded-xl h-8 text-xs font-semibold ${q.correctOptionIndex === 1 ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}`}
                                 onClick={() => handleUpdateQuestion(qIndex, { correctOptionIndex: 1, correctAnswer: 'False' })}
                               >
                                 False
@@ -2508,13 +2521,13 @@ export default function AdminAIGenerator() {
                               value={q.correctAnswer || ''}
                               onChange={(e) => handleUpdateQuestion(qIndex, { correctAnswer: e.target.value })}
                               placeholder="Key phrase or expected solution..."
-                              className="text-xs"
+                              className="text-xs sm:text-sm rounded-xl h-8"
                             />
                           </div>
                         )}
 
                         {/* Explanation */}
-                        <div className="space-y-1.5 pt-2">
+                        <div className="space-y-1.5 pt-1">
                           <Label className="text-xs sm:text-sm font-semibold text-foreground flex items-center gap-1.5">
                             <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
                             Pedagogical Explanation
@@ -2523,7 +2536,7 @@ export default function AdminAIGenerator() {
                             rows={3}
                             value={q.explanation || ''}
                             onChange={(e) => handleUpdateQuestion(qIndex, { explanation: e.target.value })}
-                            className="text-sm sm:text-base leading-relaxed bg-amber-500/5 dark:bg-amber-500/10 border-amber-500/20 text-foreground focus-visible:ring-amber-500/30"
+                            className="text-xs sm:text-sm leading-relaxed bg-amber-500/5 dark:bg-amber-500/10 border-amber-500/20 text-foreground focus-visible:ring-amber-500/30 rounded-xl"
                             placeholder="Detailed explanation with concepts, steps, and educational emojis..."
                           />
                         </div>
@@ -2536,15 +2549,15 @@ export default function AdminAIGenerator() {
           </TabsContent>
 
           {/* TAB 4: RECENT AI JOBS */}
-          <TabsContent value="history" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Recent AI Generation Jobs</CardTitle>
-                <CardDescription>
+          <TabsContent value="history" className="space-y-4 sm:space-y-6">
+            <Card className="border-border shadow-sm rounded-xl sm:rounded-2xl overflow-hidden">
+              <CardHeader className="p-3.5 sm:p-6 pb-2.5 sm:pb-4 border-b">
+                <CardTitle className="text-base sm:text-lg">Recent AI Generation Jobs</CardTitle>
+                <CardDescription className="text-xs">
                   Audit and resume past generation batches saved in your organization.
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-3 sm:p-6">
                 {recentJobsList.length === 0 ? (
                   <div className="text-center py-8 text-xs text-muted-foreground">
                     No recent AI generation jobs found.
@@ -2552,11 +2565,11 @@ export default function AdminAIGenerator() {
                 ) : (
                   <div className="divide-y text-xs">
                     {recentJobsList.map((job) => (
-                      <div key={job.jobId} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div key={job.jobId} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                         <div className="space-y-1">
                           <div className="font-semibold text-sm flex items-center gap-2">
-                            {job.title || 'Untitled Exam'}
-                            <Badge variant={job.status === 'completed' ? 'default' : 'secondary'} className="text-[10px]">
+                            <span className="truncate">{job.title || 'Untitled Exam'}</span>
+                            <Badge variant={job.status === 'completed' ? 'default' : 'secondary'} className="text-[10px] shrink-0">
                               {job.status}
                             </Badge>
                           </div>
@@ -2571,11 +2584,12 @@ export default function AdminAIGenerator() {
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
                           {job.questions && job.questions.length > 0 && (
                             <Button
                               variant="outline"
                               size="sm"
+                              className="rounded-xl text-xs h-7 sm:h-8"
                               onClick={() => {
                                 setGeneratedQuestions(job.questions);
                                 setActiveTab('review');
