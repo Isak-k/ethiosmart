@@ -45,6 +45,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { syncAllDeviceData } from "@/lib/device-storage-sync";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -65,6 +66,24 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
     await signOut();
     navigate("/");
   };
+
+  // Background auto-sync of critical subjects, chapters, exams, books and notes to device storage
+  React.useEffect(() => {
+    const runSync = () => {
+      if (typeof window !== "undefined" && navigator.onLine) {
+        syncAllDeviceData(profile?.departmentId).catch(() => {});
+      }
+    };
+
+    // Stagger slightly by 1.2s so initial page mount is instantaneous
+    const timer = setTimeout(runSync, 1200);
+    window.addEventListener("online", runSync);
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("online", runSync);
+    };
+  }, [profile?.departmentId]);
 
   const studentLinks = React.useMemo(() => [
     { href: "/dashboard/exams", label: "Exams", icon: ClipboardList },

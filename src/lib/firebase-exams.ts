@@ -17,6 +17,11 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/integrations/firebase/client';
 import { Exam, Question } from '@/integrations/firebase/types';
+import {
+  saveDeviceExams,
+  getDeviceExams,
+  getDeviceExam,
+} from '@/lib/device-storage';
 
 export async function createExam(examData: Omit<Exam, 'examId' | 'createdAt' | 'updatedAt'>) {
   const base = { ...examData };
@@ -45,10 +50,11 @@ export async function getExam(examId: string): Promise<Exam | null> {
     
     if (docSnap.exists()) {
       const data = docSnap.data();
-      return {
+      const exam = {
         examId: data.examId || docSnap.id,
         ...data
       } as Exam;
+      return exam;
     }
   } catch (error) {
     console.warn(`Error fetching exam ${examId}, trying cache:`, error);
@@ -67,6 +73,14 @@ export async function getExam(examId: string): Promise<Exam | null> {
     }
   }
   
+  // Final offline fallback to device storage
+  try {
+    const deviceExam = await getDeviceExam(examId);
+    if (deviceExam) return deviceExam;
+  } catch {
+    // ignore
+  }
+
   return null;
 }
 
@@ -187,29 +201,45 @@ export async function getAllExams(): Promise<Exam[]> {
   try {
     // Try regular fetch (uses cache automatically)
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => {
+    const exams = querySnapshot.docs.map(doc => {
       const data = doc.data();
       return {
         examId: data.examId || doc.id,
         ...data
       } as Exam;
     });
+
+    // Auto-save to device storage
+    saveDeviceExams(exams).catch(() => {});
+    return exams;
   } catch (error) {
     console.warn('Error fetching all exams, trying cache:', error);
     try {
       // Fallback to cache-only
       const cachedSnapshot = await getDocsFromCache(q);
-      return cachedSnapshot.docs.map(doc => {
+      const exams = cachedSnapshot.docs.map(doc => {
         const data = doc.data();
         return {
           examId: data.examId || doc.id,
           ...data
         } as Exam;
       });
+      if (exams.length > 0) {
+        saveDeviceExams(exams).catch(() => {});
+        return exams;
+      }
     } catch (cacheError) {
       console.error('Cache fetch failed:', cacheError);
-      return [];
     }
+
+    // Offline device storage fallback
+    try {
+      const deviceExams = await getDeviceExams();
+      if (deviceExams && deviceExams.length > 0) return deviceExams;
+    } catch {
+      // ignore
+    }
+    return [];
   }
 }
 
@@ -229,6 +259,9 @@ export async function getPublishedExams(studentDepartmentId?: string): Promise<E
         ...data
       } as Exam;
     });
+
+    // Auto-save published exams to device storage
+    saveDeviceExams(exams).catch(() => {});
 
     // Filter by department
     exams = exams.filter(exam => {
@@ -263,6 +296,10 @@ export async function getPublishedExams(studentDepartmentId?: string): Promise<E
         } as Exam;
       });
 
+      if (exams.length > 0) {
+        saveDeviceExams(exams).catch(() => {});
+      }
+
       exams = exams.filter(exam => {
         if (!exam.departmentId && (!exam.departmentIds || exam.departmentIds.length === 0)) {
           return true;
@@ -276,15 +313,28 @@ export async function getPublishedExams(studentDepartmentId?: string): Promise<E
         return false;
       });
 
-      return exams.sort((a, b) => {
-        const timeA = a.createdAt?.seconds || 0;
-        const timeB = b.createdAt?.seconds || 0;
-        return timeB - timeA;
-      });
+      if (exams.length > 0) {
+        return exams.sort((a, b) => {
+          const timeA = a.createdAt?.seconds || 0;
+          const timeB = b.createdAt?.seconds || 0;
+          return timeB - timeA;
+        });
+      }
     } catch (cacheError) {
       console.error('Cache fetch failed:', cacheError);
-      return [];
     }
+
+    // Offline device storage fallback
+    try {
+      const deviceExams = await getDeviceExams(studentDepartmentId);
+      if (deviceExams && deviceExams.length > 0) {
+        return deviceExams;
+      }
+    } catch (deviceErr) {
+      console.warn('Error reading device exams:', deviceErr);
+    }
+
+    return [];
   }
 }
 

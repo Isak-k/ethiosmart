@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { newPasswordSchema } from "@/lib/validations";
 import { Loader2, User, Mail, Lock, Save, Shield, ArrowLeft, HardDrive, Trash2 } from "lucide-react";
 import { initOfflineDB, getOfflineStorageSize } from "@/lib/offline-storage";
+import { isOfflineError } from "@/lib/firebase-utils";
 
 const Settings = () => {
   const { profile, refreshProfile, user } = useAuth();
@@ -146,6 +147,15 @@ const Settings = () => {
 
     if (!auth.currentUser || !user?.email) return;
 
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      toast({
+        title: "You are currently offline",
+        description: "Please connect to the internet to change your password.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       // Reauthenticate user with current password for security
@@ -163,6 +173,15 @@ const Settings = () => {
       setNewPassword("");
       setConfirmPassword("");
     } catch (error: any) {
+      if (isOfflineError(error)) {
+        toast({
+          title: "You are currently offline",
+          description: "Please connect to the internet to change your password.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       let errorMessage = "Could not change password";
       
       if (error.code === "auth/wrong-password" || error.code === "auth/invalid-credential") {
@@ -389,7 +408,7 @@ const Settings = () => {
               </div>
 
               <p className="text-xs text-muted-foreground">
-                Password must be at least 6 characters with uppercase, lowercase, and a number
+                Password must be at least 6 characters
               </p>
 
               <Button type="submit" variant="outline" disabled={loading || !currentPassword || !newPassword || !confirmPassword}>

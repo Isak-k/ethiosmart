@@ -12,7 +12,7 @@ import {
   exportOfflineBookToDisk,
   OfflineBookRecord,
 } from '@/lib/offline-books';
-import { buildDrivePreviewUrl, buildDriveViewUrl, buildDriveDownloadUrl } from '@/lib/google-drive';
+import { buildDrivePreviewUrl, buildDriveViewUrl, buildDriveDownloadUrl, extractDriveFileId } from '@/lib/google-drive';
 import { MobileVerticalReader } from '@/components/book/MobileVerticalReader';
 import { InteractiveShortNoteReader } from '@/components/book/InteractiveShortNoteReader';
 import { Button } from '@/components/ui/button';
@@ -337,9 +337,11 @@ export default function BookReader() {
   }
 
   const isShortNote = book.resourceType === 'short_note';
+  const fileId = book.driveFileId || extractDriveFileId(book.driveUrl || '');
+  const hasPdfSource = Boolean(fileId || book.driveUrl || pdfBlob);
 
-  // Any shortnote or any resource without a Google Drive PDF file renders in the native interactive reader
-  if (isShortNote || (book.sections && book.sections.length > 0) || (book.content && !book.driveFileId) || !book.driveFileId) {
+  // Any shortnote with interactive sections and no PDF binary renders in the native interactive reader
+  if (isShortNote && (Boolean(book.sections?.length) || Boolean(book.content)) && !hasPdfSource) {
     return (
       <DashboardLayout>
         <div className="max-w-5xl mx-auto pb-12 animate-fade-in pt-2">
@@ -352,9 +354,9 @@ export default function BookReader() {
     );
   }
 
-  const previewUrl = buildDrivePreviewUrl(book.driveFileId);
-  const viewUrl = buildDriveViewUrl(book.driveFileId);
-  const downloadUrl = buildDriveDownloadUrl(book.driveFileId);
+  const previewUrl = fileId ? buildDrivePreviewUrl(fileId) : (book.driveUrl || '');
+  const viewUrl = fileId ? buildDriveViewUrl(fileId) : (book.driveUrl || '');
+  const downloadUrl = fileId ? buildDriveDownloadUrl(fileId) : (book.driveUrl || '');
 
   // Active rendering URL: either local offline blob URL or Google Drive preview iframe
   const activeViewerUrl = isReadingOffline && offlineBlobUrl ? offlineBlobUrl : previewUrl;

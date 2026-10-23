@@ -18,6 +18,11 @@ import {
 import { Book, BookInput, BookFilterOptions } from '@/types/book';
 import { getSubject } from '@/lib/subjects';
 import { getSubjectCover } from '@/lib/subject-covers';
+import {
+  saveDeviceBooks,
+  getDeviceBooks,
+  getDeviceBook,
+} from '@/lib/device-storage';
 
 const BOOKS_COLLECTION = 'books';
 const BOOKMARKS_COLLECTION = 'bookBookmarks';
@@ -111,9 +116,20 @@ export async function getBooks(
       });
     }
 
+    // Auto-cache all fetched books and notes on device
+    saveDeviceBooks(list).catch(() => {});
+
     return list;
   } catch (error) {
-    console.error('Error fetching books from Firestore:', error);
+    console.warn('Error fetching books from Firestore, loading from device storage:', error);
+    try {
+      const deviceList = await getDeviceBooks(options, userRole, userDeptId);
+      if (deviceList && deviceList.length > 0) {
+        return deviceList;
+      }
+    } catch (deviceErr) {
+      console.warn('Error reading books from device storage:', deviceErr);
+    }
     return [];
   }
 }
@@ -125,15 +141,27 @@ export async function getBook(id: string): Promise<Book | null> {
   try {
     const docRef = doc(db, BOOKS_COLLECTION, id);
     const snap = await getDoc(docRef);
-    if (!snap.exists()) return null;
-    return {
-      id: snap.id,
-      ...snap.data(),
-    } as Book;
+    if (snap.exists()) {
+      const book = {
+        id: snap.id,
+        ...snap.data(),
+      } as Book;
+      saveDeviceBooks([book]).catch(() => {});
+      return book;
+    }
   } catch (error) {
-    console.error(`Error fetching book ${id}:`, error);
-    return null;
+    console.warn(`Error fetching book ${id} from Firestore, trying device storage:`, error);
   }
+
+  // Offline device storage fallback
+  try {
+    const deviceBook = await getDeviceBook(id);
+    if (deviceBook) return deviceBook;
+  } catch {
+    // ignore
+  }
+
+  return null;
 }
 
 /**

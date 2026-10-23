@@ -23,7 +23,9 @@ import {
   GraduationCap,
   FileText,
   Clock,
-  ChevronRight
+  ChevronRight,
+  WifiOff,
+  HardDrive
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
@@ -112,7 +114,7 @@ const StudentExams = () => {
       const examsData = isAdminUser
         ? await getAllExams().catch(() => getPublishedExams(profile?.departmentId))
         : await getPublishedExams(profile?.departmentId);
-      const attempts = await getStudentAttempts(user.uid);
+      const attempts = await getStudentAttempts(user.uid).catch(() => []);
 
       // Count attempts per exam
       const attemptsByExam = new Map<string, number>();
@@ -121,13 +123,23 @@ const StudentExams = () => {
         attemptsByExam.set(attempt.examId, count + 1);
       });
 
+      // Helper for safe timestamp conversion from both Firestore and local cache
+      const toIsoString = (val: any) => {
+        if (!val) return null;
+        if (typeof val.toDate === "function") return val.toDate().toISOString();
+        if (val instanceof Date) return val.toISOString();
+        if (typeof val === "string") return val;
+        if (typeof val.seconds === "number") return new Date(val.seconds * 1000).toISOString();
+        return null;
+      };
+
       const mappedExams: ExamData[] = examsData.map((exam) => ({
         id: exam.examId,
         title: exam.title,
         description: exam.description,
         duration_minutes: exam.durationMinutes,
-        start_time: exam.startTime?.toDate().toISOString() || null,
-        end_time: exam.endTime?.toDate().toISOString() || null,
+        start_time: toIsoString(exam.startTime),
+        end_time: toIsoString(exam.endTime),
         is_published: exam.isPublished,
         question_count: exam.questionCount,
         allow_offline_download: exam.allowOfflineDownload || false,
@@ -326,6 +338,18 @@ const StudentExams = () => {
   return (
     <DashboardLayout>
       <div className="space-y-8 animate-fade-in pb-16 max-w-7xl mx-auto">
+        {/* Offline Banner notice */}
+        {!isOnline && (
+          <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-sm font-medium">
+            <WifiOff className="h-5 w-5 text-amber-600 shrink-0" />
+            <div className="flex-1">
+              <span>You are currently offline. Showing exams and subject chapters stored on your device.</span>
+            </div>
+            <Badge variant="outline" className="border-amber-500/40 text-amber-700 dark:text-amber-300">
+              Offline Mode
+            </Badge>
+          </div>
+        )}
         {/* ==================================================================== */}
         {/* VIEW A: SPECIFIC SUBJECT SELECTED (Chapters & Contents Only)         */}
         {/* Shows ONLY its content (chapters & exams); no subject card inside   */}

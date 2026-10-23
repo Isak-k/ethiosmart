@@ -11,13 +11,14 @@ import { useToast } from "@/hooks/use-toast";
 import { loginSchema, signupSchema, getLoginSchema, getSignupSchema } from "@/lib/validations";
 import { ForgotPasswordForm } from "./ForgotPasswordForm";
 import { GoogleProfileSetup } from "./GoogleProfileSetup";
-import { GraduationCap, Loader2, Mail, Lock, User, Eye, EyeOff, Building } from "lucide-react";
+import { GraduationCap, Loader2, Mail, Lock, User, Eye, EyeOff, Building, WifiOff } from "lucide-react";
 import { getDepartments } from "@/lib/departments";
 import { Department } from "@/integrations/firebase/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { signInWithGoogle, completeGoogleSignUpProfile } from "@/lib/firebase-auth";
+import { getFriendlyAuthErrorMessage } from "@/lib/firebase-utils";
 
 export function AuthForm() {
   const navigate = useNavigate();
@@ -47,6 +48,18 @@ export function AuthForm() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loadingDepts, setLoadingDepts] = useState(true);
   const [selectedDept, setSelectedDept] = useState<string>("");
+  const [isOnline, setIsOnline] = useState(() => (typeof navigator !== "undefined" ? navigator.onLine : true));
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
 
   useEffect(() => {
     const fetchDepts = async () => {
@@ -76,6 +89,15 @@ export function AuthForm() {
     e.preventDefault();
     setLoginErrors({});
 
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      toast({
+        title: "You are currently offline",
+        description: "You are offline. Please connect to the internet to sign in to your account.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const result = getLoginSchema(t).safeParse({
       email: loginEmail,
       password: loginPassword,
@@ -102,9 +124,10 @@ export function AuthForm() {
       const userRole = await getUserRole(user.uid);
       navigate(userRole === "admin" ? "/dashboard" : "/dashboard/exams");
     } catch (error: any) {
+      const friendly = getFriendlyAuthErrorMessage(error, 'login');
       toast({
-        title: "Sign in failed",
-        description: error.message || "Invalid email or password",
+        title: friendly.title,
+        description: friendly.description,
         variant: "destructive",
       });
     } finally {
@@ -115,6 +138,15 @@ export function AuthForm() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setSignupErrors({});
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      toast({
+        title: "You are currently offline",
+        description: "You are offline. Please connect to the internet to create an account.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     const result = getSignupSchema(t).safeParse({
       name: signupName,
@@ -153,9 +185,10 @@ export function AuthForm() {
       });
       navigate(signupRole === "admin" ? "/dashboard" : "/dashboard/exams");
     } catch (error: any) {
+      const friendly = getFriendlyAuthErrorMessage(error, 'signup');
       toast({
-        title: "Sign up failed",
-        description: error.message || "Could not create account",
+        title: friendly.title,
+        description: friendly.description,
         variant: "destructive",
       });
     } finally {
@@ -164,6 +197,15 @@ export function AuthForm() {
   };
 
   const handleGoogleSignIn = async () => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      toast({
+        title: "You are currently offline",
+        description: "You are offline. Please connect to the internet to sign in with Google.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const result = await signInWithGoogle();
@@ -189,9 +231,10 @@ export function AuthForm() {
       }
     } catch (error: any) {
       setLoading(false);
+      const friendly = getFriendlyAuthErrorMessage(error, 'google');
       toast({
-        title: "Google sign-in failed",
-        description: error.message || "Could not sign in with Google",
+        title: friendly.title,
+        description: friendly.description,
         variant: "destructive",
       });
     }
@@ -199,6 +242,15 @@ export function AuthForm() {
 
   const handleCompleteGoogleProfile = async (fullName: string, departmentId: string) => {
     if (!googleUserData) return;
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      toast({
+        title: "You are currently offline",
+        description: "You are offline. Please connect to the internet to complete profile setup.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     setLoading(true);
     try {
@@ -218,9 +270,10 @@ export function AuthForm() {
       });
       navigate("/dashboard/exams");
     } catch (error: any) {
+      const friendly = getFriendlyAuthErrorMessage(error, 'signup');
       toast({
-        title: "Profile setup failed",
-        description: error.message || "Could not complete profile setup",
+        title: friendly.title,
+        description: friendly.description,
         variant: "destructive",
       });
     } finally {
@@ -283,6 +336,15 @@ export function AuthForm() {
             </TabsTrigger>
           </TabsList>
         </div>
+
+        {!isOnline && (
+          <div className="mx-8 mt-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center gap-3 text-amber-800 dark:text-amber-300 text-xs sm:text-sm animate-fade-in">
+            <WifiOff className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+            <span>
+              You are currently offline. An internet connection is required to sign in or create an account.
+            </span>
+          </div>
+        )}
 
         <div className="p-8 pt-6">
           <TabsContent value="login" className="mt-0">
@@ -558,7 +620,7 @@ export function AuthForm() {
                   <p className="text-sm text-red-500 pl-2">{signupErrors.password}</p>
                 )}
                 <p className="text-xs text-muted-foreground pl-2">
-                  Must be 6+ characters with uppercase, lowercase, and number
+                  At least 6 characters
                 </p>
               </div>
 

@@ -13,18 +13,28 @@ import {
   updateDoc
 } from "firebase/firestore";
 import { Department } from "@/integrations/firebase/types";
+import { saveDeviceDepartments, getDeviceDepartments } from "@/lib/device-storage";
 
 export const getDepartments = async (): Promise<Department[]> => {
   try {
     const q = query(collection(db, "departments"), orderBy("name"));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
+    const list = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     } as Department));
+
+    saveDeviceDepartments(list).catch(() => {});
+    return list;
   } catch (error) {
-    console.error("Error getting departments:", error);
-    throw error;
+    console.warn("Error getting departments, loading from device storage:", error);
+    try {
+      const deviceDepts = await getDeviceDepartments();
+      if (deviceDepts && deviceDepts.length > 0) return deviceDepts;
+    } catch {
+      // ignore
+    }
+    return [];
   }
 };
 

@@ -16,6 +16,12 @@ import {
 import { Subject, Chapter } from "@/types/subject";
 import { getSubjectCover } from "@/lib/subject-covers";
 import { getPublishedExams } from "@/lib/firebase-exams";
+import {
+  saveDeviceSubjects,
+  getDeviceSubjects,
+  saveDeviceChapters,
+  getDeviceChapters,
+} from "@/lib/device-storage";
 
 export interface SubjectInput {
   name: string;
@@ -141,15 +147,26 @@ export async function getSubjects(departmentId?: string): Promise<Subject[]> {
     });
     fetchedFromRemote = true;
 
-    // Cache remote subjects locally for resilience
+    // Cache remote subjects locally on device (IndexedDB & localStorage)
     saveStoredLocalSubjects(list);
+    saveDeviceSubjects(list).catch(() => {});
   } catch (error) {
     if (isPermissionDeniedError(error)) {
       console.warn("Firestore permissions for 'subjects' not configured in Firebase Console. Using local store.");
     } else {
-      console.error("Error getting subjects from Firestore, checking local storage:", error);
+      console.error("Error getting subjects from Firestore, checking device storage:", error);
     }
-    list = getStoredLocalSubjects();
+    // Check persistent device storage first
+    try {
+      const deviceList = await getDeviceSubjects(departmentId);
+      if (deviceList && deviceList.length > 0) {
+        list = deviceList;
+      } else {
+        list = getStoredLocalSubjects();
+      }
+    } catch {
+      list = getStoredLocalSubjects();
+    }
 
     // If local store is empty too, fallback to default subjects list
     if (list.length === 0) {
@@ -164,6 +181,7 @@ export async function getSubjects(departmentId?: string): Promise<Subject[]> {
         departmentIds: [],
       }));
       saveStoredLocalSubjects(list);
+      saveDeviceSubjects(list).catch(() => {});
     }
   }
 
@@ -442,21 +460,37 @@ export async function getChapters(subjectId: string): Promise<Chapter[]> {
       orderBy("chapterNumber", "asc")
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map((d) => ({
+    const chapters = snapshot.docs.map((d) => ({
       id: d.id,
       subjectId,
       ...d.data(),
     } as Chapter));
+
+    // Cache chapters on device
+    saveDeviceChapters(subjectId, chapters).catch(() => {});
+    return chapters;
   } catch (error) {
     // If ordering by chapterNumber fails due to missing index, fallback to unordered
     try {
       const fallbackSnapshot = await getDocs(collection(db, `subjects/${subjectId}/chapters`));
-      return fallbackSnapshot.docs.map((d) => ({
+      const fallbackChapters = fallbackSnapshot.docs.map((d) => ({
         id: d.id,
         subjectId,
         ...d.data(),
       } as Chapter));
+
+      saveDeviceChapters(subjectId, fallbackChapters).catch(() => {});
+      return fallbackChapters;
     } catch {
+      // Offline fallback: load chapters from device storage!
+      try {
+        const storedChapters = await getDeviceChapters(subjectId);
+        if (storedChapters && storedChapters.length > 0) {
+          return storedChapters;
+        }
+      } catch {
+        // ignore
+      }
       return [];
     }
   }

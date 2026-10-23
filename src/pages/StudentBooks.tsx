@@ -77,10 +77,12 @@ export default function StudentBooks() {
 
   // Monitor network connectivity
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
+    const handleOnline = () => {
+      setIsOnline(true);
+      fetchLibraryData();
+    };
     const handleOffline = () => {
       setIsOnline(false);
-      setActiveTab('offline');
     };
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
@@ -299,7 +301,7 @@ export default function StudentBooks() {
           <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-sm font-medium">
             <WifiOff className="h-5 w-5 text-amber-600 shrink-0" />
             <div className="flex-1">
-              <span>You are currently offline. Showing your downloaded books saved for offline browsing.</span>
+              <span>You are currently offline. Showing all books and interactive shortnotes stored on your device.</span>
             </div>
             <Badge variant="outline" className="border-amber-500/40 text-amber-700 dark:text-amber-300">
               Offline Mode

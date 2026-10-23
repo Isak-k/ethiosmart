@@ -7,6 +7,7 @@ import { resetPassword } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { getPasswordResetSchema } from "@/lib/validations";
 import { Loader2, Mail, ArrowLeft, CheckCircle } from "lucide-react";
+import { getFriendlyAuthErrorMessage } from "@/lib/firebase-utils";
 
 interface ForgotPasswordFormProps {
   onBack: () => void;
@@ -23,6 +24,15 @@ export function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      toast({
+        title: "You are currently offline",
+        description: "You are offline. Please connect to the internet to request a password reset.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     const result = getPasswordResetSchema(t).safeParse({ email });
     if (!result.success) {
@@ -41,9 +51,10 @@ export function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) {
         description: t("common.resetPassword.sentDesc"),
       });
     } catch (error: any) {
+      const friendly = getFriendlyAuthErrorMessage(error, 'reset');
       toast({
-        title: t("common.resetPassword.failedTitle"),
-        description: error.message || t("common.resetPassword.failedDesc"),
+        title: friendly.title,
+        description: friendly.description || t("common.resetPassword.failedDesc"),
         variant: "destructive",
       });
     } finally {

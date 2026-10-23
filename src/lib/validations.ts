@@ -10,8 +10,7 @@ export const loginSchema = z.object({
     .max(255, "Email must be less than 255 characters"),
   password: z
     .string()
-    .min(1, "Password is required")
-    .min(6, "Password must be at least 6 characters"),
+    .min(1, "Password is required"),
 });
 
 export const signupSchema = z.object({
@@ -29,12 +28,9 @@ export const signupSchema = z.object({
     .max(255, "Email must be less than 255 characters"),
   password: z
     .string()
+    .min(1, "Password is required")
     .min(6, "Password must be at least 6 characters")
-    .max(72, "Password must be less than 72 characters")
-    .regex(
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-      "Password must contain at least one uppercase letter, one lowercase letter, and one number"
-    ),
+    .max(72, "Password must be less than 72 characters"),
   role: z.enum(["admin", "student"]),
 });
 
@@ -50,11 +46,7 @@ export const newPasswordSchema = z.object({
   password: z
     .string()
     .min(6, "Password must be at least 6 characters")
-    .max(72, "Password must be less than 72 characters")
-    .regex(
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-      "Password must contain at least one uppercase letter, one lowercase letter, and one number"
-    ),
+    .max(72, "Password must be less than 72 characters"),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
@@ -120,8 +112,7 @@ export const getLoginSchema = (t: any) => z.object({
     .max(255, t("validations.email.max")),
   password: z
     .string()
-    .min(1, t("validations.required", { field: t("common.password") }))
-    .min(6, t("validations.password.min")),
+    .min(1, t("validations.required", { field: t("common.password") })),
 });
 
 export const getSignupSchema = (t: any) => z.object({
@@ -139,12 +130,9 @@ export const getSignupSchema = (t: any) => z.object({
     .max(255, t("validations.email.max")),
   password: z
     .string()
+    .min(1, t("validations.required", { field: t("common.password") }))
     .min(6, t("validations.password.min"))
-    .max(72, t("validations.password.max"))
-    .regex(
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-      t("validations.password.complexity")
-    ),
+    .max(72, t("validations.password.max")),
   role: z.enum(["admin", "student"]),
 });
 
@@ -160,11 +148,7 @@ export const getNewPasswordSchema = (t: any) => z.object({
   password: z
     .string()
     .min(6, t("validations.password.min"))
-    .max(72, t("validations.password.max"))
-    .regex(
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-      t("validations.password.complexity")
-    ),
+    .max(72, t("validations.password.max")),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: t("validations.password.match"),
