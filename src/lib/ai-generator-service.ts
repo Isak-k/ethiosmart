@@ -23,43 +23,125 @@ import {
   getDocs
 } from 'firebase/firestore';
 import { saveQuestionsBatch } from '@/lib/firebase-exams';
+import {
+  orchestrateGenerationBatch,
+  getProviderStatus,
+  ProviderKeys
+} from '../../functions/src/ai-generator/orchestrator';
+import { getEffectiveProviderKeys, getAISettings } from './ai-settings';
+
+/**
+ * Retrieve AI provider API keys available to client environment or local storage
+ */
+export function getClientProviderKeys(): ProviderKeys {
+  const meta: Record<string, string | undefined> = (import.meta as any).env || {};
+  const getStorage = (key: string): string | undefined => {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const val = localStorage.getItem(key);
+        return val && val.trim() ? val.trim() : undefined;
+      }
+    } catch {
+      // Ignore storage access errors
+    }
+    return undefined;
+  };
+
+  let settingsKeys: Partial<ProviderKeys> = {};
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const stored = localStorage.getItem('exampro_ai_system_settings');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed?.providers) {
+          settingsKeys = {
+            gemini: parsed.providers.gemini?.enabled ? parsed.providers.gemini?.apiKey : undefined,
+            groq: parsed.providers.groq?.enabled ? parsed.providers.groq?.apiKey : undefined,
+            openrouter: parsed.providers.openrouter?.enabled ? parsed.providers.openrouter?.apiKey : undefined,
+            huggingface: parsed.providers.huggingface?.enabled ? parsed.providers.huggingface?.apiKey : undefined,
+          };
+        }
+      }
+    }
+  } catch {}
+
+  return {
+    gemini:
+      settingsKeys.gemini ||
+      meta.VITE_GEMINI_API_KEY ||
+      meta.GEMINI_API_KEY ||
+      getStorage('gemini_api_key') ||
+      getStorage('GEMINI_API_KEY') ||
+      getStorage('google_ai_api_key'),
+    groq:
+      settingsKeys.groq ||
+      meta.VITE_GROQ_API_KEY ||
+      meta.GROQ_API_KEY ||
+      getStorage('groq_api_key') ||
+      getStorage('GROQ_API_KEY'),
+    openrouter:
+      settingsKeys.openrouter ||
+      meta.VITE_OPENROUTER_API_KEY ||
+      meta.OPENROUTER_API_KEY ||
+      getStorage('openrouter_api_key') ||
+      getStorage('OPENROUTER_API_KEY'),
+    huggingface:
+      settingsKeys.huggingface ||
+      meta.VITE_HUGGING_FACE_API_KEY ||
+      meta.HUGGING_FACE_API_KEY ||
+      getStorage('huggingface_api_key') ||
+      getStorage('HUGGING_FACE_API_KEY'),
+  };
+}
 
 /**
  * Fetch health & configuration status for all 4 AI providers
  */
 export async function getAIProviderStatuses(): Promise<ProviderStatusInfo[]> {
+  const effectiveKeys = await getEffectiveProviderKeys();
   try {
-    const res = await fetch('/api/ai/provider-status', {
+    const keysParam = encodeURIComponent(JSON.stringify(effectiveKeys));
+    const res = await fetch(`/api/ai/provider-status?keys=${keysParam}`, {
       method: 'GET',
       headers: {
-        'Accept': 'application/json'
+        Accept: 'application/json'
       }
     });
 
-    if (!res.ok) {
-      throw new Error(`Failed to fetch provider status: ${res.statusText}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.statuses && Array.isArray(data.statuses) && data.statuses.length > 0) {
+        return data.statuses;
+      }
     }
-
-    const data = await res.json();
-    return data.statuses || [];
   } catch (err: any) {
-    console.warn('Error checking AI provider status:', err.message);
-    return [
-      { id: 'gemini', name: 'Google Gemini', configured: false, inCooldown: false, cooldownRemainingSeconds: 0 },
-      { id: 'groq', name: 'Groq', configured: false, inCooldown: false, cooldownRemainingSeconds: 0 },
-      { id: 'openrouter', name: 'OpenRouter', configured: false, inCooldown: false, cooldownRemainingSeconds: 0 },
-      { id: 'huggingface', name: 'Hugging Face', configured: false, inCooldown: false, cooldownRemainingSeconds: 0 },
-    ];
+    console.warn('Error checking server AI provider status, using client environment check:', err.message);
   }
+
+  // Seamless client environment fallback
+  const clientKeys = {
+    ...getClientProviderKeys(),
+    ...effectiveKeys,
+  };
+  return getProviderStatus(clientKeys);
 }
 
 /**
- * Call server endpoint to generate a single batch of questions
+ * Call server endpoint to generate a single batch of questions, with resilient
+ * client-side fallback if the server route returns HTTP 405/404 or fails.
  */
 export async function generateBatchCall(
   request: GenerateBatchRequest
 ): Promise<GenerateBatchResponse> {
   const token = await auth.currentUser?.getIdToken();
+  const effectiveKeys = await getEffectiveProviderKeys();
+  const settings = await getAISettings();
+
+  const requestWithSettings: any = {
+    ...request,
+    providerPriority: request.providerPriority || settings.providerPriority,
+    providerKeys: effectiveKeys,
+  };
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json'
@@ -69,26 +151,71 @@ export async function generateBatchCall(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const res = await fetch('/api/ai/generate-batch', {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(request)
-  });
+  let serverRes: Response | null = null;
+  let serverData: any = null;
+  let serverFetchFailed = false;
 
-  const data = await res.json().catch(() => null);
-
-  if (!res.ok) {
-    const errorMsg = data?.error || `HTTP ${res.status} ${res.statusText}`;
-    return {
-      success: false,
-      questions: [],
-      fallbackOccurred: data?.fallbackOccurred || false,
-      attempts: data?.attempts || [],
-      error: errorMsg
-    };
+  try {
+    serverRes = await fetch('/api/ai/generate-batch', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(requestWithSettings)
+    });
+    serverData = await serverRes.json().catch(() => null);
+  } catch (err: any) {
+    console.warn('Failed to reach /api/ai/generate-batch server endpoint:', err.message);
+    serverFetchFailed = true;
   }
 
-  return data as GenerateBatchResponse;
+  // 1. If server call was completely successful, return it
+  if (serverRes && serverRes.ok && serverData && serverData.success) {
+    return serverData as GenerateBatchResponse;
+  }
+
+  // 2. If server failed (e.g. HTTP 405 Method Not Allowed, 404 Not Found, 502, or network failure),
+  // attempt immediate client-side orchestration using available provider keys
+  const clientKeys = {
+    ...getClientProviderKeys(),
+    ...effectiveKeys,
+  };
+  const hasClientKeys = Boolean(
+    (clientKeys.gemini && clientKeys.gemini.trim().length > 5) ||
+    (clientKeys.groq && clientKeys.groq.trim().length > 5) ||
+    (clientKeys.openrouter && clientKeys.openrouter.trim().length > 5) ||
+    (clientKeys.huggingface && clientKeys.huggingface.trim().length > 5)
+  );
+
+  if (hasClientKeys) {
+    console.info('[AI Generator] Server API unavailable or returned error. Running client-side AI fallback...');
+    try {
+      const clientResult = await orchestrateGenerationBatch(requestWithSettings, clientKeys);
+      if (clientResult.success) {
+        return clientResult;
+      }
+      // If client also recorded attempts and error, return that informative result
+      if (clientResult.attempts && clientResult.attempts.length > 0) {
+        return clientResult;
+      }
+    } catch (clientErr: any) {
+      console.error('[AI Generator] Client-side fallback encountered exception:', clientErr);
+    }
+  }
+
+  // 3. If neither server nor client fallback could succeed, format a descriptive error
+  const rawStatus = serverRes ? `HTTP ${serverRes.status} ${serverRes.statusText || ''}`.trim() : '';
+  const errorMsg =
+    serverData?.error ||
+    (serverRes?.status === 405
+      ? 'HTTP 405: Backend generation route not allowed. Please verify API keys in .env or provider settings.'
+      : rawStatus || 'Unable to connect to AI generation service.');
+
+  return {
+    success: false,
+    questions: [],
+    fallbackOccurred: serverData?.fallbackOccurred || false,
+    attempts: serverData?.attempts || [],
+    error: errorMsg
+  };
 }
 
 import { ExtractedPageItem } from './prompt-scope-extractor';

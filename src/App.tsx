@@ -47,6 +47,7 @@ import PracticeExamResultsPage from "./pages/PracticeExamResultsPage";
 import StudentSubjects from "./pages/StudentSubjects";
 import AdminSubjects from "./pages/AdminSubjects";
 import AdminAIGenerator from "./pages/AdminAIGenerator";
+import AdminAISettings from "./pages/AdminAISettings";
 import AdminBooks from "./pages/AdminBooks";
 import AdminShortnotesStudio from "./pages/AdminShortnotesStudio";
 import StudentBooks from "./pages/StudentBooks";
@@ -111,6 +112,7 @@ function AppRoutes() {
           
         {/* Admin Routes - Restricted to Admins; fine-grained via permissions where needed */}
         <Route path="/dashboard/admin/ai-generator" element={<ProtectedRoute allowedRoles={["admin"]}><AdminAIGenerator /></ProtectedRoute>} />
+        <Route path="/dashboard/admin/ai-settings" element={<ProtectedRoute allowedRoles={["admin"]}><AdminAISettings /></ProtectedRoute>} />
         <Route path="/dashboard/admin/exams" element={
           <ProtectedRoute allowedRoles={["admin"]}>
             <AdminExams />

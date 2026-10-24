@@ -13,9 +13,11 @@ import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { newPasswordSchema } from "@/lib/validations";
-import { Loader2, User, Mail, Lock, Save, Shield, ArrowLeft, HardDrive, Trash2 } from "lucide-react";
+import { Loader2, User, Mail, Lock, Save, Shield, ArrowLeft, HardDrive, Trash2, Sparkles, SlidersHorizontal } from "lucide-react";
 import { initOfflineDB, getOfflineStorageSize } from "@/lib/offline-storage";
 import { isOfflineError } from "@/lib/firebase-utils";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AIProviderSettingsSection } from "@/components/admin/AIProviderSettingsSection";
 
 const Settings = () => {
   const { profile, refreshProfile, user } = useAuth();
@@ -203,21 +205,225 @@ const Settings = () => {
     }
   };
 
+  const isAdmin = profile?.role === 'admin';
+
+  const accountCards = (
+    <div className="space-y-6">
+      {/* Profile Section */}
+      <Card className="card-elevated">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <User className="h-5 w-5" />
+            Profile
+          </CardTitle>
+          <CardDescription>
+            Update your personal information
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleUpdateProfile} className="space-y-6">
+            <div className="flex items-center gap-4">
+              <Avatar className="h-20 w-20">
+                <AvatarImage src={profile?.avatar_url || "/placeholder.svg"} alt={profile?.full_name} />
+                <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <p className="font-medium">{profile?.full_name}</p>
+                <p className="text-sm text-muted-foreground">{profile?.email}</p>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Full Name</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="pl-10"
+                    placeholder="Your full name"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    value={profile?.email || ""}
+                    className="pl-10"
+                    disabled
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Email cannot be changed
+                </p>
+              </div>
+            </div>
+
+            <Button type="submit" className="btn-primary" disabled={loading}>
+              {loading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="mr-2 h-4 w-4" />
+              )}
+              Save Changes
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* Storage & Cache Section */}
+      <Card className="card-elevated">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <HardDrive className="h-5 w-5" />
+            Storage & Cache
+          </CardTitle>
+          <CardDescription>
+            Manage offline storage and clear cached data
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+              <div>
+                <p className="font-medium text-sm">Storage Used</p>
+                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{storageUsed}</p>
+              </div>
+              <Button
+                onClick={handleClearCache}
+                disabled={clearingCache || storageUsed === '0 MB'}
+                variant="destructive"
+                size="sm"
+                className="gap-2"
+              >
+                {clearingCache ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+                Clear Cache
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Clears all downloaded exams and offline data from your device
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Password Section */}
+      <Card className="card-elevated">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Lock className="h-5 w-5" />
+            Change Password
+          </CardTitle>
+          <CardDescription>
+            Update your password to keep your account secure
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleChangePassword} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="current-password" className="flex items-center gap-2">
+                <Shield className="h-4 w-4 text-orange-500" />
+                Current Password
+              </Label>
+              <Input
+                id="current-password"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => {
+                  setCurrentPassword(e.target.value);
+                  setPasswordErrors((prev) => ({ ...prev, password: undefined }));
+                }}
+                placeholder="Enter your current password"
+                className={passwordErrors.password ? "border-destructive" : ""}
+              />
+              {passwordErrors.password && (
+                <p className="text-sm text-destructive">{passwordErrors.password}</p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Required for security verification
+              </p>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-2">
+              <Label htmlFor="new-password">New Password</Label>
+              <Input
+                id="new-password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => {
+                  setNewPassword(e.target.value);
+                }}
+                placeholder="••••••••"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">Confirm New Password</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => {
+                  setConfirmPassword(e.target.value);
+                  setPasswordErrors((prev) => ({ ...prev, confirmPassword: undefined }));
+                }}
+                placeholder="••••••••"
+                className={passwordErrors.confirmPassword ? "border-destructive" : ""}
+              />
+              {passwordErrors.confirmPassword && (
+                <p className="text-sm text-destructive">{passwordErrors.confirmPassword}</p>
+              )}
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              Password must be at least 6 characters
+            </p>
+
+            <Button type="submit" variant="outline" disabled={loading || !currentPassword || !newPassword || !confirmPassword}>
+              {loading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Lock className="mr-2 h-4 w-4" />
+              )}
+              Update Password
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
   return (
     <DashboardLayout>
-      <div className="space-y-6 animate-fade-in max-w-2xl">
+      <div className={`space-y-6 animate-fade-in ${isAdmin ? 'max-w-4xl' : 'max-w-2xl'} mx-auto pb-10`}>
         <div className="flex items-start sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl lg:text-3xl font-display font-bold">Settings</h1>
             <p className="text-muted-foreground mt-1">
-              Manage your account settings
+              Manage your personal preferences {isAdmin ? "and AI system providers" : ""}
             </p>
           </div>
           <Button 
             variant="outline" 
             size="sm" 
             onClick={() => navigate(-1)}
-            className="mt-1"
+            className="mt-1 rounded-xl"
             aria-label="Go Back"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
@@ -225,203 +431,30 @@ const Settings = () => {
           </Button>
         </div>
 
-        {/* Profile Section */}
-        <Card className="card-elevated">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" />
-              Profile
-            </CardTitle>
-            <CardDescription>
-              Update your personal information
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleUpdateProfile} className="space-y-6">
-              <div className="flex items-center gap-4">
-                <Avatar className="h-20 w-20">
-                  <AvatarImage src={profile?.avatar_url || "/placeholder.svg"} alt={profile?.full_name} />
-                  <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
-                    {initials}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="font-medium">{profile?.full_name}</p>
-                  <p className="text-sm text-muted-foreground">{profile?.email}</p>
-                </div>
-              </div>
+        {isAdmin ? (
+          <Tabs defaultValue="account" className="space-y-6">
+            <TabsList className="grid grid-cols-2 max-w-md h-11 p-1 bg-muted/60 rounded-xl">
+              <TabsTrigger value="account" className="rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5">
+                <User className="h-4 w-4" />
+                Account & Security
+              </TabsTrigger>
+              <TabsTrigger value="ai-providers" className="rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5">
+                <Sparkles className="h-4 w-4 text-primary" />
+                AI Provider Settings
+              </TabsTrigger>
+            </TabsList>
 
-              <Separator />
+            <TabsContent value="account" className="mt-0">
+              {accountCards}
+            </TabsContent>
 
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Full Name</Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="name"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="pl-10"
-                      placeholder="Your full name"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="email"
-                      value={profile?.email || ""}
-                      className="pl-10"
-                      disabled
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Email cannot be changed
-                  </p>
-                </div>
-              </div>
-
-              <Button type="submit" className="btn-primary" disabled={loading}>
-                {loading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="mr-2 h-4 w-4" />
-                )}
-                Save Changes
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        {/* Storage & Cache Section */}
-        <Card className="card-elevated">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <HardDrive className="h-5 w-5" />
-              Storage & Cache
-            </CardTitle>
-            <CardDescription>
-              Manage offline storage and clear cached data
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
-                <div>
-                  <p className="font-medium text-sm">Storage Used</p>
-                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{storageUsed}</p>
-                </div>
-                <Button
-                  onClick={handleClearCache}
-                  disabled={clearingCache || storageUsed === '0 MB'}
-                  variant="destructive"
-                  size="sm"
-                  className="gap-2"
-                >
-                  {clearingCache ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="h-4 w-4" />
-                  )}
-                  Clear Cache
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Clears all downloaded exams and offline data from your device
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Password Section */}
-        <Card className="card-elevated">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Lock className="h-5 w-5" />
-              Change Password
-            </CardTitle>
-            <CardDescription>
-              Update your password to keep your account secure
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleChangePassword} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="current-password" className="flex items-center gap-2">
-                  <Shield className="h-4 w-4 text-orange-500" />
-                  Current Password
-                </Label>
-                <Input
-                  id="current-password"
-                  type="password"
-                  value={currentPassword}
-                  onChange={(e) => {
-                    setCurrentPassword(e.target.value);
-                    setPasswordErrors((prev) => ({ ...prev, password: undefined }));
-                  }}
-                  placeholder="Enter your current password"
-                  className={passwordErrors.password ? "border-destructive" : ""}
-                />
-                {passwordErrors.password && (
-                  <p className="text-sm text-destructive">{passwordErrors.password}</p>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  Required for security verification
-                </p>
-              </div>
-
-              <Separator />
-
-              <div className="space-y-2">
-                <Label htmlFor="new-password">New Password</Label>
-                <Input
-                  id="new-password"
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => {
-                    setNewPassword(e.target.value);
-                  }}
-                  placeholder="••••••••"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="confirm-password">Confirm New Password</Label>
-                <Input
-                  id="confirm-password"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => {
-                    setConfirmPassword(e.target.value);
-                    setPasswordErrors((prev) => ({ ...prev, confirmPassword: undefined }));
-                  }}
-                  placeholder="••••••••"
-                  className={passwordErrors.confirmPassword ? "border-destructive" : ""}
-                />
-                {passwordErrors.confirmPassword && (
-                  <p className="text-sm text-destructive">{passwordErrors.confirmPassword}</p>
-                )}
-              </div>
-
-              <p className="text-xs text-muted-foreground">
-                Password must be at least 6 characters
-              </p>
-
-              <Button type="submit" variant="outline" disabled={loading || !currentPassword || !newPassword || !confirmPassword}>
-                {loading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Lock className="mr-2 h-4 w-4" />
-                )}
-                Update Password
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+            <TabsContent value="ai-providers" className="mt-0">
+              <AIProviderSettingsSection />
+            </TabsContent>
+          </Tabs>
+        ) : (
+          accountCards
+        )}
       </div>
     </DashboardLayout>
   );

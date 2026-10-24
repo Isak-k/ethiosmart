@@ -44,7 +44,10 @@ import {
   Search,
   Target,
   Lightbulb,
+  Settings,
+  KeyRound,
 } from 'lucide-react';
+import { AIProviderSettingsDialog } from '@/components/admin/AIProviderSettingsDialog';
 import { cn } from '@/lib/utils';
 import { getOfflineBook } from '@/lib/offline-books';
 import {
@@ -122,9 +125,13 @@ export default function AdminAIGenerator() {
   // Active view tab: 'configure' | 'progress' | 'review' | 'history'
   const [activeTab, setActiveTab] = useState<'configure' | 'progress' | 'review' | 'history'>('configure');
 
+  // AI Provider Settings Modal
+  const [showAISettingsDialog, setShowAISettingsDialog] = useState(false);
+
   // Provider health statuses
   const [providerStatuses, setProviderStatuses] = useState<ProviderStatusInfo[]>([]);
   const [loadingStatuses, setLoadingStatuses] = useState(false);
+  const configuredProvidersCount = useMemo(() => providerStatuses.filter(s => s.configured).length, [providerStatuses]);
 
   // Departments, Subjects, Existing Exams
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -277,6 +284,9 @@ export default function AdminAIGenerator() {
 
   useEffect(() => {
     refreshStatuses();
+    const handleSettingsUpdated = () => refreshStatuses();
+    window.addEventListener('exampro_ai_settings_updated', handleSettingsUpdated);
+
     getDepartments().then(setDepartments).catch(console.error);
     getSubjects().then(setSubjects).catch(console.error);
     getBooks({}, 'admin').then(setLibraryBooks).catch(console.error);
@@ -309,6 +319,10 @@ export default function AdminAIGenerator() {
     } catch (e) {
       // Ignore URL parsing errors
     }
+
+    return () => {
+      window.removeEventListener('exampro_ai_settings_updated', handleSettingsUpdated);
+    };
   }, [user]);
 
   // Selected library book
@@ -1122,18 +1136,33 @@ export default function AdminAIGenerator() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+          <div className="flex items-center gap-2 self-start sm:self-auto shrink-0 flex-wrap">
             <Badge
               variant="outline"
-              className="py-1 px-2.5 text-[11px] sm:text-xs bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-500/30 text-emerald-700 dark:text-emerald-400 font-medium flex items-center gap-1.5 cursor-pointer shadow-sm"
-              onClick={refreshStatuses}
-              title="Click to re-verify AI provider health"
+              className={cn(
+                "py-1 px-2.5 text-[11px] sm:text-xs font-medium flex items-center gap-1.5 cursor-pointer shadow-xs transition",
+                configuredProvidersCount > 0
+                  ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-500/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10"
+                  : "bg-amber-50/50 dark:bg-amber-950/20 border-amber-500/30 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10"
+              )}
+              onClick={() => setShowAISettingsDialog(true)}
+              title="Click to view & configure AI engines and API keys"
             >
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>4 AI Engines Ready</span>
+              <span className={cn("h-2 w-2 rounded-full", configuredProvidersCount > 0 ? "bg-emerald-500 animate-pulse" : "bg-amber-500")} />
+              <span>{configuredProvidersCount > 0 ? `${configuredProvidersCount} AI Engines Ready` : 'Configure AI Engines'}</span>
             </Badge>
 
-            <Button asChild variant="outline" size="sm" className="rounded-xl text-xs font-medium h-7 sm:h-8 px-2.5 sm:px-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAISettingsDialog(true)}
+              className="rounded-xl text-xs font-medium h-7 sm:h-8 px-2.5 sm:px-3 flex items-center gap-1.5 border-primary/30 text-primary hover:bg-primary/10 shadow-xs"
+            >
+              <Settings className="h-3.5 w-3.5" />
+              <span>AI Provider Settings</span>
+            </Button>
+
+            <Button asChild variant="ghost" size="sm" className="rounded-xl text-xs font-medium h-7 sm:h-8 px-2.5 sm:px-3">
               <Link to="/dashboard/admin/exams">Manage Exams</Link>
             </Button>
           </div>
@@ -2077,7 +2106,17 @@ export default function AdminAIGenerator() {
                           </div>
 
                           <div className="p-2.5 rounded-xl border bg-muted/30 space-y-1 text-xs">
-                            <span className="font-semibold text-muted-foreground text-[11px]">Automatic Engine Fallback Order:</span>
+                            <div className="flex items-center justify-between">
+                              <span className="font-semibold text-muted-foreground text-[11px]">Automatic Engine Fallback Order:</span>
+                              <button
+                                type="button"
+                                onClick={() => setShowAISettingsDialog(true)}
+                                className="text-[11px] text-primary hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+                              >
+                                <Settings className="h-3 w-3" />
+                                Configure Engines & Keys
+                              </button>
+                            </div>
                             <p className="text-muted-foreground text-[11px]">
                               1. Gemini 2.5 Flash → 2. Groq (Qwen/GPT) → 3. OpenRouter → 4. HuggingFace
                             </p>
@@ -2609,6 +2648,13 @@ export default function AdminAIGenerator() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* AI Provider Engine Settings Dialog */}
+      <AIProviderSettingsDialog
+        open={showAISettingsDialog}
+        onOpenChange={setShowAISettingsDialog}
+        onSaved={refreshStatuses}
+      />
     </DashboardLayout>
   );
 }

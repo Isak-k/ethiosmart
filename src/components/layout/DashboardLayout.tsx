@@ -43,6 +43,7 @@ import {
   BookOpen,
   Library,
   Sparkles,
+  SlidersHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { syncAllDeviceData } from "@/lib/device-storage-sync";
@@ -98,6 +99,7 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
     { href: "/dashboard", label: t("dashboard.menu.dashboard"), icon: LayoutDashboard, permission: 'viewDashboard' },
     { href: "/dashboard/admin/exams", label: t("dashboard.menu.manageExams"), icon: FileText, permission: 'viewAllExams' },
     { href: "/dashboard/admin/ai-generator", label: "AI Exam Generator", icon: Sparkles, permission: 'viewAllExams' },
+    { href: "/dashboard/admin/ai-settings", label: "AI Provider Settings", icon: SlidersHorizontal, permission: 'viewAllExams' },
     { href: "/dashboard/admin/books", label: "Books", icon: Library, permission: 'viewAllExams' },
     { href: "/dashboard/all-results", label: t("dashboard.menu.allResults"), icon: Trophy, permission: 'viewAllResults' },
     { href: "/dashboard/students", label: t("dashboard.menu.students"), icon: Users, permission: 'viewStudents' },
