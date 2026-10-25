@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Book } from '@/types/book';
-import { getBook, incrementBookView } from '@/lib/books';
+import { getBook, incrementBookView, getUserBookBookmarks, toggleBookBookmark } from '@/lib/books';
 import {
   getOfflineBook,
   isBookSavedOffline,
@@ -75,12 +75,45 @@ export default function BookReader() {
   const [isDownloadingOffline, setIsDownloadingOffline] = useState(false);
   const [downloadProgressMsg, setDownloadProgressMsg] = useState('');
   const [isOfflineUnavailable, setIsOfflineUnavailable] = useState(false);
+  const [isBookmarked, setIsBookmarked] = useState(false);
 
   useEffect(() => {
     if (bookId) {
       loadBook(bookId);
     }
   }, [bookId]);
+
+  useEffect(() => {
+    if (user && bookId) {
+      getUserBookBookmarks(user.uid).then((bmarks) => {
+        setIsBookmarked(bmarks.includes(bookId));
+      }).catch(() => {});
+    }
+  }, [user, bookId]);
+
+  const handleToggleBookmark = async () => {
+    if (!user || !book) {
+      toast({
+        title: 'Sign in required',
+        description: 'Please sign in to bookmark notes.',
+      });
+      return;
+    }
+    try {
+      const state = await toggleBookBookmark(user.uid, book.id);
+      setIsBookmarked(state);
+      toast({
+        title: state ? 'Bookmarked' : 'Bookmark Removed',
+        description: state ? 'Saved to your personal bookmarks.' : 'Removed from bookmarks.',
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Error updating bookmark',
+        description: err.message,
+        variant: 'destructive',
+      });
+    }
+  };
 
   // Clean up blob URL when unmounting or changing document
   useEffect(() => {
@@ -337,22 +370,24 @@ export default function BookReader() {
   }
 
   const isShortNote = book.resourceType === 'short_note';
-  const fileId = book.driveFileId || extractDriveFileId(book.driveUrl || '');
-  const hasPdfSource = Boolean(fileId || book.driveUrl || pdfBlob);
 
-  // Any shortnote with interactive sections and no PDF binary renders in the native interactive reader
-  if (isShortNote && (Boolean(book.sections?.length) || Boolean(book.content)) && !hasPdfSource) {
+  // Any study note renders in the native interactive reader on both mobile and desktop
+  if (isShortNote) {
     return (
-      <DashboardLayout>
-        <div className="max-w-5xl mx-auto pb-12 animate-fade-in pt-2">
+      <DashboardLayout contentClassName="p-0 w-full min-h-screen">
+        <div className="w-full pb-12 animate-fade-in pt-0">
           <InteractiveShortNoteReader
             book={book}
+            isBookmarked={isBookmarked}
+            onToggleBookmark={handleToggleBookmark}
             onBack={() => navigate(`/dashboard/books/${book.id}`)}
           />
         </div>
       </DashboardLayout>
     );
   }
+
+  const fileId = book.driveFileId || extractDriveFileId(book.driveUrl || '');
 
   const previewUrl = fileId ? buildDrivePreviewUrl(fileId) : (book.driveUrl || '');
   const viewUrl = fileId ? buildDriveViewUrl(fileId) : (book.driveUrl || '');

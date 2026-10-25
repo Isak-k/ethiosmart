@@ -270,6 +270,19 @@ function AppRoutes() {
             <PracticeExamResultsPage />
           </ProtectedRoute>
         } />
+
+        {/* Friendly Book & Study Notes Navigation Aliases (Prevent 404s) */}
+        <Route path="/books" element={<Navigate to="/dashboard/books" replace />} />
+        <Route path="/books/:bookId" element={<Navigate to="/dashboard/books/:bookId" replace />} />
+        <Route path="/books/:bookId/read" element={<Navigate to="/dashboard/books/:bookId/read" replace />} />
+        <Route path="/shortnotes" element={<Navigate to="/dashboard/books" replace />} />
+        <Route path="/dashboard/shortnotes" element={<Navigate to="/dashboard/books" replace />} />
+        <Route path="/dashboard/admin/shortnotes" element={<Navigate to="/dashboard/admin/shortnotes/create" replace />} />
+        <Route path="/admin/books" element={<Navigate to="/dashboard/admin/books" replace />} />
+        <Route path="/admin/shortnotes" element={<Navigate to="/dashboard/admin/shortnotes/create" replace />} />
+        <Route path="/admin/ai-generator" element={<Navigate to="/dashboard/admin/ai-generator" replace />} />
+        <Route path="/exams" element={<Navigate to="/dashboard/exams" replace />} />
+        <Route path="/admin/exams" element={<Navigate to="/dashboard/admin/exams" replace />} />
         
         <Route path="*" element={<NotFound />} />
       </Routes>
