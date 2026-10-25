@@ -48,6 +48,8 @@ import {
   KeyRound,
 } from 'lucide-react';
 import { AIProviderSettingsDialog } from '@/components/admin/AIProviderSettingsDialog';
+import { AIProviderSettingsSection } from '@/components/admin/AIProviderSettingsSection';
+import { getEffectiveProviderKeys } from '@/lib/ai-settings';
 import { cn } from '@/lib/utils';
 import { getOfflineBook } from '@/lib/offline-books';
 import {
@@ -122,8 +124,8 @@ export default function AdminAIGenerator() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Active view tab: 'configure' | 'progress' | 'review' | 'history'
-  const [activeTab, setActiveTab] = useState<'configure' | 'progress' | 'review' | 'history'>('configure');
+  // Active view tab: 'configure' | 'progress' | 'review' | 'history' | 'settings'
+  const [activeTab, setActiveTab] = useState<'configure' | 'progress' | 'review' | 'history' | 'settings'>('configure');
 
   // AI Provider Settings Modal
   const [showAISettingsDialog, setShowAISettingsDialog] = useState(false);
@@ -295,15 +297,19 @@ export default function AdminAIGenerator() {
       getRecentJobs(user.uid).then(setRecentJobsList).catch(console.error);
     }
 
-    // Read URL query parameters (e.g. ?source=book&bookId=...&deptId=...&subjectId=...&examId=...)
+    // Read URL query parameters (e.g. ?source=book&bookId=...&deptId=...&subjectId=...&examId=...&tab=settings)
     try {
       const params = new URLSearchParams(window.location.search);
+      const qTab = params.get('tab');
       const qSource = params.get('source');
       const qBookId = params.get('bookId');
       const qDeptId = params.get('deptId');
       const qSubjectId = params.get('subjectId');
       const qExamId = params.get('examId');
 
+      if (qTab === 'settings' || qTab === 'configure' || qTab === 'progress' || qTab === 'review' || qTab === 'history') {
+        setActiveTab(qTab as any);
+      }
       if (qDeptId) setSelectedDepartmentId(qDeptId);
       if (qSubjectId) setSelectedSubjectId(qSubjectId);
       if (qExamId) {
@@ -753,6 +759,25 @@ export default function AdminAIGenerator() {
       return;
     }
 
+    // Verify provider availability before launching
+    const clientKeys = await getEffectiveProviderKeys();
+    const hasAnyConfigured = configuredProvidersCount > 0 || Boolean(
+      (clientKeys.gemini && clientKeys.gemini.trim().length > 5) ||
+      (clientKeys.groq && clientKeys.groq.trim().length > 5) ||
+      (clientKeys.openrouter && clientKeys.openrouter.trim().length > 5) ||
+      (clientKeys.huggingface && clientKeys.huggingface.trim().length > 5)
+    );
+
+    if (!hasAnyConfigured) {
+      toast({
+        title: 'AI Providers Not Configured',
+        description: 'Please configure at least one AI engine (Google Gemini, Groq, OpenRouter, or Hugging Face) in AI Provider Settings before generating questions.',
+        variant: 'destructive',
+      });
+      setActiveTab('settings');
+      return;
+    }
+
     // Determine batch plan: e.g. 10 questions per batch
     const BATCH_SIZE = 10;
     const numBatches = Math.ceil(totalCount / BATCH_SIZE);
@@ -768,6 +793,7 @@ export default function AdminAIGenerator() {
     setActiveTab('progress');
 
     let allAcceptedQuestions: NormalizedQuestion[] = isResuming ? [...generatedQuestions] : [];
+    let lastBatchErrorMessage = '';
 
     if (!isResuming) {
       setCurrentBatchIndex(0);
@@ -954,6 +980,7 @@ export default function AdminAIGenerator() {
             console.warn('Failed to update job audit record in Firestore:', jobErr);
           }
         } else {
+          lastBatchErrorMessage = batchRes.error || '';
           setGenerationLogs(prev => [
             ...prev,
             `❌ [Batch ${batchIdx + 1}/${numBatches}] Batch failed: ${batchRes.error || 'Unknown error'}`
@@ -973,6 +1000,7 @@ export default function AdminAIGenerator() {
           break;
         }
       } catch (batchErr: any) {
+        lastBatchErrorMessage = batchErr.message || '';
         setGenerationLogs(prev => [
           ...prev,
           `❌ [Batch ${batchIdx + 1}/${numBatches}] Exception: ${batchErr.message}`
@@ -995,9 +1023,12 @@ export default function AdminAIGenerator() {
     } else {
       toast({
         title: 'Generation Failed',
-        description: 'Unable to generate questions. Please review provider settings and try again.',
+        description: lastBatchErrorMessage || 'Unable to generate questions. Please review AI provider settings and try again.',
         variant: 'destructive'
       });
+      if (!hasAnyConfigured || lastBatchErrorMessage.toLowerCase().includes('provider') || lastBatchErrorMessage.toLowerCase().includes('key')) {
+        setActiveTab('settings');
+      }
     }
 
     if (user?.uid) {
@@ -1145,7 +1176,7 @@ export default function AdminAIGenerator() {
                   ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-500/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10"
                   : "bg-amber-50/50 dark:bg-amber-950/20 border-amber-500/30 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10"
               )}
-              onClick={() => setShowAISettingsDialog(true)}
+              onClick={() => setActiveTab('settings')}
               title="Click to view & configure AI engines and API keys"
             >
               <span className={cn("h-2 w-2 rounded-full", configuredProvidersCount > 0 ? "bg-emerald-500 animate-pulse" : "bg-amber-500")} />
@@ -1153,10 +1184,13 @@ export default function AdminAIGenerator() {
             </Badge>
 
             <Button
-              variant="outline"
+              variant={activeTab === 'settings' ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setShowAISettingsDialog(true)}
-              className="rounded-xl text-xs font-medium h-7 sm:h-8 px-2.5 sm:px-3 flex items-center gap-1.5 border-primary/30 text-primary hover:bg-primary/10 shadow-xs"
+              onClick={() => setActiveTab('settings')}
+              className={cn(
+                "rounded-xl text-xs font-medium h-7 sm:h-8 px-2.5 sm:px-3 flex items-center gap-1.5 transition shadow-xs",
+                activeTab !== 'settings' && "border-primary/30 text-primary hover:bg-primary/10"
+              )}
             >
               <Settings className="h-3.5 w-3.5" />
               <span>AI Provider Settings</span>
@@ -1170,26 +1204,32 @@ export default function AdminAIGenerator() {
 
         {/* Navigation Tabs */}
         <Tabs value={activeTab} onValueChange={(val: any) => setActiveTab(val)} className="space-y-3.5 sm:space-y-6">
-          <TabsList className="grid grid-cols-4 w-full max-w-2xl p-1 bg-muted/60 rounded-xl sm:rounded-2xl gap-0.5 sm:gap-1">
-            <TabsTrigger value="configure" className="px-1 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[11px] sm:text-xs md:text-sm font-semibold flex items-center justify-center gap-1 sm:gap-1.5 transition-all">
+          <TabsList className="grid grid-cols-5 w-full max-w-3xl p-1 bg-muted/60 rounded-xl sm:rounded-2xl gap-0.5 sm:gap-1">
+            <TabsTrigger value="configure" className="px-1 sm:px-2.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[10.5px] sm:text-xs md:text-sm font-semibold flex items-center justify-center gap-1 sm:gap-1.5 transition-all">
               <Layers className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
               <span className="hidden sm:inline">Configure</span>
               <span className="sm:hidden">Setup</span>
             </TabsTrigger>
-            <TabsTrigger value="progress" className="px-1 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[11px] sm:text-xs md:text-sm font-semibold flex items-center justify-center gap-1 sm:gap-1.5 transition-all" disabled={!isGenerating && generationLogs.length === 0}>
+            <TabsTrigger value="progress" className="px-1 sm:px-2.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[10.5px] sm:text-xs md:text-sm font-semibold flex items-center justify-center gap-1 sm:gap-1.5 transition-all" disabled={!isGenerating && generationLogs.length === 0}>
               <RefreshCw className={cn("h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0", isGenerating && "animate-spin text-purple-600")} />
               <span className="hidden sm:inline">Progress</span>
               <span className="sm:hidden">Status</span>
               {isGenerating && <span className="h-1.5 w-1.5 rounded-full bg-purple-500 animate-pulse" />}
             </TabsTrigger>
-            <TabsTrigger value="review" className="px-1 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[11px] sm:text-xs md:text-sm font-semibold flex items-center justify-center gap-1 sm:gap-1.5 transition-all">
+            <TabsTrigger value="review" className="px-1 sm:px-2.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[10.5px] sm:text-xs md:text-sm font-semibold flex items-center justify-center gap-1 sm:gap-1.5 transition-all">
               <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
               <span className="truncate">Review ({generatedQuestions.length})</span>
             </TabsTrigger>
-            <TabsTrigger value="history" className="px-1 sm:px-3 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[11px] sm:text-xs md:text-sm font-semibold flex items-center justify-center gap-1 sm:gap-1.5 transition-all">
+            <TabsTrigger value="history" className="px-1 sm:px-2.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[10.5px] sm:text-xs md:text-sm font-semibold flex items-center justify-center gap-1 sm:gap-1.5 transition-all">
               <History className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
               <span className="hidden sm:inline">Recent Jobs</span>
               <span className="sm:hidden">History</span>
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="px-1 sm:px-2.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[10.5px] sm:text-xs md:text-sm font-semibold flex items-center justify-center gap-1 sm:gap-1.5 transition-all">
+              <SlidersHorizontal className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 text-primary" />
+              <span className="hidden sm:inline">AI Providers</span>
+              <span className="sm:hidden">Engines</span>
+              <span className={cn("h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full shrink-0", configuredProvidersCount > 0 ? "bg-emerald-500" : "bg-amber-500")} />
             </TabsTrigger>
           </TabsList>
 
@@ -2110,7 +2150,7 @@ export default function AdminAIGenerator() {
                               <span className="font-semibold text-muted-foreground text-[11px]">Automatic Engine Fallback Order:</span>
                               <button
                                 type="button"
-                                onClick={() => setShowAISettingsDialog(true)}
+                                onClick={() => setActiveTab('settings')}
                                 className="text-[11px] text-primary hover:underline font-semibold flex items-center gap-1 cursor-pointer"
                               >
                                 <Settings className="h-3 w-3" />
@@ -2222,15 +2262,26 @@ export default function AdminAIGenerator() {
                       </Button>
                     )}
                     {!isGenerating && generatedQuestions.length < totalCount && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleStartGeneration({ resume: true })}
-                        className="text-primary border-primary/30 rounded-xl text-xs font-semibold h-8"
-                      >
-                        <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-                        Resume Remaining ({totalCount - generatedQuestions.length})
-                      </Button>
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleStartGeneration({ resume: true })}
+                          className="text-primary border-primary/30 rounded-xl text-xs font-semibold h-8"
+                        >
+                          <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                          Resume Remaining ({totalCount - generatedQuestions.length})
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setActiveTab('settings')}
+                          className="border-amber-500/30 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10 rounded-xl text-xs font-semibold h-8"
+                        >
+                          <Settings className="h-3.5 w-3.5 mr-1.5" />
+                          AI Provider Settings
+                        </Button>
+                      </>
                     )}
                   </div>
 
@@ -2645,6 +2696,11 @@ export default function AdminAIGenerator() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* TAB 5: AI PROVIDER ENGINE SETTINGS */}
+          <TabsContent value="settings" className="space-y-4 pt-1">
+            <AIProviderSettingsSection onSaved={refreshStatuses} />
           </TabsContent>
         </Tabs>
       </div>

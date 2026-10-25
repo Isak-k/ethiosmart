@@ -246,4 +246,34 @@ describe('AI Generator Frontend Service & Utilities', () => {
     const startBatchIdx = Math.floor(existingQuestions.length / BATCH_SIZE);
     expect(startBatchIdx).toBe(1); // Resume at Batch 2 (index 1)
   });
+
+  it('verifies AI provider settings defaults and validation behavior', async () => {
+    const { DEFAULT_AI_SETTINGS, testAIProviderConnection } = await import('./ai-settings');
+
+    // 1. Verify default providers
+    expect(DEFAULT_AI_SETTINGS.providers.gemini.id).toBe('gemini');
+    expect(DEFAULT_AI_SETTINGS.providers.groq.id).toBe('groq');
+    expect(DEFAULT_AI_SETTINGS.providers.openrouter.id).toBe('openrouter');
+    expect(DEFAULT_AI_SETTINGS.providers.huggingface.id).toBe('huggingface');
+
+    // 2. Verify priority sequence
+    expect(DEFAULT_AI_SETTINGS.providerPriority).toEqual(['gemini', 'groq', 'openrouter', 'huggingface']);
+    expect(DEFAULT_AI_SETTINGS.defaultProvider).toBe('gemini');
+
+    // 3. Verify console links exist
+    expect(DEFAULT_AI_SETTINGS.providers.gemini.consoleUrl).toContain('aistudio.google.com');
+    expect(DEFAULT_AI_SETTINGS.providers.groq.consoleUrl).toContain('console.groq.com');
+    expect(DEFAULT_AI_SETTINGS.providers.openrouter.consoleUrl).toContain('openrouter.ai');
+    expect(DEFAULT_AI_SETTINGS.providers.huggingface.consoleUrl).toContain('huggingface.co');
+
+    // 4. Test empty key rejection
+    const emptyResult = await testAIProviderConnection('gemini', '   ');
+    expect(emptyResult.success).toBe(false);
+    expect(emptyResult.message).toContain('API Key is empty');
+
+    // 5. Test unknown provider rejection
+    const unknownResult = await testAIProviderConnection('unknown' as any, 'test_key');
+    expect(unknownResult.success).toBe(false);
+    expect(unknownResult.message).toContain('Unknown provider');
+  });
 });

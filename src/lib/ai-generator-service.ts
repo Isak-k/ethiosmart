@@ -26,8 +26,8 @@ import { saveQuestionsBatch } from '@/lib/firebase-exams';
 import {
   orchestrateGenerationBatch,
   getProviderStatus,
-  ProviderKeys
-} from '../../functions/src/ai-generator/orchestrator';
+} from './ai-engine/orchestrator.ts';
+import type { ProviderKeys } from './ai-engine/types.ts';
 import { getEffectiveProviderKeys, getAISettings } from './ai-settings';
 
 /**
@@ -140,6 +140,13 @@ export async function generateBatchCall(
   const requestWithSettings: any = {
     ...request,
     providerPriority: request.providerPriority || settings.providerPriority,
+    providerModels: {
+      gemini: settings.providers.gemini.model,
+      groq: settings.providers.groq.model,
+      openrouter: settings.providers.openrouter.model,
+      huggingface: settings.providers.huggingface.model,
+      ...(request.providerModels || {})
+    },
     providerKeys: effectiveKeys,
   };
 
@@ -203,11 +210,20 @@ export async function generateBatchCall(
 
   // 3. If neither server nor client fallback could succeed, format a descriptive error
   const rawStatus = serverRes ? `HTTP ${serverRes.status} ${serverRes.statusText || ''}`.trim() : '';
-  const errorMsg =
-    serverData?.error ||
-    (serverRes?.status === 405
-      ? 'HTTP 405: Backend generation route not allowed. Please verify API keys in .env or provider settings.'
-      : rawStatus || 'Unable to connect to AI generation service.');
+  let errorMsg = serverData?.error;
+  if (!errorMsg) {
+    if (serverRes?.status === 405) {
+      errorMsg = 'HTTP 405: Backend generation route not allowed. Please verify API keys in .env or provider settings.';
+    } else if (serverRes?.status === 500) {
+      errorMsg = !hasClientKeys
+        ? 'No AI provider API key is configured. Please open AI Provider Settings and add your API key for Google Gemini, Groq, OpenRouter, or Hugging Face.'
+        : 'Internal Server Error (HTTP 500) on generation endpoint. Running with your configured provider settings.';
+    } else if (!hasClientKeys) {
+      errorMsg = 'No AI provider API key is configured. Please open AI Provider Settings to configure Gemini, Groq, OpenRouter, or Hugging Face.';
+    } else {
+      errorMsg = rawStatus || 'Unable to connect to AI generation service.';
+    }
+  }
 
   return {
     success: false,

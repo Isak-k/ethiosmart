@@ -1,6 +1,6 @@
 import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/integrations/firebase/client';
-import { AIProviderId, ProviderKeys } from '../../functions/src/ai-generator/types';
+import type { AIProviderId, ProviderKeys } from './ai-engine/types.ts';
 
 export interface AIProviderConfig {
   id: AIProviderId;
@@ -342,7 +342,7 @@ export async function testAIProviderConnection(
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: 'Test connection. Reply with "OK".' }] }],
+            contents: [{ parts: [{ text: 'Ping' }] }],
             generationConfig: { maxOutputTokens: 5, temperature: 0.1 },
           }),
         });
@@ -352,6 +352,24 @@ export async function testAIProviderConnection(
 
         if (!res.ok) {
           const errMsg = data?.error?.message || `HTTP ${res.status}: ${res.statusText}`;
+          if (res.status === 404 && targetModel !== 'gemini-2.5-flash') {
+            const retryUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(cleanKey)}`;
+            const retryRes = await fetch(retryUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: 'Ping' }] }],
+                generationConfig: { maxOutputTokens: 5, temperature: 0.1 },
+              }),
+            });
+            if (retryRes.ok) {
+              return {
+                success: true,
+                latencyMs: Date.now() - startTime,
+                message: `Connected successfully to Google Gemini (verified via gemini-2.5-flash) in ${Date.now() - startTime}ms!`,
+              };
+            }
+          }
           return {
             success: false,
             latencyMs,
@@ -388,6 +406,28 @@ export async function testAIProviderConnection(
 
         if (!res.ok) {
           const errMsg = data?.error?.message || `HTTP ${res.status}: ${res.statusText}`;
+          if ((res.status === 404 || res.status === 400) && targetModel !== 'llama-3.1-8b-instant') {
+            const retryRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${cleanKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: 'llama-3.1-8b-instant',
+                messages: [{ role: 'user', content: 'Ping' }],
+                max_tokens: 5,
+                temperature: 0.1,
+              }),
+            });
+            if (retryRes.ok) {
+              return {
+                success: true,
+                latencyMs: Date.now() - startTime,
+                message: `Connected successfully to Groq (verified via llama-3.1-8b-instant) in ${Date.now() - startTime}ms!`,
+              };
+            }
+          }
           return {
             success: false,
             latencyMs,

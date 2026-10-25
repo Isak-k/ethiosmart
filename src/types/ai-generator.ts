@@ -45,6 +45,7 @@ export interface GenerateBatchRequest {
   difficulty?: Difficulty;
   language?: Language;
   providerPriority?: AIProviderId[];
+  providerModels?: Partial<Record<AIProviderId, string>>;
   batchIndex?: number;
   totalBatches?: number;
 }

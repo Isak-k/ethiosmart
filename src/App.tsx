@@ -4,7 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { OfflineIndicator } from "@/components/ui/offline-indicator";
 import { InstallPrompt } from "@/components/ui/install-prompt";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { PermissionsProvider } from "@/contexts/PermissionsContext";
 import { ThemeProvider } from "@/hooks/use-theme";
@@ -47,7 +47,6 @@ import PracticeExamResultsPage from "./pages/PracticeExamResultsPage";
 import StudentSubjects from "./pages/StudentSubjects";
 import AdminSubjects from "./pages/AdminSubjects";
 import AdminAIGenerator from "./pages/AdminAIGenerator";
-import AdminAISettings from "./pages/AdminAISettings";
 import AdminBooks from "./pages/AdminBooks";
 import AdminShortnotesStudio from "./pages/AdminShortnotesStudio";
 import StudentBooks from "./pages/StudentBooks";
@@ -112,7 +111,7 @@ function AppRoutes() {
           
         {/* Admin Routes - Restricted to Admins; fine-grained via permissions where needed */}
         <Route path="/dashboard/admin/ai-generator" element={<ProtectedRoute allowedRoles={["admin"]}><AdminAIGenerator /></ProtectedRoute>} />
-        <Route path="/dashboard/admin/ai-settings" element={<ProtectedRoute allowedRoles={["admin"]}><AdminAISettings /></ProtectedRoute>} />
+        <Route path="/dashboard/admin/ai-settings" element={<Navigate to="/dashboard/admin/ai-generator?tab=settings" replace />} />
         <Route path="/dashboard/admin/exams" element={
           <ProtectedRoute allowedRoles={["admin"]}>
             <AdminExams />

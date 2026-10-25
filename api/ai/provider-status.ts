@@ -1,5 +1,5 @@
-import { getProviderStatus } from '../../functions/src/ai-generator/orchestrator';
-import { ProviderKeys } from '../../functions/src/ai-generator/types';
+import { getProviderStatus } from '../../src/lib/ai-engine/orchestrator.ts';
+import type { ProviderKeys } from '../../src/lib/ai-engine/types.ts';
 
 function loadEnvKeys(): ProviderKeys {
   return {

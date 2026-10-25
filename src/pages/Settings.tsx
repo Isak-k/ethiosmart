@@ -13,11 +13,9 @@ import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { newPasswordSchema } from "@/lib/validations";
-import { Loader2, User, Mail, Lock, Save, Shield, ArrowLeft, HardDrive, Trash2, Sparkles, SlidersHorizontal } from "lucide-react";
+import { Loader2, User, Mail, Lock, Save, Shield, ArrowLeft, HardDrive, Trash2 } from "lucide-react";
 import { initOfflineDB, getOfflineStorageSize } from "@/lib/offline-storage";
 import { isOfflineError } from "@/lib/firebase-utils";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AIProviderSettingsSection } from "@/components/admin/AIProviderSettingsSection";
 
 const Settings = () => {
   const { profile, refreshProfile, user } = useAuth();
@@ -204,8 +202,6 @@ const Settings = () => {
       setLoading(false);
     }
   };
-
-  const isAdmin = profile?.role === 'admin';
 
   const accountCards = (
     <div className="space-y-6">
@@ -411,12 +407,12 @@ const Settings = () => {
 
   return (
     <DashboardLayout>
-      <div className={`space-y-6 animate-fade-in ${isAdmin ? 'max-w-4xl' : 'max-w-2xl'} mx-auto pb-10`}>
+      <div className="space-y-6 animate-fade-in max-w-2xl mx-auto pb-10">
         <div className="flex items-start sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl lg:text-3xl font-display font-bold">Settings</h1>
             <p className="text-muted-foreground mt-1">
-              Manage your personal preferences {isAdmin ? "and AI system providers" : ""}
+              Manage your personal preferences and account security
             </p>
           </div>
           <Button 
@@ -431,30 +427,7 @@ const Settings = () => {
           </Button>
         </div>
 
-        {isAdmin ? (
-          <Tabs defaultValue="account" className="space-y-6">
-            <TabsList className="grid grid-cols-2 max-w-md h-11 p-1 bg-muted/60 rounded-xl">
-              <TabsTrigger value="account" className="rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5">
-                <User className="h-4 w-4" />
-                Account & Security
-              </TabsTrigger>
-              <TabsTrigger value="ai-providers" className="rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5">
-                <Sparkles className="h-4 w-4 text-primary" />
-                AI Provider Settings
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="account" className="mt-0">
-              {accountCards}
-            </TabsContent>
-
-            <TabsContent value="ai-providers" className="mt-0">
-              <AIProviderSettingsSection />
-            </TabsContent>
-          </Tabs>
-        ) : (
-          accountCards
-        )}
+        {accountCards}
       </div>
     </DashboardLayout>
   );

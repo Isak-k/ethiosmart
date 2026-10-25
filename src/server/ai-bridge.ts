@@ -2,8 +2,8 @@ import type { Plugin, ViteDevServer } from 'vite';
 import fs from 'fs';
 import path from 'path';
 import { IncomingMessage, ServerResponse } from 'http';
-import { orchestrateGenerationBatch, getProviderStatus } from '../../functions/src/ai-generator/orchestrator';
-import { GenerateBatchRequest, ProviderKeys } from '../../functions/src/ai-generator/types';
+import { orchestrateGenerationBatch, getProviderStatus } from '../lib/ai-engine/orchestrator.ts';
+import type { GenerateBatchRequest, ProviderKeys } from '../lib/ai-engine/types.ts';
 import { validateGoogleDriveFile, extractGoogleDriveContent, downloadGoogleDriveBuffer } from './drive-bridge';
 
 function loadEnvKeys(): ProviderKeys {
