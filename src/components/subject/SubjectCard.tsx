@@ -175,26 +175,30 @@ export function SubjectCard({
 
       {/* Lower portion: Subject information and progress filled cleanly under the cover */}
       <div className="flex flex-col flex-1 p-3.5 sm:p-5 bg-card justify-between gap-3 sm:gap-4">
-        {/* Track category tag & Completion status */}
+        {/* Track category tag & Completion status - Hidden for students by default */}
         <div className="space-y-1 sm:space-y-1.5">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-[11px] font-semibold text-primary uppercase tracking-wider truncate">
-                {coverInfo.preset.name}
-              </span>
-              {isAdmin && subject.displayOrder !== undefined && (
-                <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0 h-4 border-primary/30 text-primary bg-primary/5 shrink-0">
-                  #{subject.displayOrder}
+          {(isAdmin || isComplete) && (
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 min-w-0">
+                {isAdmin && (
+                  <span className="text-[11px] font-semibold text-primary uppercase tracking-wider truncate">
+                    {coverInfo.preset.name}
+                  </span>
+                )}
+                {isAdmin && subject.displayOrder !== undefined && (
+                  <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0 h-4 border-primary/30 text-primary bg-primary/5 shrink-0">
+                    #{subject.displayOrder}
+                  </Badge>
+                )}
+              </div>
+              {isComplete && (
+                <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-medium text-[11px] px-2 py-0.5 border border-emerald-500/20 shadow-none flex items-center gap-1 shrink-0 ml-auto">
+                  <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                  Completed
                 </Badge>
               )}
             </div>
-            {isComplete && (
-              <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-medium text-[11px] px-2 py-0.5 border border-emerald-500/20 shadow-none flex items-center gap-1 shrink-0">
-                <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-                Completed
-              </Badge>
-            )}
-          </div>
+          )}
 
           {/* Title and arrow */}
           <div className="flex items-start justify-between gap-2">
@@ -219,10 +223,10 @@ export function SubjectCard({
 
         {/* Unit information & Progress Indicator */}
         <div className="space-y-2 pt-2 border-t border-border/40">
-          <div className="flex items-center justify-between text-xs sm:text-sm">
-            <div className="flex items-center gap-1.5 font-medium text-foreground">
+          <div className="flex items-center justify-between text-xs sm:text-sm gap-2">
+            <div className="flex items-center gap-1.5 font-medium text-foreground min-w-0">
               <Layers className="h-4 w-4 text-primary shrink-0" />
-              <span>
+              <span className="truncate">
                 {hasStudentAttempts ? (
                   `${completedUnits} of ${totalUnits} units completed`
                 ) : unitsWithExams > 0 ? (
@@ -237,17 +241,16 @@ export function SubjectCard({
               </span>
             </div>
 
-            <span className="font-semibold text-xs text-muted-foreground">
-              {hasStudentAttempts ? (
-                `${studentPercentage}%`
-              ) : totalExams > 0 ? (
-                `${totalExams} ${totalExams === 1 ? 'assessment' : 'assessments'}`
-              ) : totalUnits > 0 ? (
-                'Ready'
-              ) : (
-                'No units'
-              )}
-            </span>
+            {/* Assessment & Percentage indicator - 'assessment' count hidden for students */}
+            {hasStudentAttempts ? (
+              <span className="font-semibold text-xs text-primary shrink-0">
+                {studentPercentage}%
+              </span>
+            ) : isAdmin && totalExams > 0 ? (
+              <span className="font-semibold text-xs text-muted-foreground shrink-0">
+                {totalExams} {totalExams === 1 ? 'assessment' : 'assessments'}
+              </span>
+            ) : null}
           </div>
 
           {/* Small rounded progress bar beneath unit information */}
