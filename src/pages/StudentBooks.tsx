@@ -76,14 +76,14 @@ export default function StudentBooks() {
   const [downloadingBookId, setDownloadingBookId] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
-  // Primary mode: 'books' | 'notes' | 'bookmarks' | 'offline'
+  // Primary mode: 'notes' | 'books' | 'bookmarks' | 'offline' (Notes comes first)
   const initialMode = useMemo(() => {
     const tabParam = searchParams.get('tab');
     const typeParam = searchParams.get('type');
     if (tabParam === 'offline') return 'offline';
     if (tabParam === 'bookmarks') return 'bookmarks';
-    if (typeParam === 'notes' || tabParam === 'notes' || tabParam === 'short_note') return 'notes';
-    return 'books';
+    if (typeParam === 'books' || tabParam === 'books' || tabParam === 'textbook') return 'books';
+    return 'notes';
   }, [searchParams]);
 
   const [primaryMode, setPrimaryMode] = useState<'books' | 'notes' | 'bookmarks' | 'offline'>(initialMode);
@@ -91,10 +91,10 @@ export default function StudentBooks() {
     searchParams.get('subjectId') || null
   );
 
-  // Step 1 Choice State: 'books' | 'notes'
+  // Step 1 Choice State: 'notes' comes first
   const [selectedChoice, setSelectedChoice] = useState<'books' | 'notes'>(() => {
     const typeParam = searchParams.get('type');
-    return typeParam === 'notes' ? 'notes' : 'books';
+    return typeParam === 'books' ? 'books' : 'notes';
   });
 
   // Has the user confirmed their choice by clicking "Next"?
@@ -490,69 +490,9 @@ export default function StudentBooks() {
               </p>
             </div>
 
-            {/* The Two Choice Cards */}
+            {/* The Two Choice Cards (Notes order comes first!) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-2">
-              {/* CHOICE 1: BOOKS */}
-              <div
-                onClick={() => setSelectedChoice('books')}
-                className={`group relative p-6 sm:p-7 rounded-3xl border-2 text-left transition-all duration-200 cursor-pointer flex flex-col justify-between ${
-                  selectedChoice === 'books'
-                    ? 'border-primary bg-primary/10 shadow-lg ring-2 ring-primary/30 scale-[1.01]'
-                    : 'border-border/70 bg-card hover:border-primary/40 hover:bg-muted/30'
-                }`}
-              >
-                <div>
-                  <div className="flex items-center justify-between gap-3">
-                    <div
-                      className={`h-14 w-14 rounded-2xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${
-                        selectedChoice === 'books'
-                          ? 'bg-primary text-primary-foreground shadow-md'
-                          : 'bg-primary/10 text-primary'
-                      }`}
-                    >
-                      <BookOpen className="h-7 w-7" />
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        variant={selectedChoice === 'books' ? 'default' : 'outline'}
-                        className="rounded-full text-xs px-2.5 py-0.5 font-bold"
-                      >
-                        {textbooksCount} Available
-                      </Badge>
-
-                      {/* Custom Radio Circle */}
-                      <div
-                        className={`h-6 w-6 rounded-full flex items-center justify-center border-2 transition-all ${
-                          selectedChoice === 'books'
-                            ? 'border-primary bg-primary text-primary-foreground'
-                            : 'border-muted-foreground/40'
-                        }`}
-                      >
-                        {selectedChoice === 'books' && <Check className="h-3.5 w-3.5 stroke-[3]" />}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-5">
-                    <h2 className="text-xl sm:text-2xl font-display font-bold text-foreground">
-                      Books & Textbooks
-                    </h2>
-                    <p className="text-xs sm:text-sm text-muted-foreground mt-1.5 leading-relaxed">
-                      Complete digital textbooks, official syllabus documents, and academic reference books.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-6 pt-3.5 border-t border-border/50 flex items-center justify-between text-xs font-bold">
-                  <span className={selectedChoice === 'books' ? 'text-primary' : 'text-muted-foreground'}>
-                    {selectedChoice === 'books' ? '✓ Selected' : 'Click to select Books'}
-                  </span>
-                  <span className="text-muted-foreground text-[11px]">Full Documents</span>
-                </div>
-              </div>
-
-              {/* CHOICE 2: CHAPTER STUDY NOTES */}
+              {/* CHOICE 1: CHAPTER STUDY NOTES (FIRST) */}
               <div
                 onClick={() => setSelectedChoice('notes')}
                 className={`group relative p-6 sm:p-7 rounded-3xl border-2 text-left transition-all duration-200 cursor-pointer flex flex-col justify-between ${
@@ -612,6 +552,66 @@ export default function StudentBooks() {
                     {selectedChoice === 'notes' ? '✓ Selected' : 'Click to select Notes'}
                   </span>
                   <span className="text-muted-foreground text-[11px]">Chapter by Chapter</span>
+                </div>
+              </div>
+
+              {/* CHOICE 2: BOOKS & TEXTBOOKS (SECOND) */}
+              <div
+                onClick={() => setSelectedChoice('books')}
+                className={`group relative p-6 sm:p-7 rounded-3xl border-2 text-left transition-all duration-200 cursor-pointer flex flex-col justify-between ${
+                  selectedChoice === 'books'
+                    ? 'border-primary bg-primary/10 shadow-lg ring-2 ring-primary/30 scale-[1.01]'
+                    : 'border-border/70 bg-card hover:border-primary/40 hover:bg-muted/30'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-3">
+                    <div
+                      className={`h-14 w-14 rounded-2xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${
+                        selectedChoice === 'books'
+                          ? 'bg-primary text-primary-foreground shadow-md'
+                          : 'bg-primary/10 text-primary'
+                      }`}
+                    >
+                      <BookOpen className="h-7 w-7" />
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant={selectedChoice === 'books' ? 'default' : 'outline'}
+                        className="rounded-full text-xs px-2.5 py-0.5 font-bold"
+                      >
+                        {textbooksCount} Available
+                      </Badge>
+
+                      {/* Custom Radio Circle */}
+                      <div
+                        className={`h-6 w-6 rounded-full flex items-center justify-center border-2 transition-all ${
+                          selectedChoice === 'books'
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'border-muted-foreground/40'
+                        }`}
+                      >
+                        {selectedChoice === 'books' && <Check className="h-3.5 w-3.5 stroke-[3]" />}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-5">
+                    <h2 className="text-xl sm:text-2xl font-display font-bold text-foreground">
+                      Books & Textbooks
+                    </h2>
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-1.5 leading-relaxed">
+                      Complete digital textbooks, official syllabus documents, and academic reference books.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-6 pt-3.5 border-t border-border/50 flex items-center justify-between text-xs font-bold">
+                  <span className={selectedChoice === 'books' ? 'text-primary' : 'text-muted-foreground'}>
+                    {selectedChoice === 'books' ? '✓ Selected' : 'Click to select Books'}
+                  </span>
+                  <span className="text-muted-foreground text-[11px]">Full Documents</span>
                 </div>
               </div>
             </div>
@@ -674,13 +674,23 @@ export default function StudentBooks() {
                     setSelectedNotesSubjectId(null);
                   }}
                   className="rounded-xl text-xs h-8 gap-1.5 font-bold hover:bg-muted"
-                  title="Switch between Books and Notes"
+                  title="Switch between Notes and Books"
                 >
                   <RotateCcw className="h-3.5 w-3.5 text-primary" />
-                  <span>Change: Books / Notes</span>
+                  <span>Change: Notes / Books</span>
                 </Button>
 
-                {/* Mode Selector Pills */}
+                {/* Mode Selector Pills (Notes comes first!) */}
+                <Button
+                  variant={primaryMode === 'notes' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setPrimaryMode('notes')}
+                  className="rounded-xl text-xs h-8 font-semibold"
+                >
+                  <FileText className="h-3.5 w-3.5 mr-1 text-amber-500" />
+                  Notes ({notesCount})
+                </Button>
+
                 <Button
                   variant={primaryMode === 'books' ? 'default' : 'ghost'}
                   size="sm"
@@ -688,20 +698,10 @@ export default function StudentBooks() {
                     setPrimaryMode('books');
                     setSelectedNotesSubjectId(null);
                   }}
-                  className="rounded-xl text-xs h-8"
+                  className="rounded-xl text-xs h-8 font-semibold"
                 >
-                  <BookOpen className="h-3.5 w-3.5 mr-1" />
+                  <BookOpen className="h-3.5 w-3.5 mr-1 text-primary" />
                   Books ({textbooksCount})
-                </Button>
-
-                <Button
-                  variant={primaryMode === 'notes' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setPrimaryMode('notes')}
-                  className="rounded-xl text-xs h-8"
-                >
-                  <FileText className="h-3.5 w-3.5 mr-1 text-amber-500" />
-                  Notes ({notesCount})
                 </Button>
 
                 <Button

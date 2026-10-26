@@ -1137,10 +1137,10 @@ export function InteractiveShortNoteReader({
                         isExpanded ? 'bg-muted/15' : 'hover:bg-muted/20'
                       }`}
                     >
-                      <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex items-start gap-3 min-w-0 flex-1">
                         {/* Section Number Badge */}
                         <div
-                          className={`h-8 w-8 sm:h-9 sm:w-9 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center shrink-0 transition-colors border ${
+                          className={`h-8 w-8 sm:h-9 sm:w-9 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center shrink-0 transition-colors border mt-0.5 ${
                             isMastered
                               ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
                               : palette.badgeBg
@@ -1149,16 +1149,16 @@ export function InteractiveShortNoteReader({
                           § {sectionNumber}
                         </div>
 
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xl sm:text-2xl shrink-0" role="img" aria-label="topic">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start gap-2">
+                            <span className="text-xl sm:text-2xl shrink-0 mt-0.5" role="img" aria-label="topic">
                               {palette.emoji}
                             </span>
-                            <h3 className={`text-base sm:text-lg md:text-xl font-bold tracking-tight truncate ${palette.titleColor}`}>
+                            <h3 className={`text-base sm:text-lg md:text-xl font-extrabold tracking-tight break-words leading-snug ${palette.titleColor}`}>
                               {section?.title || `Section ${index + 1}`}
                             </h3>
                           </div>
-                          <div className="flex items-center gap-2 text-[11px] text-muted-foreground font-sans mt-0.5">
+                          <div className="flex items-center gap-2 text-[11px] text-muted-foreground font-sans mt-1">
                             {section?.isImportant && (
                               <span className="text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1">
                                 <Sparkles className="h-3 w-3" />
@@ -1557,14 +1557,14 @@ export function InteractiveShortNoteReader({
                       : 'border-border/60 hover:border-primary/40 hover:bg-muted/30'
                   }`}
                 >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="text-base shrink-0" role="img" aria-label="topic">
+                  <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                    <span className="text-base shrink-0 mt-0.5" role="img" aria-label="topic">
                       {palette.emoji}
                     </span>
-                    <span className={`h-6 w-6 rounded-lg font-bold text-xs flex items-center justify-center shrink-0 border ${palette.badgeBg}`}>
+                    <span className={`h-6 w-6 rounded-lg font-bold text-xs flex items-center justify-center shrink-0 border mt-0.5 ${palette.badgeBg}`}>
                       {idx + 1}
                     </span>
-                    <span className="text-xs sm:text-sm font-semibold text-foreground truncate">
+                    <span className={`text-xs sm:text-sm font-bold break-words leading-tight flex-1 ${palette.titleColor}`}>
                       {sec.title}
                     </span>
                   </div>

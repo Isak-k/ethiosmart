@@ -98,6 +98,7 @@ import {
   RotateCcw,
   BookMarked,
   HelpCircle,
+  Image as ImageIcon,
 } from 'lucide-react';
 
 export default function AdminShortnotesStudio() {
@@ -126,6 +127,7 @@ export default function AdminShortnotesStudio() {
   const [selectedChapterId, setSelectedChapterId] = useState<string>(paramChapterId);
   const [selectedExamId, setSelectedExamId] = useState<string>('');
   const [customChapterTitle, setCustomChapterTitle] = useState<string>(paramChapterTitle);
+  const [customCoverUrl, setCustomCoverUrl] = useState<string>('');
   const [noteTitle, setNoteTitle] = useState<string>('');
   const [authorName, setAuthorName] = useState<string>('ExamPro Academic Team');
   const [status, setStatus] = useState<'published' | 'draft'>('published');
@@ -214,6 +216,9 @@ export default function AdminShortnotesStudio() {
             setSelectedChapterId(existing.chapterId || '');
             if (existing.examId) {
               setSelectedExamId(existing.examId);
+            }
+            if (existing.coverImageUrl) {
+              setCustomCoverUrl(existing.coverImageUrl);
             }
             setCustomChapterTitle(existing.chapterTitle || '');
             setStatus(existing.status || 'published');
@@ -949,9 +954,9 @@ export default function AdminShortnotesStudio() {
       const ch = chapters.find((c) => c.id === selectedChapterId);
       const chNumber = ch?.chapterNumber;
 
-      const effectiveCover = currentSubject
+      const effectiveCover = customCoverUrl.trim() || (currentSubject
         ? currentSubject.coverImageUrl || getSubjectCover(currentSubject.name).url
-        : '';
+        : '');
 
       const generatedMarkdown =
         sections.length > 0 ? generateMarkdownFromSections(sections) : rawNotes;
@@ -1040,7 +1045,7 @@ export default function AdminShortnotesStudio() {
       departmentName: departments.find((d) => d.id === selectedDeptId)?.name,
       subjectId: selectedSubjectId,
       subjectName: currentSubject?.name || 'Subject',
-      coverImageUrl: currentSubject?.coverImageUrl || (currentSubject ? getSubjectCover(currentSubject.name).url : ''),
+      coverImageUrl: customCoverUrl.trim() || currentSubject?.coverImageUrl || (currentSubject ? getSubjectCover(currentSubject.name).url : ''),
       status: status,
       allowDownload: allowDownload,
       language: generationLanguage,
@@ -1379,6 +1384,37 @@ export default function AdminShortnotesStudio() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+
+            {/* Note Cover Art Setting Row (Auto Subject Theme by default, optional custom upload) */}
+            <div className="pt-2 border-t border-border/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2">
+                <ImageIcon className="h-4 w-4 text-primary shrink-0" />
+                <span className="font-semibold text-foreground">Note Cover Art:</span>
+                <Badge variant="outline" className="text-[10px] font-medium">
+                  {customCoverUrl.trim() ? 'Custom Cover Image' : 'Auto Subject Theme (Default)'}
+                </Badge>
+              </div>
+
+              <div className="flex items-center gap-2 flex-1 sm:max-w-md">
+                <Input
+                  placeholder="Optional custom cover image URL (e.g. https://...)..."
+                  value={customCoverUrl}
+                  onChange={(e) => setCustomCoverUrl(e.target.value)}
+                  className="h-8 text-xs rounded-xl"
+                />
+                {customCoverUrl.trim() && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setCustomCoverUrl('')}
+                    className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground shrink-0 rounded-lg"
+                  >
+                    Reset
+                  </Button>
+                )}
               </div>
             </div>
 

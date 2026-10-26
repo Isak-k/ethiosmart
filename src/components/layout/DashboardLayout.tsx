@@ -87,9 +87,9 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
 
   const studentLinks = React.useMemo(() => [
     { href: "/dashboard/exams", label: "Exams", icon: ClipboardList },
+    { href: "/dashboard/books", label: "Study", icon: BookOpen },
     { href: "/dashboard", label: t("dashboard.menu.dashboard"), icon: LayoutDashboard },
     { href: "/dashboard/results", label: t("dashboard.menu.myResults"), icon: Trophy },
-    { href: "/dashboard/books", label: "Books", icon: BookOpen },
     { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
     { href: "/dashboard/ai-assistant", label: t("aiAssistant.title", "AI Study Assistant"), icon: Brain, permission: 'viewAIAssistant' },
   ], [t]);
