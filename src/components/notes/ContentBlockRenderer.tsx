@@ -254,15 +254,23 @@ export function ContentBlockRenderer({
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
-                {block.tableData.rows.map((row, rIdx) => (
-                  <tr key={rIdx} className="hover:bg-muted/30">
-                    {row.map((cell, cIdx) => (
-                      <td key={cIdx} className="px-4 py-3 text-foreground/90 align-top">
-                        <FormattedProseWithMath text={cell} />
-                      </td>
-                    ))}
-                  </tr>
-                ))}
+                {block.tableData.rows.map((rowItem, rIdx) => {
+                  const rowCells: string[] = Array.isArray(rowItem)
+                    ? rowItem
+                    : Array.isArray((rowItem as any)?.cells)
+                    ? (rowItem as any).cells
+                    : Object.values(rowItem || {});
+
+                  return (
+                    <tr key={rIdx} className="hover:bg-muted/30">
+                      {rowCells.map((cell, cIdx) => (
+                        <td key={cIdx} className="px-4 py-3 text-foreground/90 align-top">
+                          <FormattedProseWithMath text={cell} />
+                        </td>
+                      ))}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

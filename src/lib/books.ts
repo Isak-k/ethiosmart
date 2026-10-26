@@ -18,6 +18,7 @@ import {
 import { Book, BookInput, BookFilterOptions } from '@/types/book';
 import { getSubject } from '@/lib/subjects';
 import { getSubjectCover } from '@/lib/subject-covers';
+import { removeUndefinedFields, restoreFirestoreData } from '@/lib/firestore-utils';
 import {
   saveDeviceBooks,
   getDeviceBooks,
@@ -56,7 +57,7 @@ export async function getBooks(
     }
 
     let list: Book[] = snapshot.docs.map((d) => {
-      const data = d.data();
+      const data = restoreFirestoreData(d.data());
       return {
         id: d.id,
         ...data,
@@ -144,7 +145,7 @@ export async function getBook(id: string): Promise<Book | null> {
     if (snap.exists()) {
       const book = {
         id: snap.id,
-        ...snap.data(),
+        ...restoreFirestoreData(snap.data()),
       } as Book;
       saveDeviceBooks([book]).catch(() => {});
       return book;
@@ -184,7 +185,7 @@ export async function createBook(input: BookInput, creatorId: string): Promise<s
     }
   }
 
-  const data: Omit<Book, 'id'> = {
+  const data: Record<string, any> = {
     title: input.title.trim(),
     resourceType: input.resourceType,
     departmentId: input.departmentId,
@@ -192,10 +193,8 @@ export async function createBook(input: BookInput, creatorId: string): Promise<s
     subjectId: input.subjectId,
     chapterId: input.chapterId || '',
     chapterTitle: input.chapterTitle || '',
-    chapterNumber: input.chapterNumber,
     sourceType: input.sourceType || 'resource',
     sourceResourceId: input.sourceResourceId || '',
-    generationSettings: input.generationSettings,
     driveUrl: input.driveUrl?.trim() || '',
     driveFileId: input.driveFileId?.trim() || '',
     description: input.description?.trim() || '',
@@ -226,7 +225,34 @@ export async function createBook(input: BookInput, creatorId: string): Promise<s
     downloadCount: 0,
   };
 
-  const docRef = await addDoc(booksRef, data);
+  if (input.chapterNumber !== undefined) {
+    data.chapterNumber = input.chapterNumber;
+  }
+  if (input.examId) {
+    data.examId = input.examId;
+  }
+  if (input.gradeLevel) {
+    data.gradeLevel = input.gradeLevel;
+  }
+  if (input.courseName) {
+    data.courseName = input.courseName;
+  }
+  if (input.subjectCategory) {
+    data.subjectCategory = input.subjectCategory;
+  }
+  if (input.subjectName) {
+    data.subjectName = input.subjectName;
+  }
+  if (input.departmentName) {
+    data.departmentName = input.departmentName;
+  }
+  if (input.generationSettings) {
+    data.generationSettings = input.generationSettings;
+  }
+
+  // Deeply strip any undefined values to satisfy Firestore addDoc validation
+  const cleanData = removeUndefinedFields(data);
+  const docRef = await addDoc(booksRef, cleanData);
   return docRef.id;
 }
 
@@ -248,14 +274,8 @@ export async function updateBook(id: string, updates: Partial<Book>): Promise<vo
     }
   }
 
-  // Strip any undefined keys to satisfy Firestore updateDoc validation
-  const cleanUpdates: Record<string, any> = {};
-  for (const [key, value] of Object.entries(updates)) {
-    if (value !== undefined) {
-      cleanUpdates[key] = value;
-    }
-  }
-
+  // Deeply strip any undefined keys or nested undefined values to satisfy Firestore updateDoc validation
+  const cleanUpdates = removeUndefinedFields(updates);
   cleanUpdates.updatedAt = serverTimestamp();
 
   await updateDoc(docRef, cleanUpdates);

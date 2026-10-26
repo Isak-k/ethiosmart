@@ -41,7 +41,7 @@ export interface NoteContentBlock {
   mathFormula?: string;
   variables?: { symbol: string; explanation: string }[];
   steps?: { stepNumber: number; title?: string; text: string; calculation?: string }[];
-  tableData?: { headers: string[]; rows: string[][] };
+  tableData?: { headers: string[]; rows: (string[] | { cells: string[] })[] };
   listItems?: string[];
   imageUrl?: string;
   imageCaption?: string;

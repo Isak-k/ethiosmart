@@ -317,6 +317,15 @@ export function InteractiveShortNoteReader({
   const keyTakeaways: string[] = Array.isArray(book?.keyTakeaways) ? book.keyTakeaways : [];
   const topExercises: NoteExercise[] = Array.isArray(book?.exercises) ? book.exercises : [];
 
+  const subjectNameLower = (book?.subjectName || book?.title || '').toLowerCase();
+  const isMathOrPhysics =
+    subjectNameLower.includes('math') ||
+    subjectNameLower.includes('physic') ||
+    subjectNameLower.includes('calculus') ||
+    subjectNameLower.includes('algebra') ||
+    subjectNameLower.includes('geometry') ||
+    subjectNameLower.includes('mechanic');
+
   // Expanded sections state: start with all sections expanded for natural reading flow
   const [expandedSectionIds, setExpandedSectionIds] = useState<Set<string>>(() => {
     return new Set(sections.map((s, idx) => s?.id || `sec-${idx}`));
@@ -1017,59 +1026,8 @@ export function InteractiveShortNoteReader({
                 {book.summary}
               </p>
             )}
-
-            {/* Learning Outcomes Checklist (Single column, full width, large readable text) */}
-            {Array.isArray(book.learningOutcomes) && book.learningOutcomes.length > 0 && (
-              <div className="pt-2">
-                <div className="rounded-2xl border-2 border-primary/25 bg-gradient-to-br from-primary/10 via-primary/5 to-background p-4 sm:p-5 space-y-2.5 w-full">
-                  <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-primary uppercase tracking-wider font-sans">
-                    <GraduationCap className="h-4 w-4" />
-                    <span>Learning Outcomes for this Chapter</span>
-                  </div>
-                  <ul className="flex flex-col gap-2 pt-1 font-sans w-full">
-                    {book.learningOutcomes.map((outcome, oIdx) => (
-                      <li key={oIdx} className="flex items-start gap-2.5 text-base sm:text-lg text-foreground/95 leading-relaxed">
-                        <Check className="h-4 w-4 text-primary mt-1 shrink-0" />
-                        <span>{outcome}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            )}
           </div>
         </div>
-
-        {/* KEY EXAM TAKEAWAYS BANNER (Single column, full width, enlarged like Screenshots 4 and 5) */}
-        {keyTakeaways.length > 0 && (
-          <div className="rounded-2xl sm:rounded-3xl border-2 border-emerald-500/35 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent p-4 sm:p-6 space-y-3.5 shadow-sm w-full">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-sm sm:text-base font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider font-sans">
-                <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                <span>High-Yield Exam Takeaways</span>
-              </div>
-              <Badge variant="outline" className="text-xs font-mono border-emerald-500/35 text-emerald-700 dark:text-emerald-300 px-2.5 py-0.5">
-                {keyTakeaways.length} points
-              </Badge>
-            </div>
-
-            <div className="flex flex-col gap-3 pt-1 w-full">
-              {keyTakeaways.map((takeaway, tIdx) => (
-                <div
-                  key={tIdx}
-                  className="flex items-start gap-3.5 p-4 sm:p-5 rounded-2xl bg-card border-2 border-emerald-500/25 text-foreground shadow-2xs w-full"
-                >
-                  <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-xl bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold text-sm sm:text-base flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
-                    {tIdx + 1}
-                  </div>
-                  <div className="text-base sm:text-lg font-medium text-foreground leading-relaxed flex-1">
-                    <FormattedProseWithMath text={takeaway} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* SECTIONS LIST HEADER & CONTROLS */}
         <div className="space-y-4">
@@ -1079,7 +1037,9 @@ export function InteractiveShortNoteReader({
                 Chapter Topics & Study Notes
               </h2>
               <p className="text-xs text-muted-foreground">
-                Expand sections to study detailed theories, step-by-step calculations, worked examples, and review problems.
+                {isMathOrPhysics
+                  ? 'Expand sections to study detailed theories, step-by-step calculations, worked examples, and review problems.'
+                  : 'Expand sections to study detailed theories, explanatory concepts, and review questions.'}
               </p>
             </div>
 
@@ -1202,34 +1162,27 @@ export function InteractiveShortNoteReader({
                     {/* Section Expanded Body */}
                     {isExpanded && (
                       <div className="px-4 sm:px-6 pb-6 pt-2 space-y-5 border-t border-border/50 animate-fade-in">
-                        {/* Section-specific outcomes (if any) */}
-                        {Array.isArray(section.learningOutcomes) && section.learningOutcomes.length > 0 && (
-                          <div className="rounded-xl border border-primary/20 bg-primary/5 p-3.5 space-y-1.5 font-sans">
-                            <span className="text-[11px] font-bold text-primary uppercase tracking-wider">
-                              Section Outcomes
-                            </span>
-                            <ul className="space-y-1">
-                              {section.learningOutcomes.map((oc, ocIdx) => (
-                                <li key={ocIdx} className="text-xs text-foreground flex items-start gap-2">
-                                  <span className="h-1 w-1 rounded-full bg-primary mt-2 shrink-0" />
-                                  <span>{oc}</span>
-                                </li>
-                              ))}
-                            </ul>
+                        {/* Main Explanatory Classroom Study Notes (rendered when not already decomposed into paragraph blocks) */}
+                        {(!contentBlocks.some((b) => b.type === 'paragraph' || b.type === 'heading' || b.type === 'subheading') && section?.content) && (
+                          <div className={`${textSizeClass} text-foreground whitespace-pre-wrap leading-relaxed space-y-4 font-sans`}>
+                            <FormattedProseWithMath text={section.content} />
                           </div>
                         )}
 
-                        {/* Rich Structured Content Blocks (if present) */}
-                        {contentBlocks.length > 0 ? (
+                        {/* Rich Structured Content Blocks (Worked examples only for Math/Physics, formulas, callout cards, or structured blocks) */}
+                        {contentBlocks.length > 0 && (
                           <div className="space-y-4">
-                            {contentBlocks.map((block) => (
-                              <ContentBlockRenderer key={block.id} block={block} theme={theme} />
-                            ))}
-                          </div>
-                        ) : (
-                          /* Fallback Standard Text Paragraphs with Math support */
-                          <div className={`${textSizeClass} text-foreground whitespace-pre-wrap leading-relaxed`}>
-                            <FormattedProseWithMath text={section?.content || ''} />
+                            {contentBlocks
+                              .filter((block) => {
+                                // Exclude worked example cards for non-math/physics subjects
+                                if (block.type === 'example' && !isMathOrPhysics) {
+                                  return false;
+                                }
+                                return true;
+                              })
+                              .map((block) => (
+                                <ContentBlockRenderer key={block.id} block={block} theme={theme} />
+                              ))}
                           </div>
                         )}
 

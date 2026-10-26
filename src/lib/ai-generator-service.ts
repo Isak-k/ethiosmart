@@ -325,36 +325,7 @@ export async function extractTextFromFile(file: File): Promise<string> {
   return doc.fullText;
 }
 
-/**
- * Recursively removes all `undefined` values from an object or array.
- * Firestore strictly rejects documents containing `undefined` properties.
- */
-export function removeUndefinedFields<T>(obj: T): T {
-  if (obj === null || obj === undefined) {
-    return obj;
-  }
-  if (Array.isArray(obj)) {
-    return obj.map((item) => removeUndefinedFields(item)) as unknown as T;
-  }
-  if (typeof obj === 'object') {
-    // Preserve Firestore Timestamps, Dates, or special sentinel objects
-    if (
-      obj instanceof Date ||
-      typeof (obj as any).toDate === 'function' ||
-      (obj as any)._methodName
-    ) {
-      return obj;
-    }
-    const clean: Record<string, any> = {};
-    for (const [key, value] of Object.entries(obj)) {
-      if (value !== undefined) {
-        clean[key] = removeUndefinedFields(value);
-      }
-    }
-    return clean as T;
-  }
-  return obj;
-}
+export { removeUndefinedFields } from './firestore-utils';
 
 /**
  * Create or save an AI generation job record in Firestore

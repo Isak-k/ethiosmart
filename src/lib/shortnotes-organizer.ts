@@ -4,7 +4,18 @@ import {
   NoteContentBlock,
   NoteExercise,
   NoteBlockType,
+  ShortNoteSourceType,
 } from '@/types/book';
+import {
+  getSubjectPedagogicalProfile,
+  validateStudyNoteCompleteness,
+  enrichStudyNoteToTextbookQuality,
+  synthesizeSectionBlocks,
+  ensureSectionExercises,
+  repairIncompleteSection,
+  PedagogicalProfile,
+} from './chapter-resource-generator';
+import { getClientProviderKeys } from './ai-generator-service';
 
 export interface OrganizedShortNote {
   title: string;
@@ -40,6 +51,8 @@ export function organizeChapterNotesLocal(
     typeof options === 'string'
       ? options
       : options?.chapterTitle || 'Study Notes';
+  const subjectName = typeof options === 'object' ? options?.subjectName : undefined;
+  const profile = getSubjectPedagogicalProfile(subjectName);
 
   const clean = normalizeText(rawText);
   if (!clean) {
@@ -73,28 +86,113 @@ export function organizeChapterNotesLocal(
       if (line.startsWith('# ')) {
         detectedTitle = line.replace(/^#\s+/, '').trim();
         startIndex = i + 1;
-      } else if (i === 0 && line.length < 80 && !line.includes(':') && !line.endsWith('.')) {
+      } else if (/^(?:CHAPTER|UNIT|MODULE|TOPIC)\s+[A-Za-z0-9]+[:.\s\-]/i.test(line)) {
+        const afterPrefix = line
+          .replace(/^(?:CHAPTER|UNIT|MODULE|TOPIC)\s+[A-Za-z0-9]+[:.\s\-]*/i, '')
+          .trim();
+        detectedTitle = afterPrefix || line;
+        startIndex = i + 1;
+      } else if (i === 0 && line.length < 90 && !line.endsWith('.') && !line.startsWith('-') && !line.startsWith('*')) {
         detectedTitle = line;
         startIndex = 1;
+      }
+
+      // Skip any subtitle / decorative lines immediately following title
+      while (startIndex < lines.length) {
+        const next = lines[startIndex].trim();
+        if (!next) {
+          startIndex++;
+          continue;
+        }
+        if (
+          next.includes('•') ||
+          next.includes('·') ||
+          /^(author|by|grade|subject|publisher|study notes|~?\d+\s*min read)/i.test(next) ||
+          /^(organized study notes|high-yield notes|simple english|exam preparation)/i.test(next)
+        ) {
+          startIndex++;
+        } else {
+          break;
+        }
       }
       break;
     }
   }
 
   // 2. Split content into sections by headings
-  const isHeading = (line: string): boolean => {
-    if (line.startsWith('## ') || line.startsWith('### ') || line.startsWith('#### ')) return true;
-    if (/^(Chapter|Unit|Section|Part|Topic)\s+\d+[:.]?/i.test(line)) return true;
-    if (/^\d+\.\d+\s+[A-Z]/.test(line) && line.length < 80) return true; // e.g. "1.1 Arithmetic Progression"
-    if (/^[A-Z\s]{4,60}$/.test(line) && !line.includes('AND') && !line.includes(',') && !line.includes('.')) return true;
+  let insideFence = false;
+  let prevNonEmptyLine = '';
+  let expectedTopLevelNum = 1;
+  let currentTopLevelNum = 0;
+
+  const isHeading = (line: string, insideCode: boolean, prevLine: string): boolean => {
+    const trimmed = line.trim();
+    if (!trimmed || insideCode) return false;
+
+    // Never a heading if contains tabs (table row) or pipe tables
+    if (trimmed.includes('\t') || (trimmed.startsWith('|') && trimmed.endsWith('|'))) return false;
+
+    // Never a heading if previous line introduced an enumerated list ending with a colon
+    if (prevLine && /[:]\s*$/.test(prevLine.trim()) && !/^(Chapter|Section|Unit|Topic)\s+\d+[:]?$/i.test(prevLine.trim())) {
+      if (!trimmed.startsWith('##')) {
+        return false;
+      }
+    }
+
+    // Markdown section headings (H2, H3)
+    if (/^#{2,3}\s+/.test(trimmed)) {
+      const headingText = trimmed.replace(/^#+\s*/, '').trim();
+      if (!/^(table of contents|learning outcomes|objectives|takeaways)/i.test(headingText)) {
+        return true;
+      }
+    }
+
+    // Explicit labeled headings: Chapter 1, Topic 1, Section 1, Part 1, Unit 1
+    if (/^(?:Chapter|Unit|Section|Part|Topic)\s+(?:\d+|[IVXLCDM]+)[:.]?\s+[A-Za-z0-9]/i.test(trimmed)) {
+      return true;
+    }
+
+    // Standalone bold headings: **Heading Name** or **1. Heading Name**
+    const boldMatch = trimmed.match(/^\*\*(?:(?:\d+[\.\)]|[A-Z][\.\)]|[IVXLCDM]+[\.\)]|Topic\s*\d*[:.]?)\s*)?([^*]{3,80})\*\*:?$/);
+    if (boldMatch) {
+      const bTitle = boldMatch[1].trim();
+      if (/^(definition|explanation|example|worked example|important|note|key concept|key point|solution|step|hint|question|exercise|formula|types of operating systems|application|characteristics|principles)\b/i.test(bTitle)) {
+        return false;
+      }
+      if (!bTitle.includes('.') && !bTitle.includes('\t')) return true;
+    }
+
+    // Single numbered headings (e.g. 1. Definition of Psychology, 2. Characteristics of Learning)
+    const numMatch = trimmed.match(/^(\d+)[\.\)]\s+(.+)$/);
+    if (numMatch) {
+      if (prevLine && /^(steps|solution|options|hints|example|worked example)[:.]?$/i.test(prevLine)) return false;
+      const num = parseInt(numMatch[1], 10);
+      const titlePart = numMatch[2].trim();
+
+      if (/^(identify|compute|find|substitute|use|state|solve|verify|let|where|since|because|calculate|praise|reinforce|be specific)\b/i.test(titlePart)) {
+        return false;
+      }
+      if (/[.?!]\s+[A-Z]/.test(titlePart)) return false;
+      if (titlePart.includes(':') && (titlePart.endsWith('.') || titlePart.split(/\s+/).length > 8)) return false;
+
+      // Sequential check: only match if it continues top-level numbering
+      if (num === expectedTopLevelNum || num === currentTopLevelNum + 1) {
+        return true;
+      }
+    }
+
     return false;
   };
 
   const cleanHeading = (line: string): string => {
     return line
       .replace(/^#+\s*/, '')
-      .replace(/^[0-9]+[\.\)]\s*/, '')
       .replace(/^\*\*|\*\*$/g, '')
+      .replace(/^(?:Chapter|Unit|Section|Part|Topic|Subtopic)\s*(?:\d+|[IVXLCDM]+)?[:.]?\s*/i, '')
+      .replace(/^[0-9]+(?:\.[0-9]+)*(?:[\.\)]|\s)\s*/, '')
+      .replace(/^[IVXLCDM]+[\.\)]\s*/i, '')
+      .replace(/^\*\*|\*\*$/g, '')
+      .replace(/:$/, '')
       .trim();
   };
 
@@ -106,8 +204,17 @@ export function organizeChapterNotesLocal(
 
   for (let i = startIndex; i < lines.length; i++) {
     const line = lines[i];
+    if (line.startsWith('```')) {
+      insideFence = !insideFence;
+    }
 
-    if (isHeading(line)) {
+    if (isHeading(line, insideFence, prevNonEmptyLine)) {
+      const cleanLine = line.trim().replace(/^#+\s*/, '').replace(/^\*\*\s*/, '');
+      const numMatch = cleanLine.match(/^(\d+)[\.\)]/);
+      if (numMatch) {
+        currentTopLevelNum = parseInt(numMatch[1], 10);
+        expectedTopLevelNum = currentTopLevelNum + 1;
+      }
       if (foundFirstHeading) {
         if (currentSectionLines.length > 0) {
           rawSections.push({ title: currentSectionTitle, lines: currentSectionLines });
@@ -121,6 +228,10 @@ export function organizeChapterNotesLocal(
       preambleLines.push(line);
     } else {
       currentSectionLines.push(line);
+    }
+
+    if (line.trim()) {
+      prevNonEmptyLine = line.trim();
     }
   }
 
@@ -259,12 +370,14 @@ export function organizeChapterNotesLocal(
         continue;
       }
 
-      // Markdown Table detection: | Col 1 | Col 2 |
-      if (line.startsWith('|') && line.endsWith('|')) {
-        const cells = line
-          .slice(1, -1)
-          .split('|')
-          .map((c) => c.trim());
+      // Table detection: Markdown pipe tables OR tab-separated tables
+      const isPipeTableLine = line.startsWith('|') && line.endsWith('|');
+      const isTabTableLine = line.includes('\t') && line.split('\t').map((c) => c.trim()).filter(Boolean).length >= 2;
+
+      if (isPipeTableLine || isTabTableLine) {
+        const cells = isPipeTableLine
+          ? line.slice(1, -1).split('|').map((c) => c.trim())
+          : line.split('\t').map((c) => c.trim());
 
         // Skip divider row |--|--|
         if (cells.every((c) => /^:?-+:?$/.test(c))) {
@@ -299,13 +412,14 @@ export function organizeChapterNotesLocal(
         }
       }
 
-      // Worked Example detection
-      if (/^(Example|Worked Example)\s*(\d+)?[:.]/i.test(line) && !currentExercise) {
+      // Worked Example detection - only for Mathematics & Physics calculations
+      const isMathOrPhys = profile.discipline === 'mathematics' || profile.discipline === 'physics';
+      if (isMathOrPhys && /^(Worked Example|Sample Problem|Calculation Example)\s*(\d+)?[:.]/i.test(line) && !currentExercise) {
         flushTable();
         flushWorkedExample();
         flushExercise();
         const exTitle = line.split(/[:.]/)[0].trim();
-        const exBody = line.replace(/^(Example|Worked Example)\s*(\d+)?[:.]\s*/i, '').trim();
+        const exBody = line.replace(/^(Worked Example|Sample Problem|Calculation Example)\s*(\d+)?[:.]\s*/i, '').trim();
         currentWorkedExample = {
           id: `exblock-${Date.now()}-${Math.random()}`,
           type: 'example',
@@ -480,13 +594,35 @@ export function organizeChapterNotesLocal(
       }
 
 
+      // Subheading detection: 2.1 Main features of the definition, 4.1 Readiness, etc.
+      const subMatch = line.match(/^(\d+\.\d+(?:\.\d+)*)[\.\)]?\s+([A-Za-z0-9\s:–—\-()&/]+)$/);
+      if (subMatch && !currentExercise) {
+        const subTitle = line.trim();
+        if (subTitle.length < 80 && !/[.?!]\s+[A-Z]/.test(subTitle)) {
+          contentBlocks.push({
+            id: `sub-${Date.now()}-${Math.random()}`,
+            type: 'subheading',
+            title: subTitle,
+            content: subTitle,
+          });
+          continue;
+        }
+      }
+
       // Bullet points
       if (/^[-*•]\s+/.test(line)) {
         const pt = line.replace(/^[-*•]\s+/, '').trim();
-        if (pt.length > 5) {
-          keyPoints.push(pt);
-          if (takeaways.length < 6 && pt.length < 160) {
-            takeaways.push(pt);
+        if (pt.length > 0) {
+          contentBlocks.push({
+            id: `pt-${Date.now()}-${Math.random()}`,
+            type: 'paragraph',
+            content: `• ${pt}`,
+          });
+          if (pt.length > 5) {
+            keyPoints.push(pt);
+            if (takeaways.length < 6 && pt.length < 160) {
+              takeaways.push(pt);
+            }
           }
         }
         continue;
@@ -506,6 +642,26 @@ export function organizeChapterNotesLocal(
     flushTable();
     flushExercise();
 
+    const finalBlocks = synthesizeSectionBlocks(
+      {
+        id: secId,
+        title: rawSec.title,
+        content: rawSec.lines.join('\n').trim(),
+        keyPoints: keyPoints,
+        contentBlocks: contentBlocks,
+      },
+      profile.discipline,
+      defaultTitle
+    );
+
+    const finalExercises = ensureSectionExercises(
+      exercises,
+      secIdx,
+      rawSec.title,
+      profile.discipline,
+      defaultTitle
+    );
+
     processedSections.push({
       id: secId,
       title: rawSec.title,
@@ -513,9 +669,9 @@ export function organizeChapterNotesLocal(
       content: rawSec.lines.join('\n').trim(),
       learningOutcomes: sectionOutcomes,
       keyPoints: keyPoints,
-      contentBlocks: contentBlocks,
-      exercises: exercises,
-      isImportant: secIdx === 0 || exercises.length > 0,
+      contentBlocks: finalBlocks,
+      exercises: finalExercises,
+      isImportant: secIdx === 0 || finalExercises.length > 0,
     });
   });
 
@@ -542,21 +698,11 @@ export function organizeChapterNotesLocal(
 }
 
 /**
- * Optional AI organizer powered by Gemini if configured
- */
-import {
-  getSubjectPedagogicalProfile,
-  validateStudyNoteCompleteness,
-  enrichStudyNoteToTextbookQuality,
-} from './chapter-resource-generator';
-import { getClientProviderKeys } from './ai-generator-service';
-
-/**
- * Organizes raw notes using Google Gemini AI with Subject-Aware Pedagogical Precision.
+ * Organizes raw notes using AI with Subject-Aware Pedagogical Precision.
+ * Multi-provider failover: Google Gemini -> Groq -> OpenRouter -> Local Fallback.
  * - Enforces STRICT chapter boundary isolation (never integrates one chapter with others).
  * - Enforces TEACHING-FIRST generation (never merely summarizing or turning into short bullets).
- * - Implements the full 10-element instructional structure with substantive explanatory paragraphs.
- * - Tailors content directly to the subject discipline (e.g. step-by-step calculations & formulas for Mathematics; conceptual frameworks & empirical studies for Psychology).
+ * - Implements rich structured contentBlocks (definitions, important facts, worked examples, warnings, tips, formulas).
  * - Guarantees textbook-grade academic depth with independent Show/Hide solution exercises.
  */
 export interface OrganizeAIOptions {
@@ -566,6 +712,480 @@ export interface OrganizeAIOptions {
   targetAudience?: 'beginner' | 'intermediate' | 'advanced';
   language?: string;
   customInstructions?: string;
+  sourceType?: ShortNoteSourceType;
+}
+
+async function callAIForNotes(prompt: string, effectiveKeys: ReturnType<typeof getClientProviderKeys>, userKey?: string): Promise<string> {
+  // 1. Try Google Gemini (Fastest high-throughput models with strict 10s timeout)
+  const geminiKey = userKey || effectiveKeys.gemini;
+  if (geminiKey) {
+    const models = ['gemini-2.5-flash', 'gemini-1.5-flash'];
+    for (const model of models) {
+      try {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(geminiKey)}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: AbortSignal.timeout(10000),
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: {
+                temperature: 0.2,
+                topP: 0.95,
+                maxOutputTokens: 4096,
+                responseMimeType: 'application/json',
+              },
+            }),
+          }
+        );
+        if (response.ok) {
+          const data = await response.json();
+          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text && text.trim()) return text.trim();
+        }
+      } catch {}
+    }
+  }
+
+  // 2. Try Groq (Ultra-fast failover with 8s timeout)
+  const groqKey = effectiveKeys.groq;
+  if (groqKey) {
+    const models = ['openai/gpt-oss-120b', 'qwen/qwen3.8-27b'];
+    for (const model of models) {
+      try {
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${groqKey}`,
+          },
+          signal: AbortSignal.timeout(8000),
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: 'system', content: 'You are a master university professor and textbook author. Respond strictly with valid JSON.' },
+              { role: 'user', content: prompt },
+            ],
+            temperature: 0.2,
+            max_tokens: 4096,
+            response_format: { type: 'json_object' },
+          }),
+        });
+        if (response.ok) {
+          const data = await response.json();
+          const text = data?.choices?.[0]?.message?.content;
+          if (text && text.trim()) return text.trim();
+        }
+      } catch {}
+    }
+  }
+
+  // 3. Try OpenRouter (8s timeout)
+  const openrouterKey = effectiveKeys.openrouter;
+  if (openrouterKey) {
+    const models = ['google/gemini-flash-1.5', 'meta-llama/llama-3.3-70b-instruct'];
+    for (const model of models) {
+      try {
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${openrouterKey}`,
+          },
+          signal: AbortSignal.timeout(8000),
+          body: JSON.stringify({
+            model,
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.2,
+            max_tokens: 4096,
+          }),
+        });
+        if (response.ok) {
+          const data = await response.json();
+          const text = data?.choices?.[0]?.message?.content;
+          if (text && text.trim()) return text.trim();
+        }
+      } catch {}
+    }
+  }
+
+  return '';
+}
+
+/**
+ * Safely parses JSON from an AI response, stripping markdown wrappers if present.
+ */
+function extractJsonObject(text: string): any {
+  if (!text || !text.trim()) return null;
+  const clean = text
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/```\s*$/i, '')
+    .trim();
+  try {
+    return JSON.parse(clean);
+  } catch {
+    const firstBrace = clean.indexOf('{');
+    const lastBrace = clean.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      try {
+        return JSON.parse(clean.slice(firstBrace, lastBrace + 1));
+      } catch {}
+    }
+    return null;
+  }
+}
+
+export interface DetectedTopicItem {
+  title: string;
+  level: number;
+  startIndex: number;
+  endIndex?: number;
+}
+
+/**
+ * Detects all chapter topics, subheadings, and meaningful divisions in the raw text.
+ */
+export function extractChapterTopics(rawText: string): DetectedTopicItem[] {
+  const lines = rawText.split('\n');
+  const topics: DetectedTopicItem[] = [];
+  let charPos = 0;
+  let expectedTopLevelNum = 1;
+  let currentTopLevelNum = 0;
+  let prevNonEmptyLine = '';
+
+  for (let i = 0; i < lines.length; i++) {
+    const rawLine = lines[i];
+    const line = rawLine.trim();
+    if (!line) {
+      charPos += rawLine.length + 1;
+      continue;
+    }
+
+    // Skip table rows
+    if (line.includes('\t') || (line.startsWith('|') && line.endsWith('|'))) {
+      charPos += rawLine.length + 1;
+      prevNonEmptyLine = line;
+      continue;
+    }
+
+    // Skip list lead-in items
+    if (prevNonEmptyLine && /[:]\s*$/.test(prevNonEmptyLine) && !/^(Chapter|Section|Unit|Topic)\s+\d+[:]?$/i.test(prevNonEmptyLine) && !line.startsWith('##')) {
+      charPos += rawLine.length + 1;
+      prevNonEmptyLine = line;
+      continue;
+    }
+
+    // Markdown headings (#, ##, ###)
+    const mdMatch = line.match(/^(#{1,4})\s+(.+)$/);
+    if (mdMatch) {
+      const level = mdMatch[1].length;
+      const title = mdMatch[2].replace(/^\*\*|\*\*$/g, '').trim();
+      const numM = title.match(/^(\d+)[\.\)]/);
+      if (numM) {
+        currentTopLevelNum = parseInt(numM[1], 10);
+        expectedTopLevelNum = currentTopLevelNum + 1;
+      }
+      if (!/^(table of contents|learning outcomes|objectives|summary|takeaways|exam tips)/i.test(title)) {
+        topics.push({ title, level, startIndex: charPos });
+      }
+    }
+    // Numbered sections with explicit keyword (e.g. Topic 1: ..., Section 1: ...)
+    else if (/^(?:Section|Topic|Unit|Part)\s+\d+[:.]?\s+(.+)/i.test(line)) {
+      const m = line.match(/^(?:Section|Topic|Unit|Part)\s+\d+[:.]?\s+(.+)/i);
+      const title = (m ? m[1] : line).trim();
+      topics.push({ title, level: 2, startIndex: charPos });
+    }
+    // Numbered top-level section: "1. Definition of Psychology", "2. Biological Bases..."
+    else {
+      const topMatch = line.match(/^(\d+)[\.\)]\s+([A-Za-z0-9\s:–—\-()&/]+)$/);
+      if (topMatch) {
+        const num = parseInt(topMatch[1], 10);
+        const titlePart = topMatch[2].trim();
+        const isNotActionVerb = !/^(identify|compute|find|substitute|use|state|solve|verify|let|where|since|because|calculate|praise|reinforce|be specific)\b/i.test(titlePart);
+        const isNotMultiSentence = !/[.?!]\s+[A-Z]/.test(titlePart);
+        const isNotDescriptiveItem = !(titlePart.includes(':') && (titlePart.endsWith('.') || titlePart.split(/\s+/).length > 8));
+
+        if (isNotActionVerb && isNotMultiSentence && isNotDescriptiveItem) {
+          if (num === expectedTopLevelNum || num === currentTopLevelNum + 1) {
+            currentTopLevelNum = num;
+            expectedTopLevelNum = currentTopLevelNum + 1;
+            topics.push({ title: titlePart, level: 2, startIndex: charPos });
+          }
+        }
+      } else if (/^\*\*([A-Za-z0-9\s:–—\-]{4,70})\*\*:?$/.test(line) && !line.includes('.')) {
+        const m = line.match(/^\*\*([A-Za-z0-9\s:–—\-]{4,70})\*\*:?$/);
+        if (m && !/^(important|definition|note|tip|warning|example|formula|solution|step|hint|question|exercise)/i.test(m[1])) {
+          const numM = m[1].trim().match(/^(\d+)[\.\)]/);
+          if (numM) {
+            currentTopLevelNum = parseInt(numM[1], 10);
+            expectedTopLevelNum = currentTopLevelNum + 1;
+          }
+          topics.push({ title: m[1].trim(), level: 2, startIndex: charPos });
+        }
+      }
+    }
+
+    charPos += rawLine.length + 1;
+    prevNonEmptyLine = line;
+  }
+
+  // Calculate endIndex for each topic
+  for (let j = 0; j < topics.length; j++) {
+    topics[j].endIndex = j + 1 < topics.length ? topics[j + 1].startIndex : rawText.length;
+  }
+
+  return topics;
+}
+
+export interface TopicChunk {
+  chunkText: string;
+  topicTitles: string[];
+  chunkIndex: number;
+  totalChunks: number;
+}
+
+/**
+ * Splits long chapter material into discrete topic clusters (4,000 - 12,000 characters)
+ * to ensure that NO topic is skipped or truncated during AI generation.
+ */
+export function splitContentIntoTopicChunks(
+  rawText: string,
+  maxChunkLength = 40000
+): TopicChunk[] {
+  if (rawText.length <= maxChunkLength) {
+    const topics = extractChapterTopics(rawText);
+    return [
+      {
+        chunkText: rawText,
+        topicTitles: topics.map((t) => t.title),
+        chunkIndex: 0,
+        totalChunks: 1,
+      },
+    ];
+  }
+
+  const topics = extractChapterTopics(rawText);
+
+  // If topics were detected, split along topic boundaries
+  if (topics.length > 1) {
+    const chunks: TopicChunk[] = [];
+    let currentTopicGroup: DetectedTopicItem[] = [];
+    let currentStart = topics[0].startIndex;
+
+    for (let i = 0; i < topics.length; i++) {
+      currentTopicGroup.push(topics[i]);
+      const currentEnd = topics[i].endIndex || rawText.length;
+      const groupLength = currentEnd - currentStart;
+
+      // When chunk is big enough or on last topic
+      if (groupLength >= maxChunkLength || i === topics.length - 1) {
+        const chunkSlice = rawText.slice(currentStart, currentEnd).trim();
+        chunks.push({
+          chunkText: chunkSlice,
+          topicTitles: currentTopicGroup.map((t) => t.title),
+          chunkIndex: chunks.length,
+          totalChunks: 0,
+        });
+        currentTopicGroup = [];
+        if (i + 1 < topics.length) {
+          currentStart = topics[i + 1].startIndex;
+        }
+      }
+    }
+
+    chunks.forEach((c) => (c.totalChunks = chunks.length));
+    return chunks;
+  }
+
+  // Fallback: split by paragraph boundaries near 10,000 characters
+  const paragraphs = rawText.split(/\n\s*\n/);
+  const chunks: TopicChunk[] = [];
+  let currentParas: string[] = [];
+  let currentLength = 0;
+
+  for (const para of paragraphs) {
+    currentParas.push(para);
+    currentLength += para.length;
+    if (currentLength >= maxChunkLength) {
+      chunks.push({
+        chunkText: currentParas.join('\n\n'),
+        topicTitles: [],
+        chunkIndex: chunks.length,
+        totalChunks: 0,
+      });
+      currentParas = [];
+      currentLength = 0;
+    }
+  }
+
+  if (currentParas.length > 0) {
+    chunks.push({
+      chunkText: currentParas.join('\n\n'),
+      topicTitles: [],
+      chunkIndex: chunks.length,
+      totalChunks: 0,
+    });
+  }
+
+  chunks.forEach((c) => (c.totalChunks = chunks.length));
+  return chunks;
+}
+
+/**
+ * Builds the comprehensive teacher prompt emphasizing NORMAL CLASSROOM STUDY NOTES.
+ */
+function buildNormalStudyNotesPrompt(params: {
+  subjectName: string;
+  chapterTitle: string;
+  chunkText: string;
+  topicTitles: string[];
+  chunkIndex: number;
+  totalChunks: number;
+  profile: PedagogicalProfile;
+  depth: string;
+  targetAudience: string;
+  language: string;
+  customInstructions?: string;
+  isUserOrganized?: boolean;
+}): string {
+  const {
+    subjectName,
+    chapterTitle,
+    chunkText,
+    topicTitles,
+    chunkIndex,
+    totalChunks,
+    profile,
+    depth,
+    targetAudience,
+    language,
+    customInstructions,
+    isUserOrganized,
+  } = params;
+
+  return `You are a premier university professor and master textbook author specializing in ${profile.name}.
+Your mission is to generate PROPER CLASSROOM STUDY NOTES for students, especially BEGINNERS learning this subject for the first time.
+Subject: "${subjectName || profile.name}"
+Designated Chapter: "${chapterTitle}"
+${totalChunks > 1 ? `Part: ${chunkIndex + 1} of ${totalChunks}` : ''}
+
+================================================================================
+CORE MANDATE: GENERATE NORMAL, EXPLANATORY CLASSROOM STUDY NOTES (NOT SUMMARIES)
+================================================================================
+The default output MUST resemble a teacher's well-prepared classroom notes or textbook notes:
+- Teach students who are new to the subject using clear, simple English by default.
+- Explain concepts thoroughly enough for understanding and examination preparation.
+- Do NOT generate brief summaries, revision sheets, lists of definitions without explanations, or superficial outlines.
+- Do NOT skip topics. Every meaningful topic and subtopic in the source material must be thoroughly taught.
+
+================================================================================
+CRITICAL TEACHING RULE: EXPLAIN CONCEPTS INSTEAD OF LISTING THEM
+================================================================================
+NEVER produce bare bullet lists of items or types without individual explanations!
+
+BAD OUTPUT (DO NOT DO THIS):
+**Types of Operating Systems**
+- Batch operating system
+- Time-sharing operating system
+- Distributed operating system
+
+EXPECTED OUTPUT (ALWAYS DO THIS):
+**Types of Operating Systems**
+
+An operating system can be classified into different types based on how it manages tasks, users, and computer resources.
+
+**1. Batch Operating System**
+**Definition:** A batch operating system processes groups of similar jobs together without requiring continuous interaction from the user during execution.
+**Explanation:** Users submit jobs to the system, and the operating system organizes and processes them in batches. The user generally receives the results after processing is completed.
+**Example:** Processing a large batch of payroll records in an organization.
+**Important point:** Batch processing is useful when many similar jobs need to be processed automatically.
+
+**2. Time-Sharing Operating System**
+**Definition:** A time-sharing operating system allows multiple users or tasks to share computer resources simultaneously by allocating small time slices (quantum) of CPU execution to each process.
+**Explanation:** The CPU switches rapidly between tasks so that each user feels they have dedicated access to the machine.
+**Example:** A university multi-terminal mainframe server supporting multiple student programming sessions at once.
+**Important point:** Enhances CPU utilization and provides interactive response times.
+
+================================================================================
+WHAT EVERY TOPIC AND SUBTOPIC MUST INCLUDE (WHEN RELEVANT):
+================================================================================
+For every topic and subtopic, include the relevant elements in simple English:
+1. Definition: Explain what the concept means in clear, accessible language.
+2. Explanation: Describe how and why the concept works in simple English.
+3. Types & Classifications: When a concept has types, EXPLAIN EACH TYPE INDIVIDUALLY with its own definition, explanation, example, and characteristics.
+4. Components or Characteristics: Describe the important parts and properties.
+5. Functions & Purposes: Explain what something does and why it is used.
+6. Practical Examples: Give relatable, real-world examples to help beginners understand.
+7. Important Details: Include relevant rules, principles, classifications, formulas, advantages, disadvantages, applications, and limitations.
+8. Processes & Steps: Explain steps in the correct chronological order when applicable.
+9. Comparisons: Explain differences and similarities when useful to prevent confusion.
+
+================================================================================
+MAKE THE NOTES BEGINNER-FRIENDLY:
+================================================================================
+- Explain basic concepts before advanced concepts.
+- Define technical terms before relying on them.
+- Use simple English without removing important technical meaning.
+- Avoid unexplained abbreviations and jargon.
+- Never expect students to already understand concepts that have not yet been taught.
+
+${isUserOrganized ? `================================================================================
+USER-ORGANIZED NOTE INSTRUCTION:
+================================================================================
+The source text is an already-organized study note provided by the educator/user.
+- Faithfully preserve and follow the user's exact headings, topics, and structure.
+- Create a dedicated study note section for every topic and subtopic in the user's note.
+- Do NOT merge, omit, or rename topics to generic titles. Follow the author's structure.
+- Expand every concept with full explanatory teaching prose following the author's outline.
+` : ''}
+${topicTitles.length > 0 ? `MANDATORY TOPIC COVERAGE:
+You MUST create a dedicated section for each of these topics:
+${topicTitles.map((t, idx) => `${idx + 1}. ${t}`).join('\n')}
+Do NOT skip any of these topics. Do NOT merge them into one brief paragraph.` : ''}
+
+SUBJECT PEDAGOGICAL EMPHASIS (${profile.name.toUpperCase()}):
+- ${profile.focusDescription}
+${profile.formattingRules.map((rule) => `- ${rule}`).join('\n')}
+
+Target Audience: ${targetAudience}
+Depth: ${depth}
+Language: Strictly output in ${language}.
+${customInstructions ? `Custom Teacher Guidance: ${customInstructions}` : ''}
+
+Source Material:
+"""
+${chunkText}
+"""
+
+Respond STRICTLY with valid JSON matching this schema:
+{
+  "title": "${subjectName ? `${subjectName} - ` : ''}${chapterTitle}",
+  "summary": "3-4 sentence comprehensive executive overview of the chapter's core principles and exam significance.",
+  "sections": [
+    {
+      "id": "sec-1",
+      "sectionNumber": "1",
+      "title": "Comprehensive Topic Title",
+      "content": "Full, well-written classroom study notes teaching this topic: comprehensive explanations, definitions, each type individually explained with Definition, Explanation, Example, and Important points, components, processes, advantages/disadvantages, and comparisons in clear Markdown prose.",
+      "keyPoints": [
+        "Core exam concept 1",
+        "Common pitfall or misconception to avoid 2",
+        "Key pedagogical reminder 3"
+      ]
+    }
+  ],
+  "keyTerms": [
+    {
+      "term": "Key Term 1",
+      "definition": "Complete, clear definition in simple English."
+    },
+    {
+      "term": "Key Term 2",
+      "definition": "Complete, clear definition in simple English."
+    }
+  ]
+}`;
 }
 
 export async function organizeChapterNotesWithAI(
@@ -592,216 +1212,163 @@ export async function organizeChapterNotesWithAI(
   });
 
   const effectiveKeys = getClientProviderKeys();
-  const apiKey =
+  const hasAnyKey = Boolean(
     geminiApiKey ||
     effectiveKeys.gemini ||
+    effectiveKeys.groq ||
+    effectiveKeys.openrouter ||
     (import.meta as any).env?.VITE_GEMINI_API_KEY ||
-    localStorage.getItem('gemini_api_key');
+    localStorage.getItem('gemini_api_key')
+  );
 
-  if (!apiKey || !rawText.trim()) {
+  if (!hasAnyKey || !rawText.trim()) {
     return localFallback;
   }
 
   const profile = getSubjectPedagogicalProfile(subjectName);
 
   try {
-    const prompt = `You are a premier university professor and master textbook author specializing in ${profile.name}.
-Your task is to transform raw lecture or textbook materials into deep, authoritative, textbook-quality teaching material for:
-Subject: "${subjectName || profile.name}"
-Designated Chapter: "${chapterTitle || localFallback.title}"
+    const chunks = splitContentIntoTopicChunks(rawText, 40000);
+    const collectedSections: ShortNoteSection[] = [];
+    const collectedKeyTerms: KeyTerm[] = [];
+    let detectedTitle = chapterTitle || localFallback.title;
+    let overallSummary = localFallback.summary;
+    let overallOutcomes: string[] = localFallback.learningOutcomes;
+    let overallTakeaways: string[] = localFallback.keyTakeaways;
 
-PRIMARY MISSION: REPLACE SUMMARY-FIRST WITH TEACHING-FIRST GENERATION
-The objective is NOT to summarize the uploaded resource. The objective is to ACTUALLY TEACH THE SUBJECT MATTER thoroughly, clearly, and engagingly.
-Do NOT generate a few bullet points, definitions, or superficial outlines.
-Include the actual main body of the lesson for every important topic.
+    const isUserOrganized = options.sourceType === 'upload' || options.sourceType === 'pasted_text';
 
-MANDATORY 10-ELEMENT TEACHING SEQUENCE FOR EVERY MAJOR TOPIC:
-1. Introduction & Context: Explain the topic and what it means in simple, accessible language. Explain why it matters and what fundamental questions it addresses.
-2. Prerequisite Knowledge: State what foundational concepts students need before tackling this topic.
-3. Core Explanation: Write rich, thorough explanatory paragraphs (3-5 substantive paragraphs per section, NOT bullet points). Explain how it works and develop the explanation logically from foundational to advanced ideas.
-4. Key Terminology: Define technical terms clearly before relying on them.
-5. Detailed Development: Develop the actual mechanisms, stages, governing equations, scientific laws, or theoretical models.
-6. Worked Examples & Applications:
-   - For Mathematics/Physics: Show line-by-line calculations with EVERY intermediate arithmetic step ($3 + 14 \\cdot 4 = 3 + 56 = 59$), defining every variable explicitly. State SI units for every physical quantity.
-   - For Psychology/Social Sciences: Detail theoretical paradigms (Cognitive, Behavioral, Psychoanalytic, Biological, Humanistic), seminal empirical experiments (independent/dependent variables, experimental conditions, findings), and real-world behavioral case scenarios.
-   - For Computer Science: Include syntax-highlighted code blocks, algorithmic execution traces, and time/space complexity analysis ($O(n), O(\\log n)$).
-7. Reasoning & Intuition: Explain the logic behind conclusions, methods, rules, and procedures.
-8. Common Mistakes & Misconceptions: Explicitly highlight pitfalls, exam traps, and cognitive misunderstandings, explaining how to avoid them.
-9. Concept Connections: Relate this concept to the broader discipline and subsequent chapters.
-10. Review Exercises with Show/Hide Solutions: Multi-step problems with verified solutions that students can expand independently.
+    // Execute chunks in parallel to maximize speed
+    const chunkPromises = chunks.map(async (chunk, cIdx) => {
+      const prompt = buildNormalStudyNotesPrompt({
+        subjectName: subjectName || profile.name,
+        chapterTitle: detectedTitle,
+        chunkText: chunk.chunkText,
+        topicTitles: chunk.topicTitles,
+        chunkIndex: cIdx,
+        totalChunks: chunks.length,
+        profile,
+        depth,
+        targetAudience,
+        language,
+        customInstructions,
+        isUserOrganized,
+      });
 
-CORE PRINCIPLE: OPTIMIZE FOR LEARNING QUALITY, NOT RAW PAGE FILLER
-- Preserve essential knowledge: formulas, derivations, theories, principles, and mechanisms.
-- Explain rather than merely mention: Mentioning a concept is NOT the same as explaining it.
-- Remove redundant filler without sacrificing educational depth.
-- Prioritize independent student understanding: After studying, the student should understand the topic without having to consult the original book.
+      const textOutput = await callAIForNotes(prompt, effectiveKeys, geminiApiKey);
+      if (!textOutput) return null;
+      return { cIdx, parsed: extractJsonObject(textOutput), chunkText: chunk.chunkText };
+    });
 
-CRITICAL INSTRUCTIONS:
-1. STRICT CHAPTER BOUNDARY ISOLATION:
-- Focus SOLELY and EXCLUSIVELY on this single chapter: "${chapterTitle || 'Chapter'}".
-- Do NOT include Table of Contents page index entries (e.g. "... 15").
-- Do NOT bleed into subsequent or previous chapters.
+    const chunkResults = await Promise.all(chunkPromises);
 
-2. SUBJECT-SPECIFIC PEDAGOGICAL EMPHASIS (${profile.name.toUpperCase()}):
-- ${profile.focusDescription}
-${profile.formattingRules.map((rule) => `- ${rule}`).join('\n')}
+    for (const res of chunkResults) {
+      if (!res || !res.parsed) continue;
+      const { cIdx, parsed, chunkText } = res;
 
-3. AUDIENCE & EXPLANATION DEPTH:
-- Target Audience: ${targetAudience === 'beginner' ? 'Beginner / New to Subject (explain foundational concepts gently, define all terms before using them, assume zero prior knowledge)' : targetAudience === 'intermediate' ? 'Intermediate (rigorous conceptual and problem-solving level)' : 'Advanced / Honors (in-depth proofs, edge cases, advanced exam preparation)'}.
-- Depth Level: ${depth === 'detailed' ? 'Detailed Teaching Notes (exhaustive explanations, comprehensive body of the lesson)' : depth === 'balanced' ? 'Balanced Study Notes (key explanations, definitions, and worked examples)' : 'Concise Revision (high-yield focused summary with essential definitions and formulas)'}.
-- Language: Output all explanations and titles strictly in "${language}".
-${customInstructions ? `- Custom Pedagogical Guidance: ${customInstructions}` : ''}
-
-Input Chapter Material:
-"""
-${rawText.slice(0, 18000)}
-"""
-
-Respond STRICTLY with valid JSON matching this schema:
-{
-  "title": "${subjectName ? `${subjectName} - ` : ''}${chapterTitle || 'Chapter Study Notes'}",
-  "summary": "3-4 sentence comprehensive executive overview of the chapter's core principles, mechanisms, and exam significance.",
-  "learningOutcomes": [
-    "Outcome 1: Specific mastery objective",
-    "Outcome 2: Analytical or computational skill",
-    "Outcome 3: Problem-solving capability"
-  ],
-  "keyTakeaways": [
-    "High-yield takeaway 1",
-    "High-yield takeaway 2",
-    "High-yield takeaway 3",
-    "High-yield takeaway 4"
-  ],
-  "sections": [
-    {
-      "id": "sec-1",
-      "title": "Comprehensive Topic Title",
-      "content": "Deep, thorough academic explanation containing formal principles, theoretical intuition, and governing mechanisms (3-5 substantive paragraphs).",
-      "keyPoints": [
-        "Essential exam concept 1",
-        "Common misconception or pitfall to avoid 2",
-        "Governing rule or calculation reminder 3"
-      ],
-      "isImportant": true,
-      "exercises": [
-        {
-          "id": "ex-1-1",
-          "exerciseNumber": 1,
-          "question": "Rigorous academic practice question testing calculation (for math) or conceptual analysis (for psychology).",
-          "questionType": "problem",
-          "hints": ["Targeted hint to guide reasoning."],
-          "solution": {
-            "answer": "Definitive correct answer or final numerical value with units.",
-            "steps": [
-              "Step 1: Identify given parameters and state governing principle/formula.",
-              "Step 2: Carry out algebraic substitution or conceptual analysis.",
-              "Step 3: Evaluate final calculation or deduce conclusion."
-            ],
-            "explanation": "Deep pedagogical breakdown of why this solution is correct and key exam points."
-          },
-          "initialExpanded": false
+      if (cIdx === 0) {
+        if (parsed.title) detectedTitle = parsed.title;
+        if (parsed.summary) overallSummary = parsed.summary;
+        if (Array.isArray(parsed.learningOutcomes) && parsed.learningOutcomes.length > 0) {
+          overallOutcomes = parsed.learningOutcomes;
         }
-      ]
-    }
-  ],
-  "keyTerms": [
-    {
-      "term": "Key Academic Term 1",
-      "definition": "Complete, authoritative definition with context or formula."
-    },
-    {
-      "term": "Key Academic Term 2",
-      "definition": "Complete, authoritative definition with context or formula."
-    }
-  ]
-}`;
+        if (Array.isArray(parsed.keyTakeaways) && parsed.keyTakeaways.length > 0) {
+          overallTakeaways = parsed.keyTakeaways;
+        }
+      }
 
-    const modelsToTry = ['gemini-2.5-flash', 'gemini-1.5-flash'];
-    let textOutput = '';
-
-    for (const model of modelsToTry) {
-      try {
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: {
-                temperature: 0.25,
-                topP: 0.95,
-                responseMimeType: 'application/json',
-              },
-            }),
+      if (Array.isArray(parsed.keyTerms)) {
+        parsed.keyTerms.forEach((kt: any) => {
+          if (kt && kt.term && !collectedKeyTerms.some((existing) => existing.term.toLowerCase() === kt.term.toLowerCase())) {
+            collectedKeyTerms.push({ term: kt.term, definition: kt.definition || '' });
           }
-        );
+        });
+      }
 
-        if (response.ok) {
-          const data = await response.json();
-          textOutput = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          if (textOutput) break;
-        }
-      } catch {}
+      if (Array.isArray(parsed.sections) && parsed.sections.length > 0) {
+        parsed.sections.forEach((sec: any) => {
+          const globalIdx = collectedSections.length;
+          const parsedBlocks: NoteContentBlock[] = Array.isArray(sec.contentBlocks)
+            ? sec.contentBlocks.map((blk: any, bIdx: number) => ({
+                id: blk.id || `blk-${globalIdx + 1}-${bIdx + 1}`,
+                type: (blk.type || 'paragraph') as NoteBlockType,
+                title: blk.title,
+                subtitle: blk.subtitle,
+                content: blk.content || '',
+                mathFormula: blk.mathFormula,
+                codeLanguage: blk.codeLanguage,
+                tableData: blk.tableData,
+                listItems: blk.listItems,
+                steps: Array.isArray(blk.steps) ? blk.steps : undefined,
+                variables: Array.isArray(blk.variables) ? blk.variables : undefined,
+              }))
+            : [];
+
+          let finalBlocks = synthesizeSectionBlocks(
+            {
+              id: sec.id || `sec-${globalIdx + 1}`,
+              title: sec.title || `Section ${globalIdx + 1}`,
+              content: sec.content || '',
+              keyPoints: Array.isArray(sec.keyPoints) ? sec.keyPoints : [],
+              contentBlocks: parsedBlocks,
+            },
+            profile.discipline,
+            detectedTitle
+          );
+
+          let exercises = ensureSectionExercises(
+            sec.exercises,
+            globalIdx,
+            sec.title || `Section ${globalIdx + 1}`,
+            profile.discipline,
+            detectedTitle
+          );
+
+          let builtSec: ShortNoteSection = {
+            id: sec.id || `sec-${globalIdx + 1}`,
+            sectionNumber: sec.sectionNumber || `${globalIdx + 1}`,
+            title: sec.title || `Section ${globalIdx + 1}`,
+            content: sec.content || '',
+            keyPoints: Array.isArray(sec.keyPoints) ? sec.keyPoints : [],
+            contentBlocks: finalBlocks,
+            exercises,
+            isImportant: sec.isImportant ?? true,
+          };
+
+          // If this section has bare bullets or is incomplete, repair it
+          const bulletCount = (builtSec.content || '').split('\n').filter((l) => /^[-*•]\s+/.test(l.trim())).length;
+          const words = (builtSec.content || '').split(/\s+/).filter(Boolean).length;
+          if (words < 180 || (bulletCount >= 2 && words < 250)) {
+            builtSec = repairIncompleteSection(builtSec, profile.discipline, detectedTitle, chunkText);
+          }
+
+          collectedSections.push(builtSec);
+        });
+      }
     }
 
-    if (!textOutput) return localFallback;
-
-    const cleanedJson = textOutput.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
-    const parsed = JSON.parse(cleanedJson);
+    if (collectedSections.length === 0) {
+      return localFallback;
+    }
 
     const wordsCount = rawText.split(/\s+/).filter(Boolean).length;
     const readingTimeMinutes = Math.max(3, Math.ceil(wordsCount / 180));
 
     const aiResult: OrganizedShortNote = {
-      title: parsed.title || localFallback.title,
-      summary: parsed.summary || localFallback.summary,
-      learningOutcomes:
-        Array.isArray(parsed.learningOutcomes) && parsed.learningOutcomes.length > 0
-          ? parsed.learningOutcomes
-          : localFallback.learningOutcomes,
-      keyTakeaways:
-        Array.isArray(parsed.keyTakeaways) && parsed.keyTakeaways.length > 0
-          ? parsed.keyTakeaways
-          : localFallback.keyTakeaways,
-      sections:
-        Array.isArray(parsed.sections) && parsed.sections.length > 0
-          ? parsed.sections.map((sec: any, idx: number) => ({
-              id: sec.id || `sec-${idx + 1}`,
-              sectionNumber: sec.sectionNumber || `${idx + 1}`,
-              title: sec.title || `Section ${idx + 1}`,
-              content: sec.content || '',
-              keyPoints: Array.isArray(sec.keyPoints) ? sec.keyPoints : [],
-              isImportant: sec.isImportant ?? true,
-              exercises: Array.isArray(sec.exercises)
-                ? sec.exercises.map((ex: any, exIdx: number) => ({
-                    id: ex.id || `ex-${idx + 1}-${exIdx + 1}`,
-                    exerciseNumber: ex.exerciseNumber || exIdx + 1,
-                    question: ex.question || '',
-                    questionType: ex.questionType || 'problem',
-                    hints: Array.isArray(ex.hints) ? ex.hints : [],
-                    solution: ex.solution || {
-                      answer: 'See detailed explanation above.',
-                      steps: [],
-                      explanation: '',
-                    },
-                    initialExpanded: false,
-                  }))
-                : [],
-            }))
-          : localFallback.sections,
-      keyTerms:
-        Array.isArray(parsed.keyTerms) && parsed.keyTerms.length > 0
-          ? parsed.keyTerms
-          : localFallback.keyTerms,
+      title: detectedTitle,
+      summary: overallSummary,
+      learningOutcomes: overallOutcomes,
+      keyTakeaways: overallTakeaways,
+      sections: collectedSections,
+      keyTerms: collectedKeyTerms.length > 0 ? collectedKeyTerms : localFallback.keyTerms,
       exercises: localFallback.exercises || [],
       rawContent: rawText,
       readingTimeMinutes,
     };
 
-    // Quality check: if completeness is below 80, enrich to ensure textbook quality
+    // Quality check: if completeness is below 85 or any section lacks contentBlocks, enrich (only for unorganized source text)
     const validation = validateStudyNoteCompleteness(aiResult, rawText, subjectName);
-    if (validation.score < 80) {
+    if (!isUserOrganized && (validation.score < 85 || aiResult.sections.some((s) => !s.contentBlocks || s.contentBlocks.length < 3))) {
       return enrichStudyNoteToTextbookQuality(aiResult, {
         subjectName: subjectName || 'Subject',
         chapterTitle: chapterTitle || 'Chapter Overview',

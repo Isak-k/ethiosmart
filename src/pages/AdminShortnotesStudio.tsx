@@ -25,6 +25,8 @@ import {
   enrichStudyNoteToTextbookQuality,
   getSubjectPedagogicalProfile,
   analyzeDocumentChapters,
+  synthesizeSectionBlocks,
+  ensureSectionExercises,
   SeparatedChapterItem,
   DocumentChapterAnalysis,
   CompletenessValidationResult,
@@ -577,20 +579,33 @@ export default function AdminShortnotesStudio() {
 
       // Stage 3: Generating teaching-first explanations
       setGenerationStage(3);
-      setGenerationStageText('Generating teaching-first explanations, worked examples & Show/Hide solutions...');
+      setGenerationStageText('Generating teaching-first explanations & detailed concepts...');
+
+      const stageTimer1 = setTimeout(() => {
+        setGenerationStageText('Explaining concepts, types & practical examples in simple English...');
+      }, 3500);
+      const stageTimer2 = setTimeout(() => {
+        setGenerationStageText('Synthesizing pedagogical callouts, worked calculations & review exercises...');
+      }, 7500);
 
       let organizedResult;
       try {
-        organizedResult = await organizeChapterNotesWithAI(rawInputText, {
-          chapterTitle: targetChapterTitle,
-          subjectName: currentSubject?.name,
-          depth: generationDepth,
-          targetAudience: generationAudience,
-          language: generationLanguage,
-          customInstructions: customInstructions,
-        });
+        organizedResult = await Promise.race([
+          organizeChapterNotesWithAI(rawInputText, {
+            chapterTitle: targetChapterTitle,
+            subjectName: currentSubject?.name,
+            depth: generationDepth,
+            targetAudience: generationAudience,
+            language: generationLanguage,
+            customInstructions: customInstructions,
+            sourceType: sourceTypeParam,
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('AI generation timed out (exceeded 18s)')), 18000)
+          ),
+        ]);
       } catch (aiErr) {
-        console.warn('AI generation failed, using local textbook generator:', aiErr);
+        console.warn('AI generation timed out or failed, instantly applying textbook synthesis:', aiErr);
         organizedResult = generateImportantChapterNotes(rawInputText, {
           subjectName: currentSubject?.name || 'Subject',
           chapterTitle: targetChapterTitle,
@@ -602,24 +617,47 @@ export default function AdminShortnotesStudio() {
           language: generationLanguage,
           customInstructions: customInstructions,
         });
+      } finally {
+        clearTimeout(stageTimer1);
+        clearTimeout(stageTimer2);
       }
 
       // Stage 4: Completeness Audit & Textbook Quality Upgrade
       setGenerationStage(4);
-      setGenerationStageText('Auditing completeness against 10-element textbook standards...');
-      const validation = validateStudyNoteCompleteness(organizedResult, rawInputText, currentSubject?.name);
+      setGenerationStageText('Auditing completeness & formatting interactive structure...');
 
-      if (validation.score < 85) {
-        organizedResult = enrichStudyNoteToTextbookQuality(organizedResult, {
-          subjectName: currentSubject?.name || 'Subject',
-          chapterTitle: targetChapterTitle,
-          chapterNumber: targetChapterNum || 1,
-          gradeLevel: gradeLevel,
-          depth: generationDepth,
-          targetAudience: generationAudience,
-          language: generationLanguage,
-          customInstructions: customInstructions,
-        });
+      if (sourceTypeParam === 'upload' || sourceTypeParam === 'pasted_text') {
+        // Author's organized notes: strictly preserve the author's exact topics and sections
+        // Build visual pedagogical cards and interactive exercises directly from the author's structure
+        organizedResult = {
+          ...organizedResult,
+          sections: organizedResult.sections.map((sec, idx) => ({
+            ...sec,
+            contentBlocks: sec.contentBlocks && sec.contentBlocks.length >= 2
+              ? sec.contentBlocks
+              : synthesizeSectionBlocks(sec, currentPedagogicalProfile.discipline, targetChapterTitle),
+            exercises: ensureSectionExercises(sec.exercises || [], idx, sec.title, currentPedagogicalProfile.discipline, targetChapterTitle),
+          })),
+        };
+      } else {
+        const validation = validateStudyNoteCompleteness(organizedResult, rawInputText, currentSubject?.name);
+
+        if (
+          validation.score < 85 ||
+          (validation.incompleteSectionIndices && validation.incompleteSectionIndices.length > 0) ||
+          organizedResult.sections.some((s) => !s.contentBlocks || s.contentBlocks.length < 3)
+        ) {
+          organizedResult = enrichStudyNoteToTextbookQuality(organizedResult, {
+            subjectName: currentSubject?.name || 'Subject',
+            chapterTitle: targetChapterTitle,
+            chapterNumber: targetChapterNum || 1,
+            gradeLevel: gradeLevel,
+            depth: generationDepth,
+            targetAudience: generationAudience,
+            language: generationLanguage,
+            customInstructions: customInstructions,
+          });
+        }
       }
       await new Promise((r) => setTimeout(r, 400));
 
@@ -801,17 +839,53 @@ export default function AdminShortnotesStudio() {
           currentTitle: item.chapterTitle,
         });
 
-        const result = generateImportantChapterNotes(item.rawText || '', {
-          subjectName: currentSubject?.name || 'Subject',
-          chapterTitle: item.chapterTitle,
-          chapterNumber: item.chapterNumber,
-          chapterId: item.chapterId,
-          gradeLevel: gradeLevel,
-          depth: generationDepth,
-          targetAudience: generationAudience,
-          language: generationLanguage,
-          customInstructions: customInstructions,
-        });
+        let result: OrganizedShortNote;
+        try {
+          result = await Promise.race([
+            organizeChapterNotesWithAI(item.rawText || '', {
+              chapterTitle: item.chapterTitle,
+              subjectName: currentSubject?.name,
+              depth: generationDepth,
+              targetAudience: generationAudience,
+              language: generationLanguage,
+              customInstructions: customInstructions,
+            }),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('AI generation timeout')), 60000)
+            ),
+          ]);
+        } catch {
+          result = generateImportantChapterNotes(item.rawText || '', {
+            subjectName: currentSubject?.name || 'Subject',
+            chapterTitle: item.chapterTitle,
+            chapterNumber: item.chapterNumber,
+            chapterId: item.chapterId,
+            gradeLevel: gradeLevel,
+            depth: generationDepth,
+            targetAudience: generationAudience,
+            language: generationLanguage,
+            customInstructions: customInstructions,
+          });
+        }
+
+        const validation = validateStudyNoteCompleteness(result, item.rawText, currentSubject?.name);
+        if (
+          validation.score < 85 ||
+          (validation.incompleteSectionIndices && validation.incompleteSectionIndices.length > 0) ||
+          result.sections.some((s) => !s.contentBlocks || s.contentBlocks.length < 3)
+        ) {
+          result = enrichStudyNoteToTextbookQuality(result, {
+            subjectName: currentSubject?.name || 'Subject',
+            chapterTitle: item.chapterTitle,
+            chapterNumber: item.chapterNumber,
+            chapterId: item.chapterId,
+            gradeLevel: gradeLevel,
+            depth: generationDepth,
+            targetAudience: generationAudience,
+            language: generationLanguage,
+            customInstructions: customInstructions,
+          });
+        }
 
         const effectiveCover = currentSubject
           ? currentSubject.coverImageUrl || getSubjectCover(currentSubject.name).url
@@ -834,12 +908,12 @@ export default function AdminShortnotesStudio() {
           resourceType: 'short_note',
           sourceType: 'resource',
           sourceResourceId: selectedBookResourceId,
-          examId: matchedExam?.examId || undefined,
+          ...(matchedExam?.examId ? { examId: matchedExam.examId } : {}),
           generationSettings: {
             depth: generationDepth,
             targetAudience: generationAudience,
             language: generationLanguage,
-            customInstructions: customInstructions || undefined,
+            ...(customInstructions.trim() ? { customInstructions: customInstructions.trim() } : {}),
           },
           driveFileId: '',
           departmentId: selectedDeptId && selectedDeptId !== 'all' ? selectedDeptId : (currentSubject?.departmentIds?.[0] || ''),
@@ -847,9 +921,9 @@ export default function AdminShortnotesStudio() {
           coverImageUrl: effectiveCover,
           status: 'published',
           allowDownload: true,
-          chapterId: item.chapterId || undefined,
+          ...(item.chapterId ? { chapterId: item.chapterId } : {}),
           chapterTitle: item.chapterTitle,
-          chapterNumber: item.chapterNumber,
+          ...(item.chapterNumber !== undefined ? { chapterNumber: item.chapterNumber } : {}),
           gradeLevel: gradeLevel,
           learningOutcomes: result.learningOutcomes,
           content: generatedMarkdown,
@@ -972,18 +1046,18 @@ export default function AdminShortnotesStudio() {
           depth: generationDepth,
           targetAudience: generationAudience,
           language: generationLanguage,
-          customInstructions: customInstructions.trim() || undefined,
+          ...(customInstructions.trim() ? { customInstructions: customInstructions.trim() } : {}),
         },
         driveFileId: '',
         departmentId: selectedDeptId && selectedDeptId !== 'all' ? selectedDeptId : (currentSubject?.departmentIds?.[0] || ''),
         subjectId: selectedSubjectId,
         coverImageUrl: effectiveCover,
-        examId: selectedExamId || undefined,
+        ...(selectedExamId ? { examId: selectedExamId } : {}),
         status: status,
         allowDownload: allowDownload,
-        chapterId: selectedChapterId || undefined,
-        chapterTitle: currentChapterTitle || undefined,
-        chapterNumber: chNumber,
+        ...(selectedChapterId ? { chapterId: selectedChapterId } : {}),
+        ...(currentChapterTitle ? { chapterTitle: currentChapterTitle } : {}),
+        ...(chNumber !== undefined ? { chapterNumber: chNumber } : {}),
         gradeLevel: gradeLevel,
         learningOutcomes: learningOutcomes.filter((o) => o.trim().length > 0),
         content: generatedMarkdown,

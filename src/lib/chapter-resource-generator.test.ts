@@ -6,7 +6,12 @@ import {
   validateStudyNoteCompleteness,
   enrichStudyNoteToTextbookQuality,
   analyzeDocumentChapters,
+  repairIncompleteSection,
 } from './chapter-resource-generator';
+import {
+  extractChapterTopics,
+  splitContentIntoTopicChunks,
+} from './shortnotes-organizer';
 import { Chapter } from '@/types/subject';
 
 describe('chapter-resource-generator', () => {
@@ -413,6 +418,189 @@ ${paragraph}
       expect(analysis.status).toBe('uncertain');
       expect(analysis.outlineItems.length).toBeGreaterThanOrEqual(4);
       expect(analysis.outlineItems[0].title).toContain('Overview of Educational Assessment');
+    });
+  });
+
+  describe('textbook-quality content blocks guarantee', () => {
+    it('synthesizes rich contentBlocks (definitions, facts, examples, warnings, tips) for Psychology', () => {
+      const rawTextbookChapter = `
+Chapter 1: Definition of Psychology and Major Approaches
+Psychology is the scientific study of mind and behavior. It encompasses the biological influences, social pressures, and environmental factors that affect how people think, act, and feel.
+Wilhelm Wundt opened the Institute for Experimental Psychology at the University of Leipzig in Germany in 1879.
+Major perspectives include the biological, behavioral, cognitive, and psychodynamic perspectives.
+      `.trim();
+
+      const result = generateImportantChapterNotes(rawTextbookChapter, {
+        subjectName: 'Psychology',
+        chapterTitle: 'Definition of Psychology',
+        chapterNumber: 1,
+      });
+
+      expect(result.sections.length).toBeGreaterThan(0);
+      const firstSec = result.sections[0];
+
+      // Must have contentBlocks populated
+      expect(firstSec.contentBlocks).toBeDefined();
+      expect(firstSec.contentBlocks!.length).toBeGreaterThanOrEqual(4);
+
+      const blockTypes = firstSec.contentBlocks!.map((b) => b.type);
+      expect(blockTypes).toContain('definition');
+      expect(blockTypes).toContain('important_fact');
+      // Worked example cards are strictly excluded for Psychology and non-STEM subjects
+      expect(blockTypes).not.toContain('example');
+      expect(blockTypes).toContain('warning');
+      expect(blockTypes).toContain('tip');
+
+      // Check exercises
+      expect(firstSec.exercises).toBeDefined();
+      expect(firstSec.exercises!.length).toBeGreaterThan(0);
+      expect(firstSec.exercises![0].solution.steps.length).toBeGreaterThan(0);
+    });
+
+    it('synthesizes rich contentBlocks including formulas and step-by-step calculations for Mathematics', () => {
+      const rawMathChapter = `
+Chapter 1: Arithmetic Sequences
+An arithmetic sequence is a sequence of numbers such that the difference between the consecutive terms is constant.
+Formula: a_n = a_1 + (n - 1)d.
+      `.trim();
+
+      const result = generateImportantChapterNotes(rawMathChapter, {
+        subjectName: 'Mathematics',
+        chapterTitle: 'Arithmetic Sequences',
+        chapterNumber: 1,
+      });
+
+      expect(result.sections.length).toBeGreaterThan(0);
+      const firstSec = result.sections[0];
+      const blockTypes = firstSec.contentBlocks!.map((b) => b.type);
+
+      expect(blockTypes).toContain('definition');
+      expect(blockTypes).toContain('important_fact');
+      expect(blockTypes).toContain('formula');
+      expect(blockTypes).toContain('example');
+      expect(blockTypes).toContain('warning');
+
+      const formulaBlock = firstSec.contentBlocks!.find((b) => b.type === 'formula');
+      expect(formulaBlock).toBeDefined();
+      expect(formulaBlock!.variables).toBeDefined();
+      expect(formulaBlock!.variables!.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Normal Study Notes & Explanation Quality Assurance', () => {
+    it('audits explanation quality and flags sections with bare bullet points without explanations', () => {
+      const bareBulletNote = {
+        title: 'Operating Systems - Chapter 1: Types of Operating Systems',
+        summary: 'Overview of operating systems.',
+        learningOutcomes: ['Understand OS types'],
+        keyTakeaways: ['Key takeaway 1'],
+        keyTerms: [{ term: 'OS', definition: 'Operating system' }],
+        exercises: [],
+        rawContent: '',
+        readingTimeMinutes: 1,
+        sections: [
+          {
+            id: 'sec-1',
+            sectionNumber: '1',
+            title: 'Types of Operating Systems',
+            content: `
+Types of Operating Systems:
+- Batch operating system
+- Time-sharing operating system
+- Distributed operating system
+            `.trim(),
+            keyPoints: [],
+            contentBlocks: [],
+            exercises: [],
+          },
+        ],
+      };
+
+      const validation = validateStudyNoteCompleteness(
+        bareBulletNote,
+        'Types of Operating Systems\n- Batch OS\n- Time-sharing OS',
+        'Computer Science'
+      );
+
+      // Must detect that section 0 relies on bare bullet points
+      expect(validation.incompleteSectionIndices).toBeDefined();
+      expect(validation.incompleteSectionIndices).toContain(0);
+
+      const expQualityCheck = validation.checks.find((c) => c.id === 'explanation_quality');
+      expect(expQualityCheck).toBeDefined();
+      expect(expQualityCheck!.passed).toBe(false);
+      expect(expQualityCheck!.feedback).toContain('bare bullet lists');
+    });
+
+    it('repairIncompleteSection transforms bare bullet outlines into full classroom notes with definitions, explanations, and examples', () => {
+      const incompleteSection = {
+        id: 'sec-1',
+        sectionNumber: '1',
+        title: 'Types of Operating Systems',
+        content: `
+Types of Operating Systems:
+- Batch operating system
+- Time-sharing operating system
+- Distributed operating system
+        `.trim(),
+        keyPoints: [],
+        contentBlocks: [],
+        exercises: [],
+      };
+
+      const repaired = repairIncompleteSection(
+        incompleteSection,
+        'computer',
+        'Operating Systems'
+      );
+
+      // Verify that concepts are explained instead of listed
+      expect(repaired.content).toContain('**Definition:**');
+      expect(repaired.content).toContain('**Explanation:**');
+      expect(repaired.content).toContain('**Example:**');
+      expect(repaired.content).toContain('**Important point:**');
+      expect(repaired.content).toContain('Batch operating system');
+      expect(repaired.content).toContain('Time-sharing operating system');
+      expect(repaired.content).toContain('Distributed operating system');
+
+      // Verify rich contentBlocks and exercises were synthesized
+      expect(repaired.contentBlocks).toBeDefined();
+      expect(repaired.contentBlocks!.length).toBeGreaterThanOrEqual(3);
+      expect(repaired.exercises).toBeDefined();
+      expect(repaired.exercises!.length).toBeGreaterThan(0);
+    });
+
+    it('splitContentIntoTopicChunks extracts all topics and preserves long content without topic loss', () => {
+      const longChapter = `
+# Principles of Software Engineering
+
+## Topic 1: Software Development Life Cycle (SDLC)
+SDLC is a structured process used to design, develop, and test high-quality software.
+${'Explanatory paragraph about SDLC planning, design, coding, testing, and deployment. '.repeat(40)}
+
+## Topic 2: Agile Methodologies and Scrum
+Agile is an iterative approach to project management and software development.
+${'Explanatory paragraph about sprints, standups, backlogs, and velocity. '.repeat(40)}
+
+## Topic 3: Continuous Integration and Continuous Deployment (CI/CD)
+CI/CD introduces ongoing automation and continuous monitoring throughout the lifecycle of apps.
+${'Explanatory paragraph about automated pipelines, unit testing, and artifact deployment. '.repeat(40)}
+      `.trim();
+
+      const topics = extractChapterTopics(longChapter);
+      expect(topics.length).toBeGreaterThanOrEqual(3);
+      expect(topics.map((t) => t.title)).toContain('Topic 1: Software Development Life Cycle (SDLC)');
+      expect(topics.map((t) => t.title)).toContain('Topic 2: Agile Methodologies and Scrum');
+      expect(topics.map((t) => t.title)).toContain('Topic 3: Continuous Integration and Continuous Deployment (CI/CD)');
+
+      const chunks = splitContentIntoTopicChunks(longChapter, 3000);
+      expect(chunks.length).toBeGreaterThan(1);
+
+      // Verify all topics are retained across the chunks
+      const allChunkTopics = chunks.flatMap((c) => c.topicTitles);
+      expect(allChunkTopics).toContain('Topic 1: Software Development Life Cycle (SDLC)');
+      expect(allChunkTopics).toContain('Topic 2: Agile Methodologies and Scrum');
+      expect(allChunkTopics).toContain('Topic 3: Continuous Integration and Continuous Deployment (CI/CD)');
     });
   });
 });
