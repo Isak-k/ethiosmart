@@ -44,6 +44,15 @@ import { InteractiveShortNoteReader } from '@/components/book/InteractiveShortNo
 import { Department, Exam } from '@/integrations/firebase/types';
 import { getAllExams } from '@/lib/firebase-exams';
 import { Subject, Chapter } from '@/types/subject';
+import { uploadSubjectCoverImage } from '@/lib/image-upload';
+import { Progress } from '@/components/ui/progress';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -102,6 +111,9 @@ import {
   HelpCircle,
   Image as ImageIcon,
   ShieldCheck,
+  FolderOpen,
+  Search,
+  Edit,
 } from 'lucide-react';
 
 export default function AdminShortnotesStudio() {
@@ -191,6 +203,70 @@ export default function AdminShortnotesStudio() {
   const [activeTab, setActiveTab] = useState<'input' | 'editor' | 'preview'>('input');
   const [isSaving, setIsSaving] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+
+  // Cover Image File Upload State
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const [uploadCoverProgress, setUploadCoverProgress] = useState(0);
+  const coverFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Browse & Edit Existing Notes Modal State
+  const [browseNotesOpen, setBrowseNotesOpen] = useState(false);
+  const [existingNotesList, setExistingNotesList] = useState<Book[]>([]);
+  const [loadingExistingNotes, setLoadingExistingNotes] = useState(false);
+  const [existingNotesSearch, setExistingNotesSearch] = useState('');
+
+  const handleOpenBrowseNotes = async () => {
+    setBrowseNotesOpen(true);
+    setLoadingExistingNotes(true);
+    try {
+      const data = await getBooks({ resourceType: 'short_note' }, 'admin');
+      setExistingNotesList(data);
+    } catch (err) {
+      console.error('Failed to load existing notes:', err);
+    } finally {
+      setLoadingExistingNotes(false);
+    }
+  };
+
+  const filteredExistingNotes = useMemo(() => {
+    if (!existingNotesSearch.trim()) return existingNotesList;
+    const q = existingNotesSearch.toLowerCase().trim();
+    return existingNotesList.filter((n) => {
+      return (
+        n.title?.toLowerCase().includes(q) ||
+        n.subjectName?.toLowerCase().includes(q) ||
+        n.chapterTitle?.toLowerCase().includes(q) ||
+        n.departmentName?.toLowerCase().includes(q)
+      );
+    });
+  }, [existingNotesList, existingNotesSearch]);
+
+  const handleCoverFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingCover(true);
+    setUploadCoverProgress(20);
+    try {
+      const result = await uploadSubjectCoverImage(file, {
+        subjectId: selectedSubjectId || undefined,
+        onProgress: (p) => setUploadCoverProgress(p),
+      });
+      setCustomCoverUrl(result.url);
+      toast({
+        title: 'Cover Image Uploaded!',
+        description: 'Custom cover page image applied to this study note.',
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Upload Failed',
+        description: err.message || 'Could not upload cover image.',
+        variant: 'destructive',
+      });
+    } finally {
+      setUploadingCover(false);
+      if (coverFileInputRef.current) coverFileInputRef.current.value = '';
+    }
+  };
 
   // Initial load
   useEffect(() => {
@@ -1272,6 +1348,17 @@ export default function AdminShortnotesStudio() {
 
           {/* Action Toolbar */}
           <div className="flex items-center gap-2.5 flex-wrap">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleOpenBrowseNotes}
+              className="rounded-xl border-purple-500/30 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/40 text-xs font-semibold h-9 px-3"
+            >
+              <FolderOpen className="h-4 w-4 mr-1.5" />
+              <span>Edit Existing Notes</span>
+            </Button>
+
             <Select
               value={status}
               onValueChange={(v: 'published' | 'draft') => setStatus(v)}
@@ -1314,6 +1401,43 @@ export default function AdminShortnotesStudio() {
             </Button>
           </div>
         </div>
+
+        {/* EDITING EXISTING NOTE BANNER */}
+        {editNoteId && (
+          <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-purple-500/15 via-primary/10 to-indigo-500/15 border border-purple-500/35 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fade-in shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <Edit className="h-4 w-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-purple-600 text-white text-[10px] uppercase font-bold tracking-wider">
+                    Editing Mode
+                  </Badge>
+                  <span className="text-xs sm:text-sm font-bold text-foreground truncate max-w-[280px] sm:max-w-md">
+                    {noteTitle || 'Existing Study Note'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  You are editing this live note. Click &quot;Update Notes&quot; to save your changes back to the library.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/dashboard/admin/shortnotes/create')}
+                className="h-8 text-xs rounded-xl border-border bg-background hover:bg-accent font-semibold"
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                Create New Note
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* TARGET SUBJECT & CURRICULUM PROFILE CARD */}
         <Card className="rounded-3xl border bg-card/60 shadow-xs backdrop-blur-xs">
@@ -1437,34 +1561,100 @@ export default function AdminShortnotesStudio() {
               </div>
             </div>
 
-            {/* Note Cover Art Setting Row (Auto Subject Theme by default, optional custom upload) */}
-            <div className="pt-2 border-t border-border/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-              <div className="flex items-center gap-2">
-                <ImageIcon className="h-4 w-4 text-primary shrink-0" />
-                <span className="font-semibold text-foreground">Note Cover Art:</span>
-                <Badge variant="outline" className="text-[10px] font-medium">
-                  {customCoverUrl.trim() ? 'Custom Cover Image' : 'Auto Subject Theme (Default)'}
+            {/* Note Book Cover Page Art Card & Uploader */}
+            <div className="p-4 rounded-2xl border border-primary/25 bg-card/70 shadow-xs space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <ImageIcon className="h-4 w-4 text-primary shrink-0" />
+                  <Label className="text-xs font-bold text-foreground">
+                    Study Note Cover Page Image (Like a Book)
+                  </Label>
+                </div>
+                <Badge
+                  variant="outline"
+                  className={`text-[10px] font-semibold ${
+                    customCoverUrl.trim()
+                      ? 'bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/30'
+                      : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
+                  }`}
+                >
+                  {customCoverUrl.trim() ? 'Custom Uploaded Cover' : 'Auto Subject Theme (Default)'}
                 </Badge>
               </div>
 
-              <div className="flex items-center gap-2 flex-1 sm:max-w-md">
-                <Input
-                  placeholder="Optional custom cover image URL (e.g. https://...)..."
-                  value={customCoverUrl}
-                  onChange={(e) => setCustomCoverUrl(e.target.value)}
-                  className="h-8 text-xs rounded-xl"
-                />
-                {customCoverUrl.trim() && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setCustomCoverUrl('')}
-                    className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground shrink-0 rounded-lg"
-                  >
-                    Reset
-                  </Button>
-                )}
+              <div className="flex flex-col sm:flex-row items-center gap-4">
+                {/* 4:3 Book Cover Preview */}
+                <div className="relative aspect-[4/3] w-28 sm:w-36 rounded-xl overflow-hidden bg-muted border border-border/80 shadow-md shrink-0">
+                  <img
+                    src={customCoverUrl.trim() || (currentSubject ? currentSubject.coverImageUrl || getSubjectCover(currentSubject.name).url : '/placeholder.svg')}
+                    alt={noteTitle || 'Study Note Cover'}
+                    className="h-full w-full object-cover"
+                  />
+                  {uploadingCover && (
+                    <div className="absolute inset-0 bg-background/80 backdrop-blur-xs flex flex-col items-center justify-center p-2 text-center">
+                      <Loader2 className="h-5 w-5 text-primary animate-spin mb-1" />
+                      <span className="text-[10px] font-bold text-foreground">Uploading...</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2 flex-1 min-w-0 w-full">
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Upload an authentic cover page image like a textbook (JPG, PNG, WebP) or use the curriculum subject theme.
+                  </p>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <input
+                      type="file"
+                      ref={coverFileInputRef}
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={handleCoverFileUpload}
+                    />
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => coverFileInputRef.current?.click()}
+                      disabled={uploadingCover}
+                      className="rounded-xl h-8 text-xs font-semibold border-primary/30 text-primary hover:bg-primary/5"
+                    >
+                      <Upload className="h-3.5 w-3.5 mr-1.5" />
+                      {uploadingCover ? 'Uploading Cover...' : 'Upload Cover Image'}
+                    </Button>
+
+                    {customCoverUrl.trim() && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setCustomCoverUrl('')}
+                        className="rounded-xl h-8 text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        Reset to Subject Cover
+                      </Button>
+                    )}
+                  </div>
+
+                  {uploadingCover && (
+                    <div className="space-y-1 pt-1">
+                      <Progress value={uploadCoverProgress} className="h-1.5 w-full" />
+                      <span className="text-[10px] text-muted-foreground font-mono">
+                        Uploading cover image ({uploadCoverProgress}%)...
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="pt-1">
+                    <Input
+                      placeholder="Or enter image URL directly (e.g. https://...)..."
+                      value={customCoverUrl}
+                      onChange={(e) => setCustomCoverUrl(e.target.value)}
+                      className="h-8 text-xs rounded-xl"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -2750,6 +2940,123 @@ export default function AdminShortnotesStudio() {
             </Card>
           </div>
         )}
+        {/* BROWSE & EDIT EXISTING STUDY NOTES DIALOG */}
+        <Dialog open={browseNotesOpen} onOpenChange={setBrowseNotesOpen}>
+          <DialogContent className="max-w-3xl rounded-3xl p-5 sm:p-6 max-h-[85vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-lg font-bold">
+                <FolderOpen className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                <span>Existing Study Notes ({existingNotesList.length})</span>
+              </DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground">
+                Select any existing study note to load into the Studio for editing, updating content, or uploading a cover image.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="py-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search existing notes by title, subject, or chapter..."
+                  value={existingNotesSearch}
+                  onChange={(e) => setExistingNotesSearch(e.target.value)}
+                  className="pl-9 rounded-xl text-xs sm:text-sm h-10"
+                />
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 min-h-[250px]">
+              {loadingExistingNotes ? (
+                <div className="py-12 flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  <span className="text-xs">Loading existing study notes...</span>
+                </div>
+              ) : filteredExistingNotes.length === 0 ? (
+                <div className="py-12 text-center text-muted-foreground text-xs space-y-2">
+                  <FileText className="h-8 w-8 mx-auto text-muted-foreground/50" />
+                  <p className="font-semibold">No study notes found.</p>
+                  <p className="text-[11px]">No notes match your search or none have been published yet.</p>
+                </div>
+              ) : (
+                filteredExistingNotes.map((note) => {
+                  const effectiveCoverUrl =
+                    note.coverImageUrl ||
+                    (note.subjectName ? getSubjectCover(note.subjectName).url : '/placeholder.svg');
+                  const isCurrent = editNoteId === note.id;
+                  return (
+                    <div
+                      key={note.id}
+                      className={`p-3 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                        isCurrent
+                          ? 'border-purple-500 bg-purple-500/10'
+                          : 'border-border/80 bg-card hover:border-primary/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="aspect-[4/3] w-14 sm:w-16 rounded-xl overflow-hidden bg-muted border shrink-0">
+                          <img
+                            src={effectiveCoverUrl}
+                            alt={note.title}
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-xs font-bold text-foreground truncate max-w-sm">
+                              {note.title}
+                            </span>
+                            {note.status && (
+                              <Badge
+                                variant="outline"
+                                className={`text-[9px] px-1.5 py-0 ${
+                                  note.status === 'published'
+                                    ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30'
+                                    : 'bg-amber-500/10 text-amber-600 border-amber-500/30'
+                                }`}
+                              >
+                                {note.status.toUpperCase()}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 text-[11px] text-muted-foreground flex-wrap">
+                            <span className="font-medium text-primary">
+                              {note.subjectName || 'Curriculum Subject'}
+                            </span>
+                            {note.sections && (
+                              <span>• {note.sections.length} topics</span>
+                            )}
+                            {note.departmentName && (
+                              <span>• {note.departmentName}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                        <Button
+                          size="sm"
+                          variant={isCurrent ? 'secondary' : 'default'}
+                          onClick={() => {
+                            setBrowseNotesOpen(false);
+                            navigate(`/dashboard/admin/shortnotes/edit/${note.id}`);
+                          }}
+                          className={`rounded-xl text-xs font-semibold h-8 px-3 ${
+                            isCurrent
+                              ? 'bg-purple-600 text-white hover:bg-purple-700'
+                              : 'bg-primary hover:bg-primary/90 text-primary-foreground'
+                          }`}
+                        >
+                          <Edit className="h-3 w-3 mr-1" />
+                          <span>{isCurrent ? 'Currently Editing' : 'Edit Note'}</span>
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );

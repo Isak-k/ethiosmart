@@ -333,6 +333,62 @@ export default function AdminBooks() {
           </Card>
         </div>
 
+        {/* Quick Resource Type Switcher (All / Textbooks / Study Notes) */}
+        <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-card border shadow-xs w-full sm:w-fit overflow-x-auto">
+          <button
+            type="button"
+            onClick={() => setSelectedType('all')}
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 shrink-0 ${
+              selectedType === 'all'
+                ? 'bg-primary text-primary-foreground shadow-xs'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+            }`}
+          >
+            <Layers className="h-4 w-4" />
+            <span>All Resources</span>
+            <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-mono">
+              {stats.total}
+            </Badge>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedType('textbook')}
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 shrink-0 ${
+              selectedType === 'textbook'
+                ? 'bg-primary text-primary-foreground shadow-xs'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+            }`}
+          >
+            <BookOpen className="h-4 w-4" />
+            <span>Curriculum Books</span>
+            <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-mono">
+              {stats.textbooks}
+            </Badge>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedType('short_note')}
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 shrink-0 ${
+              selectedType === 'short_note'
+                ? 'bg-purple-600 text-white shadow-xs'
+                : 'text-muted-foreground hover:text-foreground hover:bg-purple-50 dark:hover:bg-purple-950/30'
+            }`}
+          >
+            <FileText className="h-4 w-4" />
+            <span>Study Notes</span>
+            <Badge
+              variant="secondary"
+              className={`text-[10px] h-5 px-1.5 font-mono ${
+                selectedType === 'short_note' ? 'bg-white/20 text-white' : ''
+              }`}
+            >
+              {stats.shortNotes}
+            </Badge>
+          </button>
+        </div>
+
         {/* Filter Bar */}
         <Card className="rounded-2xl border bg-card shadow-xs">
           <CardContent className="p-4 space-y-3">

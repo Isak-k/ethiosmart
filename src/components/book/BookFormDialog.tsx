@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Book, BookInput, BookResourceType, BookStatus, GoogleDriveFileInfo } from '@/types/book';
 import { extractDriveFileId, validateDriveLink, buildDrivePreviewUrl } from '@/lib/google-drive';
 import { Department } from '@/integrations/firebase/types';
@@ -6,6 +7,8 @@ import { Subject } from '@/types/subject';
 import { getDepartments } from '@/lib/departments';
 import { getSubjects } from '@/lib/subjects';
 import { getSubjectCover } from '@/lib/subject-covers';
+import { uploadSubjectCoverImage } from '@/lib/image-upload';
+import { Progress } from '@/components/ui/progress';
 import {
   Dialog,
   DialogContent,
@@ -41,6 +44,8 @@ import {
   Layers,
   Building,
   Tag,
+  Upload,
+  Image as ImageIcon,
 } from 'lucide-react';
 
 interface BookFormDialogProps {
@@ -61,6 +66,7 @@ export function BookFormDialog({
   defaultSubjectId,
 }: BookFormDialogProps) {
   const isEditing = Boolean(book?.id);
+  const navigate = useNavigate();
 
   // Departments and subjects
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -83,6 +89,9 @@ export function BookFormDialog({
   const [allowDownload, setAllowDownload] = useState<boolean>(true);
   const [coverImageUrl, setCoverImageUrl] = useState<string>('');
   const [showCustomCoverInput, setShowCustomCoverInput] = useState<boolean>(false);
+  const [uploadingCover, setUploadingCover] = useState<boolean>(false);
+  const [uploadCoverProgress, setUploadCoverProgress] = useState<number>(0);
+  const coverFileInputRef = useRef<HTMLInputElement>(null);
 
   // Drive Validation State
   const [validatingDrive, setValidatingDrive] = useState(false);
@@ -438,52 +447,119 @@ export function BookFormDialog({
               </Select>
             </div>
 
-            {/* Subject Cover Page Integration Preview */}
-            {selectedSubject && selectedSubjectCover && (
-              <div className="col-span-1 sm:col-span-2 mt-1 space-y-2">
-                <div className="p-3.5 rounded-2xl bg-card border border-primary/20 shadow-xs flex items-center gap-3.5 animate-fade-in">
-                  <div className="h-16 w-24 shrink-0 rounded-xl overflow-hidden bg-muted border border-border/80 shadow-xs">
-                    <img
-                      src={coverImageUrl || selectedSubjectCover.url}
-                      alt={selectedSubject.name}
-                      className="h-full w-full object-cover"
-                    />
+            {/* Study Note Shortcut to Full Studio Editor */}
+            {book?.resourceType === 'short_note' && (
+              <div className="col-span-1 sm:col-span-2 p-3.5 rounded-2xl bg-gradient-to-r from-purple-500/10 via-primary/10 to-indigo-500/10 border border-purple-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-9 w-9 rounded-xl bg-purple-500/20 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
+                    <FileText className="h-5 w-5" />
                   </div>
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <Badge
-                        variant="outline"
-                        className="text-[11px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
-                      >
-                        <CheckCircle2 className="h-3 w-3 mr-1 text-emerald-600 dark:text-emerald-400" />
-                        Subject Cover Applied
-                      </Badge>
-                      {selectedSubject.coverImageUrl ? (
-                        <Badge variant="secondary" className="text-[10px]">
-                          Custom Subject Cover
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary" className="text-[10px]">
-                          Curriculum Subject Cover
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-xs font-semibold text-foreground truncate">
-                      {selectedSubject.name}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground truncate">
-                      This resource is linked to &quot;{selectedSubject.name}&quot; and automatically inherits its cover page across all library views.
+                  <div>
+                    <h4 className="text-xs font-bold text-foreground">Interactive Study Note Detected</h4>
+                    <p className="text-[11px] text-muted-foreground">
+                      Edit sections, conceptual explanations, flashcards & interactive MCQs directly in the Studio.
                     </p>
                   </div>
                 </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => {
+                    onOpenChange(false);
+                    navigate(`/dashboard/admin/shortnotes/edit/${book.id}`);
+                  }}
+                  className="rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white shrink-0 shadow-sm"
+                >
+                  <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                  Open in Chapter Studio &rarr;
+                </Button>
+              </div>
+            )}
 
-                {/* Optional Custom Cover Override */}
-                {showCustomCoverInput ? (
-                  <div className="space-y-1.5 p-3 rounded-xl bg-muted/40 border border-border/60 animate-fade-in">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="custom-cover-input" className="text-xs font-medium">
-                        Custom Cover Image URL (Optional Override)
-                      </Label>
+            {/* Book / Study Note Cover Page Art & Upload */}
+            <div className="col-span-1 sm:col-span-2 mt-1 space-y-3 p-4 rounded-2xl border border-primary/20 bg-card/60 shadow-xs">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ImageIcon className="h-4 w-4 text-primary shrink-0" />
+                  <Label className="text-xs font-bold text-foreground">
+                    Book & Study Note Cover Page Image
+                  </Label>
+                </div>
+                <Badge
+                  variant="outline"
+                  className={`text-[10px] font-semibold ${
+                    coverImageUrl && (!selectedSubjectCover || coverImageUrl !== selectedSubjectCover.url)
+                      ? 'bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/30'
+                      : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
+                  }`}
+                >
+                  {coverImageUrl && (!selectedSubjectCover || coverImageUrl !== selectedSubjectCover.url)
+                    ? 'Custom Uploaded Cover'
+                    : 'Auto Subject Curriculum Cover'}
+                </Badge>
+              </div>
+
+              {/* Cover Preview & Upload Controls */}
+              <div className="flex flex-col sm:flex-row items-center gap-4">
+                <div className="relative aspect-[4/3] w-28 sm:w-36 rounded-xl overflow-hidden bg-muted border border-border/80 shadow-md shrink-0">
+                  <img
+                    src={coverImageUrl || selectedSubjectCover?.url || '/placeholder.svg'}
+                    alt={title || 'Book Cover'}
+                    className="h-full w-full object-cover"
+                  />
+                  {uploadingCover && (
+                    <div className="absolute inset-0 bg-background/80 backdrop-blur-xs flex flex-col items-center justify-center p-2 text-center">
+                      <Loader2 className="h-5 w-5 text-primary animate-spin mb-1" />
+                      <span className="text-[10px] font-bold text-foreground">Uploading...</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2 flex-1 min-w-0 w-full">
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Upload an authentic cover page image like a textbook. Supports JPG, PNG, WebP (4:3 ratio recommended).
+                  </p>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <input
+                      type="file"
+                      ref={coverFileInputRef}
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setUploadingCover(true);
+                        setUploadCoverProgress(20);
+                        try {
+                          const result = await uploadSubjectCoverImage(file, {
+                            subjectId: subjectId || undefined,
+                            onProgress: (pct) => setUploadCoverProgress(pct),
+                          });
+                          setCoverImageUrl(result.url);
+                          setShowCustomCoverInput(false);
+                        } catch (err: any) {
+                          setFormError(err.message || 'Failed to upload cover image.');
+                        } finally {
+                          setUploadingCover(false);
+                          if (coverFileInputRef.current) coverFileInputRef.current.value = '';
+                        }
+                      }}
+                    />
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => coverFileInputRef.current?.click()}
+                      disabled={uploadingCover}
+                      className="rounded-xl h-8 text-xs font-semibold border-primary/30 text-primary hover:bg-primary/5"
+                    >
+                      <Upload className="h-3.5 w-3.5 mr-1.5" />
+                      {uploadingCover ? 'Uploading...' : 'Upload Cover Image'}
+                    </Button>
+
+                    {coverImageUrl && selectedSubjectCover && coverImageUrl !== selectedSubjectCover.url && (
                       <Button
                         type="button"
                         variant="ghost"
@@ -492,33 +568,46 @@ export function BookFormDialog({
                           setCoverImageUrl(selectedSubjectCover.url);
                           setShowCustomCoverInput(false);
                         }}
-                        className="h-5 text-[11px] text-muted-foreground hover:text-foreground"
+                        className="rounded-xl h-8 text-xs text-muted-foreground hover:text-foreground"
                       >
                         Reset to Subject Cover
                       </Button>
-                    </div>
-                    <Input
-                      id="custom-cover-input"
-                      placeholder="https://example.com/cover.jpg"
-                      value={coverImageUrl}
-                      onChange={(e) => setCoverImageUrl(e.target.value)}
-                      className="rounded-lg text-xs h-8"
-                    />
-                  </div>
-                ) : (
-                  <div className="flex justify-end">
-                    <button
+                    )}
+
+                    <Button
                       type="button"
-                      onClick={() => setShowCustomCoverInput(true)}
-                      className="text-[11px] text-muted-foreground hover:text-primary transition-colors flex items-center gap-1 px-1"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowCustomCoverInput((prev) => !prev)}
+                      className="rounded-xl h-8 text-xs text-muted-foreground hover:text-foreground"
                     >
-                      <Sparkles className="h-3 w-3 text-primary" />
-                      <span>Use a custom cover image URL instead?</span>
-                    </button>
+                      {showCustomCoverInput ? 'Hide URL Input' : 'Use Image URL'}
+                    </Button>
                   </div>
-                )}
+
+                  {uploadingCover && (
+                    <div className="space-y-1 pt-1">
+                      <Progress value={uploadCoverProgress} className="h-1.5 w-full" />
+                      <span className="text-[10px] text-muted-foreground font-mono">
+                        Processing & optimizing cover image ({uploadCoverProgress}%)...
+                      </span>
+                    </div>
+                  )}
+
+                  {showCustomCoverInput && (
+                    <div className="pt-2 animate-fade-in">
+                      <Input
+                        id="custom-cover-input"
+                        placeholder="https://example.com/cover-image.jpg"
+                        value={coverImageUrl}
+                        onChange={(e) => setCoverImageUrl(e.target.value)}
+                        className="rounded-xl text-xs h-8"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
+            </div>
           </div>
 
           {/* Google Drive Integration */}

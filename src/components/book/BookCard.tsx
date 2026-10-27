@@ -258,6 +258,32 @@ export function BookCard({
                 <span className="truncate">Read {isShortNote ? 'Note' : 'Book'}</span>
               </Button>
 
+              {/* Admin Direct Edit Action */}
+              {isAdmin && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onEdit) {
+                      onEdit(book);
+                    } else if (isShortNote) {
+                      navigate(`/dashboard/admin/shortnotes/edit/${book.id}`);
+                    }
+                  }}
+                  title={isShortNote ? 'Edit study note content & exercises' : 'Edit book metadata & cover'}
+                  className={`h-8 px-2 sm:px-2.5 text-xs font-semibold rounded-xl shrink-0 transition-all ${
+                    isShortNote
+                      ? 'border-purple-500/40 text-purple-600 dark:text-purple-400 bg-purple-500/5 hover:bg-purple-500/15'
+                      : 'border-primary/40 text-primary bg-primary/5 hover:bg-primary/15'
+                  }`}
+                >
+                  <Edit className="w-3.5 h-3.5 mr-1" />
+                  <span>{isShortNote ? 'Edit Note' : 'Edit'}</span>
+                </Button>
+              )}
+
               {/* Detail Button (Hides and opens the detailed info) */}
               <Button
                 type="button"
