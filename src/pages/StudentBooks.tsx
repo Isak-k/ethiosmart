@@ -65,6 +65,7 @@ export default function StudentBooks() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
 
+  const isAdmin = role === 'admin' || role === 'superadmin';
   const userDeptId = profile?.departmentId || (profile as any)?.department_id;
 
   const [books, setBooks] = useState<Book[]>([]);
@@ -140,8 +141,20 @@ export default function StudentBooks() {
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedDept, setSelectedDept] = useState<string>('all');
+  const [selectedDept, setSelectedDept] = useState<string>(() => {
+    if (role !== 'admin' && role !== 'superadmin' && userDeptId && userDeptId !== 'all') {
+      return userDeptId;
+    }
+    return 'all';
+  });
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
+
+  // Keep selectedDept synced to user's assigned department for non-admins
+  useEffect(() => {
+    if (!isAdmin && userDeptId && userDeptId !== 'all') {
+      setSelectedDept(userDeptId);
+    }
+  }, [userDeptId, isAdmin]);
 
   // Monitor network connectivity
   useEffect(() => {
@@ -181,18 +194,32 @@ export default function StudentBooks() {
   const fetchLibraryData = async () => {
     setLoading(true);
     try {
-      const [booksData, deptsData, subsData, bookmarksData, examsData] = await Promise.all([
-        getBooks({}, 'student'),
+      const activeDeptId = (!isAdmin && userDeptId && userDeptId !== 'all') ? userDeptId : undefined;
+
+      const [booksData, deptsData, rawSubsData, bookmarksData, examsData] = await Promise.all([
+        getBooks(activeDeptId ? { departmentId: activeDeptId } : {}, 'student'),
         getDepartments().catch(() => []),
-        getSubjects().catch(() => []),
+        getSubjects(activeDeptId).catch(() => []),
         user ? getUserBookBookmarks(user.uid).catch(() => []) : Promise.resolve([]),
-        getPublishedExams().catch(() => []),
+        getPublishedExams(activeDeptId).catch(() => []),
       ]);
+
+      // Strict department assignment rule: students only see subjects explicitly assigned to their department
+      let subsData = rawSubsData;
+      if (!isAdmin && userDeptId && userDeptId !== 'all') {
+        subsData = subsData.filter((s) => {
+          if (s.isActive === false) return false;
+          if (s.departmentIds && s.departmentIds.length > 0) {
+            return s.departmentIds.includes(userDeptId) || s.departmentIds.includes('all');
+          }
+          return (s as any).departmentId === userDeptId || (s as any).departmentId === 'all';
+        });
+      }
 
       // Enrich books with dept & subject names and cover images
       const enriched = booksData.map((b) => {
         const dept = deptsData.find((d) => d.id === b.departmentId);
-        const sub = subsData.find((s) => s.id === b.subjectId);
+        const sub = subsData.find((s) => s.id === b.subjectId) || rawSubsData.find((s) => s.id === b.subjectId);
         const isShortNote = b.resourceType === 'short_note';
         const effectiveCoverUrl =
           b.coverImageUrl ||
@@ -313,15 +340,48 @@ export default function StudentBooks() {
     return new Set(offlineRecords.map((r) => r.bookId));
   }, [offlineRecords]);
 
+  // Helper to test if a subject belongs to a department
+  const isSubjectInDepartment = (sub: Subject, deptId: string) => {
+    if (!deptId || deptId === 'all') return true;
+    if (sub.departmentIds && sub.departmentIds.length > 0) {
+      return sub.departmentIds.includes(deptId) || sub.departmentIds.includes('all');
+    }
+    return (sub as any).departmentId === deptId || (sub as any).departmentId === 'all';
+  };
+
+  // Active department filter: students with an assigned department are strictly bound to userDeptId
+  const effectiveDeptId = (!isAdmin && userDeptId && userDeptId !== 'all') ? userDeptId : selectedDept;
+
   // Counts
-  const textbooksCount = useMemo(
-    () => books.filter((b) => b.resourceType === 'textbook').length,
-    [books]
-  );
-  const notesCount = useMemo(
-    () => books.filter((b) => b.resourceType === 'short_note').length,
-    [books]
-  );
+  const textbooksCount = useMemo(() => {
+    return books.filter((b) => {
+      if (b.resourceType !== 'textbook') return false;
+      if (effectiveDeptId !== 'all') {
+        const matchesDept =
+          !b.departmentId ||
+          b.departmentId === 'all' ||
+          b.departmentId === effectiveDeptId ||
+          (Array.isArray(b.departmentIds) && (b.departmentIds.includes(effectiveDeptId) || b.departmentIds.includes('all')));
+        if (!matchesDept) return false;
+      }
+      return true;
+    }).length;
+  }, [books, effectiveDeptId]);
+
+  const notesCount = useMemo(() => {
+    return books.filter((b) => {
+      if (b.resourceType !== 'short_note') return false;
+      if (effectiveDeptId !== 'all') {
+        const matchesDept =
+          !b.departmentId ||
+          b.departmentId === 'all' ||
+          b.departmentId === effectiveDeptId ||
+          (Array.isArray(b.departmentIds) && (b.departmentIds.includes(effectiveDeptId) || b.departmentIds.includes('all')));
+        if (!matchesDept) return false;
+      }
+      return true;
+    }).length;
+  }, [books, effectiveDeptId]);
 
   // Filtered source list depending on primaryMode
   const filteredBooksList = useMemo(() => {
@@ -347,12 +407,12 @@ export default function StudentBooks() {
       if (primaryMode === 'bookmarks' && !bookmarkedIds.includes(b.id)) return false;
 
       // Department filter
-      if (selectedDept !== 'all') {
+      if (effectiveDeptId !== 'all') {
         const matchesDept =
           !b.departmentId ||
           b.departmentId === 'all' ||
-          b.departmentId === selectedDept ||
-          (Array.isArray(b.departmentIds) && (b.departmentIds.includes(selectedDept) || b.departmentIds.includes('all')));
+          b.departmentId === effectiveDeptId ||
+          (Array.isArray(b.departmentIds) && (b.departmentIds.includes(effectiveDeptId) || b.departmentIds.includes('all')));
         if (!matchesDept) return false;
       }
 
@@ -372,14 +432,17 @@ export default function StudentBooks() {
 
       return true;
     });
-  }, [books, offlineRecords, primaryMode, selectedDept, selectedSubject, searchQuery, bookmarkedIds, subjects]);
+  }, [books, offlineRecords, primaryMode, effectiveDeptId, selectedSubject, searchQuery, bookmarkedIds, subjects]);
 
   // Subjects that have notes, enriched with note counts and reading time
   const subjectsWithNotes = useMemo(() => {
     return subjects
       .filter((s) => {
-        if (selectedDept !== 'all') {
-          if (!s.departmentIds?.includes(selectedDept) && s.departmentId !== selectedDept) {
+        if (!isAdmin && s.isActive === false) return false;
+
+        // Department filter
+        if (effectiveDeptId !== 'all') {
+          if (!isSubjectInDepartment(s, effectiveDeptId)) {
             return false;
           }
         }
@@ -408,7 +471,7 @@ export default function StudentBooks() {
         };
       })
       .sort((a, b) => b.notesCount - a.notesCount); // Show subjects with notes first
-  }, [subjects, books, selectedDept, searchQuery]);
+  }, [subjects, books, effectiveDeptId, searchQuery, isAdmin, role]);
 
   // Selected Subject details for Notes Level 2
   const currentNotesSubject = useMemo(
@@ -499,8 +562,8 @@ export default function StudentBooks() {
             (n.chapterTitle && ch.title && n.chapterTitle.toLowerCase().trim() === ch.title.toLowerCase().trim())
         );
 
-        // First unit free, subsequent locked if non-admin and not premium
-        const isLocked = !note || (idx > 0 && role !== 'admin' && !profile?.isPremium);
+        // All units with uploaded notes are open; locked only if note has not been uploaded yet
+        const isLocked = !note;
 
         return {
           id: ch.id,
@@ -523,7 +586,7 @@ export default function StudentBooks() {
           unitNumber: unitNum,
           title: n.chapterTitle || n.title,
           note: n,
-          isLocked: mapped.length > 0 && role !== 'admin' && !profile?.isPremium,
+          isLocked: false,
           matchedExam: findExamForNote(n),
         });
       });
@@ -844,21 +907,30 @@ export default function StudentBooks() {
               </div>
 
               {/* Department Filter */}
-              <div className="w-full sm:w-auto">
-                <Select value={selectedDept} onValueChange={setSelectedDept}>
-                  <SelectTrigger className="w-full sm:w-[170px] rounded-xl text-xs h-8 bg-card">
-                    <SelectValue placeholder="All Departments" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Departments</SelectItem>
-                    {departments.map((dept) => (
-                      <SelectItem key={dept.id} value={dept.id}>
-                        {dept.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {isAdmin || !userDeptId || userDeptId === 'all' ? (
+                <div className="w-full sm:w-auto">
+                  <Select value={selectedDept} onValueChange={setSelectedDept}>
+                    <SelectTrigger className="w-full sm:w-[170px] rounded-xl text-xs h-8 bg-card">
+                      <SelectValue placeholder="All Departments" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Departments</SelectItem>
+                      {departments.map((dept) => (
+                        <SelectItem key={dept.id} value={dept.id}>
+                          {dept.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-700 dark:text-purple-300 text-xs font-semibold">
+                  <Building className="h-3.5 w-3.5 text-purple-500 shrink-0" />
+                  <span className="truncate max-w-[150px]">
+                    {departments.find((d) => d.id === userDeptId)?.name || 'My Department'}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* OFFLINE STORAGE BAR (in offline mode) */}
@@ -939,7 +1011,7 @@ export default function StudentBooks() {
                       onClick={() => {
                         setSearchQuery('');
                         setSelectedSubject('all');
-                        setSelectedDept('all');
+                        setSelectedDept((!isAdmin && userDeptId && userDeptId !== 'all') ? userDeptId : 'all');
                       }}
                       className="rounded-xl text-xs"
                     >
@@ -1003,7 +1075,7 @@ export default function StudentBooks() {
                           size="sm"
                           onClick={() => {
                             setSearchQuery('');
-                            setSelectedDept('all');
+                            setSelectedDept((!isAdmin && userDeptId && userDeptId !== 'all') ? userDeptId : 'all');
                           }}
                           className="rounded-xl text-xs"
                         >

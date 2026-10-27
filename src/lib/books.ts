@@ -84,7 +84,7 @@ export async function getBooks(
     });
 
     // 3. Department filtering:
-    const targetDeptId = options.departmentId;
+    const targetDeptId = options.departmentId || (!isAdmin && userDeptId && userDeptId !== 'all' ? userDeptId : undefined);
     if (targetDeptId && targetDeptId !== 'all') {
       list = list.filter((b) => {
         if (!b.departmentId || b.departmentId === 'all') return true;
