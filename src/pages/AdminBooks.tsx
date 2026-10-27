@@ -828,6 +828,7 @@ export default function AdminBooks() {
                   setBookToDelete(b);
                   setDeleteDialogOpen(true);
                 }}
+                onToggleStatus={handleToggleStatus}
                 onGenerateAI={handleGenerateAI}
               />
             ))}

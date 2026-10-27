@@ -389,7 +389,10 @@ export default function StudentBooks() {
       })
       .map((s) => {
         const subjectNotes = books.filter(
-          (b) => b.resourceType === 'short_note' && b.subjectId === s.id
+          (b) =>
+            b.resourceType === 'short_note' &&
+            b.subjectId === s.id &&
+            (role === 'admin' || b.status === 'published' || !b.status)
         );
         const totalMinutes = subjectNotes.reduce(
           (acc, n) => acc + (n.readingTimeMinutes || 10),
@@ -415,7 +418,10 @@ export default function StudentBooks() {
   const currentSubjectChapterNotes = useMemo(() => {
     if (!selectedNotesSubjectId) return [];
     const list = books.filter(
-      (b) => b.resourceType === 'short_note' && b.subjectId === selectedNotesSubjectId
+      (b) =>
+        b.resourceType === 'short_note' &&
+        b.subjectId === selectedNotesSubjectId &&
+        (role === 'admin' || b.status === 'published' || !b.status)
     );
 
     // Apply search query filter if user searches inside chapter view
@@ -1207,11 +1213,16 @@ export default function StudentBooks() {
                                       )}
                                     </div>
 
-                                    <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium flex-wrap">
                                       {unit.note ? (
                                         <span className="inline-flex items-center gap-1 text-slate-500 dark:text-slate-400">
                                           <Check className="w-3.5 h-3.5 text-emerald-500 stroke-[2.5]" />
                                           <span>Converted guide</span>
+                                          {unit.note.status === 'draft' && (
+                                            <span className="ml-1.5 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                                              Draft (Admin Preview)
+                                            </span>
+                                          )}
                                           {unit.note.readingTimeMinutes && (
                                             <span className="text-[11px] text-muted-foreground/80 ml-1.5">
                                               · {unit.note.readingTimeMinutes} min read

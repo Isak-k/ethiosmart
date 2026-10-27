@@ -8,6 +8,7 @@ import {
   updateChapter,
   deleteChapter,
 } from '@/lib/subjects';
+import { updateBook, deleteBook } from '@/lib/books';
 import { getSubjectCover } from '@/lib/subject-covers';
 import {
   Dialog,
@@ -16,6 +17,16 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -41,6 +52,9 @@ import {
   BookMarked,
   Eye,
   Edit,
+  Globe,
+  GlobeLock,
+  Upload,
 } from 'lucide-react';
 
 export interface SubjectNotesManagerDialogProps {
@@ -80,6 +94,11 @@ export function SubjectNotesManagerDialog({
 
   // Delete Chapter state
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Note Publish/Draft toggle & Delete state
+  const [togglingNoteId, setTogglingNoteId] = useState<string | null>(null);
+  const [deletingNote, setDeletingNote] = useState<Book | null>(null);
+  const [isDeletingNote, setIsDeletingNote] = useState<boolean>(false);
 
   useEffect(() => {
     if (open && subject?.id) {
@@ -209,6 +228,52 @@ export function SubjectNotesManagerDialog({
       });
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleToggleNoteStatus = async (note: Book) => {
+    const nextStatus: 'published' | 'draft' = note.status === 'published' ? 'draft' : 'published';
+    setTogglingNoteId(note.id);
+    try {
+      await updateBook(note.id, { status: nextStatus });
+      toast({
+        title: nextStatus === 'published' ? 'Note Published Live!' : 'Note Unpublished (Saved as Draft)',
+        description:
+          nextStatus === 'published'
+            ? `"${note.title}" is now published and visible to students.`
+            : `"${note.title}" is saved as draft and hidden from students.`,
+      });
+      onNotesChanged?.();
+    } catch (err: any) {
+      toast({
+        title: 'Failed to update status',
+        description: err.message || 'Database error occurred.',
+        variant: 'destructive',
+      });
+    } finally {
+      setTogglingNoteId(null);
+    }
+  };
+
+  const handleConfirmDeleteNote = async () => {
+    if (!deletingNote) return;
+    setIsDeletingNote(true);
+    try {
+      await deleteBook(deletingNote.id);
+      toast({
+        title: 'Study Note Deleted',
+        description: `"${deletingNote.title}" has been permanently removed.`,
+      });
+      setDeletingNote(null);
+      onNotesChanged?.();
+    } catch (err: any) {
+      toast({
+        title: 'Failed to delete note',
+        description: err.message || 'Permission denied or network error.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeletingNote(false);
     }
   };
 
@@ -475,10 +540,19 @@ export function SubjectNotesManagerDialog({
                                 </h4>
 
                                 {note ? (
-                                  <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 text-[11px] font-semibold rounded-full px-2 py-0.5">
-                                    <Check className="h-3 w-3 mr-1 stroke-[3]" />
-                                    Study Notes Ready
-                                  </Badge>
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    {note.status === 'published' ? (
+                                      <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 text-[11px] font-semibold rounded-full px-2 py-0.5">
+                                        <Check className="h-3 w-3 mr-1 stroke-[3]" />
+                                        Published Live
+                                      </Badge>
+                                    ) : (
+                                      <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 text-[11px] font-semibold rounded-full px-2 py-0.5">
+                                        <Clock className="h-3 w-3 mr-1" />
+                                        Draft (Hidden)
+                                      </Badge>
+                                    )}
+                                  </div>
                                 ) : (
                                   <Badge variant="outline" className="text-amber-600 dark:text-amber-400 border-amber-500/30 text-[11px] font-semibold rounded-full px-2 py-0.5">
                                     Pending Notes
@@ -513,7 +587,35 @@ export function SubjectNotesManagerDialog({
                           <div className="flex items-center gap-2 shrink-0 self-end sm:self-center flex-wrap">
                             {note ? (
                               <>
-                                {/* 1. Read Note */}
+                                {/* 1. Publish / Unpublish Toggle */}
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={togglingNoteId === note.id}
+                                  onClick={() => handleToggleNoteStatus(note)}
+                                  className={`rounded-xl text-xs h-8 px-2.5 font-semibold gap-1.5 transition-all ${
+                                    note.status === 'published'
+                                      ? 'text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/40 border-amber-500/30'
+                                      : 'text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 border-emerald-500/30'
+                                  }`}
+                                  title={note.status === 'published' ? 'Unpublish note (hide from students)' : 'Publish note live to students'}
+                                >
+                                  {togglingNoteId === note.id ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : note.status === 'published' ? (
+                                    <>
+                                      <GlobeLock className="h-3.5 w-3.5" />
+                                      <span className="hidden md:inline">Unpublish</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Globe className="h-3.5 w-3.5" />
+                                      <span className="hidden md:inline">Publish</span>
+                                    </>
+                                  )}
+                                </Button>
+
+                                {/* 2. Read Note (R in CRUD) */}
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -528,7 +630,7 @@ export function SubjectNotesManagerDialog({
                                   <span className="hidden sm:inline">Read</span>
                                 </Button>
 
-                                {/* 2. Edit Note in Studio */}
+                                {/* 3. Edit Note in Studio (U in CRUD) */}
                                 <Button
                                   size="sm"
                                   onClick={() => {
@@ -541,10 +643,21 @@ export function SubjectNotesManagerDialog({
                                   <Pencil className="h-3.5 w-3.5" />
                                   <span>Edit Note</span>
                                 </Button>
+
+                                {/* 4. Delete Note (D in CRUD) */}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setDeletingNote(note)}
+                                  className="h-8 w-8 p-0 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                  title="Delete Note"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
                               </>
                             ) : (
                               <>
-                                {/* Generate with AI */}
+                                {/* Generate with AI (C in CRUD) */}
                                 <Button
                                   size="sm"
                                   onClick={() => {
@@ -557,7 +670,25 @@ export function SubjectNotesManagerDialog({
                                   className="rounded-xl text-xs h-8 px-3 font-semibold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white gap-1.5 shadow-xs"
                                 >
                                   <Sparkles className="h-3.5 w-3.5" />
-                                  <span>Generate with AI</span>
+                                  <span>Generate AI</span>
+                                </Button>
+
+                                {/* Write Note Manually (C in CRUD) */}
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    onOpenChange(false);
+                                    const deptId = subject.departmentIds?.[0] || '';
+                                    navigate(
+                                      `/dashboard/admin/shortnotes/create?subjectId=${subject.id}&chapterId=${ch.id}&chapterTitle=${encodeURIComponent(ch.title)}&departmentId=${deptId}&mode=manual`
+                                    );
+                                  }}
+                                  className="rounded-xl text-xs h-8 px-2.5 font-semibold border-purple-500/30 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/30 gap-1"
+                                  title="Write or upload note manually"
+                                >
+                                  <Plus className="h-3.5 w-3.5" />
+                                  <span className="hidden sm:inline">Write Note</span>
                                 </Button>
                               </>
                             )}
@@ -597,6 +728,31 @@ export function SubjectNotesManagerDialog({
             </div>
           )}
         </div>
+
+        {/* Delete Note Confirmation Dialog */}
+        <AlertDialog open={Boolean(deletingNote)} onOpenChange={(open) => !open && setDeletingNote(null)}>
+          <AlertDialogContent className="rounded-3xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Study Note?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to permanently delete &quot;{deletingNote?.title}&quot;?
+                All sections, definitions, worked examples, and interactive MCQs in this note will be removed.
+                This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleConfirmDeleteNote}
+                disabled={isDeletingNote}
+                className="rounded-xl bg-destructive hover:bg-destructive/90 text-white font-semibold"
+              >
+                {isDeletingNote && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Delete Note
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DialogContent>
     </Dialog>
   );

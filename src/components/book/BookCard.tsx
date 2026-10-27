@@ -42,6 +42,7 @@ interface BookCardProps {
   isAdmin?: boolean;
   onEdit?: (book: Book) => void;
   onDelete?: (book: Book) => void;
+  onToggleStatus?: (book: Book) => void;
   onGenerateAI?: (book: Book) => void;
   isSavedOffline?: boolean;
   onSaveOffline?: (book: Book) => void;
@@ -55,6 +56,7 @@ export function BookCard({
   isAdmin = false,
   onEdit,
   onDelete,
+  onToggleStatus,
   onGenerateAI,
   isSavedOffline = false,
   onSaveOffline,
@@ -199,15 +201,24 @@ export function BookCard({
                 {isAdmin && (
                   <Badge
                     variant="outline"
-                    className={`text-[9px] font-medium px-1.5 py-0 ${
+                    onClick={(e) => {
+                      if (onToggleStatus) {
+                        e.stopPropagation();
+                        onToggleStatus(book);
+                      }
+                    }}
+                    title={onToggleStatus ? 'Click to toggle status (Published / Draft)' : undefined}
+                    className={`text-[9px] font-semibold px-2 py-0.5 transition-all ${
+                      onToggleStatus ? 'cursor-pointer hover:scale-105 shadow-xs' : ''
+                    } ${
                       book.status === 'published'
-                        ? 'bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20'
+                        ? 'bg-green-500/15 text-green-700 dark:text-green-400 border-green-500/30'
                         : book.status === 'archived'
-                        ? 'bg-slate-500/10 text-slate-700 dark:text-slate-400 border-slate-500/20'
-                        : 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20'
+                        ? 'bg-slate-500/15 text-slate-700 dark:text-slate-400 border-slate-500/30'
+                        : 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30'
                     }`}
                   >
-                    {book.status.toUpperCase()}
+                    {book.status === 'published' ? '✓ PUBLISHED' : book.status === 'draft' ? '⏱ DRAFT' : book.status.toUpperCase()}
                   </Badge>
                 )}
               </div>
@@ -524,6 +535,24 @@ export function BookCard({
                   >
                     <Sparkles className="w-3.5 h-3.5 mr-1" />
                     Generate AI Questions
+                  </Button>
+                )}
+                {isAdmin && onToggleStatus && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleStatus(book);
+                    }}
+                    className={`rounded-xl text-xs h-8 ${
+                      book.status === 'published'
+                        ? 'border-amber-500/30 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30'
+                        : 'border-green-500/30 text-green-600 hover:bg-green-50 dark:hover:bg-green-950/30'
+                    }`}
+                  >
+                    {book.status === 'published' ? 'Unpublish to Draft' : 'Publish Live'}
                   </Button>
                 )}
                 {onEdit && (

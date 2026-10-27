@@ -14,6 +14,7 @@ import {
   createBook,
   getBook,
   updateBook,
+  deleteBook,
   getBooks,
 } from '@/lib/books';
 import { getOfflineBook } from '@/lib/offline-books';
@@ -53,6 +54,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -114,6 +125,8 @@ import {
   FolderOpen,
   Search,
   Edit,
+  Globe,
+  GlobeLock,
 } from 'lucide-react';
 
 export default function AdminShortnotesStudio() {
@@ -1048,7 +1061,10 @@ export default function AdminShortnotesStudio() {
   };
 
   // Save / Publish Note to Firestore
-  const handleSaveAndPublish = async () => {
+  const handleSaveAndPublish = async (explicitStatus?: 'published' | 'draft') => {
+    const targetStatus = explicitStatus || status;
+    setStatus(targetStatus);
+
     if (!noteTitle.trim()) {
       toast({
         title: 'Title required',
@@ -1106,7 +1122,7 @@ export default function AdminShortnotesStudio() {
         subjectId: selectedSubjectId,
         coverImageUrl: effectiveCover,
         ...(selectedExamId ? { examId: selectedExamId } : {}),
-        status: status,
+        status: targetStatus,
         allowDownload: allowDownload,
         ...(selectedChapterId ? { chapterId: selectedChapterId } : {}),
         ...(currentChapterTitle ? { chapterTitle: currentChapterTitle } : {}),
@@ -1125,15 +1141,21 @@ export default function AdminShortnotesStudio() {
       if (editNoteId) {
         await updateBook(editNoteId, input);
         toast({
-          title: 'Study Notes Updated!',
-          description: `"${noteTitle}" has been saved.`,
+          title: targetStatus === 'published' ? 'Study Notes Updated & Published Live!' : 'Study Notes Saved as Draft!',
+          description:
+            targetStatus === 'published'
+              ? `"${noteTitle}" is now live for students in the library.`
+              : `"${noteTitle}" has been saved as a draft and is hidden from students.`,
         });
       } else {
         if (!user) throw new Error('You must be logged in to save study notes.');
         savedId = await createBook(input, user.uid);
         toast({
-          title: 'Study Notes Published Live!',
-          description: `"${noteTitle}" is now live for students in the library.`,
+          title: targetStatus === 'published' ? 'Study Notes Published Live!' : 'Study Notes Saved as Draft!',
+          description:
+            targetStatus === 'published'
+              ? `"${noteTitle}" is now live for students in the library.`
+              : `"${noteTitle}" has been saved as a draft and is hidden from students.`,
         });
       }
 
@@ -1147,6 +1169,31 @@ export default function AdminShortnotesStudio() {
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const [deleteNoteDialogOpen, setDeleteNoteDialogOpen] = useState(false);
+  const [isDeletingNote, setIsDeletingNote] = useState(false);
+
+  const handleDeleteCurrentNote = async () => {
+    if (!editNoteId) return;
+    setIsDeletingNote(true);
+    try {
+      await deleteBook(editNoteId);
+      toast({
+        title: 'Study Note Deleted',
+        description: `"${noteTitle}" has been permanently removed from the library.`,
+      });
+      navigate('/dashboard/admin/books');
+    } catch (err: any) {
+      toast({
+        title: 'Failed to delete note',
+        description: err.message || 'Permission denied or network error.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeletingNote(false);
+      setDeleteNoteDialogOpen(false);
     }
   };
 
@@ -1360,6 +1407,7 @@ export default function AdminShortnotesStudio() {
               <span>Edit Existing Notes</span>
             </Button>
 
+            {/* Status Selector */}
             <Select
               value={status}
               onValueChange={(v: 'published' | 'draft') => setStatus(v)}
@@ -1369,13 +1417,13 @@ export default function AdminShortnotesStudio() {
               </SelectTrigger>
               <SelectContent className="rounded-xl">
                 <SelectItem value="published">
-                  <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                  <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold">
                     <CheckCircle2 className="h-3.5 w-3.5" />
                     Published
                   </span>
                 </SelectItem>
                 <SelectItem value="draft">
-                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                  <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-semibold">
                     <Clock className="h-3.5 w-3.5" />
                     Draft
                   </span>
@@ -1383,20 +1431,36 @@ export default function AdminShortnotesStudio() {
               </SelectContent>
             </Select>
 
+            {/* Save as Draft Button */}
             <Button
-              onClick={handleSaveAndPublish}
+              type="button"
+              variant="outline"
+              onClick={() => handleSaveAndPublish('draft')}
               disabled={isSaving || sections.length === 0}
-              className="rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-sm text-xs sm:text-sm h-9 px-4"
+              className="rounded-xl text-xs font-semibold h-9 px-3 gap-1.5 border-border"
+              title="Save as Draft (hidden from students)"
+            >
+              <Clock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+              <span className="hidden sm:inline">Save as Draft</span>
+            </Button>
+
+            {/* Publish Live Button */}
+            <Button
+              type="button"
+              onClick={() => handleSaveAndPublish('published')}
+              disabled={isSaving || sections.length === 0}
+              className="rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold shadow-xs text-xs sm:text-sm h-9 px-4 gap-1.5"
+              title="Publish live to students"
             >
               {isSaving ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   Saving...
                 </>
               ) : (
                 <>
-                  <Save className="h-4 w-4 mr-1.5" />
-                  {editNoteId ? 'Update Notes' : 'Publish Notes'}
+                  <Globe className="h-4 w-4" />
+                  <span>{editNoteId ? 'Update & Publish' : 'Publish Live'}</span>
                 </>
               )}
             </Button>
@@ -1411,30 +1475,73 @@ export default function AdminShortnotesStudio() {
                 <Edit className="h-4 w-4" />
               </div>
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Badge className="bg-purple-600 text-white text-[10px] uppercase font-bold tracking-wider">
                     Editing Mode
                   </Badge>
+                  {status === 'published' ? (
+                    <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 text-[10px] font-semibold">
+                      <Check className="h-3 w-3 mr-1 stroke-[3]" />
+                      Published Live
+                    </Badge>
+                  ) : (
+                    <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 text-[10px] font-semibold">
+                      <Clock className="h-3 w-3 mr-1" />
+                      Draft (Hidden)
+                    </Badge>
+                  )}
                   <span className="text-xs sm:text-sm font-bold text-foreground truncate max-w-[280px] sm:max-w-md">
                     {noteTitle || 'Existing Study Note'}
                   </span>
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
-                  You are editing this live note. Click &quot;Update Notes&quot; to save your changes back to the library.
+                  You are editing this note in the Digital Library. Choose &quot;Save as Draft&quot; to hide from students or &quot;Publish Live&quot; to make it accessible.
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
+                onClick={() => handleSaveAndPublish(status === 'published' ? 'draft' : 'published')}
+                className="h-8 text-xs rounded-xl font-semibold gap-1"
+              >
+                {status === 'published' ? (
+                  <>
+                    <GlobeLock className="h-3.5 w-3.5 text-amber-600" />
+                    <span>Unpublish to Draft</span>
+                  </>
+                ) : (
+                  <>
+                    <Globe className="h-3.5 w-3.5 text-emerald-600" />
+                    <span>Publish Live</span>
+                  </>
+                )}
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setDeleteNoteDialogOpen(true)}
+                className="h-8 text-xs rounded-xl text-destructive hover:bg-destructive/10 border-destructive/30 font-semibold gap-1"
+                title="Delete this study note permanently"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Delete</span>
+              </Button>
+
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
                 onClick={() => navigate('/dashboard/admin/shortnotes/create')}
-                className="h-8 text-xs rounded-xl border-border bg-background hover:bg-accent font-semibold"
+                className="h-8 text-xs rounded-xl font-semibold"
               >
                 <Plus className="h-3.5 w-3.5 mr-1" />
-                Create New Note
+                New Note
               </Button>
             </div>
           </div>
@@ -3058,6 +3165,31 @@ export default function AdminShortnotesStudio() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Delete Current Note Confirmation Dialog */}
+        <AlertDialog open={deleteNoteDialogOpen} onOpenChange={setDeleteNoteDialogOpen}>
+          <AlertDialogContent className="rounded-3xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete This Study Note?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to permanently delete &quot;{noteTitle}&quot;?
+                All sections, learning outcomes, definitions, and exercises in this note will be erased.
+                This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteCurrentNote}
+                disabled={isDeletingNote}
+                className="rounded-xl bg-destructive hover:bg-destructive/90 text-white font-semibold"
+              >
+                {isDeletingNote && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Delete Note
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </DashboardLayout>
   );
