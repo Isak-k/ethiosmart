@@ -1244,16 +1244,14 @@ export function synthesizeSectionBlocks(
     }
 
     if (!defText) {
-      if (cleanDiscipline === 'psychology') {
-        defText = `The academic and scientific paradigm within ${chapterTitle} examining how internal mental structures, observable actions, and external stimuli interact systematically to govern human experience.`;
-      } else if (cleanDiscipline === 'mathematics' || cleanDiscipline === 'physics') {
-        defText = `The governing quantitative construct and algebraic formulation in ${chapterTitle} relating independent parameters to calculated values across system boundaries.`;
-      } else if (cleanDiscipline === 'biology') {
-        defText = `The specialized biological mechanism and functional adaptation operating within living organisms under ${chapterTitle}.`;
-      } else if (cleanDiscipline === 'computer') {
-        defText = `The systematic algorithmic procedure and data organizational pattern governing computational execution in ${chapterTitle}.`;
-      } else {
-        defText = `Core foundational concept in ${chapterTitle} examining principles and practical applications.`;
+      if (sec.content) {
+        const firstSentence = sec.content.split(/[.?!]\s+/)[0]?.trim();
+        if (firstSentence && firstSentence.length > 20) {
+          defText = firstSentence.endsWith('.') ? firstSentence : `${firstSentence}.`;
+        }
+      }
+      if (!defText) {
+        defText = `${title} is an essential academic concept in ${chapterTitle} detailing fundamental principles, characteristics, and practical applications.`;
       }
     }
 
@@ -1281,21 +1279,14 @@ export function synthesizeSectionBlocks(
     }
 
     if (!factContent) {
-      if (cleanDiscipline === 'psychology') {
-        factTitle = 'Theoretical Mechanism & Empirical Validity';
-        factContent = `Scientific psychology distinguishes between directly observable actions (behavior) and inferred internal cognitive states. All theoretical models must be verified through controlled experimental observation rather than subjective intuition.`;
-      } else if (cleanDiscipline === 'mathematics' || cleanDiscipline === 'physics') {
-        factTitle = 'Governing Physical / Mathematical Law';
-        factContent = `Governing equations remain invariant across coordinate transformations. Always verify dimensional consistency and state units explicitly before carrying out numerical calculations.`;
-      } else if (cleanDiscipline === 'biology') {
-        factTitle = 'Physiological Homeostasis & Adaptation';
-        factContent = `Biological pathways operate via negative and positive feedback regulation. Structural form is directly optimized to execute specific biochemical functions.`;
-      } else if (cleanDiscipline === 'computer') {
-        factTitle = 'Asymptotic Complexity & Invariance';
-        factContent = `Algorithmic efficiency is measured via Big-O notation. Space and time tradeoffs determine system scalability under maximum input size n.`;
-      } else {
-        factTitle = 'Key Academic Concept';
-        factContent = `Core concept in ${chapterTitle}: review the main characteristics, definitions, and practical applications.`;
+      if (sec.content) {
+        const sentences = sec.content.split(/[.?!]\s+/).filter((s) => s.length > 25);
+        if (sentences.length > 1) {
+          factContent = sentences[1].trim() + '.';
+        }
+      }
+      if (!factContent) {
+        factContent = `Core understanding of ${title}: focus on its main definitions, mechanisms, and real-world significance in ${chapterTitle}.`;
       }
     }
 
@@ -1393,16 +1384,10 @@ export function synthesizeSectionBlocks(
   // 5. Warning block (Common Misconceptions)
   if (!hasWarning) {
     let warnContent = '';
-    if (cleanDiscipline === 'psychology') {
-      warnContent = 'Do not confuse negative reinforcement with punishment. Negative reinforcement strengthens a desired behavior by removing an unpleasant stimulus, whereas punishment delivers an aversive outcome to reduce an undesired behavior.';
-    } else if (cleanDiscipline === 'mathematics' || cleanDiscipline === 'physics') {
+    if (cleanDiscipline === 'mathematics' || cleanDiscipline === 'physics') {
       warnContent = 'Frequent Exam Trap: Sign distribution errors when expanding negative parenthetical terms (e.g. -(a - b) = -a + b). Always check negative multipliers carefully.';
-    } else if (cleanDiscipline === 'biology') {
-      warnContent = 'Avoid conflating mitosis with meiosis. Mitosis produces 2 genetically identical diploid (2n) daughter cells, while meiosis produces 4 genetically unique haploid (n) gametes.';
-    } else if (cleanDiscipline === 'computer') {
-      warnContent = 'Binary search requires that the array is already sorted. Executing binary search on unsorted data yields invalid results. Sorting first takes O(n log n).';
     } else {
-      warnContent = `Common Exam Pitfall: Ensure definitions and explanations for ${title} are stated clearly with relevant examples rather than relying on brief bullet points.`;
+      warnContent = `Common Exam Pitfall: Stating conclusions for ${title} without demonstrating intermediate reasoning or clearly defining key terms leads to preventable mark loss. Explain concepts and supporting evidence thoroughly.`;
     }
 
     generatedBlocks.push({
@@ -1416,14 +1401,10 @@ export function synthesizeSectionBlocks(
   // 6. Tip block (Exam Strategy)
   if (!hasTip) {
     let tipContent = '';
-    if (cleanDiscipline === 'psychology') {
-      tipContent = 'In exam essays, always connect theoretical claims directly to landmark empirical studies. Identifying the independent variable, dependent variable, and sample increases marks significantly.';
-    } else if (cleanDiscipline === 'mathematics' || cleanDiscipline === 'physics') {
+    if (cleanDiscipline === 'mathematics' || cleanDiscipline === 'physics') {
       tipContent = 'Show all working line by line. Even if a computational slip occurs at the final step, examination rubrics award full method marks for correct algebraic setups.';
-    } else if (cleanDiscipline === 'biology') {
-      tipContent = 'Use biological mnemonic devices (such as PMAT for cell division) and always reference specific enzyme names and molecular substrates.';
     } else {
-      tipContent = `Connect key concepts of ${title} to practical examples to maximize scoring on examination questions.`;
+      tipContent = `When answering exam questions on ${title}, state the core definition first, then provide a concrete example illustrating how it applies in practice.`;
     }
 
     generatedBlocks.push({
@@ -1453,10 +1434,18 @@ export function ensureSectionExercises(
   chapterTitle: string
 ): NoteExercise[] {
   if (Array.isArray(exercises) && exercises.length > 0) {
-    return exercises.map((ex) => ({
-      ...ex,
-      initialExpanded: false,
-    }));
+    return exercises.map((ex) => {
+      const rawOptions: string[] = Array.isArray(ex.options)
+        ? ex.options.map((o: any) => String(o).trim()).filter(Boolean)
+        : [];
+      const isMCQ = rawOptions.length > 0 || ex.questionType === 'mcq';
+      return {
+        ...ex,
+        questionType: (isMCQ ? 'mcq' : (ex.questionType || 'problem')) as any,
+        options: rawOptions.length > 0 ? rawOptions : undefined,
+        initialExpanded: false,
+      };
+    });
   }
 
   const cleanDiscipline = String(discipline).toLowerCase();
@@ -1467,40 +1456,24 @@ export function ensureSectionExercises(
       {
         id: `ex-${secIndex + 1}-1`,
         exerciseNumber: 1,
-        question: `Given a primary problem in ${cleanTitle}, apply the governing formula to compute the exact numerical solution showing all intermediate algebraic steps.`,
-        questionType: 'problem',
-        hints: ['State the general formula first, isolate the target parameter, and substitute values carefully.'],
+        questionType: 'mcq',
+        question: `When analyzing a problem in ${cleanTitle}, which procedure ensures full marks according to standard academic marking rubrics?`,
+        options: [
+          `State the governing formula, isolate the target parameter algebraically, and verify unit consistency throughout all calculation steps.`,
+          `Skip the governing formula and substitute numerical approximations directly without writing units.`,
+          `Assume unknown variables cancel out automatically without checking boundary conditions.`,
+          `Round all intermediate steps to integers before completing the final calculation.`
+        ],
+        correctAnswer: 'A',
+        hints: ['Standard scientific problem solving requires stating governing laws, algebraic isolation, and unit verification.'],
         solution: {
-          answer: `Verified numerical solution for ${cleanTitle}.`,
+          answer: `Option A: State the governing formula, isolate the target parameter algebraically, and verify unit consistency throughout all calculation steps.`,
+          explanation: `Option A represents the methodical, mathematically rigorous approach required on examinations. The other choices reflect common computational pitfalls.`,
           steps: [
-            'Step 1: State the governing equation and identify all given parameters with their SI units.',
-            'Step 2: Rearrange algebraically for the target unknown variable.',
-            'Step 3: Substitute numerical values and compute intermediate operations ($3 + 14 \\cdot 4 = 3 + 56 = 59$).',
-            'Step 4: Check dimensional consistency and state the final result with units.',
+            `Step 1: Identify all given quantities and target variables for ${cleanTitle}.`,
+            `Step 2: State the primary governing formula and isolate the target parameter.`,
+            `Step 3: Confirm dimensional and unit consistency before stating the final result.`
           ],
-          explanation: 'Methodical step-by-step presentation guarantees full marks on examination scoring rubrics.',
-        },
-        initialExpanded: false,
-      },
-    ];
-  }
-
-  if (cleanDiscipline === 'psychology') {
-    return [
-      {
-        id: `ex-psych-${secIndex + 1}-1`,
-        exerciseNumber: 1,
-        question: `Analyze how the primary theoretical model of ${cleanTitle} explains human behavioral variation in a clinical or academic scenario. Contrast this with an alternative psychological perspective.`,
-        hints: ['Identify the core cognitive schema or environmental contingency and examine how it mediates observable behavior.'],
-        solution: {
-          answer: `The primary framework attributes behavior to underlying cognitive or environmental mechanisms, distinguishing between learned responses and internal representations.`,
-          steps: [
-            'Step 1: Define the core theoretical construct and its primary psychological mechanism.',
-            'Step 2: Apply the model to the scenario, identifying mediating cognitive appraisals or environmental reinforcers.',
-            'Step 3: Contrast with an alternative perspective (e.g. Cognitive vs Behavioral framework).',
-            'Step 4: Formulate an evidence-grounded synthesis linking internal mental processes to observable actions.',
-          ],
-          explanation: 'In academic psychology examinations, comparative conceptual analysis receives the highest analytical marks.',
         },
         initialExpanded: false,
       },
@@ -1509,18 +1482,26 @@ export function ensureSectionExercises(
 
   return [
     {
-      id: `ex-gen-${secIndex + 1}-1`,
+      id: `ex-sec-${secIndex + 1}-1`,
       exerciseNumber: 1,
-      question: `Explain how the foundational principles of ${cleanTitle} apply to solve representative academic questions in ${chapterTitle}.`,
-      hints: ['State the formal definition, identify the core mechanism, and apply it step by step.'],
+      questionType: 'mcq',
+      question: `Which of the following statements most accurately defines or characterizes "${cleanTitle}" within ${chapterTitle}?`,
+      options: [
+        `It represents the primary foundational mechanism and core analytical framework governing ${cleanTitle}.`,
+        `It is a temporary biological reflex that dissipates immediately without producing any lasting change.`,
+        `It is an incidental anomaly that operates entirely independently of the principles in ${chapterTitle}.`,
+        `It describes an obsolete hypothesis that has been completely discarded in modern academic study.`
+      ],
+      correctAnswer: 'A',
+      hints: [`Focus on the core definition and enduring pedagogical principle of ${cleanTitle}.`],
       solution: {
-        answer: `Comprehensive analytical solution for ${cleanTitle}.`,
+        answer: `Option A: It represents the primary foundational mechanism and core analytical framework governing ${cleanTitle}.`,
+        explanation: `Option A accurately captures the primary definition and role of ${cleanTitle} in ${chapterTitle}. The remaining options incorrectly minimize or mischaracterize the concept.`,
         steps: [
-          'Step 1: State the governing rule or principle.',
-          'Step 2: Apply the analytical framework to the specific scenario.',
-          'Step 3: Synthesize the final conclusion with academic evidence.',
+          `Step 1: Recall the core definition and theoretical scope of ${cleanTitle}.`,
+          `Step 2: Contrast the primary mechanism against temporary, transient states or unrelated anomalies.`,
+          `Step 3: Select Option A as the scientifically accurate answer.`
         ],
-        explanation: 'Methodical deconstruction demonstrates complete academic mastery.',
       },
       initialExpanded: false,
     },

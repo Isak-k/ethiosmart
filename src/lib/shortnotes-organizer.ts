@@ -265,16 +265,43 @@ export function organizeChapterNotesLocal(
     let chunk: string[] = [];
     let chunkIndex = 1;
 
+    const deriveGroundedChunkTitle = (lines: string[], fallbackIdx: number): string => {
+      for (const line of lines) {
+        const trimmed = line.trim();
+        const boldM = trimmed.match(/^\*\*([^*]{3,60})\*\*$/);
+        if (boldM && !/^(note|definition|example|tip|warning|hint)/i.test(boldM[1])) {
+          return boldM[1].trim();
+        }
+        if (trimmed.length > 5 && trimmed.length < 60 && !trimmed.endsWith('.') && /^[A-Z0-9]/.test(trimmed)) {
+          if (!/^(the|a|an|in|on|at|for|to|and|but)\b/i.test(trimmed)) {
+            return trimmed.replace(/^(\d+[\.\)]\s*|[-*•]\s*)/, '').trim();
+          }
+        }
+      }
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed.length > 15) {
+          const firstSentence = trimmed.split(/[.?!]/)[0].trim();
+          if (firstSentence.length > 8 && firstSentence.length < 55) {
+            return firstSentence;
+          }
+        }
+      }
+      return defaultTitle ? `${defaultTitle} (Part ${fallbackIdx})` : `Core Concepts (Part ${fallbackIdx})`;
+    };
+
     for (const l of allLines) {
       chunk.push(l);
-      if (chunk.length >= 20 && l === '') {
-        rawSections.push({ title: `Part ${chunkIndex}: Fundamental Concepts`, lines: [...chunk] });
+      if (chunk.length >= 25 && l === '') {
+        const chunkTitle = deriveGroundedChunkTitle(chunk, chunkIndex);
+        rawSections.push({ title: chunkTitle, lines: [...chunk] });
         chunk = [];
         chunkIndex++;
       }
     }
     if (chunk.length > 0) {
-      rawSections.push({ title: `Part ${chunkIndex}: Applications & Practice`, lines: chunk });
+      const chunkTitle = deriveGroundedChunkTitle(chunk, chunkIndex);
+      rawSections.push({ title: chunkTitle, lines: chunk });
     }
   }
 
@@ -716,7 +743,7 @@ export interface OrganizeAIOptions {
 }
 
 async function callAIForNotes(prompt: string, effectiveKeys: ReturnType<typeof getClientProviderKeys>, userKey?: string): Promise<string> {
-  // 1. Try Google Gemini (Fastest high-throughput models with strict 10s timeout)
+  // 1. Try Google Gemini (Fastest high-throughput models with realistic 45s timeout)
   const geminiKey = userKey || effectiveKeys.gemini;
   if (geminiKey) {
     const models = ['gemini-flash-lite-latest', 'gemini-3.5-flash-lite', 'gemini-3-flash-preview', 'gemini-flash-latest', 'gemini-2.5-flash'];
@@ -727,13 +754,13 @@ async function callAIForNotes(prompt: string, effectiveKeys: ReturnType<typeof g
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            signal: AbortSignal.timeout(10000),
+            signal: AbortSignal.timeout(45000),
             body: JSON.stringify({
               contents: [{ parts: [{ text: prompt }] }],
               generationConfig: {
                 temperature: 0.2,
                 topP: 0.95,
-                maxOutputTokens: 4096,
+                maxOutputTokens: 8192,
                 responseMimeType: 'application/json',
               },
             }),
@@ -744,11 +771,13 @@ async function callAIForNotes(prompt: string, effectiveKeys: ReturnType<typeof g
           const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
           if (text && text.trim()) return text.trim();
         }
-      } catch {}
+      } catch (err) {
+        console.warn(`[callAIForNotes] Gemini (${model}) failed:`, err);
+      }
     }
   }
 
-  // 2. Try Groq (Ultra-fast failover with 8s timeout)
+  // 2. Try Groq (Ultra-fast failover with 35s timeout)
   const groqKey = effectiveKeys.groq;
   if (groqKey) {
     const models = ['qwen/qwen3.8-27b', 'openai/gpt-oss-120b', 'llama-3.1-8b-instant'];
@@ -760,15 +789,15 @@ async function callAIForNotes(prompt: string, effectiveKeys: ReturnType<typeof g
             'Content-Type': 'application/json',
             Authorization: `Bearer ${groqKey}`,
           },
-          signal: AbortSignal.timeout(8000),
+          signal: AbortSignal.timeout(35000),
           body: JSON.stringify({
             model,
             messages: [
-              { role: 'system', content: 'You are a master university professor and textbook author. Respond strictly with valid JSON.' },
+              { role: 'system', content: 'You are an expert university professor and master textbook author. Strictly ground all generated notes in the provided source material and respond strictly with valid JSON.' },
               { role: 'user', content: prompt },
             ],
             temperature: 0.2,
-            max_tokens: 4096,
+            max_tokens: 8192,
             response_format: { type: 'json_object' },
           }),
         });
@@ -777,11 +806,13 @@ async function callAIForNotes(prompt: string, effectiveKeys: ReturnType<typeof g
           const text = data?.choices?.[0]?.message?.content;
           if (text && text.trim()) return text.trim();
         }
-      } catch {}
+      } catch (err) {
+        console.warn(`[callAIForNotes] Groq (${model}) failed:`, err);
+      }
     }
   }
 
-  // 3. Try OpenRouter (8s timeout)
+  // 3. Try OpenRouter (45s timeout)
   const openrouterKey = effectiveKeys.openrouter;
   if (openrouterKey) {
     const models = ['meta-llama/llama-3.3-70b-instruct', 'google/gemini-2.0-flash-exp:free', 'deepseek/deepseek-chat'];
@@ -793,12 +824,13 @@ async function callAIForNotes(prompt: string, effectiveKeys: ReturnType<typeof g
             'Content-Type': 'application/json',
             Authorization: `Bearer ${openrouterKey}`,
           },
-          signal: AbortSignal.timeout(8000),
+          signal: AbortSignal.timeout(45000),
           body: JSON.stringify({
             model,
             messages: [{ role: 'user', content: prompt }],
             temperature: 0.2,
-            max_tokens: 4096,
+            max_tokens: 8192,
+            response_format: { type: 'json_object' },
           }),
         });
         if (response.ok) {
@@ -806,7 +838,9 @@ async function callAIForNotes(prompt: string, effectiveKeys: ReturnType<typeof g
           const text = data?.choices?.[0]?.message?.content;
           if (text && text.trim()) return text.trim();
         }
-      } catch {}
+      } catch (err) {
+        console.warn(`[callAIForNotes] OpenRouter (${model}) failed:`, err);
+      }
     }
   }
 
@@ -951,7 +985,7 @@ export interface TopicChunk {
  */
 export function splitContentIntoTopicChunks(
   rawText: string,
-  maxChunkLength = 40000
+  maxChunkLength = 60000
 ): TopicChunk[] {
   if (rawText.length <= maxChunkLength) {
     const topics = extractChapterTopics(rawText);
@@ -1065,17 +1099,37 @@ function buildNormalStudyNotesPrompt(params: {
   } = params;
 
   return `You are a premier university professor and master textbook author specializing in ${profile.name}.
-Your mission is to generate PROPER CLASSROOM STUDY NOTES for students, especially BEGINNERS learning this subject for the first time.
+Your mission is to generate GROUNDED, AUTHENTIC, EXPLANATORY CLASSROOM STUDY NOTES for students, based STRICTLY on the provided source material and user instructions.
+
 Subject: "${subjectName || profile.name}"
 Designated Chapter: "${chapterTitle}"
 ${totalChunks > 1 ? `Part: ${chunkIndex + 1} of ${totalChunks}` : ''}
 
 ================================================================================
+CRITICAL GROUNDING DIRECTIVE (STRICTLY CONFINED TO SOURCE MATERIAL - NO OUTSIDE FILLER):
+================================================================================
+1. Read, analyze, and understand the Source Material provided below first.
+2. Every section title, explanation, definition, fact, example, and exercise MUST be directly derived from and faithful to the Source Material.
+3. DO NOT introduce generic placeholder titles (e.g. NEVER output "Part 1: Fundamental Concepts", "Part 2: Fundamental Concepts", "Section 1", or "Overview"). Use the real, authentic topic names from the text.
+4. DO NOT invent outside facts, theories, or boilerplate that do not exist in the source material.
+5. If the source material is about Geography, the content must be about the specific geographic topics, regions, climate, or landforms in the text. If it is about Psychology, it must be about the specific theories, experiments, and concepts in the text.
+6. Zero Hallucination: Ground every definition, explanation, and exercise strictly in the text.
+
+================================================================================
+USER PROMPT & CUSTOM INSTRUCTIONS (HIGHEST PRIORITY):
+================================================================================
+${customInstructions ? `The educator has provided specific prompt instructions:
+"""
+${customInstructions}
+"""
+You MUST prioritize and apply these custom instructions when structuring, prioritizing, and explaining concepts from the source material.` : 'Follow the natural structure and pedagogical depth of the source material.'}
+
+================================================================================
 CORE MANDATE: GENERATE NORMAL, EXPLANATORY CLASSROOM STUDY NOTES (NOT SUMMARIES)
 ================================================================================
-The default output MUST resemble a teacher's well-prepared classroom notes or textbook notes:
+The default output MUST resemble a master teacher's classroom notes or textbook notes:
 - Teach students who are new to the subject using clear, simple English by default.
-- Explain concepts thoroughly enough for understanding and examination preparation.
+- Explain concepts thoroughly enough for deep understanding and examination preparation.
 - Do NOT generate brief summaries, revision sheets, lists of definitions without explanations, or superficial outlines.
 - Do NOT skip topics. Every meaningful topic and subtopic in the source material must be thoroughly taught.
 
@@ -1083,52 +1137,36 @@ The default output MUST resemble a teacher's well-prepared classroom notes or te
 CRITICAL TEACHING RULE: EXPLAIN CONCEPTS INSTEAD OF LISTING THEM
 ================================================================================
 NEVER produce bare bullet lists of items or types without individual explanations!
-
-BAD OUTPUT (DO NOT DO THIS):
-**Types of Operating Systems**
-- Batch operating system
-- Time-sharing operating system
-- Distributed operating system
-
-EXPECTED OUTPUT (ALWAYS DO THIS):
-**Types of Operating Systems**
-
-An operating system can be classified into different types based on how it manages tasks, users, and computer resources.
-
-**1. Batch Operating System**
-**Definition:** A batch operating system processes groups of similar jobs together without requiring continuous interaction from the user during execution.
-**Explanation:** Users submit jobs to the system, and the operating system organizes and processes them in batches. The user generally receives the results after processing is completed.
-**Example:** Processing a large batch of payroll records in an organization.
-**Important point:** Batch processing is useful when many similar jobs need to be processed automatically.
-
-**2. Time-Sharing Operating System**
-**Definition:** A time-sharing operating system allows multiple users or tasks to share computer resources simultaneously by allocating small time slices (quantum) of CPU execution to each process.
-**Explanation:** The CPU switches rapidly between tasks so that each user feels they have dedicated access to the machine.
-**Example:** A university multi-terminal mainframe server supporting multiple student programming sessions at once.
-**Important point:** Enhances CPU utilization and provides interactive response times.
+When a concept has types or classifications, EXPLAIN EACH TYPE INDIVIDUALLY with its own Definition, Explanation, Example, and Important points in clear Markdown prose.
 
 ================================================================================
-WHAT EVERY TOPIC AND SUBTOPIC MUST INCLUDE (WHEN RELEVANT):
+EXPANDED IN-DEPTH NOTE COVERAGE (+40% DEPTH & COMPREHENSIVENESS):
 ================================================================================
-For every topic and subtopic, include the relevant elements in simple English:
-1. Definition: Explain what the concept means in clear, accessible language.
-2. Explanation: Describe how and why the concept works in simple English.
-3. Types & Classifications: When a concept has types, EXPLAIN EACH TYPE INDIVIDUALLY with its own definition, explanation, example, and characteristics.
-4. Components or Characteristics: Describe the important parts and properties.
-5. Functions & Purposes: Explain what something does and why it is used.
-6. Practical Examples: Give relatable, real-world examples to help beginners understand.
-7. Important Details: Include relevant rules, principles, classifications, formulas, advantages, disadvantages, applications, and limitations.
-8. Processes & Steps: Explain steps in the correct chronological order when applicable.
-9. Comparisons: Explain differences and similarities when useful to prevent confusion.
+- INCREASE EXPLANATORY NOTE SIZE BY ~40%: Do NOT write brief, superficial summaries. Provide comprehensive, textbook-grade teaching notes.
+- For EVERY concept, theory, or mechanism:
+  1. Foundational context & rationale: Explain why this concept was developed and why it matters.
+  2. Deep internal mechanism: Walk through the step-by-step logic, components, or psychological/scientific processes.
+  3. Concrete real-world examples: Provide relatable everyday illustrations for every theoretical point.
+  4. Precise distinctions: Highlight how this concept contrasts with similar or easily confused concepts.
+  5. Nuances & exam traps: Warn students about common misconceptions and errors.
+- Ensure each section's "content" is a rich, substantive multi-paragraph masterclass (at least 350-600 words per section).
 
 ================================================================================
-MAKE THE NOTES BEGINNER-FRIENDLY:
+COLOR THE IMPORTANT POINTS & EMPHASIS DIRECTIVE:
 ================================================================================
-- Explain basic concepts before advanced concepts.
-- Define technical terms before relying on them.
-- Use simple English without removing important technical meaning.
-- Avoid unexplained abbreviations and jargon.
-- Never expect students to already understand concepts that have not yet been taught.
+- AGGRESSIVELY COLOR AND HIGHLIGHT key terms, definitions, laws, experiments, and exam takeaways using Markdown bold:
+  * Wrap EVERY core concept, technical term, governing rule, and critical exam takeaway in **bold** (e.g. **Conditioned Stimulus (CS)**, **Extinction**, **Relatively Permanent Change**).
+  * Our interactive reader automatically converts all **bold terms** into multi-colored, vibrant visual highlight pills (blue, emerald, amber, purple, rose) for effortless retention!
+  * Wrap pivotal governing formulas and immutable laws in ==highlight== syntax.
+  * In the "keyPoints" array, start every point with a bold anchor: e.g., "**Core Principle**: ...", "**Exam Misconception**: ...", "**Practical Example**: ...".
+
+================================================================================
+INTERACTIVE MULTIPLE CHOICE QUESTIONS (MCQs) FOR EVERY TOPIC (MANDATORY):
+================================================================================
+- Every section MUST include 2-3 Interactive Multiple Choice Questions (MCQs) in the "exercises" array.
+- DO NOT generate open-ended questions without choices. Every exercise must provide 4 distinct plausible options (A, B, C, D).
+- State the correct answer letter ("A", "B", "C", or "D") in "correctAnswer".
+- Provide a helpful hint in "hints", and a complete breakdown in "solution" explaining why the correct choice is right and why distractors are incorrect.
 
 ${isUserOrganized ? `================================================================================
 USER-ORGANIZED NOTE INSTRUCTION:
@@ -1140,7 +1178,7 @@ The source text is an already-organized study note provided by the educator/user
 - Expand every concept with full explanatory teaching prose following the author's outline.
 ` : ''}
 ${topicTitles.length > 0 ? `MANDATORY TOPIC COVERAGE:
-You MUST create a dedicated section for each of these topics:
+You MUST create a dedicated section for each of these topics from the material:
 ${topicTitles.map((t, idx) => `${idx + 1}. ${t}`).join('\n')}
 Do NOT skip any of these topics. Do NOT merge them into one brief paragraph.` : ''}
 
@@ -1151,7 +1189,6 @@ ${profile.formattingRules.map((rule) => `- ${rule}`).join('\n')}
 Target Audience: ${targetAudience}
 Depth: ${depth}
 Language: Strictly output in ${language}.
-${customInstructions ? `Custom Teacher Guidance: ${customInstructions}` : ''}
 
 Source Material:
 """
@@ -1161,28 +1198,87 @@ ${chunkText}
 Respond STRICTLY with valid JSON matching this schema:
 {
   "title": "${subjectName ? `${subjectName} - ` : ''}${chapterTitle}",
-  "summary": "3-4 sentence comprehensive executive overview of the chapter's core principles and exam significance.",
+  "summary": "3-4 sentence comprehensive executive overview grounded directly in the chapter's core principles.",
+  "learningOutcomes": [
+    "Identify ...",
+    "Explain ...",
+    "Differentiate ..."
+  ],
+  "keyTakeaways": [
+    "High-yield exam takeaway 1 directly from text",
+    "High-yield exam takeaway 2 directly from text"
+  ],
   "sections": [
     {
       "id": "sec-1",
       "sectionNumber": "1",
-      "title": "Comprehensive Topic Title",
-      "content": "Full, well-written classroom study notes teaching this topic: comprehensive explanations, definitions, each type individually explained with Definition, Explanation, Example, and Important points, components, processes, advantages/disadvantages, and comparisons in clear Markdown prose.",
+      "title": "Authentic Topic Title From Source Material",
+      "content": "Comprehensive, well-written classroom study notes teaching this topic: detailed explanations, definitions, each type individually explained with Definition, Explanation, Example, and Important points, components, processes, advantages/disadvantages, and comparisons in clear Markdown prose.",
       "keyPoints": [
-        "Core exam concept 1",
-        "Common pitfall or misconception to avoid 2",
-        "Key pedagogical reminder 3"
+        "Core exam concept 1 directly from text",
+        "Key pedagogical reminder 2"
+      ],
+      "contentBlocks": [
+        {
+          "type": "definition",
+          "title": "Exact Term Name From Text",
+          "subtitle": "Core Concept",
+          "content": "Clear, grounded definition in simple English."
+        },
+        {
+          "type": "important_fact",
+          "title": "Key Principle / Fact to Remember",
+          "content": "Grounded law, mechanism, or critical takeaway directly from this section."
+        },
+        {
+          "type": "example",
+          "title": "Realistic Application Example",
+          "subtitle": "Practical Scenario",
+          "content": "Relatable scenario directly illustrating this concept from the text."
+        },
+        {
+          "type": "warning",
+          "title": "Common Exam Misconception / Warning",
+          "content": "Specific misconception students often make regarding this exact topic."
+        },
+        {
+          "type": "tip",
+          "title": "Exam Tip & Strategy",
+          "content": "How to answer questions on this topic effectively."
+        }
+      ],
+      "exercises": [
+        {
+          "id": "ex-1-1",
+          "exerciseNumber": 1,
+          "questionType": "mcq",
+          "question": "Clear, grounded multiple-choice question testing understanding of this topic based on the source text...",
+          "options": [
+            "Plausible distractor option A",
+            "Correct answer option B",
+            "Plausible distractor option C",
+            "Plausible distractor option D"
+          ],
+          "correctAnswer": "B",
+          "hints": [
+            "Grounded hint guiding students to the correct mechanism..."
+          ],
+          "solution": {
+            "answer": "Option B: [Correct choice text]",
+            "explanation": "Detailed explanation of why Option B is correct and why options A, C, and D are incorrect.",
+            "steps": [
+              "Step 1: Identify the governing principle from this section.",
+              "Step 2: Evaluate each option against the principle to eliminate distractors."
+            ]
+          }
+        }
       ]
     }
   ],
   "keyTerms": [
     {
-      "term": "Key Term 1",
-      "definition": "Complete, clear definition in simple English."
-    },
-    {
-      "term": "Key Term 2",
-      "definition": "Complete, clear definition in simple English."
+      "term": "Term directly from text",
+      "definition": "Clear definition in simple English."
     }
   ]
 }`;
@@ -1304,25 +1400,54 @@ export async function organizeChapterNotesWithAI(
               }))
             : [];
 
-          let finalBlocks = synthesizeSectionBlocks(
-            {
-              id: sec.id || `sec-${globalIdx + 1}`,
-              title: sec.title || `Section ${globalIdx + 1}`,
-              content: sec.content || '',
-              keyPoints: Array.isArray(sec.keyPoints) ? sec.keyPoints : [],
-              contentBlocks: parsedBlocks,
-            },
-            profile.discipline,
-            detectedTitle
-          );
+          let finalBlocks: NoteContentBlock[];
+          if (parsedBlocks.length >= 2) {
+            finalBlocks = parsedBlocks;
+          } else {
+            finalBlocks = synthesizeSectionBlocks(
+              {
+                id: sec.id || `sec-${globalIdx + 1}`,
+                title: sec.title || `Section ${globalIdx + 1}`,
+                content: sec.content || '',
+                keyPoints: Array.isArray(sec.keyPoints) ? sec.keyPoints : [],
+                contentBlocks: parsedBlocks,
+              },
+              profile.discipline,
+              detectedTitle
+            );
+          }
 
-          let exercises = ensureSectionExercises(
-            sec.exercises,
-            globalIdx,
-            sec.title || `Section ${globalIdx + 1}`,
-            profile.discipline,
-            detectedTitle
-          );
+          const parsedExercises: NoteExercise[] = Array.isArray(sec.exercises) && sec.exercises.length > 0
+            ? sec.exercises.map((ex: any, eIdx: number) => {
+                const rawOptions: string[] = Array.isArray(ex.options)
+                  ? ex.options.map((o: any) => String(o).trim()).filter(Boolean)
+                  : [];
+                const isMCQ = rawOptions.length > 0 || ex.questionType === 'mcq';
+                return {
+                  id: ex.id || `ex-${globalIdx + 1}-${eIdx + 1}`,
+                  exerciseNumber: ex.exerciseNumber || (eIdx + 1),
+                  question: ex.question || '',
+                  questionType: (isMCQ ? 'mcq' : (ex.questionType || 'problem')) as any,
+                  options: rawOptions.length > 0 ? rawOptions : undefined,
+                  correctAnswer: ex.correctAnswer || (ex.solution && typeof ex.solution === 'object' ? ex.solution.answer : undefined),
+                  hints: ex.hint ? [ex.hint] : (Array.isArray(ex.hints) ? ex.hints : []),
+                  solution: typeof ex.solution === 'string'
+                    ? { answer: ex.solution, steps: [ex.solution], explanation: 'Direct model answer based on the source study notes.' }
+                    : ex.solution || { answer: 'Model answer for ' + (sec.title || 'Topic'), steps: [], explanation: '' },
+                  initialExpanded: false,
+                };
+              })
+            : [];
+
+          let exercises = parsedExercises.length > 0
+            ? parsedExercises
+            : ensureSectionExercises(
+                sec.exercises,
+                globalIdx,
+                sec.title || `Section ${globalIdx + 1}`,
+                profile.discipline,
+                detectedTitle
+              );
 
           let builtSec: ShortNoteSection = {
             id: sec.id || `sec-${globalIdx + 1}`,
@@ -1335,10 +1460,9 @@ export async function organizeChapterNotesWithAI(
             isImportant: sec.isImportant ?? true,
           };
 
-          // If this section has bare bullets or is incomplete, repair it
-          const bulletCount = (builtSec.content || '').split('\n').filter((l) => /^[-*•]\s+/.test(l.trim())).length;
+          // Only repair if section content is virtually empty (less than 30 words)
           const words = (builtSec.content || '').split(/\s+/).filter(Boolean).length;
-          if (words < 180 || (bulletCount >= 2 && words < 250)) {
+          if (words < 30 && (!builtSec.contentBlocks || builtSec.contentBlocks.length < 2)) {
             builtSec = repairIncompleteSection(builtSec, profile.discipline, detectedTitle, chunkText);
           }
 
@@ -1366,15 +1490,7 @@ export async function organizeChapterNotesWithAI(
       readingTimeMinutes,
     };
 
-    // Quality check: if completeness is below 85 or any section lacks contentBlocks, enrich (only for unorganized source text)
-    const validation = validateStudyNoteCompleteness(aiResult, rawText, subjectName);
-    if (!isUserOrganized && (validation.score < 85 || aiResult.sections.some((s) => !s.contentBlocks || s.contentBlocks.length < 3))) {
-      return enrichStudyNoteToTextbookQuality(aiResult, {
-        subjectName: subjectName || 'Subject',
-        chapterTitle: chapterTitle || 'Chapter Overview',
-      });
-    }
-
+    // When AI generation produces valid sections, faithfully return the AI-grounded result
     return aiResult;
   } catch (err) {
     console.warn('AI smart organize encountered parsing error, falling back to local organizer:', err);

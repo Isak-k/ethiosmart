@@ -101,6 +101,7 @@ import {
   BookMarked,
   HelpCircle,
   Image as ImageIcon,
+  ShieldCheck,
 } from 'lucide-react';
 
 export default function AdminShortnotesStudio() {
@@ -601,11 +602,11 @@ export default function AdminShortnotesStudio() {
             sourceType: sourceTypeParam,
           }),
           new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('AI generation timed out (exceeded 18s)')), 18000)
+            setTimeout(() => reject(new Error('AI generation timed out (exceeded 90s)')), 90000)
           ),
         ]);
       } catch (aiErr) {
-        console.warn('AI generation timed out or failed, instantly applying textbook synthesis:', aiErr);
+        console.warn('AI generation timed out or failed, falling back to local grounded organizer:', aiErr);
         organizedResult = generateImportantChapterNotes(rawInputText, {
           subjectName: currentSubject?.name || 'Subject',
           chapterTitle: targetChapterTitle,
@@ -622,43 +623,23 @@ export default function AdminShortnotesStudio() {
         clearTimeout(stageTimer2);
       }
 
-      // Stage 4: Completeness Audit & Textbook Quality Upgrade
+      // Stage 4: Interactive Card Structuring & Verification
       setGenerationStage(4);
       setGenerationStageText('Auditing completeness & formatting interactive structure...');
 
-      if (sourceTypeParam === 'upload' || sourceTypeParam === 'pasted_text') {
-        // Author's organized notes: strictly preserve the author's exact topics and sections
-        // Build visual pedagogical cards and interactive exercises directly from the author's structure
-        organizedResult = {
-          ...organizedResult,
-          sections: organizedResult.sections.map((sec, idx) => ({
-            ...sec,
-            contentBlocks: sec.contentBlocks && sec.contentBlocks.length >= 2
-              ? sec.contentBlocks
-              : synthesizeSectionBlocks(sec, currentPedagogicalProfile.discipline, targetChapterTitle),
-            exercises: ensureSectionExercises(sec.exercises || [], idx, sec.title, currentPedagogicalProfile.discipline, targetChapterTitle),
-          })),
-        };
-      } else {
-        const validation = validateStudyNoteCompleteness(organizedResult, rawInputText, currentSubject?.name);
-
-        if (
-          validation.score < 85 ||
-          (validation.incompleteSectionIndices && validation.incompleteSectionIndices.length > 0) ||
-          organizedResult.sections.some((s) => !s.contentBlocks || s.contentBlocks.length < 3)
-        ) {
-          organizedResult = enrichStudyNoteToTextbookQuality(organizedResult, {
-            subjectName: currentSubject?.name || 'Subject',
-            chapterTitle: targetChapterTitle,
-            chapterNumber: targetChapterNum || 1,
-            gradeLevel: gradeLevel,
-            depth: generationDepth,
-            targetAudience: generationAudience,
-            language: generationLanguage,
-            customInstructions: customInstructions,
-          });
-        }
-      }
+      // Preserve AI's authentic sections, contentBlocks, and exercises across all workflows without overwriting with boilerplate
+      organizedResult = {
+        ...organizedResult,
+        sections: organizedResult.sections.map((sec, idx) => ({
+          ...sec,
+          contentBlocks: sec.contentBlocks && sec.contentBlocks.length >= 2
+            ? sec.contentBlocks
+            : synthesizeSectionBlocks(sec, currentPedagogicalProfile.discipline, targetChapterTitle),
+          exercises: (sec.exercises && sec.exercises.length > 0)
+            ? sec.exercises
+            : ensureSectionExercises(sec.exercises || [], idx, sec.title, currentPedagogicalProfile.discipline, targetChapterTitle),
+        })),
+      };
       await new Promise((r) => setTimeout(r, 400));
 
       // Stage 5: Finalizing interactive note reader
@@ -851,7 +832,7 @@ export default function AdminShortnotesStudio() {
               customInstructions: customInstructions,
             }),
             new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error('AI generation timeout')), 60000)
+              setTimeout(() => reject(new Error('AI generation timeout')), 90000)
             ),
           ]);
         } catch {
@@ -868,24 +849,19 @@ export default function AdminShortnotesStudio() {
           });
         }
 
-        const validation = validateStudyNoteCompleteness(result, item.rawText, currentSubject?.name);
-        if (
-          validation.score < 85 ||
-          (validation.incompleteSectionIndices && validation.incompleteSectionIndices.length > 0) ||
-          result.sections.some((s) => !s.contentBlocks || s.contentBlocks.length < 3)
-        ) {
-          result = enrichStudyNoteToTextbookQuality(result, {
-            subjectName: currentSubject?.name || 'Subject',
-            chapterTitle: item.chapterTitle,
-            chapterNumber: item.chapterNumber,
-            chapterId: item.chapterId,
-            gradeLevel: gradeLevel,
-            depth: generationDepth,
-            targetAudience: generationAudience,
-            language: generationLanguage,
-            customInstructions: customInstructions,
-          });
-        }
+        // Preserve AI generated content blocks and exercises; only synthesize if missing
+        result = {
+          ...result,
+          sections: (result.sections || []).map((sec, idx) => ({
+            ...sec,
+            contentBlocks: sec.contentBlocks && sec.contentBlocks.length >= 2
+              ? sec.contentBlocks
+              : synthesizeSectionBlocks(sec, currentPedagogicalProfile.discipline, item.chapterTitle),
+            exercises: (sec.exercises && sec.exercises.length > 0)
+              ? sec.exercises
+              : ensureSectionExercises(sec.exercises || [], idx, sec.title, currentPedagogicalProfile.discipline, item.chapterTitle),
+          })),
+        };
 
         const effectiveCover = currentSubject
           ? currentSubject.coverImageUrl || getSubjectCover(currentSubject.name).url
@@ -2177,23 +2153,142 @@ export default function AdminShortnotesStudio() {
                   </div>
                 </div>
 
-                {/* Custom Guidance */}
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-muted-foreground">
-                    Optional Custom Pedagogical Guidance
-                  </Label>
-                  <Input
-                    placeholder="e.g. Emphasize step-by-step calculus proofs, focus on landmark cognitive experiments..."
+                {/* AI Prompt & Custom Guidance Panel */}
+                <div className="rounded-2xl border border-primary/20 bg-muted/30 p-4 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      <Label className="text-xs font-bold text-foreground">
+                        AI Generation Prompt & Custom Instructions
+                      </Label>
+                    </div>
+                    <Badge variant="outline" className="text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 flex items-center gap-1 w-fit">
+                      <ShieldCheck className="h-3 w-3" />
+                      Strict Source Grounding & +40% Depth Active
+                    </Badge>
+                  </div>
+
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Instruct the AI on focus, tone, or specific concepts. The AI model reads and deeply understands your provided resource first, ensuring all definitions, explanations, and review problems are strictly derived from the text without outside filler.
+                  </p>
+
+                  <Textarea
+                    placeholder="Enter your instructions for the AI (e.g. 'Explain each learning theory in simple English with real-life examples, focus on Pavlov and Skinner experiments, highlight exam misconceptions, exclude unrelated formulas, keep Grade 12 level')..."
                     value={customInstructions}
                     onChange={(e) => setCustomInstructions(e.target.value)}
-                    className="rounded-xl text-xs h-9"
+                    rows={3}
+                    className="rounded-xl text-xs resize-y bg-background focus:ring-1 focus:ring-primary"
                   />
+
+                  {/* Preset Quick Chips */}
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                      Quick Instruction Presets (Click to insert):
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        {
+                          label: '🎯 Strictly Ground in Source Text',
+                          text: 'Strictly confine all definitions, examples, and questions to the source material. Do not include outside theories or unmentioned formulas.',
+                        },
+                        {
+                          label: '📈 +40% In-Depth Content',
+                          text: 'Increase explanatory note depth and size by 40%. Provide rich, comprehensive multi-paragraph explanations breaking down mechanisms, context, nuances, and real-world examples.',
+                        },
+                        {
+                          label: '🎨 Color Key Terms & Highlights',
+                          text: 'Aggressively highlight and bold (**important concept**, **governing law**, **key term**) all critical definitions and exam takeaways so they are rendered as colorful, high-contrast visual pills.',
+                        },
+                        {
+                          label: '❓ Interactive MCQs per Topic',
+                          text: 'For every topic/section, generate 2-3 interactive Multiple Choice Questions (MCQs) with 4 plausible options (A, B, C, D), correct answer letter, hints, and detailed explanations of why the answer is correct.',
+                        },
+                        {
+                          label: '📘 Simple English for Grade 12',
+                          text: 'Use clear, accessible English suitable for Grade 12 students. Break down complex academic terms into plain explanations.',
+                        },
+                        {
+                          label: '💡 Real-World Practical Examples',
+                          text: 'Provide concrete, intuitive everyday examples for every theoretical mechanism and concept.',
+                        },
+                        {
+                          label: '⚠️ Common Exam Pitfalls',
+                          text: 'Highlight frequent exam traps, common misconceptions, and mark-losing errors with clear distinctions.',
+                        },
+                      ].map((preset, pIdx) => (
+                        <button
+                          key={pIdx}
+                          type="button"
+                          onClick={() => {
+                            setCustomInstructions((prev) => {
+                              const trimmed = prev.trim();
+                              if (!trimmed) return preset.text;
+                              if (trimmed.includes(preset.text)) return trimmed;
+                              return `${trimmed}. ${preset.text}`;
+                            });
+                          }}
+                          className="text-[10px] px-2.5 py-1 rounded-lg border border-border/80 bg-background/80 hover:bg-primary/10 hover:border-primary/40 text-foreground transition-all cursor-pointer font-medium"
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                      {customInstructions && (
+                        <button
+                          type="button"
+                          onClick={() => setCustomInstructions('')}
+                          className="text-[10px] px-2 py-1 rounded-lg border border-destructive/30 text-destructive hover:bg-destructive/10 transition-all cursor-pointer font-medium"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Active Source Material Status Indicator */}
+                  <div className="pt-2 border-t border-border/40 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <span className="font-semibold text-foreground">Target Material:</span>
+                      {selectedWorkflow === 'workflow_a' ? (
+                        <span>
+                          {selectedWorkflowAChapter
+                            ? `Chapter ${selectedWorkflowAChapter.chapterNumber}: ${selectedWorkflowAChapter.chapterTitle} (${selectedWorkflowAChapter.wordCount.toLocaleString()} words)`
+                            : 'No chapter selected yet'}
+                        </span>
+                      ) : selectedWorkflow === 'workflow_b' ? (
+                        <span>
+                          {selectedUploadChapter
+                            ? `Chapter ${selectedUploadChapter.chapterNumber}: ${selectedUploadChapter.chapterTitle}`
+                            : uploadedFile
+                            ? `${uploadedFile.name} (${uploadAnalysis?.totalWordCount.toLocaleString() || 0} words)`
+                            : 'No document uploaded yet'}
+                        </span>
+                      ) : (
+                        <span>
+                          {pastedRawText.trim()
+                            ? `Pasted text (${pastedRawText.trim().split(/\s+/).filter(Boolean).length} words)`
+                            : 'No text pasted yet'}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                      ✓ AI Ingestion & Pedagogical Grounding Ready
+                    </span>
+                  </div>
                 </div>
 
                 {/* PRIMARY ACTION BUTTON */}
                 <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3">
                   <div className="text-[11px] text-muted-foreground">
-                    Enforces ExamPro 10-Element Teaching Sequence: Definitions, Intermediate Calculations & Show/Hide Solution Exercises.
+                    {isGenerating ? (
+                      <span className="text-primary font-medium flex items-center gap-1.5 animate-pulse">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        Stage {generationStage}/5: {generationStageText}
+                      </span>
+                    ) : (
+                      <span>
+                        Builds comprehensive interactive study notes strictly grounded in the resource with interactive check cards and exercises.
+                      </span>
+                    )}
                   </div>
 
                   <Button
@@ -2205,7 +2300,7 @@ export default function AdminShortnotesStudio() {
                       else handleGenerateWorkflowC();
                     }}
                     disabled={isGenerating}
-                    className="rounded-2xl bg-gradient-to-r from-primary via-purple-600 to-indigo-600 hover:from-primary/90 hover:to-indigo-700 text-white font-bold shadow-md h-11 px-6 w-full sm:w-auto text-sm"
+                    className="rounded-2xl bg-gradient-to-r from-primary via-purple-600 to-indigo-600 hover:from-primary/90 hover:to-indigo-700 text-white font-bold shadow-md h-12 px-7 w-full sm:w-auto text-sm shrink-0"
                   >
                     {isGenerating ? (
                       <>
@@ -2215,7 +2310,7 @@ export default function AdminShortnotesStudio() {
                     ) : (
                       <>
                         <Sparkles className="h-4 w-4 mr-2" />
-                        Generate Textbook-Quality Study Note
+                        AI Generate In-Depth Study Notes from Resource
                       </>
                     )}
                   </Button>

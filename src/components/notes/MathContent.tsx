@@ -156,34 +156,57 @@ export function formatMathToHtml(input: string): string {
  */
 export const PEDAGOGICAL_MAIN_POINT_COLORS = [
   {
-    text: 'text-blue-700 dark:text-blue-300',
-    bg: 'bg-blue-500/10 dark:bg-blue-400/15 border-blue-500/30',
+    text: 'text-blue-900 dark:text-blue-100',
+    bg: 'bg-blue-500/15 dark:bg-blue-500/25 border-blue-500/40 shadow-xs',
   },
   {
-    text: 'text-amber-700 dark:text-amber-300',
-    bg: 'bg-amber-500/10 dark:bg-amber-400/15 border-amber-500/30',
+    text: 'text-amber-900 dark:text-amber-100',
+    bg: 'bg-amber-500/15 dark:bg-amber-500/25 border-amber-500/40 shadow-xs',
   },
   {
-    text: 'text-emerald-700 dark:text-emerald-300',
-    bg: 'bg-emerald-500/10 dark:bg-emerald-400/15 border-emerald-500/30',
+    text: 'text-emerald-900 dark:text-emerald-100',
+    bg: 'bg-emerald-500/15 dark:bg-emerald-500/25 border-emerald-500/40 shadow-xs',
   },
   {
-    text: 'text-purple-700 dark:text-purple-300',
-    bg: 'bg-purple-500/10 dark:bg-purple-400/15 border-purple-500/30',
+    text: 'text-purple-900 dark:text-purple-100',
+    bg: 'bg-purple-500/15 dark:bg-purple-500/25 border-purple-500/40 shadow-xs',
   },
   {
-    text: 'text-rose-700 dark:text-rose-300',
-    bg: 'bg-rose-500/10 dark:bg-rose-400/15 border-rose-500/30',
+    text: 'text-rose-900 dark:text-rose-100',
+    bg: 'bg-rose-500/15 dark:bg-rose-500/25 border-rose-500/40 shadow-xs',
   },
   {
-    text: 'text-cyan-700 dark:text-cyan-300',
-    bg: 'bg-cyan-500/10 dark:bg-cyan-400/15 border-cyan-500/30',
+    text: 'text-cyan-900 dark:text-cyan-100',
+    bg: 'bg-cyan-500/15 dark:bg-cyan-500/25 border-cyan-500/40 shadow-xs',
   },
   {
-    text: 'text-indigo-700 dark:text-indigo-300',
-    bg: 'bg-indigo-500/10 dark:bg-indigo-400/15 border-indigo-500/30',
+    text: 'text-indigo-900 dark:text-indigo-100',
+    bg: 'bg-indigo-500/15 dark:bg-indigo-500/25 border-indigo-500/40 shadow-xs',
   },
 ];
+
+/**
+ * Maps known pedagogical anchors to high-visibility colored badge styling.
+ */
+function getPedagogicalPrefixStyle(prefixText: string): { text: string; bg: string } {
+  const lower = prefixText.toLowerCase();
+  if (lower.includes('definition')) {
+    return { text: 'text-blue-700 dark:text-blue-300', bg: 'bg-blue-500/15 border-blue-500/40' };
+  }
+  if (lower.includes('remember') || lower.includes('important')) {
+    return { text: 'text-amber-800 dark:text-amber-300', bg: 'bg-amber-500/15 border-amber-500/40' };
+  }
+  if (lower.includes('example')) {
+    return { text: 'text-emerald-800 dark:text-emerald-300', bg: 'bg-emerald-500/15 border-emerald-500/40' };
+  }
+  if (lower.includes('misconception') || lower.includes('pitfall') || lower.includes('warning')) {
+    return { text: 'text-rose-800 dark:text-rose-300', bg: 'bg-rose-500/15 border-rose-500/40' };
+  }
+  if (lower.includes('tip') || lower.includes('takeaway')) {
+    return { text: 'text-purple-800 dark:text-purple-300', bg: 'bg-purple-500/15 border-purple-500/40' };
+  }
+  return { text: 'text-indigo-800 dark:text-indigo-300', bg: 'bg-indigo-500/15 border-indigo-500/40' };
+}
 
 /**
  * Parses markdown inline styles in a plain prose segment:
@@ -191,6 +214,7 @@ export const PEDAGOGICAL_MAIN_POINT_COLORS = [
  * - `code` -> inline code pill
  * - *italic* -> emphasized italic
  * - ==highlight== -> marked text
+ * - Auto-colors prominent pedagogical prefixes (Definition:, Example:, Remember for exams:)
  */
 function renderColoredProseSegment(segment: string, baseKey: number | string) {
   if (!segment) return null;
@@ -213,7 +237,7 @@ function renderColoredProseSegment(segment: string, baseKey: number | string) {
       return (
         <strong
           key={key}
-          className={`font-bold inline-block px-1.5 py-0.5 rounded-md border text-[1.02em] shadow-2xs mx-0.5 transition-colors ${style.text} ${style.bg}`}
+          className={`font-bold inline-block px-2 py-0.5 rounded-lg border text-[1.02em] mx-0.5 transition-colors ${style.text} ${style.bg}`}
         >
           {clean}
         </strong>
@@ -226,7 +250,7 @@ function renderColoredProseSegment(segment: string, baseKey: number | string) {
       return (
         <code
           key={key}
-          className="font-mono text-[0.9em] px-1.5 py-0.5 rounded bg-muted/80 border border-border/70 text-primary font-semibold mx-0.5"
+          className="font-mono text-[0.9em] px-1.5 py-0.5 rounded-md bg-muted/80 border border-border/70 text-primary font-semibold mx-0.5"
         >
           {clean}
         </code>
@@ -239,7 +263,7 @@ function renderColoredProseSegment(segment: string, baseKey: number | string) {
       return (
         <mark
           key={key}
-          className="bg-amber-400/25 dark:bg-amber-400/35 text-foreground px-1 py-0.5 rounded font-medium mx-0.5"
+          className="bg-amber-300/40 dark:bg-amber-400/30 text-amber-950 dark:text-amber-100 px-1.5 py-0.5 rounded-md font-semibold border-b-2 border-amber-500/60 mx-0.5"
         >
           {clean}
         </mark>
@@ -256,8 +280,32 @@ function renderColoredProseSegment(segment: string, baseKey: number | string) {
       );
     }
 
-    // Plain prose: clean out any accidental loose double asterisks
+    // Plain prose: check for pedagogical anchors like "Definition:", "Example:", "Remember for exams:"
     const sanitized = token.replaceAll('**', '');
+    const prefixRegex = /(?:^|\n)(Definition|Key Concept|Core Concept|Remember for [eE]xams|Remember|Exam Tip|Common Misconception|Exam Pitfall|Scenario|Solution Steps|Key Takeaway|Example|Important|Note):/gi;
+
+    if (prefixRegex.test(sanitized)) {
+      const parts = sanitized.split(/(Definition:|Key Concept:|Core Concept:|Remember for [eE]xams:|Remember:|Exam Tip:|Common Misconception:|Exam Pitfall:|Scenario:|Solution Steps:|Key Takeaway:|Example:|Important:|Note:)/gi);
+      return (
+        <span key={key}>
+          {parts.map((p, pIdx) => {
+            if (/^(Definition|Key Concept|Core Concept|Remember for [eE]xams|Remember|Exam Tip|Common Misconception|Exam Pitfall|Scenario|Solution Steps|Key Takeaway|Example|Important|Note):$/i.test(p)) {
+              const style = getPedagogicalPrefixStyle(p);
+              return (
+                <span
+                  key={`${key}-prefix-${pIdx}`}
+                  className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs sm:text-sm font-bold border mr-1.5 ${style.text} ${style.bg}`}
+                >
+                  {p}
+                </span>
+              );
+            }
+            return <React.Fragment key={`${key}-p-${pIdx}`}>{p}</React.Fragment>;
+          })}
+        </span>
+      );
+    }
+
     return <span key={key}>{sanitized}</span>;
   });
 }
