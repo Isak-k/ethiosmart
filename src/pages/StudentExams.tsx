@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getPublishedExams, getAllExams } from "@/lib/firebase-exams";
 import { getStudentAttempts } from "@/lib/firebase-attempts";
 import { getSubjects, getChapters } from "@/lib/subjects";
+import { getBooks } from "@/lib/books";
 import { calculateAllSubjectsProgress } from "@/lib/subject-progress";
 import { getSubjectCover } from "@/lib/subject-covers";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -25,13 +26,21 @@ import {
   Clock,
   ChevronRight,
   WifiOff,
-  HardDrive
+  HardDrive,
+  Play
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { Subject, Chapter, StudentSubjectProgress } from "@/types/subject";
 
@@ -54,13 +63,15 @@ interface ExamData {
   chapterTitle?: string;
 }
 
-interface ChapterGroup {
+interface UnitDisplayItem {
   id: string;
+  unitNumber: number;
   title: string;
-  chapterNumber?: number;
   description?: string;
   exams: ExamData[];
-  completedCount: number;
+  hasExam: boolean;
+  hasAttempted: boolean;
+  isDownloaded?: boolean;
 }
 
 const StudentExams = () => {
@@ -81,6 +92,7 @@ const StudentExams = () => {
   // Subject-specific chapters state
   const [subjectChapters, setSubjectChapters] = useState<Chapter[]>([]);
   const [chaptersLoading, setChaptersLoading] = useState(false);
+  const [selectedMultiExamUnit, setSelectedMultiExamUnit] = useState<UnitDisplayItem | null>(null);
 
   const { toast } = useToast();
 
@@ -155,15 +167,47 @@ const StudentExams = () => {
       setAttemptedExamIds(new Set(attempts.map((a) => a.examId)));
       setExams(mappedExams);
 
-      // 2. Fetch subjects available to student's department
-      const subjectsList = await getSubjects(profile?.departmentId).catch(() => []);
-      const activeSubjects = subjectsList.filter((s) => s.isActive !== false);
-      setSubjects(activeSubjects);
+      // 2. Fetch subjects available to student's department and curriculum textbooks
+      const [subjectsList, textbooks] = await Promise.all([
+        getSubjects(profile?.departmentId).catch(() => []),
+        getBooks({ resourceType: 'textbook' }, 'student').catch(() => []),
+      ]);
+
+      let activeSubjects = subjectsList.filter((s) => s.isActive !== false);
+
+      // Strict department assignment rule: students only see subjects explicitly assigned to their department
+      if (profile?.departmentId && profile.departmentId !== 'all') {
+        activeSubjects = activeSubjects.filter((s) => {
+          if (s.departmentIds && s.departmentIds.length > 0) {
+            return s.departmentIds.includes(profile.departmentId!) || s.departmentIds.includes('all');
+          }
+          return (s as any).departmentId === profile.departmentId;
+        });
+      }
+
+      // Inherit coverpage of curriculum BOOK (textbook), NOT study notes
+      const enrichedSubjects = activeSubjects.map((sub) => {
+        const matchingBook = textbooks.find(
+          (b) => b.resourceType === 'textbook' && b.subjectId === sub.id && b.coverImageUrl
+        );
+        const effectiveBookCover =
+          matchingBook?.coverImageUrl ||
+          sub.bookCoverImageUrl ||
+          (sub.coverImageUrl && sub.coverImageUrl !== sub.notesCoverImageUrl ? sub.coverImageUrl : '') ||
+          getSubjectCover(sub.name).url;
+
+        return {
+          ...sub,
+          coverImageUrl: effectiveBookCover,
+        };
+      });
+
+      setSubjects(enrichedSubjects);
 
       // 3. Calculate unit progress & curriculum coverage for each subject
-      if (activeSubjects.length > 0) {
+      if (enrichedSubjects.length > 0) {
         const prog = await calculateAllSubjectsProgress(
-          activeSubjects,
+          enrichedSubjects,
           user.uid,
           profile?.departmentId,
           examsData,
@@ -235,39 +279,101 @@ const StudentExams = () => {
     );
   }, [currentSubjectExams, searchQuery]);
 
-  // Organize the active subject's exams into chapters & units
-  const organizedChapterGroups = useMemo(() => {
+  // Map curriculum units & exams matching the horizontal cards UI
+  const displayUnits = useMemo(() => {
     if (!activeSubject) return [];
 
-    const groups: ChapterGroup[] = [];
+    const units: UnitDisplayItem[] = [];
     const assignedExamIds = new Set<string>();
 
     // 1. If explicit chapters exist in Firestore subcollection
-    subjectChapters.forEach((ch, idx) => {
-      const chapterExams = searchedCurrentSubjectExams.filter((e) => {
-        if (e.chapterId === ch.id) return true;
-        if (e.chapterTitle && e.chapterTitle.toLowerCase().trim() === ch.title.toLowerCase().trim()) return true;
-        return false;
+    if (subjectChapters.length > 0) {
+      const sortedChapters = [...subjectChapters].sort(
+        (a, b) => (a.chapterNumber ?? 0) - (b.chapterNumber ?? 0)
+      );
+
+      sortedChapters.forEach((ch, idx) => {
+        const unitNum = ch.chapterNumber ?? idx + 1;
+        const chapterExams = currentSubjectExams.filter((e) => {
+          if (e.chapterId === ch.id) return true;
+          if (e.chapterTitle && ch.title && e.chapterTitle.toLowerCase().trim() === ch.title.toLowerCase().trim()) return true;
+          if (e.title && ch.title && e.title.toLowerCase().includes(ch.title.toLowerCase())) return true;
+          return false;
+        });
+
+        chapterExams.forEach((e) => assignedExamIds.add(e.id));
+        const completed = chapterExams.some((e) => attemptedExamIds.has(e.id));
+
+        units.push({
+          id: ch.id,
+          unitNumber: unitNum,
+          title: ch.title,
+          description: ch.description,
+          exams: chapterExams,
+          hasExam: chapterExams.length > 0,
+          hasAttempted: completed,
+        });
       });
 
-      chapterExams.forEach((e) => assignedExamIds.add(e.id));
-      const completed = chapterExams.filter((e) => attemptedExamIds.has(e.id)).length;
+      // Include remaining exams with explicit chapter title
+      const remainingExamsWithTitle = currentSubjectExams.filter(
+        (e) => !assignedExamIds.has(e.id) && Boolean(e.chapterTitle)
+      );
+      const derivedTitles = Array.from(
+        new Set(remainingExamsWithTitle.map((e) => e.chapterTitle!.trim()))
+      );
 
-      groups.push({
-        id: ch.id,
-        title: ch.title,
-        chapterNumber: ch.chapterNumber ?? (idx + 1),
-        description: ch.description,
-        exams: chapterExams,
-        completedCount: completed,
+      derivedTitles.forEach((title, idx) => {
+        const chapterExams = remainingExamsWithTitle.filter(
+          (e) => e.chapterTitle?.trim() === title
+        );
+        chapterExams.forEach((e) => assignedExamIds.add(e.id));
+        const matchNum = title.match(/unit\s*(\d+)|chapter\s*(\d+)/i);
+        const unitNum = matchNum ? parseInt(matchNum[1] || matchNum[2], 10) : units.length + idx + 1;
+        units.push({
+          id: `derived_${idx}_${title}`,
+          unitNumber: unitNum,
+          title,
+          exams: chapterExams,
+          hasExam: chapterExams.length > 0,
+          hasAttempted: chapterExams.some((e) => attemptedExamIds.has(e.id)),
+        });
       });
-    });
 
-    // 2. Derive chapters from exam.chapterTitle if not in subcollection
-    const remainingExamsWithTitle = searchedCurrentSubjectExams.filter(
-      (e) => !assignedExamIds.has(e.id) && Boolean(e.chapterTitle)
-    );
+      // Ensure totalUnits from subject (e.g. Grade 9 9 units) are represented
+      const targetCount = Math.max(activeSubject.totalUnits || 0, units.length);
+      for (let i = 1; i <= targetCount; i++) {
+        if (!units.some((u) => u.unitNumber === i)) {
+          units.push({
+            id: `placeholder_unit_${i}`,
+            unitNumber: i,
+            title: `Unit ${i}`,
+            exams: [],
+            hasExam: false,
+            hasAttempted: false,
+          });
+        }
+      }
 
+      // Remaining unassigned exams
+      const unassignedExams = currentSubjectExams.filter((e) => !assignedExamIds.has(e.id));
+      if (unassignedExams.length > 0) {
+        units.push({
+          id: "general_subject_assessments",
+          unitNumber: units.length + 1,
+          title: "Comprehensive Curriculum Assessment",
+          description: "Curriculum assessment examination",
+          exams: unassignedExams,
+          hasExam: true,
+          hasAttempted: unassignedExams.some((e) => attemptedExamIds.has(e.id)),
+        });
+      }
+
+      return units.sort((a, b) => a.unitNumber - b.unitNumber);
+    }
+
+    // 2. If no Firestore subcollection chapters exist, derive from exam titles and totalUnits
+    const remainingExamsWithTitle = currentSubjectExams.filter((e) => Boolean(e.chapterTitle));
     const derivedTitles = Array.from(
       new Set(remainingExamsWithTitle.map((e) => e.chapterTitle!.trim()))
     );
@@ -277,36 +383,82 @@ const StudentExams = () => {
         (e) => e.chapterTitle?.trim() === title
       );
       chapterExams.forEach((e) => assignedExamIds.add(e.id));
-      const completed = chapterExams.filter((e) => attemptedExamIds.has(e.id)).length;
-
-      groups.push({
+      const matchNum = title.match(/unit\s*(\d+)|chapter\s*(\d+)/i);
+      const unitNum = matchNum ? parseInt(matchNum[1] || matchNum[2], 10) : idx + 1;
+      units.push({
         id: `derived_${idx}_${title}`,
+        unitNumber: unitNum,
         title,
-        chapterNumber: groups.length + 1,
         exams: chapterExams,
-        completedCount: completed,
+        hasExam: chapterExams.length > 0,
+        hasAttempted: chapterExams.some((e) => attemptedExamIds.has(e.id)),
       });
     });
 
-    // 3. Any remaining exams in this subject without a chapter title
-    const unassignedExams = searchedCurrentSubjectExams.filter(
-      (e) => !assignedExamIds.has(e.id)
-    );
-
-    if (unassignedExams.length > 0) {
-      const completed = unassignedExams.filter((e) => attemptedExamIds.has(e.id)).length;
-      groups.push({
-        id: "general_subject_assessments",
-        title: groups.length > 0 ? "General Unit Assessments" : "Coursework Examinations",
-        chapterNumber: groups.length > 0 ? undefined : 1,
-        description: "Comprehensive assessments and module review examinations",
-        exams: unassignedExams,
-        completedCount: completed,
-      });
+    const targetCount = Math.max(activeSubject.totalUnits || 0, units.length > 0 ? units.length : 8);
+    for (let i = 1; i <= targetCount; i++) {
+      if (!units.some((u) => u.unitNumber === i)) {
+        units.push({
+          id: `placeholder_unit_${i}`,
+          unitNumber: i,
+          title: `Unit ${i}`,
+          exams: [],
+          hasExam: false,
+          hasAttempted: false,
+        });
+      }
     }
 
-    return groups;
-  }, [activeSubject, subjectChapters, searchedCurrentSubjectExams, attemptedExamIds]);
+    const unassignedExams = currentSubjectExams.filter((e) => !assignedExamIds.has(e.id));
+    if (unassignedExams.length > 0) {
+      if (units.length > 0 && units[0].exams.length === 0) {
+        units[0].exams = unassignedExams;
+        units[0].hasExam = true;
+        units[0].hasAttempted = unassignedExams.some((e) => attemptedExamIds.has(e.id));
+      } else {
+        units.push({
+          id: "general_subject_assessments",
+          unitNumber: units.length + 1,
+          title: "Comprehensive Curriculum Assessment",
+          description: "Curriculum assessment examination",
+          exams: unassignedExams,
+          hasExam: true,
+          hasAttempted: unassignedExams.some((e) => attemptedExamIds.has(e.id)),
+        });
+      }
+    }
+
+    return units.sort((a, b) => a.unitNumber - b.unitNumber);
+  }, [activeSubject, subjectChapters, currentSubjectExams, attemptedExamIds]);
+
+  // Filter units inside the selected subject by searchQuery
+  const filteredUnits = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return displayUnits;
+    return displayUnits.filter(
+      (u) =>
+        u.title.toLowerCase().includes(q) ||
+        `unit ${u.unitNumber}`.includes(q) ||
+        u.description?.toLowerCase().includes(q) ||
+        u.exams.some(
+          (e) =>
+            e.title.toLowerCase().includes(q) ||
+            e.description?.toLowerCase().includes(q)
+        )
+    );
+  }, [displayUnits, searchQuery]);
+
+  const readyUnitsCount = useMemo(() => {
+    return displayUnits.filter((u) => u.hasExam).length;
+  }, [displayUnits]);
+
+  const totalUnitsCount = useMemo(() => {
+    return Math.max(displayUnits.length, activeSubject?.totalUnits || 0, 1);
+  }, [displayUnits, activeSubject]);
+
+  const gradeText = useMemo(() => {
+    return activeSubject?.description?.match(/Grade\s*\d+/i)?.[0] || 'Grade 9';
+  }, [activeSubject]);
 
   // Navigate to specific subject
   const handleSelectSubject = (subjectId: string) => {
@@ -351,157 +503,170 @@ const StudentExams = () => {
           </div>
         )}
         {/* ==================================================================== */}
-        {/* VIEW A: SPECIFIC SUBJECT SELECTED (Chapters & Contents Only)         */}
-        {/* Shows ONLY its content (chapters & exams); no subject card inside   */}
+        {/* VIEW A: SPECIFIC SUBJECT SELECTED (Horizontal Chapters Cards View)   */}
         {/* ==================================================================== */}
         {activeSubject ? (
-          <div className="space-y-6">
-            {/* Top Navigation Bar with Back Icon & Subject Title */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border/60">
-              <div className="flex items-center gap-3.5">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={handleBackToAllSubjects}
-                  className="h-11 w-11 rounded-2xl bg-card border-border/80 hover:bg-muted text-foreground shadow-xs transition-all hover:scale-105 shrink-0 cursor-pointer"
-                  title="Back to all subjects"
-                  aria-label="Back to all subjects"
-                >
-                  <ArrowLeft className="h-5 w-5 text-primary" />
-                </Button>
-
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground tracking-tight">
-                      {activeSubject.name}
-                    </h1>
-                    <Badge variant="secondary" className="font-semibold text-xs px-2.5 py-0.5 rounded-lg">
-                      {currentSubjectExams.length} {currentSubjectExams.length === 1 ? "Assessment" : "Assessments"}
-                    </Badge>
-                  </div>
-                  <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-                    Chapters and topic assessments. Click the back arrow to view other subjects.
-                  </p>
-                </div>
-              </div>
-
-              {/* Search Bar for exams inside this subject */}
-              {currentSubjectExams.length > 0 && (
-                <div className="relative w-full sm:w-72">
-                  <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    type="text"
-                    placeholder={`Search in ${activeSubject.name}...`}
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 pr-9 rounded-2xl bg-card border-border/80 h-10 text-sm shadow-xs"
-                  />
-                  {searchQuery && (
-                    <button
-                      onClick={() => setSearchQuery("")}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                </div>
-              )}
+          <div className="max-w-3xl mx-auto space-y-6">
+            {/* Top Navigation Bar with Back Button */}
+            <div className="flex items-center justify-between gap-4 pb-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleBackToAllSubjects}
+                className="rounded-xl gap-2 font-medium bg-card hover:bg-muted text-foreground border-border/80 shadow-2xs"
+              >
+                <ArrowLeft className="h-4 w-4 text-[#7c3aed]" />
+                <span>Back to all subjects</span>
+              </Button>
             </div>
 
-            {/* Chapters & Contents Sections */}
+            {/* Screenshot-aligned Header */}
+            <div className="space-y-1.5 pb-2">
+              <h1 className="text-3xl sm:text-4xl font-extrabold text-[#111827] dark:text-foreground tracking-tight font-display">
+                {activeSubject.name}
+              </h1>
+              <p className="text-sm sm:text-base text-slate-500 dark:text-muted-foreground font-medium">
+                {gradeText} · {readyUnitsCount} of {totalUnitsCount} units uploaded
+              </p>
+            </div>
+
+            {/* Search Bar for chapters inside this subject */}
+            {displayUnits.length > 5 && (
+              <div className="relative w-full">
+                <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder={`Search units or exams in ${activeSubject.name}...`}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 pr-9 rounded-2xl bg-card border-border/80 h-11 text-sm shadow-2xs"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Chapters Loading state */}
             {chaptersLoading ? (
               <div className="flex flex-col items-center justify-center py-20">
-                <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
-                <p className="text-sm text-muted-foreground">Loading chapters & contents...</p>
+                <Loader2 className="h-8 w-8 animate-spin text-[#7c3aed] mb-2" />
+                <p className="text-sm text-muted-foreground">Loading curriculum units...</p>
               </div>
-            ) : organizedChapterGroups.length > 0 ? (
-              <div className="space-y-8">
-                {organizedChapterGroups.map((chGroup) => (
-                  <div
-                    key={chGroup.id}
-                    className="rounded-3xl bg-card border border-border/70 p-5 sm:p-7 space-y-5 shadow-xs"
-                  >
-                    {/* Chapter Header */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border/50">
-                      <div className="flex items-start sm:items-center gap-3">
-                        <div className="h-10 w-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold shrink-0 text-sm">
-                          {chGroup.chapterNumber ? `Ch ${chGroup.chapterNumber}` : <BookOpen className="h-5 w-5" />}
+            ) : filteredUnits.length > 0 ? (
+              /* Vertical stack of horizontal cards matching screenshot */
+              <div className="space-y-3.5">
+                {filteredUnits.map((unit) => {
+                  const hasExam = unit.hasExam;
+                  const primaryExam = unit.exams[0];
+
+                  return (
+                    <div
+                      key={unit.id}
+                      onClick={() => {
+                        if (hasExam) {
+                          if (unit.exams.length === 1) {
+                            navigate(`/exam/${primaryExam.id}`);
+                          } else {
+                            setSelectedMultiExamUnit(unit);
+                          }
+                        } else {
+                          toast({
+                            title: "Exam gonna upload soon",
+                            description: `The assessment for Unit ${unit.unitNumber}: "${unit.title}" will be uploaded soon.`,
+                          });
+                        }
+                      }}
+                      className={`group relative overflow-hidden rounded-[24px] sm:rounded-3xl border border-slate-200/90 dark:border-border/70 bg-white dark:bg-card p-4 sm:p-5 flex items-center justify-between gap-3 sm:gap-4 transition-all duration-200 cursor-pointer shadow-xs hover:shadow-md hover:border-purple-400 ${
+                        !hasExam ? "opacity-80 bg-muted/20" : "hover:scale-[1.008]"
+                      }`}
+                    >
+                      {/* Left Curved Purple Accent Ribbon */}
+                      <div className="absolute left-0 top-3 bottom-3 w-1.5 sm:w-2 bg-[#7c3aed] rounded-r-full" />
+
+                      {/* Squircle Icon Badge + Title & Status */}
+                      <div className="flex items-center gap-3.5 sm:gap-4 pl-2 min-w-0 flex-1">
+                        {/* Purple Squircle Icon Badge */}
+                        <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-[#7c3aed] text-white flex items-center justify-center shrink-0 shadow-sm transition-transform group-hover:scale-105">
+                          <GraduationCap className="w-6 h-6 sm:w-6.5 sm:h-6.5 text-white stroke-[2]" />
                         </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="text-lg sm:text-xl font-display font-bold text-foreground">
-                              {chGroup.title}
-                            </h3>
-                            {chGroup.exams.length > 0 && chGroup.completedCount === chGroup.exams.length && (
-                              <Badge className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[10px] font-bold">
-                                <CheckCircle2 className="h-3 w-3 mr-1" />
+
+                        {/* Title & Metadata */}
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="text-base sm:text-lg font-bold text-[#1e293b] dark:text-foreground group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors leading-snug">
+                              Unit {unit.unitNumber}: {unit.title}
+                            </h4>
+
+                            {unit.hasAttempted && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-200/80 shrink-0">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
                                 Completed
-                              </Badge>
+                              </span>
                             )}
                           </div>
-                          {chGroup.description && (
-                            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-                              {chGroup.description}
-                            </p>
-                          )}
+
+                          {/* Status Line */}
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium flex-wrap">
+                            {hasExam ? (
+                              <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold">
+                                <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                                <span>
+                                  {unit.exams.length > 1
+                                    ? `${unit.exams.length} Practice Exams Ready`
+                                    : "Practice Exam Ready"}
+                                </span>
+                                {primaryExam?.question_count && (
+                                  <span className="text-slate-500 dark:text-slate-400 font-normal">
+                                    · {primaryExam.question_count} Questions
+                                  </span>
+                                )}
+                                {primaryExam?.duration_minutes && (
+                                  <span className="text-slate-500 dark:text-slate-400 font-normal">
+                                    · {primaryExam.duration_minutes} min
+                                  </span>
+                                )}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-medium italic">
+                                <Clock className="w-3.5 h-3.5" />
+                                <span>Exam gonna upload soon</span>
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
-                      <Badge variant="secondary" className="self-start sm:self-auto text-xs font-bold px-3 py-1 rounded-xl">
-                        {chGroup.exams.length} {chGroup.exams.length === 1 ? "Assessment" : "Assessments"}
-                      </Badge>
+                      {/* Right: Round Action Button / Chevron */}
+                      <div className="shrink-0 flex items-center gap-2">
+                        {hasExam ? (
+                          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-purple-50 dark:bg-purple-950/50 text-[#7c3aed] flex items-center justify-center group-hover:bg-[#7c3aed] group-hover:text-white transition-colors shadow-2xs">
+                            <ChevronRight className="w-5 h-5 stroke-[2.5]" />
+                          </div>
+                        ) : (
+                          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-slate-100 dark:bg-muted text-slate-400 flex items-center justify-center">
+                            <ChevronRight className="w-5 h-5 stroke-[2]" />
+                          </div>
+                        )}
+                      </div>
                     </div>
-
-                    {/* Exams inside this Chapter (1 column on mobile screen, 2 on tablet, 3 on desktop) */}
-                    {chGroup.exams.length > 0 ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-5">
-                        {chGroup.exams.map((exam) => (
-                          <ExamCard
-                            key={exam.id}
-                            exam={exam}
-                            hasAttempted={attemptedExamIds.has(exam.id)}
-                            showOfflineDownload={true}
-                            departmentId={profile?.departmentId}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="py-6 text-center text-xs text-muted-foreground bg-muted/20 rounded-2xl border border-dashed">
-                        No examinations attached to this chapter yet.
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : currentSubjectExams.length === 0 ? (
-              /* No exams in this subject */
-              <div className="flex flex-col items-center justify-center py-20 text-center bg-card rounded-3xl border border-dashed p-8 max-w-md mx-auto">
-                <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 text-primary">
-                  <ClipboardList className="h-8 w-8" />
-                </div>
-                <h3 className="text-lg font-bold text-foreground">No examinations yet</h3>
-                <p className="text-muted-foreground mt-1 text-sm">
-                  Examiners have not published any assessments under {activeSubject.name} yet.
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleBackToAllSubjects}
-                  className="mt-5 rounded-xl font-semibold gap-2"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  View All Subjects
-                </Button>
+                  );
+                })}
               </div>
             ) : (
-              /* Search query matched no exams in this subject */
+              /* Search query matched no units */
               <div className="flex flex-col items-center justify-center py-16 text-center bg-card rounded-3xl border border-dashed p-8 max-w-md mx-auto">
                 <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 text-primary">
                   <Search className="h-7 w-7" />
                 </div>
-                <h3 className="text-lg font-bold text-foreground">No matching assessments</h3>
+                <h3 className="text-lg font-bold text-foreground">No matching units</h3>
                 <p className="text-muted-foreground mt-1 text-sm">
-                  No examinations in {activeSubject.name} matched &ldquo;{searchQuery}&rdquo;.
+                  No units in {activeSubject.name} matched &ldquo;{searchQuery}&rdquo;.
                 </p>
                 <Button
                   variant="outline"
@@ -513,6 +678,42 @@ const StudentExams = () => {
                 </Button>
               </div>
             )}
+
+            {/* Multiple Exams Dialog */}
+            <Dialog open={Boolean(selectedMultiExamUnit)} onOpenChange={() => setSelectedMultiExamUnit(null)}>
+              <DialogContent className="max-w-md rounded-3xl p-6">
+                <DialogHeader>
+                  <DialogTitle className="text-xl font-bold font-display">
+                    Unit {selectedMultiExamUnit?.unitNumber}: {selectedMultiExamUnit?.title}
+                  </DialogTitle>
+                  <DialogDescription>
+                    Choose an assessment below to take:
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-3 pt-2">
+                  {selectedMultiExamUnit?.exams.map((exam) => (
+                    <div
+                      key={exam.id}
+                      onClick={() => {
+                        setSelectedMultiExamUnit(null);
+                        navigate(`/exam/${exam.id}`);
+                      }}
+                      className="p-4 rounded-2xl border bg-card hover:border-[#7c3aed] hover:shadow-md cursor-pointer transition-all flex items-center justify-between gap-3"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <h4 className="font-bold text-foreground text-sm sm:text-base truncate">{exam.title}</h4>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {exam.question_count || 10} Questions · {exam.duration_minutes} mins
+                        </p>
+                      </div>
+                      <Button size="sm" className="rounded-xl bg-[#7c3aed] text-white hover:bg-[#6d28d9] gap-1 shrink-0">
+                        <Play className="h-3.5 w-3.5" /> Start
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         ) : (
           /* ==================================================================== */

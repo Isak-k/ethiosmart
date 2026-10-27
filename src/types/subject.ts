@@ -7,6 +7,8 @@ export interface Subject {
   description?: string;
   coverImageUrl?: string;
   coverImagePublicId?: string;
+  bookCoverImageUrl?: string; // Curriculum book cover URL
+  notesCoverImageUrl?: string; // Study notes cover URL
   departmentIds?: string[]; // Departments where this subject is published/available
   totalUnits?: number;
   displayOrder?: number;

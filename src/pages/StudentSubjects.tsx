@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { SubjectGrid } from "@/components/subject/SubjectGrid";
 import { getSubjects, seedDefaultSubjects } from "@/lib/subjects";
+import { getBooks } from "@/lib/books";
 import { calculateAllSubjectsProgress } from "@/lib/subject-progress";
 import { getSubjectCover } from "@/lib/subject-covers";
 import { Subject, StudentSubjectProgress } from "@/types/subject";
@@ -75,7 +76,11 @@ export default function StudentSubjects() {
   const fetchSubjectsAndProgress = async () => {
     try {
       setLoading(true);
-      let list = await getSubjects(profile?.departmentId);
+      const [listRaw, textbooks] = await Promise.all([
+        getSubjects(profile?.departmentId),
+        getBooks({ resourceType: 'textbook' }, 'student').catch(() => []),
+      ]);
+      let list = listRaw;
 
       // If database has no subjects yet and no department filter, seed the default curriculum
       if (list.length === 0 && !profile?.departmentId) {
@@ -84,13 +89,41 @@ export default function StudentSubjects() {
       }
 
       // Filter only active subjects for students
-      const activeSubjects = list.filter((s) => s.isActive !== false);
-      setSubjects(activeSubjects);
+      let activeSubjects = list.filter((s) => s.isActive !== false);
+
+      // Strict department assignment rule: students only see subjects explicitly assigned to their department
+      if (profile?.departmentId && profile.departmentId !== 'all') {
+        activeSubjects = activeSubjects.filter((s) => {
+          if (s.departmentIds && s.departmentIds.length > 0) {
+            return s.departmentIds.includes(profile.departmentId!) || s.departmentIds.includes('all');
+          }
+          return (s as any).departmentId === profile.departmentId;
+        });
+      }
+
+      // Inherit coverpage of the curriculum BOOK (textbook), NOT study notes
+      const enrichedSubjects = activeSubjects.map((sub) => {
+        const matchingBook = textbooks.find(
+          (b) => b.resourceType === 'textbook' && b.subjectId === sub.id && b.coverImageUrl
+        );
+        const effectiveBookCover =
+          matchingBook?.coverImageUrl ||
+          sub.bookCoverImageUrl ||
+          (sub.coverImageUrl && sub.coverImageUrl !== sub.notesCoverImageUrl ? sub.coverImageUrl : '') ||
+          getSubjectCover(sub.name).url;
+
+        return {
+          ...sub,
+          coverImageUrl: effectiveBookCover,
+        };
+      });
+
+      setSubjects(enrichedSubjects);
 
       // Calculate progress if student is logged in, scoped to their department
       if (user?.uid) {
         const progress = await calculateAllSubjectsProgress(
-          activeSubjects,
+          enrichedSubjects,
           user.uid,
           profile?.departmentId
         ).catch(() => ({}));

@@ -109,8 +109,10 @@ export default function AdminBooks() {
       const enriched = booksData.map((b) => {
         const dept = deptsData.find((d) => d.id === b.departmentId);
         const sub = subsData.find((s) => s.id === b.subjectId);
+        const isShortNote = b.resourceType === 'short_note';
         const effectiveCoverUrl =
           b.coverImageUrl ||
+          (isShortNote ? sub?.notesCoverImageUrl : sub?.bookCoverImageUrl) ||
           sub?.coverImageUrl ||
           (sub ? getSubjectCover(sub.name).url : '');
 
@@ -673,6 +675,7 @@ export default function AdminBooks() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {subjectsWithStudyNotes.map((sub) => {
                   const coverUrl =
+                    sub.notesCoverImageUrl ||
                     sub.coverImageUrl ||
                     (sub.name ? getSubjectCover(sub.name).url : '/placeholder.svg');
                   const dept = departments.find(

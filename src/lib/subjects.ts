@@ -28,6 +28,8 @@ export interface SubjectInput {
   description?: string;
   coverImageUrl?: string;
   coverImagePublicId?: string;
+  bookCoverImageUrl?: string;
+  notesCoverImageUrl?: string;
   departmentIds?: string[];
   totalUnits?: number;
   displayOrder?: number;
@@ -220,15 +222,14 @@ export async function getSubjects(departmentId?: string): Promise<Subject[]> {
 
       // If subject is directly assigned to this department
       if (subject.departmentIds && subject.departmentIds.length > 0) {
-        if (subject.departmentIds.includes(departmentId)) {
+        if (subject.departmentIds.includes(departmentId) || subject.departmentIds.includes('all')) {
           return true;
         }
-      } else {
-        // If departmentIds is not set or empty, check if any exam published in this department belongs to it
-        if (activeSubjectIdsFromExams.has(subject.id)) {
-          return true;
-        }
-        // If no specific department is set, subject is available to all
+        return false;
+      }
+
+      // Legacy single departmentId field
+      if ((subject as any).departmentId === departmentId || (subject as any).departmentId === 'all') {
         return true;
       }
 
@@ -237,6 +238,7 @@ export async function getSubjects(departmentId?: string): Promise<Subject[]> {
         return true;
       }
 
+      // Strict department assignment rule: unassigned subjects are NOT visible to students with a department
       return false;
     });
   }
@@ -294,6 +296,8 @@ export async function createSubject(input: SubjectInput, userId?: string): Promi
   if (input.description !== undefined) payload.description = input.description.trim();
   if (input.coverImageUrl !== undefined) payload.coverImageUrl = input.coverImageUrl.trim();
   if (input.coverImagePublicId !== undefined) payload.coverImagePublicId = input.coverImagePublicId.trim();
+  if (input.bookCoverImageUrl !== undefined) payload.bookCoverImageUrl = input.bookCoverImageUrl.trim();
+  if (input.notesCoverImageUrl !== undefined) payload.notesCoverImageUrl = input.notesCoverImageUrl.trim();
   if (input.departmentIds !== undefined) payload.departmentIds = input.departmentIds;
   if (input.totalUnits !== undefined && !isNaN(Number(input.totalUnits))) {
     payload.totalUnits = Math.max(0, Number(input.totalUnits));
@@ -388,6 +392,8 @@ export async function updateSubject(id: string, input: Partial<SubjectInput>): P
     if (input.description !== undefined) payload.description = input.description.trim();
     if (input.coverImageUrl !== undefined) payload.coverImageUrl = input.coverImageUrl ? input.coverImageUrl.trim() : null;
     if (input.coverImagePublicId !== undefined) payload.coverImagePublicId = input.coverImagePublicId ? input.coverImagePublicId.trim() : null;
+    if (input.bookCoverImageUrl !== undefined) payload.bookCoverImageUrl = input.bookCoverImageUrl ? input.bookCoverImageUrl.trim() : null;
+    if (input.notesCoverImageUrl !== undefined) payload.notesCoverImageUrl = input.notesCoverImageUrl ? input.notesCoverImageUrl.trim() : null;
     if (input.departmentIds !== undefined) payload.departmentIds = input.departmentIds;
     if (input.totalUnits !== undefined) {
       payload.totalUnits = isNaN(Number(input.totalUnits)) ? 0 : Math.max(0, Number(input.totalUnits));

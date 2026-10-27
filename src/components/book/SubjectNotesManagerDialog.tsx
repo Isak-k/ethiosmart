@@ -7,9 +7,11 @@ import {
   createChapter,
   updateChapter,
   deleteChapter,
+  updateSubject,
 } from '@/lib/subjects';
 import { updateBook, deleteBook } from '@/lib/books';
 import { getSubjectCover } from '@/lib/subject-covers';
+import { uploadSubjectCoverImage, validateCoverImage } from '@/lib/image-upload';
 import {
   Dialog,
   DialogContent,
@@ -99,6 +101,53 @@ export function SubjectNotesManagerDialog({
   const [togglingNoteId, setTogglingNoteId] = useState<string | null>(null);
   const [deletingNote, setDeletingNote] = useState<Book | null>(null);
   const [isDeletingNote, setIsDeletingNote] = useState<boolean>(false);
+
+  // Notes Cover Image state & upload
+  const [localCoverUrl, setLocalCoverUrl] = useState<string>('');
+  const [uploadingCover, setUploadingCover] = useState<boolean>(false);
+  const coverFileRef = React.useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (subject) {
+      setLocalCoverUrl(subject.notesCoverImageUrl || subject.coverImageUrl || '');
+    }
+  }, [subject]);
+
+  const handleCoverFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !subject) return;
+
+    const validation = validateCoverImage(file);
+    if (!validation.isValid) {
+      toast({
+        title: 'Invalid Image',
+        description: validation.error || 'Please choose a valid JPG, PNG, or WebP image.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setUploadingCover(true);
+    try {
+      const res = await uploadSubjectCoverImage(file, { subjectId: subject.id });
+      await updateSubject(subject.id, { notesCoverImageUrl: res.url });
+      setLocalCoverUrl(res.url);
+      toast({
+        title: 'Notes Coverpage Uploaded',
+        description: 'Study notes cover image updated successfully without modifying textbook covers.',
+      });
+      if (onNotesChanged) onNotesChanged();
+    } catch (err: any) {
+      toast({
+        title: 'Upload failed',
+        description: err.message || 'Could not upload cover image.',
+        variant: 'destructive',
+      });
+    } finally {
+      setUploadingCover(false);
+      if (e.target) e.target.value = '';
+    }
+  };
 
   useEffect(() => {
     if (open && subject?.id) {
@@ -280,6 +329,8 @@ export function SubjectNotesManagerDialog({
   if (!subject) return null;
 
   const coverUrl =
+    localCoverUrl ||
+    subject.notesCoverImageUrl ||
     subject.coverImageUrl ||
     (subject.name ? getSubjectCover(subject.name).url : '/placeholder.svg');
 
@@ -337,20 +388,34 @@ export function SubjectNotesManagerDialog({
           </div>
 
           <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
-            {onEditSubjectCover && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  onEditSubjectCover(subject);
-                  onOpenChange(false);
-                }}
-                className="rounded-xl text-xs font-semibold gap-1.5 border-purple-500/30 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/30"
-              >
-                <ImageIcon className="h-3.5 w-3.5" />
-                Edit Coverpage
-              </Button>
-            )}
+            {/* Hidden cover file picker */}
+            <input
+              type="file"
+              ref={coverFileRef}
+              accept="image/*"
+              className="hidden"
+              onChange={handleCoverFileChange}
+            />
+
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={uploadingCover}
+              onClick={() => coverFileRef.current?.click()}
+              className="rounded-xl text-xs font-semibold gap-1.5 border-purple-500/30 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/30"
+            >
+              {uploadingCover ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <span>Uploading...</span>
+                </>
+              ) : (
+                <>
+                  <ImageIcon className="h-3.5 w-3.5" />
+                  <span>Upload Notes Cover</span>
+                </>
+              )}
+            </Button>
 
             <Button
               size="sm"

@@ -193,8 +193,10 @@ export default function StudentBooks() {
       const enriched = booksData.map((b) => {
         const dept = deptsData.find((d) => d.id === b.departmentId);
         const sub = subsData.find((s) => s.id === b.subjectId);
+        const isShortNote = b.resourceType === 'short_note';
         const effectiveCoverUrl =
           b.coverImageUrl ||
+          (isShortNote ? sub?.notesCoverImageUrl : sub?.bookCoverImageUrl) ||
           sub?.coverImageUrl ||
           (sub ? getSubjectCover(sub.name).url : '');
 
@@ -1016,6 +1018,7 @@ export default function StudentBooks() {
                             (d) => d.id === subject.departmentId || subject.departmentIds?.includes(d.id)
                           );
                           const coverUrl =
+                            subject.notesCoverImageUrl ||
                             subject.coverImageUrl ||
                             (subject.name ? getSubjectCover(subject.name).url : '/placeholder.svg');
 
