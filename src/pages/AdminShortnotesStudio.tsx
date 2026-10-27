@@ -120,7 +120,8 @@ export default function AdminShortnotesStudio() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { id: editNoteId } = useParams<{ id?: string }>();
+  const { id: routeNoteId } = useParams<{ id?: string }>();
+  const editNoteId = routeNoteId || searchParams.get('editNoteId') || searchParams.get('editBookId') || undefined;
   const { toast } = useToast();
 
   // Query parameter defaults

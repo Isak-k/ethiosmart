@@ -12,7 +12,7 @@ import {
   OfflineBookRecord,
 } from '@/lib/offline-books';
 import { getDepartments } from '@/lib/departments';
-import { getSubjects } from '@/lib/subjects';
+import { getSubjects, getChapters } from '@/lib/subjects';
 import { getSubjectCover } from '@/lib/subject-covers';
 import { Department, Exam } from '@/integrations/firebase/types';
 import { Subject } from '@/types/subject';
@@ -53,10 +53,14 @@ import {
   BookCheck,
   Check,
   RotateCcw,
+  Lock,
+  Compass,
+  Ruler,
+  ChevronRight,
 } from 'lucide-react';
 
 export default function StudentBooks() {
-  const { user, profile } = useAuth();
+  const { user, profile, role } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
@@ -90,6 +94,32 @@ export default function StudentBooks() {
   const [selectedNotesSubjectId, setSelectedNotesSubjectId] = useState<string | null>(
     searchParams.get('subjectId') || null
   );
+
+  // Curriculum chapters for the selected notes subject
+  const [subjectCurriculumChapters, setSubjectCurriculumChapters] = useState<Chapter[]>([]);
+  const [loadingCurriculumChapters, setLoadingCurriculumChapters] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!selectedNotesSubjectId) {
+      setSubjectCurriculumChapters([]);
+      return;
+    }
+    let active = true;
+    setLoadingCurriculumChapters(true);
+    getChapters(selectedNotesSubjectId)
+      .then((chs) => {
+        if (active) setSubjectCurriculumChapters(chs);
+      })
+      .catch((err) => {
+        console.warn('Could not load curriculum chapters:', err);
+      })
+      .finally(() => {
+        if (active) setLoadingCurriculumChapters(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [selectedNotesSubjectId]);
 
   // Step 1 Choice State: 'notes' comes first
   const [selectedChoice, setSelectedChoice] = useState<'books' | 'notes'>(() => {
@@ -441,6 +471,86 @@ export default function StudentBooks() {
     }
     return undefined;
   };
+
+  // Computed list of Chapter / Unit items matching the screenshot UI
+  const displayUnits = useMemo(() => {
+    if (!selectedNotesSubjectId) return [];
+
+    // Map curriculum chapters with notes
+    if (subjectCurriculumChapters.length > 0) {
+      const sortedChapters = [...subjectCurriculumChapters].sort(
+        (a, b) => (a.chapterNumber ?? 0) - (b.chapterNumber ?? 0)
+      );
+
+      const mapped = sortedChapters.map((ch, idx) => {
+        const unitNum = ch.chapterNumber ?? idx + 1;
+        const note = currentSubjectChapterNotes.find(
+          (n) =>
+            n.chapterId === ch.id ||
+            n.chapterNumber === unitNum ||
+            (n.chapterTitle && ch.title && n.chapterTitle.toLowerCase().trim() === ch.title.toLowerCase().trim())
+        );
+
+        // First unit free, subsequent locked if non-admin and not premium
+        const isLocked = !note || (idx > 0 && role !== 'admin' && !profile?.isPremium);
+
+        return {
+          id: ch.id,
+          unitNumber: unitNum,
+          title: ch.title,
+          note,
+          isLocked,
+          matchedExam: note ? findExamForNote(note) : undefined,
+        };
+      });
+
+      // Include any notes that might not have a matching curriculum chapter in subcollection
+      const extraNotes = currentSubjectChapterNotes.filter(
+        (n) => !mapped.some((m) => m.note?.id === n.id)
+      );
+      extraNotes.forEach((n, idx) => {
+        const unitNum = n.chapterNumber ?? mapped.length + idx + 1;
+        mapped.push({
+          id: n.id,
+          unitNumber: unitNum,
+          title: n.chapterTitle || n.title,
+          note: n,
+          isLocked: mapped.length > 0 && role !== 'admin' && !profile?.isPremium,
+          matchedExam: findExamForNote(n),
+        });
+      });
+
+      return mapped.sort((a, b) => a.unitNumber - b.unitNumber);
+    }
+
+    // Fallback: If no curriculum chapters exist in subcollection, map directly from notes
+    return currentSubjectChapterNotes.map((note, idx) => {
+      const getNum = (n: Book) => {
+        if (typeof n.chapterNumber === 'number') return n.chapterNumber;
+        const match = (n.chapterTitle || n.title || '').match(/chapter\s*(\d+)|unit\s*(\d+)/i);
+        if (match) return parseInt(match[1] || match[2], 10);
+        return idx + 1;
+      };
+      const unitNum = getNum(note);
+      const isLocked = idx > 0 && role !== 'admin' && !profile?.isPremium;
+
+      return {
+        id: note.id,
+        unitNumber: unitNum,
+        title: note.chapterTitle || note.title,
+        note,
+        isLocked,
+        matchedExam: findExamForNote(note),
+      };
+    }).sort((a, b) => a.unitNumber - b.unitNumber);
+  }, [
+    selectedNotesSubjectId,
+    subjectCurriculumChapters,
+    currentSubjectChapterNotes,
+    role,
+    profile,
+    availableExams,
+  ]);
 
   // Handler when user clicks "Next" on the choice screen
   const handleProceedNext = () => {
@@ -899,50 +1009,56 @@ export default function StudentBooks() {
                           const dept = departments.find(
                             (d) => d.id === subject.departmentId || subject.departmentIds?.includes(d.id)
                           );
+                          const coverUrl =
+                            subject.coverImageUrl ||
+                            (subject.name ? getSubjectCover(subject.name).url : '/placeholder.svg');
 
                           return (
                             <div
                               key={subject.id}
                               onClick={() => setSelectedNotesSubjectId(subject.id)}
-                              className="group relative p-6 rounded-3xl border bg-card hover:border-amber-500/50 hover:shadow-lg transition-all duration-200 cursor-pointer flex flex-col justify-between overflow-hidden"
+                              className="group relative p-5 rounded-3xl border bg-card hover:border-purple-500/50 hover:shadow-xl transition-all duration-300 cursor-pointer flex flex-col justify-between overflow-hidden"
                             >
                               <div className="space-y-4">
-                                <div className="flex items-start justify-between gap-3">
-                                  <div className="h-14 w-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-3xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-110">
-                                    {theme.emoji}
+                                {/* Book Cover Header */}
+                                <div className="relative aspect-[16/10] sm:aspect-[16/9] rounded-2xl overflow-hidden bg-slate-900 border shadow-xs group-hover:shadow-md transition-shadow">
+                                  <img
+                                    src={coverUrl}
+                                    alt={subject.name}
+                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                    onError={(e) => {
+                                      (e.target as HTMLElement).src = getSubjectCover(subject.name).url;
+                                    }}
+                                  />
+                                  {/* Book spine simulation */}
+                                  <div className="absolute inset-y-0 left-0 w-2.5 bg-gradient-to-r from-black/60 via-black/30 to-transparent pointer-events-none" />
+                                  <div className="absolute top-2.5 right-2.5">
+                                    <Badge className="bg-purple-600/90 hover:bg-purple-600 text-white font-bold text-[11px] rounded-lg px-2.5 py-0.5 backdrop-blur-xs shadow-xs">
+                                      {subject.notesCount} {subject.notesCount === 1 ? 'Unit Ready' : 'Units Ready'}
+                                    </Badge>
                                   </div>
-                                  <Badge
-                                    variant={subject.notesCount > 0 ? 'default' : 'outline'}
-                                    className={`rounded-xl text-xs font-bold px-2.5 py-1 ${
-                                      subject.notesCount > 0
-                                        ? 'bg-amber-500 text-white border-amber-500 shadow-xs'
-                                        : 'text-muted-foreground'
-                                    }`}
-                                  >
-                                    {subject.notesCount} {subject.notesCount === 1 ? 'Chapter' : 'Chapters'}
-                                  </Badge>
                                 </div>
 
                                 <div>
-                                  <div className="text-[11px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">
+                                  <div className="text-[11px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider">
                                     {dept?.name || 'Academic Curriculum'}
                                   </div>
-                                  <h3 className="text-xl font-display font-bold text-foreground group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors mt-0.5">
+                                  <h3 className="text-xl font-display font-bold text-foreground group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors mt-0.5">
                                     {subject.name}
                                   </h3>
                                   <p className="text-xs text-muted-foreground mt-1 line-clamp-2 leading-relaxed">
-                                    {subject.description || `Comprehensive study notes and practice exams for ${subject.name}.`}
+                                    {subject.description || `Comprehensive chapter-by-chapter study notes for ${subject.name}.`}
                                   </p>
                                 </div>
                               </div>
 
-                              <div className="mt-5 pt-3.5 border-t border-border/60 flex items-center justify-between text-xs font-semibold">
+                              <div className="mt-4 pt-3.5 border-t border-border/60 flex items-center justify-between text-xs font-semibold">
                                 <span className="text-muted-foreground flex items-center gap-1">
-                                  <Clock className="h-3.5 w-3.5 text-amber-500" />
+                                  <Clock className="h-3.5 w-3.5 text-purple-500" />
                                   <span>~{subject.totalMinutes || 15} min study time</span>
                                 </span>
-                                <span className="text-amber-600 dark:text-amber-400 group-hover:translate-x-1 transition-transform flex items-center gap-1">
-                                  <span>Choose Chapters</span>
+                                <span className="text-purple-600 dark:text-purple-400 group-hover:translate-x-1 transition-transform flex items-center gap-1">
+                                  <span>Read Chapters</span>
                                   <ArrowRight className="h-3.5 w-3.5" />
                                 </span>
                               </div>
@@ -953,10 +1069,10 @@ export default function StudentBooks() {
                     )}
                   </div>
                 ) : (
-                  /* LEVEL 2: AVAILABLE CHAPTERS FOR SELECTED SUBJECT */
-                  <div className="space-y-6">
-                    {/* Back button and Subject Header Banner */}
-                    <div className="space-y-4">
+                  /* LEVEL 2: AVAILABLE CHAPTERS FOR SELECTED SUBJECT (MATCHING SCREENSHOT UI) */
+                  <div className="space-y-6 max-w-3xl mx-auto">
+                    {/* Back Button */}
+                    <div>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -964,51 +1080,56 @@ export default function StudentBooks() {
                           setSelectedNotesSubjectId(null);
                           setSearchQuery('');
                         }}
-                        className="rounded-xl text-muted-foreground hover:text-foreground -ml-2"
+                        className="rounded-xl text-muted-foreground hover:text-foreground text-xs font-semibold gap-1.5 h-8 -ml-2"
                       >
-                        <ArrowLeft className="h-4 w-4 mr-1.5" />
+                        <ArrowLeft className="h-3.5 w-3.5" />
                         Back to All Subjects
                       </Button>
-
-                      <div className="p-6 sm:p-8 rounded-3xl border bg-gradient-to-r from-card via-card to-amber-500/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div className="flex items-center gap-4">
-                          <div className="h-16 w-16 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-3xl flex items-center justify-center shrink-0">
-                            {getSubjectVisualTheme(currentNotesSubject?.name || '').emoji}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h2 className="text-2xl sm:text-3xl font-display font-bold text-foreground">
-                                {currentNotesSubject?.name}
-                              </h2>
-                              <Badge className="bg-amber-500 text-white font-bold text-xs rounded-lg px-2.5">
-                                {currentSubjectChapterNotes.length} {currentSubjectChapterNotes.length === 1 ? 'Chapter' : 'Chapters'}
-                              </Badge>
-                            </div>
-                            <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                              Pedagogical chapter-by-chapter study notes, key definitions, worked solutions & recall practice exams.
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="relative w-full sm:w-64 shrink-0">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                          <Input
-                            placeholder="Search chapters..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-9 rounded-xl bg-card text-xs h-9"
-                          />
-                        </div>
-                      </div>
                     </div>
 
-                    {/* Chapters Grid / List */}
-                    {currentSubjectChapterNotes.length === 0 ? (
+                    {/* Screenshot-aligned Header */}
+                    {(() => {
+                      const uploadedCount = displayUnits.filter((u) => Boolean(u.note)).length;
+                      const totalUnits = Math.max(displayUnits.length, currentNotesSubject?.totalUnits || 0, 1);
+                      const gradeText = currentNotesSubject?.description?.match(/Grade\s*\d+/i)?.[0] || 'Grade 9';
+
+                      return (
+                        <div className="space-y-1.5 pb-2">
+                          <h1 className="text-3xl sm:text-4xl font-extrabold text-[#111827] dark:text-foreground tracking-tight font-display">
+                            {currentNotesSubject?.name || 'Subject'}
+                          </h1>
+                          <p className="text-sm sm:text-base text-slate-500 dark:text-muted-foreground font-medium">
+                            {gradeText} · {uploadedCount} of {totalUnits} units uploaded
+                          </p>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Search inside chapter view */}
+                    {displayUnits.length > 6 && (
+                      <div className="relative w-full">
+                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search units or topics..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="pl-10 rounded-2xl bg-card text-xs h-9"
+                        />
+                      </div>
+                    )}
+
+                    {/* Loading State */}
+                    {loadingCurriculumChapters ? (
+                      <div className="text-center py-20">
+                        <Loader2 className="h-8 w-8 text-purple-600 animate-spin mx-auto mb-2" />
+                        <p className="text-xs text-muted-foreground">Loading curriculum units...</p>
+                      </div>
+                    ) : displayUnits.length === 0 ? (
                       <div className="text-center py-20 px-6 rounded-3xl border border-dashed bg-card/40">
                         <FileText className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-                        <h3 className="text-lg font-bold font-display">No chapter notes available yet</h3>
+                        <h3 className="text-lg font-bold font-display">No units available yet</h3>
                         <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto mt-1 mb-4">
-                          Study notes for {currentNotesSubject?.name || 'this subject'} are being prepared by the academic team.
+                          Study notes for {currentNotesSubject?.name || 'this subject'} are currently being organized.
                         </p>
                         <Button
                           variant="outline"
@@ -1020,139 +1141,114 @@ export default function StudentBooks() {
                         </Button>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        {currentSubjectChapterNotes.map((note, idx) => {
-                          const chNum = note.chapterNumber ?? idx + 1;
-                          const chTitle = note.chapterTitle || note.title;
-                          const mins = note.readingTimeMinutes || 12;
-                          const matchedExam = findExamForNote(note);
+                      /* Vertical stack of horizontal cards matching screenshot */
+                      <div className="space-y-3.5">
+                        {displayUnits
+                          .filter((unit) => {
+                            if (!searchQuery.trim()) return true;
+                            const q = searchQuery.toLowerCase().trim();
+                            return (
+                              unit.title.toLowerCase().includes(q) ||
+                              `unit ${unit.unitNumber}`.includes(q) ||
+                              unit.note?.summary?.toLowerCase().includes(q) ||
+                              unit.note?.title?.toLowerCase().includes(q)
+                            );
+                          })
+                          .map((unit) => {
+                            return (
+                              <div
+                                key={unit.id}
+                                onClick={() => {
+                                  if (unit.note) {
+                                    navigate(`/dashboard/books/${unit.note.id}/read`);
+                                  } else {
+                                    toast({
+                                      title: 'Study guide in preparation',
+                                      description: `Study notes for Unit ${unit.unitNumber}: "${unit.title}" will be uploaded soon.`,
+                                    });
+                                  }
+                                }}
+                                className={`group relative overflow-hidden rounded-[24px] sm:rounded-3xl border border-slate-200/90 dark:border-border/70 bg-white dark:bg-card p-4 sm:p-5 flex items-center justify-between gap-3 sm:gap-4 transition-all duration-200 cursor-pointer shadow-xs hover:shadow-md hover:border-purple-400 ${
+                                  !unit.note ? 'opacity-70 bg-muted/20' : ''
+                                }`}
+                              >
+                                {/* Left Curved Purple Accent Ribbon */}
+                                <div className="absolute left-0 top-3 bottom-3 w-1.5 sm:w-2 bg-[#7c3aed] rounded-r-full" />
 
-                          return (
-                            <Card
-                              key={note.id}
-                              className="rounded-3xl border hover:border-amber-500/50 transition-all duration-200 hover:shadow-md bg-card flex flex-col justify-between overflow-hidden group"
-                            >
-                              <div className="p-5 sm:p-6 space-y-3.5">
-                                {/* Top row: Chapter Badge & Reading Time */}
-                                <div className="flex items-center justify-between gap-2">
-                                  <Badge className="bg-gradient-to-r from-amber-600 via-orange-600 to-amber-600 text-white font-bold text-xs px-2.5 py-0.5 rounded-lg shadow-xs">
-                                    Chapter {chNum}
-                                  </Badge>
+                                {/* Squircle Icon + Title & Metadata */}
+                                <div className="flex items-center gap-3.5 sm:gap-4 pl-2 min-w-0 flex-1">
+                                  {/* Purple Squircle Icon Badge */}
+                                  <div
+                                    className={`w-12 h-12 sm:w-13 sm:h-13 rounded-2xl flex items-center justify-center shrink-0 shadow-sm transition-transform group-hover:scale-105 ${
+                                      unit.isLocked
+                                        ? 'bg-[#8b5cf6] text-amber-300'
+                                        : 'bg-[#7c3aed] text-white'
+                                    }`}
+                                  >
+                                    {unit.isLocked ? (
+                                      <Lock className="w-5 h-5 sm:w-6 sm:h-6 text-amber-300 drop-shadow-xs" />
+                                    ) : (
+                                      <Compass className="w-6 h-6 sm:w-6 sm:h-6 text-white stroke-[2]" />
+                                    )}
+                                  </div>
 
-                                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                    <Clock className="h-3.5 w-3.5 text-amber-500" />
-                                    <span>{mins} min read</span>
+                                  {/* Title & Status */}
+                                  <div className="min-w-0 flex-1 space-y-1">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <h4 className="text-base sm:text-lg font-bold text-[#1e293b] dark:text-foreground group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors leading-snug">
+                                        Unit {unit.unitNumber}: {unit.title}
+                                      </h4>
+
+                                      {unit.isLocked && (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/40 shrink-0">
+                                          <Lock className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                                          Premium
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
+                                      {unit.note ? (
+                                        <span className="inline-flex items-center gap-1 text-slate-500 dark:text-slate-400">
+                                          <Check className="w-3.5 h-3.5 text-emerald-500 stroke-[2.5]" />
+                                          <span>Converted guide</span>
+                                          {unit.note.readingTimeMinutes && (
+                                            <span className="text-[11px] text-muted-foreground/80 ml-1.5">
+                                              · {unit.note.readingTimeMinutes} min read
+                                            </span>
+                                          )}
+                                        </span>
+                                      ) : (
+                                        <span className="text-amber-600 dark:text-amber-400 italic">
+                                          Study guide in preparation
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
 
-                                {/* Chapter Title */}
-                                <div>
-                                  <h3 className="text-lg sm:text-xl font-display font-bold text-foreground group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors leading-snug">
-                                    {chTitle}
-                                  </h3>
-                                  <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 mt-1 leading-relaxed">
-                                    {note.summary || note.description || 'Comprehensive textbook-quality study guide with step-by-step teaching depth.'}
-                                  </p>
-                                </div>
+                                {/* Right Side: Exam Link (if any) & Right Chevron */}
+                                <div className="flex items-center gap-2 shrink-0 pr-1">
+                                  {unit.matchedExam && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigate(`/exam/${unit.matchedExam.examId}`);
+                                      }}
+                                      title="Practice Exam for this Chapter"
+                                      className="h-8 px-2.5 rounded-xl bg-purple-50 hover:bg-purple-600 hover:text-white text-purple-700 dark:bg-purple-950/50 dark:text-purple-300 text-xs font-bold flex items-center gap-1 transition-all"
+                                    >
+                                      <GraduationCap className="h-3.5 w-3.5" />
+                                      <span className="hidden sm:inline">Exam</span>
+                                    </button>
+                                  )}
 
-                                {/* Section metrics */}
-                                <div className="flex items-center gap-2 pt-1 flex-wrap text-[11px] text-muted-foreground">
-                                  {note.sections && note.sections.length > 0 && (
-                                    <span className="px-2 py-0.5 rounded-md bg-muted font-medium">
-                                      {note.sections.length} Topics
-                                    </span>
-                                  )}
-                                  {note.keyTerms && note.keyTerms.length > 0 && (
-                                    <span className="px-2 py-0.5 rounded-md bg-muted font-medium">
-                                      {note.keyTerms.length} Definitions
-                                    </span>
-                                  )}
-                                  {note.learningOutcomes && note.learningOutcomes.length > 0 && (
-                                    <span className="px-2 py-0.5 rounded-md bg-muted font-medium">
-                                      {note.learningOutcomes.length} Outcomes
-                                    </span>
-                                  )}
+                                  <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-purple-600 group-hover:translate-x-1 transition-all" />
                                 </div>
                               </div>
-
-                              {/* Action Footer */}
-                              <div className="p-4 sm:p-5 pt-0 mt-auto border-t bg-muted/20 flex flex-col gap-2.5">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-3">
-                                  {/* 1. Read Study Note */}
-                                  <Button
-                                    onClick={() => navigate(`/dashboard/books/${note.id}/read`)}
-                                    className="h-10 rounded-xl bg-primary text-primary-foreground font-bold text-xs sm:text-sm shadow-xs flex items-center justify-center gap-1.5 hover:bg-primary/90"
-                                  >
-                                    <BookOpen className="h-4 w-4" />
-                                    <span>Read Study Notes</span>
-                                  </Button>
-
-                                  {/* 2. Take Chapter Exam */}
-                                  {matchedExam ? (
-                                    <Button
-                                      onClick={() => navigate(`/exam/${matchedExam.examId}`)}
-                                      className="h-10 rounded-xl bg-gradient-to-r from-amber-600 via-orange-600 to-amber-600 hover:from-amber-700 hover:via-orange-700 hover:to-amber-700 text-white font-bold text-xs sm:text-sm shadow-xs flex items-center justify-center gap-1.5 transition-transform hover:scale-[1.02]"
-                                    >
-                                      <GraduationCap className="h-4 w-4" />
-                                      <span>Take Chapter Exam</span>
-                                    </Button>
-                                  ) : (
-                                    <Button
-                                      variant="outline"
-                                      disabled
-                                      className="h-10 rounded-xl text-xs sm:text-sm font-medium text-muted-foreground border-dashed flex items-center justify-center gap-1.5 opacity-60"
-                                    >
-                                      <GraduationCap className="h-4 w-4" />
-                                      <span>Exam Coming Soon</span>
-                                    </Button>
-                                  )}
-                                </div>
-
-                                {/* Bookmark & Offline Download */}
-                                <div className="flex items-center justify-between pt-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleToggleBookmark(note.id)}
-                                    className="h-8 text-xs text-muted-foreground hover:text-foreground px-2 rounded-lg"
-                                  >
-                                    <Bookmark
-                                      className={`h-3.5 w-3.5 mr-1.5 ${
-                                        bookmarkedIds.includes(note.id) ? 'fill-primary text-primary' : ''
-                                      }`}
-                                    />
-                                    <span>{bookmarkedIds.includes(note.id) ? 'Saved' : 'Bookmark'}</span>
-                                  </Button>
-
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleSaveBookOffline(note)}
-                                    disabled={downloadingBookId === note.id}
-                                    className="h-8 text-xs text-muted-foreground hover:text-foreground px-2 rounded-lg"
-                                  >
-                                    {downloadingBookId === note.id ? (
-                                      <>
-                                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                                        <span>Saving...</span>
-                                      </>
-                                    ) : offlineBookIds.has(note.id) ? (
-                                      <>
-                                        <CheckCircle2 className="h-3.5 w-3.5 mr-1.5 text-emerald-500" />
-                                        <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Available Offline</span>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <HardDrive className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
-                                        <span>Save Offline</span>
-                                      </>
-                                    )}
-                                  </Button>
-                                </div>
-                              </div>
-                            </Card>
-                          );
-                        })}
+                            );
+                          })}
                       </div>
                     )}
                   </div>

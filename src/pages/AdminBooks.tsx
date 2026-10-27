@@ -5,12 +5,15 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Book, BookInput, BookResourceType, BookStatus } from '@/types/book';
 import { getBooks, createBook, updateBook, deleteBook } from '@/lib/books';
 import { getDepartments } from '@/lib/departments';
-import { getSubjects } from '@/lib/subjects';
+import { getSubjects, createSubject, updateSubject, SubjectInput } from '@/lib/subjects';
 import { getSubjectCover } from '@/lib/subject-covers';
 import { Department } from '@/integrations/firebase/types';
 import { Subject } from '@/types/subject';
 import { BookCard } from '@/components/book/BookCard';
 import { BookFormDialog } from '@/components/book/BookFormDialog';
+import { SubjectFormDialog } from '@/components/subject/SubjectFormDialog';
+import { SubjectNotesManagerDialog } from '@/components/book/SubjectNotesManagerDialog';
+import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -51,6 +54,9 @@ import {
   Archive,
   Loader2,
   FolderOpen,
+  ArrowRight,
+  Image as ImageIcon,
+  Check,
 } from 'lucide-react';
 
 export default function AdminBooks() {
@@ -73,6 +79,13 @@ export default function AdminBooks() {
   // Dialog states
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingBook, setEditingBook] = useState<Book | null>(null);
+
+  // Study Notes Subject Book Management States
+  const [studyNotesViewMode, setStudyNotesViewMode] = useState<'by_subject' | 'all_notes'>('by_subject');
+  const [subjectFormOpen, setSubjectFormOpen] = useState(false);
+  const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
+  const [notesManagerOpen, setNotesManagerOpen] = useState(false);
+  const [selectedSubjectForNotes, setSelectedSubjectForNotes] = useState<Subject | null>(null);
 
   // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -181,6 +194,72 @@ export default function AdminBooks() {
     fetchData();
   };
 
+  // Save subject (create or update with cover page)
+  const handleSaveSubject = async (data: SubjectInput) => {
+    if (!user) return;
+    try {
+      if (editingSubject) {
+        await updateSubject(editingSubject.id, data);
+        toast({
+          title: 'Subject Updated',
+          description: `"${data.name}" and its cover page have been updated successfully.`,
+        });
+      } else {
+        await createSubject(data, user.uid);
+        toast({
+          title: 'Study Notes Subject Created',
+          description: `"${data.name}" has been created with a book cover. You can now assign chapter notes to it.`,
+        });
+      }
+      setSubjectFormOpen(false);
+      setEditingSubject(null);
+      await fetchData();
+    } catch (err: any) {
+      toast({
+        title: 'Error saving subject',
+        description: err.message || 'Could not save subject to database.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Grouped subjects with their assigned study notes
+  const subjectsWithStudyNotes = useMemo(() => {
+    return subjects
+      .map((sub) => {
+        const subjectNotes = books.filter(
+          (b) => b.resourceType === 'short_note' && b.subjectId === sub.id
+        );
+        const totalUnits = Math.max(subjectNotes.length, sub.totalUnits || 0, 1);
+        const percent = Math.min(100, Math.round((subjectNotes.length / totalUnits) * 100));
+
+        return {
+          ...sub,
+          notesCount: subjectNotes.length,
+          totalUnits,
+          percent,
+          notes: subjectNotes,
+        };
+      })
+      .filter((sub) => {
+        if (
+          selectedDept !== 'all' &&
+          sub.departmentId !== selectedDept &&
+          !sub.departmentIds?.includes(selectedDept)
+        ) {
+          return false;
+        }
+        if (searchQuery.trim().length > 0) {
+          const q = searchQuery.toLowerCase().trim();
+          return (
+            sub.name.toLowerCase().includes(q) ||
+            sub.description?.toLowerCase().includes(q)
+          );
+        }
+        return true;
+      });
+  }, [subjects, books, selectedDept, searchQuery]);
+
   // Delete book
   const handleConfirmDelete = async () => {
     if (!bookToDelete) return;
@@ -251,6 +330,20 @@ export default function AdminBooks() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
+            {selectedType === 'short_note' && (
+              <Button
+                onClick={() => {
+                  setEditingSubject(null);
+                  setSubjectFormOpen(true);
+                }}
+                className="rounded-xl bg-purple-600 hover:bg-purple-700 text-white shadow-xs font-semibold"
+              >
+                <Plus className="w-4 h-4 mr-1.5" />
+                <BookOpen className="w-4 h-4 mr-1.5" />
+                Create Notes Subject
+              </Button>
+            )}
+
             <Button
               variant="outline"
               onClick={() => navigate('/dashboard/admin/shortnotes/create')}
@@ -389,6 +482,61 @@ export default function AdminBooks() {
           </button>
         </div>
 
+        {/* If Study Notes is selected, allow switching between Subject Books View and Individual Notes View */}
+        {selectedType === 'short_note' && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-purple-500/10 border border-purple-500/20">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge className="bg-purple-600 text-white font-bold text-xs rounded-lg px-2.5">
+                Study Notes Book Mode
+              </Badge>
+              <span className="text-xs text-muted-foreground font-medium">
+                Create subject books with custom coverpage images and assign chapter notes to them.
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center rounded-xl bg-card border p-1 shadow-xs">
+                <button
+                  type="button"
+                  onClick={() => setStudyNotesViewMode('by_subject')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    studyNotesViewMode === 'by_subject'
+                      ? 'bg-purple-600 text-white shadow-xs'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <BookOpen className="h-3.5 w-3.5" />
+                  <span>Subject Books ({subjectsWithStudyNotes.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStudyNotesViewMode('all_notes')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                    studyNotesViewMode === 'all_notes'
+                      ? 'bg-purple-600 text-white shadow-xs'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  <span>All Chapter Notes ({stats.shortNotes})</span>
+                </button>
+              </div>
+
+              <Button
+                size="sm"
+                onClick={() => {
+                  setEditingSubject(null);
+                  setSubjectFormOpen(true);
+                }}
+                className="h-8 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-xs"
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                New Notes Subject
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Filter Bar */}
         <Card className="rounded-2xl border bg-card shadow-xs">
           <CardContent className="p-4 space-y-3">
@@ -498,6 +646,147 @@ export default function AdminBooks() {
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
+        ) : selectedType === 'short_note' && studyNotesViewMode === 'by_subject' ? (
+          /* SUBJECT BOOKS VIEW (STUDY NOTES ORGANIZED LIKE BOOKS WITH COVER PAGES) */
+          <div>
+            {subjectsWithStudyNotes.length === 0 ? (
+              <div className="text-center py-16 px-4 rounded-3xl border border-dashed bg-card/50 space-y-3">
+                <BookOpen className="h-10 w-10 text-muted-foreground mx-auto" />
+                <div>
+                  <h3 className="text-lg font-bold font-display">No study notes subjects found</h3>
+                  <p className="text-sm text-muted-foreground max-w-md mx-auto mt-1">
+                    Create a subject with a book coverpage image and assign notes to it by chapter.
+                  </p>
+                </div>
+                <Button
+                  onClick={() => {
+                    setEditingSubject(null);
+                    setSubjectFormOpen(true);
+                  }}
+                  className="rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create First Notes Subject
+                </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {subjectsWithStudyNotes.map((sub) => {
+                  const coverUrl =
+                    sub.coverImageUrl ||
+                    (sub.name ? getSubjectCover(sub.name).url : '/placeholder.svg');
+                  const dept = departments.find(
+                    (d) => d.id === sub.departmentId || sub.departmentIds?.includes(d.id)
+                  );
+
+                  return (
+                    <Card
+                      key={sub.id}
+                      className="rounded-3xl border bg-card hover:border-purple-500/50 hover:shadow-lg transition-all duration-200 overflow-hidden flex flex-col justify-between group"
+                    >
+                      <div className="p-5 space-y-4">
+                        {/* Book Cover Preview with 4:3 Aspect Ratio and realistic book spine */}
+                        <div className="relative aspect-[16/10] sm:aspect-[4/3] rounded-2xl overflow-hidden bg-slate-900 border shadow-xs group-hover:shadow-md transition-shadow">
+                          <img
+                            src={coverUrl}
+                            alt={sub.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            onError={(e) => {
+                              (e.target as HTMLElement).src = getSubjectCover(sub.name).url;
+                            }}
+                          />
+                          {/* Book spine simulation */}
+                          <div className="absolute inset-y-0 left-0 w-3 bg-gradient-to-r from-black/60 via-black/30 to-transparent pointer-events-none" />
+
+                          {/* Overlay Badges */}
+                          <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5">
+                            <Badge className="bg-purple-600/90 text-white font-bold text-xs rounded-lg px-2.5 py-0.5 backdrop-blur-xs shadow-xs">
+                              {sub.notesCount} of {sub.totalUnits} Units
+                            </Badge>
+                          </div>
+
+                          <div className="absolute bottom-2.5 left-3.5 right-3.5">
+                            <div className="bg-black/60 backdrop-blur-md rounded-xl p-2 text-white border border-white/10">
+                              <p className="text-[10px] uppercase font-bold text-purple-300">
+                                {dept?.name || 'Academic Curriculum'}
+                              </p>
+                              <h4 className="text-sm font-bold truncate">{sub.name}</h4>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Title and metadata */}
+                        <div>
+                          <div className="flex items-center justify-between gap-2">
+                            <h3 className="text-xl font-display font-bold text-foreground group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                              {sub.name}
+                            </h3>
+                            <span className="text-xs font-bold text-purple-600 dark:text-purple-400">
+                              {sub.percent}% uploaded
+                            </span>
+                          </div>
+
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                            {sub.description || `Study notes book with chapter-by-chapter curriculum notes.`}
+                          </p>
+
+                          {/* Progress bar */}
+                          <div className="mt-3">
+                            <Progress value={sub.percent} className="h-1.5 rounded-full" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Footer Actions */}
+                      <div className="p-4 pt-0 border-t bg-muted/15 flex flex-col gap-2">
+                        <div className="grid grid-cols-2 gap-2 pt-3">
+                          {/* 1. Manage Chapters & Notes */}
+                          <Button
+                            onClick={() => {
+                              setSelectedSubjectForNotes(sub);
+                              setNotesManagerOpen(true);
+                            }}
+                            className="h-9 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-xs flex items-center justify-center gap-1.5"
+                          >
+                            <Layers className="h-3.5 w-3.5" />
+                            <span>Chapters & Notes</span>
+                          </Button>
+
+                          {/* 2. Edit Subject & Cover */}
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setEditingSubject(sub);
+                              setSubjectFormOpen(true);
+                            }}
+                            className="h-9 rounded-xl border-purple-500/30 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/30 font-semibold text-xs flex items-center justify-center gap-1.5"
+                          >
+                            <ImageIcon className="h-3.5 w-3.5" />
+                            <span>Edit Coverpage</span>
+                          </Button>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-1 text-[11px] text-muted-foreground">
+                          <span>{sub.notes.length} note guides assigned</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const deptId = sub.departmentIds?.[0] || '';
+                              navigate(`/dashboard/admin/shortnotes/create?subjectId=${sub.id}&departmentId=${deptId}`);
+                            }}
+                            className="text-purple-600 dark:text-purple-400 hover:underline font-semibold flex items-center gap-1"
+                          >
+                            <span>Add note in studio</span>
+                            <ArrowRight className="h-3 w-3" />
+                          </button>
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         ) : filteredBooks.length === 0 ? (
           <div className="text-center py-16 px-4 rounded-3xl border border-dashed bg-card/50">
             <div className="h-14 w-14 rounded-2xl bg-muted text-muted-foreground flex items-center justify-center mx-auto mb-4">
@@ -556,6 +845,34 @@ export default function AdminBooks() {
           onSave={handleSaveBook}
           defaultDepartmentId={selectedDept !== 'all' ? selectedDept : undefined}
           defaultSubjectId={selectedSubject !== 'all' ? selectedSubject : undefined}
+        />
+
+        {/* Subject Form Dialog (Create / Edit Subject & Book Coverpage) */}
+        <SubjectFormDialog
+          open={subjectFormOpen}
+          onOpenChange={(open) => {
+            setSubjectFormOpen(open);
+            if (!open) setEditingSubject(null);
+          }}
+          subject={editingSubject}
+          onSave={handleSaveSubject}
+          defaultDepartmentId={selectedDept !== 'all' ? selectedDept : undefined}
+        />
+
+        {/* Subject Notes & Chapters Manager Dialog */}
+        <SubjectNotesManagerDialog
+          open={notesManagerOpen}
+          onOpenChange={(open) => {
+            setNotesManagerOpen(open);
+            if (!open) setSelectedSubjectForNotes(null);
+          }}
+          subject={selectedSubjectForNotes}
+          books={books}
+          onNotesChanged={fetchData}
+          onEditSubjectCover={(sub) => {
+            setEditingSubject(sub);
+            setSubjectFormOpen(true);
+          }}
         />
 
         {/* Delete Confirmation Alert */}
