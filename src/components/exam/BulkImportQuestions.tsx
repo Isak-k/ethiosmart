@@ -176,9 +176,9 @@ Study Material:
 ${pdfText.substring(0, 30000)}`; // Limit to 30k chars to avoid token limits
 
     try {
-      // Using Google Gemini API with gemini-2.5-flash (latest and most stable model)
+      // Using Google Gemini API with high-quota gemini-flash-lite-latest model
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: {

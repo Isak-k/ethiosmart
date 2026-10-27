@@ -719,7 +719,7 @@ async function callAIForNotes(prompt: string, effectiveKeys: ReturnType<typeof g
   // 1. Try Google Gemini (Fastest high-throughput models with strict 10s timeout)
   const geminiKey = userKey || effectiveKeys.gemini;
   if (geminiKey) {
-    const models = ['gemini-2.5-flash', 'gemini-1.5-flash'];
+    const models = ['gemini-flash-lite-latest', 'gemini-3.5-flash-lite', 'gemini-3-flash-preview', 'gemini-flash-latest', 'gemini-2.5-flash'];
     for (const model of models) {
       try {
         const response = await fetch(
@@ -751,7 +751,7 @@ async function callAIForNotes(prompt: string, effectiveKeys: ReturnType<typeof g
   // 2. Try Groq (Ultra-fast failover with 8s timeout)
   const groqKey = effectiveKeys.groq;
   if (groqKey) {
-    const models = ['openai/gpt-oss-120b', 'qwen/qwen3.8-27b'];
+    const models = ['qwen/qwen3.8-27b', 'openai/gpt-oss-120b', 'llama-3.1-8b-instant'];
     for (const model of models) {
       try {
         const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -784,7 +784,7 @@ async function callAIForNotes(prompt: string, effectiveKeys: ReturnType<typeof g
   // 3. Try OpenRouter (8s timeout)
   const openrouterKey = effectiveKeys.openrouter;
   if (openrouterKey) {
-    const models = ['google/gemini-flash-1.5', 'meta-llama/llama-3.3-70b-instruct'];
+    const models = ['meta-llama/llama-3.3-70b-instruct', 'google/gemini-2.0-flash-exp:free', 'deepseek/deepseek-chat'];
     for (const model of models) {
       try {
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {

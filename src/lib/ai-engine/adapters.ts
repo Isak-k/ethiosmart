@@ -23,9 +23,11 @@ export async function callGemini(
   const requestedModel = req.providerModels?.gemini;
   const modelsToTry = [
     ...(requestedModel ? [requestedModel] : []),
+    'gemini-flash-lite-latest',
+    'gemini-3.5-flash-lite',
+    'gemini-3-flash-preview',
+    'gemini-flash-latest',
     'gemini-2.5-flash',
-    'gemini-1.5-flash',
-    'gemini-1.5-pro'
   ].filter((m, idx, arr) => arr.indexOf(m) === idx);
   let lastError: any = null;
 
@@ -61,7 +63,15 @@ export async function callGemini(
         err.status = res.status;
         err.retryAfter = res.headers.get('Retry-After');
 
-        if (res.status === 404 || (res.status === 400 && errorMsg.includes('not found'))) {
+        const isModelOrQuotaError =
+          res.status === 404 ||
+          res.status === 429 ||
+          res.status === 503 ||
+          res.status === 500 ||
+          (res.status === 400 && (errorMsg.includes('not found') || errorMsg.includes('deprecated') || errorMsg.includes('not supported')));
+
+        if (isModelOrQuotaError) {
+          console.warn(`[Gemini Adapter] Model '${model}' failed (HTTP ${res.status}: ${errorMsg}). Trying fallback model...`);
           lastError = err;
           continue;
         }
@@ -81,10 +91,13 @@ export async function callGemini(
       return normalized;
     } catch (err: any) {
       lastError = err;
-      if (err.status === 404) {
-        continue;
+      if (err.name === 'AbortError') {
+        throw err;
       }
-      throw err;
+      if (err.status === 401 || (err.status === 403 && String(err.message).toLowerCase().includes('key'))) {
+        throw err;
+      }
+      continue;
     }
   }
 
@@ -113,7 +126,6 @@ export async function callGroq(
   const requestedModel = req.providerModels?.groq;
   const modelsToTry = [
     ...(requestedModel ? [requestedModel] : []),
-    'llama-3.3-70b-versatile',
     'qwen/qwen3.8-27b',
     'openai/gpt-oss-120b',
     'llama-3.1-8b-instant'
@@ -148,11 +160,14 @@ export async function callGroq(
         err.status = res.status;
         err.retryAfter = res.headers.get('Retry-After');
 
-        if (res.status === 400 && responseBody?.error?.code === 'model_not_found') {
-          lastError = err;
-          continue;
-        }
-        if (res.status === 404) {
+        const isModelOrQuotaError =
+          res.status === 404 ||
+          res.status === 429 ||
+          res.status === 503 ||
+          (res.status === 400 && (responseBody?.error?.code === 'model_not_found' || errorMsg.includes('model') || errorMsg.includes('deprecated')));
+
+        if (isModelOrQuotaError) {
+          console.warn(`[Groq Adapter] Model '${model}' failed (HTTP ${res.status}: ${errorMsg}). Trying fallback model...`);
           lastError = err;
           continue;
         }
@@ -172,10 +187,13 @@ export async function callGroq(
       return normalized;
     } catch (err: any) {
       lastError = err;
-      if (err.status === 404 || (err.status === 400 && err.message?.includes('model'))) {
-        continue;
+      if (err.name === 'AbortError') {
+        throw err;
       }
-      throw err;
+      if (err.status === 401 || (err.status === 403 && String(err.message).toLowerCase().includes('key'))) {
+        throw err;
+      }
+      continue;
     }
   }
 
@@ -206,7 +224,8 @@ export async function callOpenRouter(
     ...(requestedModel ? [requestedModel] : []),
     'meta-llama/llama-3.3-70b-instruct',
     'google/gemini-2.0-flash-exp:free',
-    'mistralai/mistral-small-24b-instruct-2501'
+    'mistralai/mistral-small-24b-instruct-2501',
+    'deepseek/deepseek-chat'
   ].filter((m, idx, arr) => arr.indexOf(m) === idx);
 
   let lastError: any = null;
@@ -241,7 +260,14 @@ export async function callOpenRouter(
         err.status = res.status;
         err.retryAfter = res.headers.get('Retry-After');
 
-        if (res.status === 404 || (res.status === 400 && errorMsg.includes('model'))) {
+        const isModelOrQuotaError =
+          res.status === 404 ||
+          res.status === 429 ||
+          res.status === 503 ||
+          (res.status === 400 && (errorMsg.includes('model') || errorMsg.includes('not supported') || errorMsg.includes('deprecated')));
+
+        if (isModelOrQuotaError) {
+          console.warn(`[OpenRouter Adapter] Model '${model}' failed (HTTP ${res.status}: ${errorMsg}). Trying fallback model...`);
           lastError = err;
           continue;
         }
@@ -261,10 +287,13 @@ export async function callOpenRouter(
       return normalized;
     } catch (err: any) {
       lastError = err;
-      if (err.status === 404 || (err.status === 400 && err.message?.includes('model'))) {
-        continue;
+      if (err.name === 'AbortError') {
+        throw err;
       }
-      throw err;
+      if (err.status === 401 || (err.status === 403 && String(err.message).toLowerCase().includes('key'))) {
+        throw err;
+      }
+      continue;
     }
   }
 
@@ -333,7 +362,14 @@ export async function callHuggingFace(
           throw err;
         }
 
-        if (res.status === 404 || (res.status === 400 && String(errorMsg).includes('Model not supported'))) {
+        const isModelOrQuotaError =
+          res.status === 404 ||
+          res.status === 429 ||
+          res.status === 503 ||
+          (res.status === 400 && String(errorMsg).includes('Model not supported'));
+
+        if (isModelOrQuotaError) {
+          console.warn(`[Hugging Face Adapter] Model '${model}' failed (HTTP ${res.status}: ${errorMsg}). Trying fallback model...`);
           lastError = err;
           continue;
         }
@@ -353,10 +389,16 @@ export async function callHuggingFace(
       return normalized;
     } catch (err: any) {
       lastError = err;
-      if (err.status === 404 || (err.status === 400 && String(err.message).includes('Model not supported'))) {
-        continue;
+      if (err.name === 'AbortError') {
+        throw err;
       }
-      throw err;
+      if (err.status === 402 || err.code === 'quota_exceeded') {
+        throw err;
+      }
+      if (err.status === 401 || (err.status === 403 && String(err.message).toLowerCase().includes('key'))) {
+        throw err;
+      }
+      continue;
     }
   }
 

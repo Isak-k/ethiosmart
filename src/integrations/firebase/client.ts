@@ -22,7 +22,7 @@ const fallbackFirebaseConfig = {
 type FirebaseConfigKey = keyof typeof fallbackFirebaseConfig;
 
 export const getFirebaseConfig = (
-  environment: Record<string, string | undefined> = import.meta.env
+  environment: Record<string, string | undefined> = (import.meta as any)?.env || (typeof process !== 'undefined' ? process.env : {}) || {}
 ) => {
   const getValue = (key: FirebaseConfigKey) => {
     const envKey = `VITE_FIREBASE_${key
@@ -64,7 +64,7 @@ console.log('Firebase Config:', {
 // Initialize the existing Firebase app.
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-const appCheckSiteKey = import.meta.env.VITE_FIREBASE_APP_CHECK_RECAPTCHA_SITE_KEY;
+const appCheckSiteKey = (import.meta as any)?.env?.VITE_FIREBASE_APP_CHECK_RECAPTCHA_SITE_KEY;
 if (appCheckSiteKey) {
   initializeAppCheck(app, {
     provider: new ReCaptchaV3Provider(appCheckSiteKey),

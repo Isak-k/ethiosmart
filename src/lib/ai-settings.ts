@@ -33,34 +33,55 @@ export interface AISystemSettings {
 const SETTINGS_DOC_ID = 'ai_providers';
 const LOCAL_STORAGE_KEY = 'exampro_ai_system_settings';
 
+/**
+ * Pre-configured built-in fallback keys guaranteed to provide out-of-the-box readiness
+ * without forcing the user to manually enter keys before generating questions.
+ */
+export const BUILTIN_DEFAULT_KEYS: ProviderKeys = {
+  gemini: 'AIzaSyBDNhU8bdkqYdPidT6TnxjInTxg7HuiB-k',
+  groq: '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',
+  openrouter: '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',
+  huggingface: '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',
+};
+
 export const DEFAULT_AI_SETTINGS: AISystemSettings = {
   providers: {
     gemini: {
       id: 'gemini',
       name: 'Google Gemini',
-      apiKey: '',
+      apiKey: BUILTIN_DEFAULT_KEYS.gemini || '',
       enabled: true,
-      model: 'gemini-1.5-flash',
+      model: 'gemini-flash-lite-latest',
       priority: 1,
       description: 'Ultra-fast, high-accuracy model with huge context window and native JSON formatting.',
       consoleUrl: 'https://aistudio.google.com/app/apikey',
-      recommendedModels: ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'],
+      recommendedModels: [
+        'gemini-flash-lite-latest',
+        'gemini-3.5-flash-lite',
+        'gemini-3-flash-preview',
+        'gemini-flash-latest',
+        'gemini-2.5-flash',
+      ],
     },
     groq: {
       id: 'groq',
       name: 'Groq (LPU Inference)',
-      apiKey: '',
+      apiKey: BUILTIN_DEFAULT_KEYS.groq || '',
       enabled: true,
-      model: 'llama-3.3-70b-versatile',
+      model: 'qwen/qwen3.8-27b',
       priority: 2,
       description: 'Extremely fast inference on custom LPU chips, ideal for high-throughput batch generation.',
       consoleUrl: 'https://console.groq.com/keys',
-      recommendedModels: ['llama-3.3-70b-versatile', 'mixtral-8x7b-32768', 'qwen/qwen3.8-27b', 'openai/gpt-oss-120b'],
+      recommendedModels: [
+        'qwen/qwen3.8-27b',
+        'openai/gpt-oss-120b',
+        'llama-3.1-8b-instant',
+      ],
     },
     openrouter: {
       id: 'openrouter',
       name: 'OpenRouter Gateway',
-      apiKey: '',
+      apiKey: BUILTIN_DEFAULT_KEYS.openrouter || '',
       enabled: true,
       model: 'meta-llama/llama-3.3-70b-instruct',
       priority: 3,
@@ -76,7 +97,7 @@ export const DEFAULT_AI_SETTINGS: AISystemSettings = {
     huggingface: {
       id: 'huggingface',
       name: 'Hugging Face Inference',
-      apiKey: '',
+      apiKey: BUILTIN_DEFAULT_KEYS.huggingface || '',
       enabled: true,
       model: 'Qwen/Qwen2.5-72B-Instruct',
       priority: 4,
@@ -98,7 +119,7 @@ export const DEFAULT_AI_SETTINGS: AISystemSettings = {
 };
 
 /**
- * Load initial keys from environment variables and local storage
+ * Load initial keys from environment variables, local storage, or built-in defaults
  */
 function getPreconfiguredEnvKeys(): ProviderKeys {
   const meta: Record<string, string | undefined> = (import.meta as any).env || {};
@@ -120,22 +141,26 @@ function getPreconfiguredEnvKeys(): ProviderKeys {
       meta.GEMINI_API_KEY ||
       getStorage('gemini_api_key') ||
       getStorage('GEMINI_API_KEY') ||
-      getStorage('google_ai_api_key'),
+      getStorage('google_ai_api_key') ||
+      BUILTIN_DEFAULT_KEYS.gemini,
     groq:
       meta.VITE_GROQ_API_KEY ||
       meta.GROQ_API_KEY ||
       getStorage('groq_api_key') ||
-      getStorage('GROQ_API_KEY'),
+      getStorage('GROQ_API_KEY') ||
+      BUILTIN_DEFAULT_KEYS.groq,
     openrouter:
       meta.VITE_OPENROUTER_API_KEY ||
       meta.OPENROUTER_API_KEY ||
       getStorage('openrouter_api_key') ||
-      getStorage('OPENROUTER_API_KEY'),
+      getStorage('OPENROUTER_API_KEY') ||
+      BUILTIN_DEFAULT_KEYS.openrouter,
     huggingface:
       meta.VITE_HUGGING_FACE_API_KEY ||
       meta.HUGGING_FACE_API_KEY ||
       getStorage('huggingface_api_key') ||
-      getStorage('HUGGING_FACE_API_KEY'),
+      getStorage('HUGGING_FACE_API_KEY') ||
+      BUILTIN_DEFAULT_KEYS.huggingface,
   };
 }
 
@@ -202,6 +227,11 @@ function mergeWithDefaults(data: Partial<AISystemSettings>): AISystemSettings {
   const base = JSON.parse(JSON.stringify(DEFAULT_AI_SETTINGS)) as AISystemSettings;
   const envKeys = getPreconfiguredEnvKeys();
 
+  const getEffectiveKey = (userKey: string | undefined, provider: AIProviderId): string => {
+    if (userKey && userKey.trim().length > 0) return userKey.trim();
+    return envKeys[provider] || BUILTIN_DEFAULT_KEYS[provider] || '';
+  };
+
   const merged: AISystemSettings = {
     ...base,
     ...data,
@@ -209,22 +239,22 @@ function mergeWithDefaults(data: Partial<AISystemSettings>): AISystemSettings {
       gemini: {
         ...base.providers.gemini,
         ...(data.providers?.gemini || {}),
-        apiKey: data.providers?.gemini?.apiKey || envKeys.gemini || '',
+        apiKey: getEffectiveKey(data.providers?.gemini?.apiKey, 'gemini'),
       },
       groq: {
         ...base.providers.groq,
         ...(data.providers?.groq || {}),
-        apiKey: data.providers?.groq?.apiKey || envKeys.groq || '',
+        apiKey: getEffectiveKey(data.providers?.groq?.apiKey, 'groq'),
       },
       openrouter: {
         ...base.providers.openrouter,
         ...(data.providers?.openrouter || {}),
-        apiKey: data.providers?.openrouter?.apiKey || envKeys.openrouter || '',
+        apiKey: getEffectiveKey(data.providers?.openrouter?.apiKey, 'openrouter'),
       },
       huggingface: {
         ...base.providers.huggingface,
         ...(data.providers?.huggingface || {}),
-        apiKey: data.providers?.huggingface?.apiKey || envKeys.huggingface || '',
+        apiKey: getEffectiveKey(data.providers?.huggingface?.apiKey, 'huggingface'),
       },
     },
     providerPriority: data.providerPriority || base.providerPriority,
@@ -233,6 +263,21 @@ function mergeWithDefaults(data: Partial<AISystemSettings>): AISystemSettings {
     temperature: data.temperature ?? base.temperature,
     maxBatchSize: data.maxBatchSize ?? base.maxBatchSize,
   };
+
+  // Auto-migrate legacy or deprecated models from older saved configs
+  if (merged.providers.groq.model === 'llama-3.3-70b-versatile' || !merged.providers.groq.model) {
+    merged.providers.groq.model = 'qwen/qwen3.8-27b';
+  }
+  if (
+    merged.providers.gemini.model === 'gemini-1.5-flash' ||
+    merged.providers.gemini.model === 'gemini-2.5-flash' ||
+    !merged.providers.gemini.model
+  ) {
+    merged.providers.gemini.model = 'gemini-flash-lite-latest';
+  }
+  if (merged.providers.openrouter.model === 'google/gemini-flash-1.5' || !merged.providers.openrouter.model) {
+    merged.providers.openrouter.model = 'meta-llama/llama-3.3-70b-instruct';
+  }
 
   return merged;
 }
@@ -336,7 +381,7 @@ export async function testAIProviderConnection(
   try {
     switch (provider) {
       case 'gemini': {
-        const targetModel = model || 'gemini-1.5-flash';
+        const targetModel = model || 'gemini-flash-lite-latest';
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${encodeURIComponent(cleanKey)}`;
         const res = await fetch(url, {
           method: 'POST',
@@ -352,8 +397,8 @@ export async function testAIProviderConnection(
 
         if (!res.ok) {
           const errMsg = data?.error?.message || `HTTP ${res.status}: ${res.statusText}`;
-          if (res.status === 404 && targetModel !== 'gemini-2.5-flash') {
-            const retryUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(cleanKey)}`;
+          if ((res.status === 404 || res.status === 429) && targetModel !== 'gemini-3.5-flash-lite') {
+            const retryUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${encodeURIComponent(cleanKey)}`;
             const retryRes = await fetch(retryUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -366,7 +411,7 @@ export async function testAIProviderConnection(
               return {
                 success: true,
                 latencyMs: Date.now() - startTime,
-                message: `Connected successfully to Google Gemini (verified via gemini-2.5-flash) in ${Date.now() - startTime}ms!`,
+                message: `Connected successfully to Google Gemini (verified via gemini-3.5-flash-lite) in ${Date.now() - startTime}ms!`,
               };
             }
           }
@@ -386,7 +431,7 @@ export async function testAIProviderConnection(
       }
 
       case 'groq': {
-        const targetModel = model || 'llama-3.3-70b-versatile';
+        const targetModel = model || 'qwen/qwen3.8-27b';
         const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -406,7 +451,7 @@ export async function testAIProviderConnection(
 
         if (!res.ok) {
           const errMsg = data?.error?.message || `HTTP ${res.status}: ${res.statusText}`;
-          if ((res.status === 404 || res.status === 400) && targetModel !== 'llama-3.1-8b-instant') {
+          if ((res.status === 404 || res.status === 400) && targetModel !== 'openai/gpt-oss-120b') {
             const retryRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
               method: 'POST',
               headers: {
@@ -414,7 +459,7 @@ export async function testAIProviderConnection(
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                model: 'llama-3.1-8b-instant',
+                model: 'openai/gpt-oss-120b',
                 messages: [{ role: 'user', content: 'Ping' }],
                 max_tokens: 5,
                 temperature: 0.1,
@@ -424,7 +469,7 @@ export async function testAIProviderConnection(
               return {
                 success: true,
                 latencyMs: Date.now() - startTime,
-                message: `Connected successfully to Groq (verified via llama-3.1-8b-instant) in ${Date.now() - startTime}ms!`,
+                message: `Connected successfully to Groq (verified via openai/gpt-oss-120b) in ${Date.now() - startTime}ms!`,
               };
             }
           }
