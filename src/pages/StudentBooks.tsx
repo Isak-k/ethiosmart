@@ -656,47 +656,47 @@ export default function StudentBooks() {
           /* ========================================================================= */
           /* STEP 1: CHOICE SCREEN (USER CHOOSES BOOKS OR NOTES, THEN CLICKS NEXT)      */
           /* ========================================================================= */
-          <div className="space-y-8 max-w-4xl mx-auto py-4">
+          <div className="space-y-4 sm:space-y-6 max-w-3xl mx-auto py-1 sm:py-3">
             {/* Hero Selection Header */}
-            <div className="text-center space-y-3">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
-                <Library className="h-3.5 w-3.5" />
+            <div className="text-center space-y-1.5 sm:space-y-2.5">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] sm:text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
+                <Library className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                 ExamPro Academic Library
               </div>
-              <h1 className="text-3xl sm:text-4xl font-display font-bold text-foreground tracking-tight">
+              <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground tracking-tight">
                 What would you like to study?
               </h1>
-              <p className="text-sm sm:text-base text-muted-foreground max-w-xl mx-auto leading-relaxed">
+              <p className="text-xs sm:text-sm text-muted-foreground max-w-lg mx-auto leading-relaxed">
                 Choose between complete curriculum textbooks or high-yield chapter study notes, then click Next to view available materials.
               </p>
             </div>
 
             {/* The Two Choice Cards (Notes order comes first!) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 pt-1 sm:pt-2">
               {/* CHOICE 1: CHAPTER STUDY NOTES (FIRST) */}
               <div
                 onClick={() => setSelectedChoice('notes')}
-                className={`group relative p-6 sm:p-7 rounded-3xl border-2 text-left transition-all duration-200 cursor-pointer flex flex-col justify-between ${
+                className={`group relative p-4 sm:p-5 rounded-2xl sm:rounded-3xl border-2 text-left transition-all duration-200 cursor-pointer flex flex-col justify-between ${
                   selectedChoice === 'notes'
-                    ? 'border-amber-500 bg-amber-500/10 shadow-lg ring-2 ring-amber-500/30 scale-[1.01]'
+                    ? 'border-amber-500 bg-amber-500/10 shadow-md ring-2 ring-amber-500/30 scale-[1.01]'
                     : 'border-border/70 bg-card hover:border-amber-500/40 hover:bg-muted/30'
                 }`}
               >
                 <div>
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center justify-between gap-2.5">
                     <div
-                      className={`h-14 w-14 rounded-2xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${
+                      className={`h-11 w-11 sm:h-12 sm:w-12 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${
                         selectedChoice === 'notes'
-                          ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-md'
+                          ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-sm'
                           : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
                       }`}
                     >
-                      <FileText className="h-7 w-7" />
+                      <FileText className="h-5 w-5 sm:h-6 sm:w-6" />
                     </div>
 
                     <div className="flex items-center gap-2">
                       <Badge
-                        className={`rounded-full text-xs px-2.5 py-0.5 font-bold ${
+                        className={`rounded-full text-[11px] sm:text-xs px-2 sm:px-2.5 py-0.5 font-bold ${
                           selectedChoice === 'notes'
                             ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white border-none'
                             : 'border-amber-500/40 text-amber-700 dark:text-amber-300 bg-amber-500/10'
@@ -707,110 +707,110 @@ export default function StudentBooks() {
 
                       {/* Custom Radio Circle */}
                       <div
-                        className={`h-6 w-6 rounded-full flex items-center justify-center border-2 transition-all ${
+                        className={`h-5 w-5 sm:h-5.5 sm:w-5.5 rounded-full flex items-center justify-center border-2 transition-all ${
                           selectedChoice === 'notes'
                             ? 'border-amber-500 bg-amber-500 text-white'
                             : 'border-muted-foreground/40'
                         }`}
                       >
-                        {selectedChoice === 'notes' && <Check className="h-3.5 w-3.5 stroke-[3]" />}
+                        {selectedChoice === 'notes' && <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5 stroke-[3]" />}
                       </div>
                     </div>
                   </div>
 
-                  <div className="mt-5">
-                    <h2 className="text-xl sm:text-2xl font-display font-bold text-foreground">
+                  <div className="mt-3 sm:mt-4">
+                    <h2 className="text-base sm:text-lg font-display font-bold text-foreground">
                       Chapter Study Notes
                     </h2>
-                    <p className="text-xs sm:text-sm text-muted-foreground mt-1.5 leading-relaxed">
+                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed line-clamp-2">
                       Separated chapter-by-chapter guides with smart definitions, worked examples & chapter recall exams.
                     </p>
                   </div>
                 </div>
 
-                <div className="mt-6 pt-3.5 border-t border-border/50 flex items-center justify-between text-xs font-bold">
+                <div className="mt-3.5 sm:mt-4 pt-2.5 sm:pt-3 border-t border-border/50 flex items-center justify-between text-[11px] sm:text-xs font-bold">
                   <span className={selectedChoice === 'notes' ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}>
                     {selectedChoice === 'notes' ? '✓ Selected' : 'Click to select Notes'}
                   </span>
-                  <span className="text-muted-foreground text-[11px]">Chapter by Chapter</span>
+                  <span className="text-muted-foreground text-[10px] sm:text-[11px]">Chapter by Chapter</span>
                 </div>
               </div>
 
               {/* CHOICE 2: BOOKS & TEXTBOOKS (SECOND) */}
               <div
                 onClick={() => setSelectedChoice('books')}
-                className={`group relative p-6 sm:p-7 rounded-3xl border-2 text-left transition-all duration-200 cursor-pointer flex flex-col justify-between ${
+                className={`group relative p-4 sm:p-5 rounded-2xl sm:rounded-3xl border-2 text-left transition-all duration-200 cursor-pointer flex flex-col justify-between ${
                   selectedChoice === 'books'
-                    ? 'border-primary bg-primary/10 shadow-lg ring-2 ring-primary/30 scale-[1.01]'
+                    ? 'border-primary bg-primary/10 shadow-md ring-2 ring-primary/30 scale-[1.01]'
                     : 'border-border/70 bg-card hover:border-primary/40 hover:bg-muted/30'
                 }`}
               >
                 <div>
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center justify-between gap-2.5">
                     <div
-                      className={`h-14 w-14 rounded-2xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${
+                      className={`h-11 w-11 sm:h-12 sm:w-12 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${
                         selectedChoice === 'books'
-                          ? 'bg-primary text-primary-foreground shadow-md'
+                          ? 'bg-primary text-primary-foreground shadow-sm'
                           : 'bg-primary/10 text-primary'
                       }`}
                     >
-                      <BookOpen className="h-7 w-7" />
+                      <BookOpen className="h-5 w-5 sm:h-6 sm:w-6" />
                     </div>
 
                     <div className="flex items-center gap-2">
                       <Badge
                         variant={selectedChoice === 'books' ? 'default' : 'outline'}
-                        className="rounded-full text-xs px-2.5 py-0.5 font-bold"
+                        className="rounded-full text-[11px] sm:text-xs px-2 sm:px-2.5 py-0.5 font-bold"
                       >
                         {textbooksCount} Available
                       </Badge>
 
                       {/* Custom Radio Circle */}
                       <div
-                        className={`h-6 w-6 rounded-full flex items-center justify-center border-2 transition-all ${
+                        className={`h-5 w-5 sm:h-5.5 sm:w-5.5 rounded-full flex items-center justify-center border-2 transition-all ${
                           selectedChoice === 'books'
                             ? 'border-primary bg-primary text-primary-foreground'
                             : 'border-muted-foreground/40'
                         }`}
                       >
-                        {selectedChoice === 'books' && <Check className="h-3.5 w-3.5 stroke-[3]" />}
+                        {selectedChoice === 'books' && <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5 stroke-[3]" />}
                       </div>
                     </div>
                   </div>
 
-                  <div className="mt-5">
-                    <h2 className="text-xl sm:text-2xl font-display font-bold text-foreground">
+                  <div className="mt-3 sm:mt-4">
+                    <h2 className="text-base sm:text-lg font-display font-bold text-foreground">
                       Books & Textbooks
                     </h2>
-                    <p className="text-xs sm:text-sm text-muted-foreground mt-1.5 leading-relaxed">
+                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed line-clamp-2">
                       Complete digital textbooks, official syllabus documents, and academic reference books.
                     </p>
                   </div>
                 </div>
 
-                <div className="mt-6 pt-3.5 border-t border-border/50 flex items-center justify-between text-xs font-bold">
+                <div className="mt-3.5 sm:mt-4 pt-2.5 sm:pt-3 border-t border-border/50 flex items-center justify-between text-[11px] sm:text-xs font-bold">
                   <span className={selectedChoice === 'books' ? 'text-primary' : 'text-muted-foreground'}>
                     {selectedChoice === 'books' ? '✓ Selected' : 'Click to select Books'}
                   </span>
-                  <span className="text-muted-foreground text-[11px]">Full Documents</span>
+                  <span className="text-muted-foreground text-[10px] sm:text-[11px]">Full Documents</span>
                 </div>
               </div>
             </div>
 
             {/* NEXT BUTTON */}
-            <div className="pt-4 flex flex-col items-center justify-center gap-4">
+            <div className="pt-2 sm:pt-3 flex flex-col items-center justify-center gap-3">
               <Button
                 type="button"
                 size="lg"
                 onClick={handleProceedNext}
-                className="w-full sm:w-auto min-w-[240px] h-12 rounded-2xl font-bold text-base bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 flex items-center justify-center gap-2.5 group transition-transform hover:scale-[1.02]"
+                className="w-full sm:w-auto min-w-[200px] sm:min-w-[220px] h-10 sm:h-11 rounded-xl sm:rounded-2xl font-bold text-sm sm:text-base bg-primary text-primary-foreground shadow-md hover:bg-primary/90 flex items-center justify-center gap-2 group transition-transform hover:scale-[1.01]"
               >
                 <span>Next</span>
-                <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                <ArrowRight className="h-4 w-4 sm:h-4.5 sm:w-4.5 group-hover:translate-x-1 transition-transform" />
               </Button>
 
               {/* Direct Jump Links */}
-              <div className="flex items-center justify-center gap-3 pt-1 text-xs text-muted-foreground flex-wrap">
+              <div className="flex items-center justify-center gap-3 pt-0.5 text-[11px] sm:text-xs text-muted-foreground flex-wrap">
                 <span>Or jump directly to:</span>
                 <button
                   type="button"
@@ -820,7 +820,7 @@ export default function StudentBooks() {
                   }}
                   className="text-emerald-600 dark:text-emerald-400 font-semibold hover:underline flex items-center gap-1"
                 >
-                  <HardDrive className="h-3.5 w-3.5" />
+                  <HardDrive className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                   Offline Saved ({offlineRecords.length})
                 </button>
                 <span>•</span>
@@ -832,7 +832,7 @@ export default function StudentBooks() {
                   }}
                   className="text-primary font-semibold hover:underline flex items-center gap-1"
                 >
-                  <Bookmark className="h-3.5 w-3.5" />
+                  <Bookmark className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                   Bookmarks ({bookmarkedIds.length})
                 </button>
               </div>
