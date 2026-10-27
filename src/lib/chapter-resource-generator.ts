@@ -1815,6 +1815,54 @@ export function enrichStudyNoteToTextbookQuality(
   });
 
   // Ensure at least 2 developed sections exist for comprehensive textbook depth
+  if (enrichedSections.length === 0) {
+    const sec1Title = `Foundational Principles & Core Concepts`;
+    const sec1Content = `### 1. Conceptual Framework & Theoretical Basis\n${chapterTitle} forms an essential component of ${subjectName}. Comprehensive mastery begins with grasping the foundational definitions, underlying principles, and standard analytical paradigms.\n\n### 2. High-Yield Principles for Examination Mastery\n- **Core Definition**: Systematic categorization and structured analysis of central elements.\n- **Theoretical Framework**: Applying evidence-based reasoning to predict and explain outcomes.\n- **Common Pitfalls**: Avoid conflating introductory concepts with advanced boundary conditions.`;
+    const sec1KeyPoints = [
+      `Grasp core theoretical foundations of ${chapterTitle}.`,
+      `Apply structured frameworks to solve academic problems.`,
+      `Distinguish governing mechanisms from surface symptoms.`
+    ];
+    const sec1Blocks = synthesizeSectionBlocks(
+      {
+        id: `sec-${chapterNumber}-1`,
+        title: sec1Title,
+        content: sec1Content,
+        keyPoints: sec1KeyPoints,
+      },
+      profile.discipline,
+      chapterTitle
+    );
+    enrichedSections.push({
+      id: `sec-${chapterNumber}-1`,
+      sectionNumber: `${chapterNumber}.1`,
+      title: sec1Title,
+      content: sec1Content,
+      keyPoints: sec1KeyPoints,
+      contentBlocks: sec1Blocks,
+      isImportant: true,
+      exercises: [
+        {
+          id: `ex-${chapterNumber}-1`,
+          exerciseNumber: 1,
+          question: `Explain the fundamental principles governing ${chapterTitle} and contrast them with baseline models.`,
+          questionType: 'conceptual',
+          hints: ['State the core definition before highlighting the differentiating mechanisms.'],
+          solution: {
+            answer: `The fundamental principles define system behavior and establish clear causal linkages.`,
+            steps: [
+              `Step 1: State the governing definition of ${chapterTitle}.`,
+              `Step 2: Trace the causal mechanism through the system.`,
+              `Step 3: Relate the mechanism to observable exam outcomes.`
+            ],
+            explanation: `Structured conceptual explanation ensures full credit.`
+          },
+          initialExpanded: false
+        }
+      ]
+    });
+  }
+
   if (enrichedSections.length === 1) {
     if (profile.discipline === 'mathematics' || profile.discipline === 'physics') {
       const sec2Title = `Worked Multi-Step Calculations & Exam Problem-Solving`;
@@ -1919,7 +1967,7 @@ export function enrichStudyNoteToTextbookQuality(
     learningOutcomes: existingOutcomes,
     keyTakeaways: existingTakeaways,
     keyTerms: existingKeyTerms,
-    sections: enrichedSections.length > 0 ? enrichedSections : generateImportantChapterNotes('', options).sections,
+    sections: enrichedSections,
     readingTimeMinutes: Math.max(4, Math.ceil(
       enrichedSections.reduce((acc, s) => acc + (s.content || '').split(/\s+/).filter(Boolean).length, 0) / 180
     )),

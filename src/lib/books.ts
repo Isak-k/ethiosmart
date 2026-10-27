@@ -203,7 +203,7 @@ export async function createBook(input: BookInput, creatorId: string): Promise<s
     publicationYear: input.publicationYear || '',
     language: input.language || 'English',
     chapterLabels: input.chapterLabels || [],
-    status: input.status || 'published',
+    status: input.status === 'draft' ? 'draft' : 'published',
     allowDownload: input.allowDownload ?? true,
     mimeType: input.mimeType || (input.resourceType === 'short_note' ? 'text/markdown' : 'application/pdf'),
     fileSizeBytes: input.fileSizeBytes || (input.content ? new Blob([input.content]).size : 0),
@@ -276,6 +276,9 @@ export async function updateBook(id: string, updates: Partial<Book>): Promise<vo
 
   // Deeply strip any undefined keys or nested undefined values to satisfy Firestore updateDoc validation
   const cleanUpdates = removeUndefinedFields(updates);
+  if (cleanUpdates.status !== undefined) {
+    cleanUpdates.status = cleanUpdates.status === 'draft' ? 'draft' : 'published';
+  }
   cleanUpdates.updatedAt = serverTimestamp();
 
   await updateDoc(docRef, cleanUpdates);

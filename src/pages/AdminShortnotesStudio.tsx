@@ -1061,8 +1061,13 @@ export default function AdminShortnotesStudio() {
   };
 
   // Save / Publish Note to Firestore
-  const handleSaveAndPublish = async (explicitStatus?: 'published' | 'draft') => {
-    const targetStatus = explicitStatus || status;
+  const handleSaveAndPublish = async (explicitStatus?: unknown) => {
+    const targetStatus: 'published' | 'draft' =
+      explicitStatus === 'published' || explicitStatus === 'draft'
+        ? explicitStatus
+        : status === 'published'
+        ? 'published'
+        : 'draft';
     setStatus(targetStatus);
 
     if (!noteTitle.trim()) {
@@ -2939,7 +2944,7 @@ export default function AdminShortnotesStudio() {
 
                 <Button
                   size="sm"
-                  onClick={handleSaveAndPublish}
+                  onClick={() => handleSaveAndPublish('published')}
                   disabled={isSaving}
                   className="rounded-xl h-8 text-xs font-semibold bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
                 >
