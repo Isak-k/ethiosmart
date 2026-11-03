@@ -173,311 +173,198 @@ const Index = () => {
     }
   };
 
-  const features = [
-    {
-      icon: BookOpen,
-      title: "Digital Curriculum Library",
-      description: "Complete textbooks and high-yield chapter notes accessible online and 100% offline.",
-      gradient: "from-blue-600 to-indigo-700",
-    },
-    {
-      icon: Brain,
-      title: "AI Study Assistant",
-      description: "Smart 24/7 AI tutor to explain complex topics, answer doubts, and generate practice questions.",
-      gradient: "from-purple-600 to-pink-600",
-    },
-    {
-      icon: ClipboardList,
-      title: "Practice & Examination",
-      description: "Timed examinations, practice mode with instant explanations, and verified questions.",
-      gradient: "from-emerald-500 to-teal-700",
-    },
-    {
-      icon: TrendingUp,
-      title: "Academic Growth",
-      description: "Detailed progress tracking, subject mastery, and department leaderboards.",
-      gradient: "from-amber-500 to-orange-600",
-    },
-  ];
-
   return (
-    <div className="min-h-screen bg-background font-sans selection:bg-sky-500/20 overflow-x-hidden">
-      {/* Hero Section - Strictly Constrained to 100dvh Viewport (Zero Overflow) */}
-      <section className="relative h-[100dvh] max-h-[100dvh] flex flex-col justify-between overflow-hidden bg-gradient-to-b from-[#f8fafc] via-[#f1f5f9] to-[#e2e8f0] dark:from-[#070c18] dark:via-[#0c162d] dark:to-[#050811] transition-colors duration-500">
-        {/* Dynamic Liquid Glass Canvas with Interactive Cursor Spotlight & Ripples */}
-        <LiquidBackdrop showDroplets={true} showSplash={true} showRipples={true} interactive={true} variant="hero" />
+    <div className="h-[100dvh] max-h-[100dvh] bg-background font-sans selection:bg-sky-500/20 overflow-hidden flex flex-col justify-between">
+      {/* Dynamic Liquid Glass Canvas with Interactive Cursor Spotlight & Ripples */}
+      <LiquidBackdrop showDroplets={true} showSplash={true} showRipples={true} interactive={true} variant="hero" />
 
-        {/* 1. Sleek Navigation Bar with Prominent Brand Logo */}
-        <header className="relative z-20 px-4 py-2.5 sm:px-8 sm:py-3.5 flex items-center justify-between shrink-0">
-          {/* Logo */}
-          <div
-            className="cursor-pointer transition-transform hover:scale-105 active:scale-95"
-            onClick={() => navigate("/")}
-          >
-            <EthioSmartLogo variant="full" size="md" textColor="auto" showTagline={true} />
+      {/* 1. Sleek Navigation Bar with Prominent Brand Logo */}
+      <header className="relative z-20 px-3 sm:px-8 py-2 sm:py-3.5 flex items-center justify-between shrink-0">
+        {/* Logo - Increased size */}
+        <div
+          className="cursor-pointer transition-transform hover:scale-105 active:scale-95"
+          onClick={() => navigate("/")}
+        >
+          <EthioSmartLogo variant="full" size="lg" textColor="auto" showTagline={true} />
+        </div>
+
+        {/* Navigation Actions */}
+        <div className="flex items-center gap-1.5 sm:gap-3">
+          {/* Install Button in Top Nav - Only place on screen, visible until installed */}
+          {!isInstalled && (
+            <button
+              type="button"
+              onClick={handleInstallClick}
+              className="liquid-glass-button-secondary rounded-full h-8 sm:h-9 px-3 sm:px-4 text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95 shadow-md bg-gradient-to-r from-sky-500/15 via-blue-500/10 to-cyan-500/15 border border-sky-400/40 text-sky-700 dark:text-sky-300 hover:border-sky-500"
+              title="Install EthioSmart on your device"
+            >
+              <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-sky-600 dark:text-sky-400" />
+              <span className="inline font-bold">Install App</span>
+            </button>
+          )}
+
+          <div className="[&_button]:liquid-glass-squircle [&_button]:rounded-xl [&_button]:h-8 [&_button]:w-8">
+            <LanguageToggle />
           </div>
 
-          {/* Navigation Actions */}
-          <div className="flex items-center gap-1.5 sm:gap-3">
-            {/* Install Button in Top Nav - Only place on screen, visible until installed */}
-            {!isInstalled && (
+          <div className="[&_button]:liquid-glass-squircle [&_button]:rounded-xl [&_button]:h-8 [&_button]:w-8">
+            <ThemeToggle />
+          </div>
+
+          {user && !isGuest ? (
+            <button
+              type="button"
+              className="liquid-glass-button rounded-full h-8 sm:h-9 px-3 sm:px-4 text-xs sm:text-sm font-semibold transition-all hover:scale-105 active:scale-95 shadow-sm"
+              onClick={() => navigate(role === "admin" ? "/dashboard" : "/dashboard/exams")}
+            >
+              Dashboard
+            </button>
+          ) : requireStudentLogin ? (
+            <button
+              type="button"
+              className="liquid-glass-button-secondary rounded-full h-8 sm:h-9 px-3 sm:px-4 text-xs sm:text-sm font-semibold transition-all hover:scale-105 active:scale-95"
+              onClick={() => navigate("/auth")}
+            >
+              {t("common.signIn")}
+            </button>
+          ) : (
+            <div className="flex items-center gap-1.5 sm:gap-2">
               <button
                 type="button"
-                onClick={handleInstallClick}
-                className="liquid-glass-button-secondary rounded-full h-8 sm:h-9 px-3 sm:px-4 text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95 shadow-md bg-gradient-to-r from-sky-500/15 via-blue-500/10 to-cyan-500/15 border border-sky-400/40 text-sky-700 dark:text-sky-300 hover:border-sky-500"
-                title="Install EthioSmart on your device"
+                className="liquid-glass-button rounded-full h-8 sm:h-9 px-3 sm:px-4 text-xs sm:text-sm font-bold shadow-sm flex items-center gap-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:opacity-95 text-white active:scale-95 transition-transform"
+                onClick={async () => {
+                  try {
+                    if (continueAsGuest) await continueAsGuest();
+                    navigate("/dashboard/exams");
+                  } catch {
+                    navigate("/dashboard/exams");
+                  }
+                }}
+                title="Explore curriculum as a guest"
               >
-                <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-sky-600 dark:text-sky-400" />
-                <span className="inline font-bold">Install App</span>
+                <Sparkles className="h-3 w-3 text-amber-300 shrink-0" />
+                <span>Continue as Guest</span>
               </button>
-            )}
-
-            <div className="[&_button]:liquid-glass-squircle [&_button]:rounded-xl [&_button]:h-8 [&_button]:w-8">
-              <LanguageToggle />
-            </div>
-
-            <div className="[&_button]:liquid-glass-squircle [&_button]:rounded-xl [&_button]:h-8 [&_button]:w-8">
-              <ThemeToggle />
-            </div>
-
-            {user && !isGuest ? (
               <button
                 type="button"
-                className="liquid-glass-button rounded-full h-8 sm:h-9 px-3 sm:px-4 text-xs sm:text-sm font-semibold transition-all hover:scale-105 active:scale-95 shadow-sm"
-                onClick={() => navigate(role === "admin" ? "/dashboard" : "/dashboard/exams")}
-              >
-                Dashboard
-              </button>
-            ) : requireStudentLogin ? (
-              <button
-                type="button"
-                className="liquid-glass-button-secondary rounded-full h-8 sm:h-9 px-3 sm:px-4 text-xs sm:text-sm font-semibold transition-all hover:scale-105 active:scale-95"
+                className="liquid-glass-button-secondary rounded-full h-8 sm:h-9 px-2.5 sm:px-3 text-xs sm:text-sm font-semibold transition-all hover:scale-105 active:scale-95"
                 onClick={() => navigate("/auth")}
+                title="Sign in to your account"
               >
                 {t("common.signIn")}
               </button>
-            ) : (
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                <button
-                  type="button"
-                  className="liquid-glass-button rounded-full h-8 sm:h-9 px-3 sm:px-4 text-xs sm:text-sm font-bold shadow-sm flex items-center gap-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:opacity-95 text-white active:scale-95 transition-transform"
-                  onClick={async () => {
-                    try {
-                      if (continueAsGuest) await continueAsGuest();
-                      navigate("/dashboard/exams");
-                    } catch {
-                      navigate("/dashboard/exams");
-                    }
+              <button
+                type="button"
+                className="hidden md:inline-flex text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 text-xs px-1.5"
+                onClick={() => navigate("/admin/login")}
+                title="Staff sign in"
+              >
+                Admin
+              </button>
+            </div>
+          )}
+        </div>
+      </header>
+
+      {/* 2. Hero Center Card - Full Height on Screen, Reduced Width, Increased Logo */}
+      <div className="flex-1 flex items-center justify-center px-3 sm:px-6 py-2 sm:py-3 relative z-10 min-h-0">
+        <LiquidTiltCard
+          maxTilt={3}
+          glareOpacity={0.15}
+          className="w-[88%] xs:w-[86%] max-w-[340px] xs:max-w-[365px] sm:max-w-xl md:max-w-2xl h-full max-h-[calc(100dvh-5.5rem)] mx-auto text-center flex flex-col justify-between py-5 sm:py-7 px-4 sm:px-8 liquid-glass-card rounded-[32px] sm:rounded-[40px] shadow-2xl relative overflow-hidden"
+        >
+          {/* Primary Visual Logo Showcase - Increased Logo Size */}
+          <div className="flex justify-center shrink-0">
+            <div className="relative group">
+              {/* Luminous blue/cyan aura behind the primary logo */}
+              <div className="absolute -inset-3 bg-gradient-to-r from-blue-500/30 via-sky-400/25 to-cyan-400/30 rounded-[34px] blur-xl opacity-85 group-hover:opacity-100 transition-opacity duration-500" />
+              
+              <div className="relative liquid-glass-squircle w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-[28px] sm:rounded-[32px] p-2.5 sm:p-3 flex items-center justify-center shadow-2xl shadow-blue-500/20 group-hover:scale-105 transition-all duration-300">
+                <img
+                  src="/EthioSmart.png"
+                  alt="EthioSmart"
+                  className="w-full h-full object-contain drop-shadow-md rounded-2xl"
+                  loading="eager"
+                  onError={(e) => {
+                    const target = e.currentTarget;
+                    if (target.src !== "/EthioSmart-512.png") target.src = "/EthioSmart-512.png";
                   }}
-                  title="Explore curriculum as a guest"
-                >
-                  <Sparkles className="h-3 w-3 text-amber-300 shrink-0" />
-                  <span>Continue as Guest</span>
-                </button>
-                <button
-                  type="button"
-                  className="liquid-glass-button-secondary rounded-full h-8 sm:h-9 px-2.5 sm:px-3 text-xs sm:text-sm font-semibold transition-all hover:scale-105 active:scale-95"
-                  onClick={() => navigate("/auth")}
-                  title="Sign in to your account"
-                >
-                  {t("common.signIn")}
-                </button>
-                <button
-                  type="button"
-                  className="hidden md:inline-flex text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 text-xs px-1.5"
-                  onClick={() => navigate("/admin/login")}
-                  title="Staff sign in"
-                >
-                  Admin
-                </button>
-              </div>
-            )}
-          </div>
-        </header>
-
-        {/* 2. Hero Center Card - Logo as the Primary Visual Anchor */}
-        <div className="flex-1 flex items-center justify-center px-3 sm:px-6 py-1 sm:py-2 relative z-10 min-h-0">
-          <LiquidTiltCard
-            maxTilt={3}
-            glareOpacity={0.15}
-            className="max-w-2xl lg:max-w-3xl w-full mx-auto text-center space-y-2.5 sm:space-y-3.5 p-4 sm:p-6 md:p-8 liquid-glass-card rounded-3xl sm:rounded-[36px] shadow-xl relative overflow-hidden"
-          >
-            {/* Primary Visual Logo Showcase - Clearly Visible & Proud */}
-            <div className="flex justify-center -mt-1 sm:-mt-2 mb-1 sm:mb-2">
-              <div className="relative group">
-                {/* Luminous blue/cyan aura behind the primary logo */}
-                <div className="absolute -inset-2.5 bg-gradient-to-r from-blue-500/25 via-sky-400/20 to-cyan-400/25 rounded-[32px] blur-xl opacity-80 group-hover:opacity-100 transition-opacity duration-500" />
-                
-                <div className="relative liquid-glass-squircle w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-[24px] sm:rounded-[28px] p-2 sm:p-2.5 flex items-center justify-center shadow-xl shadow-blue-500/15 group-hover:scale-105 transition-all duration-300">
-                  <img
-                    src="/EthioSmart.png"
-                    alt="EthioSmart"
-                    className="w-full h-full object-contain drop-shadow-md rounded-xl sm:rounded-2xl"
-                    loading="eager"
-                    onError={(e) => {
-                      const target = e.currentTarget;
-                      if (target.src !== "/EthioSmart-512.png") target.src = "/EthioSmart-512.png";
-                    }}
-                  />
-                </div>
+                />
               </div>
             </div>
-
-            {/* Tagline Badge */}
-            <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[11px] sm:text-xs font-semibold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-sky-300 border border-blue-200 dark:border-blue-800 shadow-xs cursor-default">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-500 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-600"></span>
-              </span>
-              <span>
-                {t("hero.badge", "EthioSmart • Learn • Practice • Grow")}
-              </span>
-            </div>
-
-            {/* Main Heading */}
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-display font-extrabold leading-tight tracking-tight text-slate-900 dark:text-white">
-              <span>{t("hero.titlePre")}</span>{" "}
-              <span className="bg-gradient-to-r from-blue-600 via-sky-600 to-cyan-500 dark:from-sky-400 dark:via-cyan-300 dark:to-blue-400 bg-clip-text text-transparent">
-                {t("hero.titleHighlight")}
-              </span>
-            </h1>
-
-            {/* High-Contrast Description */}
-            <p className="text-xs sm:text-sm md:text-base text-slate-600 dark:text-slate-300 max-w-lg mx-auto font-medium line-clamp-2 sm:line-clamp-none leading-relaxed">
-              {t("hero.description")}
-            </p>
-
-            {/* Responsive Action Buttons (Always fits within view) */}
-            <div className="flex flex-row items-center justify-center gap-2 sm:gap-3 pt-1 max-w-md mx-auto w-full">
-              {/* Primary Start Learning Button */}
-              <button
-                type="button"
-                className="liquid-glass-button h-10 sm:h-11 px-6 sm:px-8 text-xs sm:text-sm font-bold rounded-full flex items-center justify-center gap-2 shadow-md flex-1 sm:flex-initial"
-                onClick={async () => {
-                  if (requireStudentLogin) {
-                    navigate("/auth");
-                  } else {
-                    try {
-                      if (continueAsGuest) await continueAsGuest();
-                    } catch {}
-                    navigate("/dashboard/exams");
-                  }
-                }}
-              >
-                <span>{requireStudentLogin ? t("common.getStarted") : "Continue as Guest"}</span>
-                <ArrowRight className="h-4 w-4 text-white" />
-              </button>
-
-              {/* Learn More */}
-              <button
-                type="button"
-                className="liquid-glass-button-secondary h-10 sm:h-11 px-5 sm:px-6 text-xs sm:text-sm font-semibold rounded-full items-center justify-center text-slate-700 dark:text-slate-200"
-                onClick={() => navigate("/about")}
-              >
-                {t("common.learnMore")}
-              </button>
-            </div>
-
-            {/* Trust Indicators in Frosted Glass Badges */}
-            <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 pt-0.5 text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium">
-              <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
-                <CheckCircle className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                <span>Works 100% Offline</span>
-              </div>
-              <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
-                <CheckCircle className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                <span>Curriculum Aligned</span>
-              </div>
-            </div>
-          </LiquidTiltCard>
-        </div>
-
-        {/* 3. Subtle Bottom Cue inside 100dvh Viewport */}
-        <div className="relative z-20 flex justify-center pb-2 shrink-0">
-          <a
-            href="#features"
-            className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 hover:text-blue-600 dark:text-slate-400 dark:hover:text-sky-300 px-3 py-1 rounded-full bg-white/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 backdrop-blur-md shadow-xs transition-colors"
-          >
-            <span>Explore Platform</span>
-            <span className="text-xs">↓</span>
-          </a>
-        </div>
-        <EthioAccentBar className="absolute bottom-0 left-0 right-0" size="xs" />
-      </section>
-
-      {/* Features Section - Interactive High-Visibility Liquid Glass Cards */}
-      <div id="features" className="relative py-14 sm:py-20 bg-gradient-to-b from-[#eaf2fd] via-background to-background dark:from-[#060c18] dark:via-background dark:to-background transition-colors duration-500">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-10 sm:mb-14 animate-slide-up">
-            <h2 className="text-2xl sm:text-4xl lg:text-5xl font-display font-bold mb-2.5 sm:mb-3 text-slate-900 dark:text-white">
-              Why Choose <span className="bg-gradient-to-r from-blue-700 via-sky-600 to-cyan-600 dark:from-sky-400 dark:to-cyan-400 bg-clip-text text-transparent">EthioSmart</span>
-            </h2>
-            <p className="text-xs sm:text-base text-slate-600 dark:text-slate-300 max-w-2xl mx-auto font-medium">
-              Everything you need to learn curriculum topics, practice questions, and achieve academic excellence
-            </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-            {features.map((feature, index) => (
-              <LiquidTiltCard
-                key={index}
-                maxTilt={6}
-                className="liquid-glass-card group relative p-5 sm:p-6 rounded-3xl hover:border-blue-400 dark:hover:border-sky-500 shadow-md hover:shadow-xl transition-all duration-300 animate-slide-up"
-                style={{ animationDelay: `${index * 100}ms` }}
-              >
-                <div
-                  className={`h-11 w-11 sm:h-12 sm:w-12 rounded-2xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center mb-3.5 shadow-md group-hover:scale-105 transition-transform duration-300`}
-                >
-                  <feature.icon className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
-                </div>
-                <h3 className="text-base sm:text-lg font-display font-bold mb-1.5 text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-sky-400 transition-colors">
-                  {feature.title}
-                </h3>
-                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-                  {feature.description}
-                </p>
-              </LiquidTiltCard>
-            ))}
+          {/* Tagline Badge */}
+          <div className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-sky-300 border border-blue-200 dark:border-blue-800 shadow-xs cursor-default mx-auto shrink-0">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-500 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-600"></span>
+            </span>
+            <span>
+              {t("hero.badge", "EthioSmart • Learn • Practice • Grow")}
+            </span>
           </div>
-        </div>
+
+          {/* Main Heading */}
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-display font-extrabold leading-tight tracking-tight text-slate-900 dark:text-white shrink-0">
+            <span>{t("hero.titlePre")}</span>{" "}
+            <span className="bg-gradient-to-r from-blue-600 via-sky-600 to-cyan-500 dark:from-sky-400 dark:via-cyan-300 dark:to-blue-400 bg-clip-text text-transparent">
+              {t("hero.titleHighlight")}
+            </span>
+          </h1>
+
+          {/* High-Contrast Description */}
+          <p className="text-xs sm:text-sm md:text-base text-slate-600 dark:text-slate-300 max-w-md mx-auto font-medium leading-relaxed shrink-0">
+            {t("hero.description")}
+          </p>
+
+          {/* Responsive Action Buttons */}
+          <div className="flex flex-row items-center justify-center gap-2 sm:gap-3 max-w-sm mx-auto w-full shrink-0">
+            {/* Primary Start Learning Button */}
+            <button
+              type="button"
+              className="liquid-glass-button h-11 sm:h-12 px-6 sm:px-8 text-xs sm:text-sm font-bold rounded-full flex items-center justify-center gap-2 shadow-md flex-1"
+              onClick={async () => {
+                if (requireStudentLogin) {
+                  navigate("/auth");
+                } else {
+                  try {
+                    if (continueAsGuest) await continueAsGuest();
+                  } catch {}
+                  navigate("/dashboard/exams");
+                }
+              }}
+            >
+              <span>{requireStudentLogin ? t("common.getStarted") : "Continue as Guest"}</span>
+              <ArrowRight className="h-4 w-4 text-white" />
+            </button>
+
+            {/* Learn More */}
+            <button
+              type="button"
+              className="liquid-glass-button-secondary h-11 sm:h-12 px-5 sm:px-6 text-xs sm:text-sm font-semibold rounded-full items-center justify-center text-slate-700 dark:text-slate-200"
+              onClick={() => navigate("/about")}
+            >
+              {t("common.learnMore")}
+            </button>
+          </div>
+
+          {/* Trust Indicators in Frosted Glass Badges */}
+          <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 pt-1 text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium shrink-0">
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
+              <CheckCircle className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Works 100% Offline</span>
+            </div>
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
+              <CheckCircle className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Curriculum Aligned</span>
+            </div>
+          </div>
+        </LiquidTiltCard>
       </div>
 
-      {/* Responsive Liquid Glass Call-To-Action Banner */}
-      <div className="relative py-16 sm:py-24 overflow-hidden bg-gradient-to-br from-[#0c244d] via-[#091b3b] to-[#040d1f] text-white">
-        <LiquidBackdrop showDroplets={true} showSplash={false} className="opacity-30" />
-        <div className="relative container mx-auto px-4 text-center z-10">
-          <div className="max-w-3xl mx-auto space-y-6 sm:space-y-8 animate-slide-up">
-            <Award className="h-12 w-12 sm:h-16 sm:w-16 text-sky-400 mx-auto animate-float" />
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold text-white">
-              Ready to Accelerate Your Academic Growth?
-            </h2>
-            <p className="text-base sm:text-xl text-sky-100/90 max-w-xl mx-auto font-normal">
-              Join thousands of students and educators across Ethiopia using EthioSmart to learn, practice, and excel.
-            </p>
-
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center pt-2">
-              <button
-                type="button"
-                className="liquid-glass-button w-full sm:w-auto h-13 sm:h-14 px-9 text-base sm:text-lg font-bold rounded-full shadow-2xl flex items-center justify-center gap-2"
-                onClick={async () => {
-                  if (requireStudentLogin) {
-                    navigate("/auth");
-                  } else {
-                    try {
-                      if (continueAsGuest) await continueAsGuest();
-                    } catch {}
-                    navigate("/dashboard/exams");
-                  }
-                }}
-              >
-                <span>{requireStudentLogin ? "Get Started Free" : "Start Learning (Guest Access)"}</span>
-                <ArrowRight className="h-5 w-5" />
-              </button>
-            </div>
-          </div>
-        </div>
-        <EthioAccentBar className="absolute bottom-0 left-0 right-0" size="sm" />
-      </div>
+      {/* Bottom Accent Bar */}
+      <EthioAccentBar className="relative z-20 shrink-0" size="xs" />
 
       {/* Cross-Device PWA Installation Instructions Modal */}
       <Dialog open={installModalOpen} onOpenChange={setInstallModalOpen}>

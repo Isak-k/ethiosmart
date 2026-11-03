@@ -43,6 +43,7 @@ import {
   BookOpen,
   Library,
   Sparkles,
+  Video,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { syncAllDeviceData } from "@/lib/device-storage-sync";
@@ -171,6 +172,25 @@ export const CATEGORY_THEMES: Record<string, CategoryTheme> = {
     hoverBg: "hover:bg-fuchsia-500/10",
     hoverText: "hover:text-fuchsia-100",
     badgeStyle: "bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-400/30",
+  },
+  "/dashboard/video-tutorials": {
+    category: "video",
+    label: "Video Tutorials",
+    colorName: "rose",
+    accentHex: "#f43f5e",
+    sidebarGradient: "bg-gradient-to-b from-[#2e0915] via-[#220610] to-[#120208]",
+    headerGradient: "from-rose-950 via-pink-950 to-slate-950",
+    activeBg: "bg-rose-500/20 shadow-md shadow-rose-500/15",
+    activeText: "text-white font-bold",
+    activeBorder: "border-rose-400/40",
+    activeIndicator: "bg-rose-400 shadow-[0_0_10px_#fb7185]",
+    iconBgActive: "bg-rose-500 text-white shadow-md shadow-rose-500/30",
+    iconBgInactive: "bg-rose-500/15 text-rose-300 group-hover:bg-rose-500/25 group-hover:text-rose-200",
+    iconColorActive: "text-white",
+    iconColorInactive: "text-rose-300",
+    hoverBg: "hover:bg-rose-500/10",
+    hoverText: "hover:text-rose-100",
+    badgeStyle: "bg-rose-500/20 text-rose-300 border-rose-400/30",
   },
   "/dashboard/admin/ai-generator": {
     category: "ai",
@@ -440,7 +460,8 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
     { href: "/dashboard", label: t("dashboard.menu.dashboard", "Home"), icon: LayoutDashboard },
     { href: "/dashboard/books", label: "Study", icon: BookOpen },
     { href: "/dashboard/exams", label: "Exams", icon: ClipboardList },
-    { href: "/dashboard/ai-assistant", label: "AI Tutor", icon: Brain, permission: 'viewAIAssistant' },
+    { href: "/dashboard/video-tutorials", label: "Video Tutorials", icon: Video, badge: "Soon" },
+    { href: "/dashboard/ai-assistant", label: "AI Tutor", icon: Brain, badge: "Soon" },
     { href: "/dashboard/results", label: t("dashboard.menu.myResults", "Results"), icon: Trophy },
     { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
   ], [t]);
@@ -619,9 +640,16 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
                   </div>
 
                   {/* Category Label */}
-                  <span className={cn("text-xs sm:text-sm tracking-wide", isActive ? "font-bold text-white" : "font-medium")}>
-                    {link.label}
-                  </span>
+                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                    <span className={cn("text-xs sm:text-sm tracking-wide truncate", isActive ? "font-bold text-white" : "font-medium")}>
+                      {link.label}
+                    </span>
+                    {(link as any).badge && (
+                      <span className="px-1.5 py-0.2 text-[9px] font-bold rounded-full bg-white/20 text-white tracking-wider uppercase shrink-0">
+                        {(link as any).badge}
+                      </span>
+                    )}
+                  </div>
 
                   {/* Right Glowing Pill for Active Category */}
                   {isActive && (

@@ -332,16 +332,16 @@ export function AuthForm() {
     <div className="w-full relative">
       <Tabs value={tab} onValueChange={setTab}>
         {/* Liquid Glass Header with Prominent High-Visibility Brand Emblem */}
-        <div className="pt-3.5 pb-1 px-4 sm:px-6 text-center relative">
-          <div className="flex justify-center mb-1.5">
+        <div className="pt-2 sm:pt-4 pb-2 px-4 sm:px-6 text-center relative">
+          <div className="flex justify-center mb-2">
             <div className="relative group">
               {/* Luminous blue/cyan halo */}
-              <div className="absolute -inset-2 bg-gradient-to-r from-blue-500/25 via-sky-400/20 to-cyan-400/25 rounded-[28px] blur-lg opacity-75 group-hover:opacity-100 transition-opacity" />
-              <div className="relative liquid-glass-squircle w-16 h-16 sm:w-20 sm:h-20 rounded-2xl sm:rounded-[26px] p-2 sm:p-2.5 flex items-center justify-center shadow-xl shadow-blue-500/15 group-hover:scale-105 transition-all duration-300">
+              <div className="absolute -inset-3 bg-gradient-to-r from-blue-500/30 via-sky-400/25 to-cyan-400/30 rounded-[36px] blur-xl opacity-85 group-hover:opacity-100 transition-opacity duration-500" />
+              <div className="relative liquid-glass-squircle w-26 h-26 sm:w-28 sm:h-28 rounded-[28px] sm:rounded-[32px] p-2.5 sm:p-3 flex items-center justify-center shadow-2xl shadow-blue-500/20 group-hover:scale-105 transition-all duration-300">
                 <img
                   src="/EthioSmart.png"
                   alt="EthioSmart"
-                  className="w-full h-full object-contain drop-shadow-md rounded-xl sm:rounded-2xl"
+                  className="w-full h-full object-contain drop-shadow-md rounded-2xl"
                   onError={(e) => {
                     const target = e.currentTarget;
                     if (target.src !== "/EthioSmart-192.png") target.src = "/EthioSmart-192.png";
@@ -351,23 +351,23 @@ export function AuthForm() {
             </div>
           </div>
 
-          <h2 className="text-xl font-display font-bold tracking-tight text-slate-900 dark:text-white">
+          <h2 className="text-2xl sm:text-3xl font-display font-extrabold tracking-tight text-slate-900 dark:text-white mt-1">
             {tab === "login" ? t("common.welcomeBack") : "Create Account"}
           </h2>
         </div>
 
         {/* Liquid Segment Toggle */}
         <div className="px-4 sm:px-6 pt-1">
-          <TabsList className="grid w-full grid-cols-2 h-8 sm:h-9 bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-full p-0.5 backdrop-blur-md">
+          <TabsList className="grid w-full grid-cols-2 h-10 sm:h-11 bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 rounded-full p-1 backdrop-blur-md">
             <TabsTrigger 
               value="login" 
-              className="font-semibold text-xs py-1 rounded-full data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-blue-600 dark:data-[state=active]:text-white data-[state=active]:shadow-sm transition-all"
+              className="font-bold text-xs sm:text-sm py-2 rounded-full data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-blue-600 dark:data-[state=active]:text-white data-[state=active]:shadow-sm transition-all"
             >
               {t("common.signIn")}
             </TabsTrigger>
             <TabsTrigger 
               value="signup" 
-              className="font-semibold text-xs py-1 rounded-full data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-blue-600 dark:data-[state=active]:text-white data-[state=active]:shadow-sm transition-all"
+              className="font-bold text-xs sm:text-sm py-2 rounded-full data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-blue-600 dark:data-[state=active]:text-white data-[state=active]:shadow-sm transition-all"
             >
               {t("common.signup")}
             </TabsTrigger>
@@ -375,22 +375,22 @@ export function AuthForm() {
         </div>
 
         {!isOnline && (
-          <div className="mx-4 sm:mx-6 mt-2 p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center gap-2 text-amber-800 dark:text-amber-300 text-xs animate-fade-in">
-            <WifiOff className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+          <div className="mx-4 sm:mx-6 mt-2 p-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center gap-2 text-amber-800 dark:text-amber-300 text-xs animate-fade-in">
+            <WifiOff className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
             <span>You are offline.</span>
           </div>
         )}
 
-        <div className="p-3.5 sm:p-5 pt-2">
+        <div className="p-3.5 sm:p-5 pt-3">
           <TabsContent value="login" className="mt-0">
-            <form onSubmit={handleLogin} className="space-y-2">
+            <form onSubmit={handleLogin} className="space-y-3.5 sm:space-y-4">
               {/* Email Input */}
               <div>
                 <label htmlFor="login-email" className="sr-only">
                   {t("common.email")}
                 </label>
                 <div className="relative group">
-                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-600 transition-colors z-10" />
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-blue-600 transition-colors z-10" />
                   <Input
                     id="login-email"
                     type="email"
@@ -401,7 +401,7 @@ export function AuthForm() {
                       setLoginErrors((prev) => ({ ...prev, email: undefined }));
                     }}
                     className={cn(
-                      "pl-10 h-10 rounded-full liquid-glass-input text-xs sm:text-sm text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500",
+                      "pl-11 h-12 rounded-2xl liquid-glass-input text-sm text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500",
                       loginErrors.email && "border-red-500"
                     )}
                     required
@@ -420,7 +420,7 @@ export function AuthForm() {
                   {t("common.password")}
                 </label>
                 <div className="relative group">
-                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-600 transition-colors z-10" />
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-blue-600 transition-colors z-10" />
                   <Input
                     id="login-password"
                     type={showPassword ? "text" : "password"}
@@ -431,7 +431,7 @@ export function AuthForm() {
                       setLoginErrors((prev) => ({ ...prev, password: undefined }));
                     }}
                     className={cn(
-                      "pl-10 pr-9 h-10 rounded-full liquid-glass-input text-xs sm:text-sm text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500",
+                      "pl-11 pr-10 h-12 rounded-2xl liquid-glass-input text-sm text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500",
                       loginErrors.password && "border-red-500"
                     )}
                     required
@@ -440,14 +440,14 @@ export function AuthForm() {
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 h-7 w-7 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
                     onClick={() => setShowPassword(!showPassword)}
                     tabIndex={-1}
                   >
                     {showPassword ? (
-                      <EyeOff className="h-3.5 w-3.5 text-slate-500" />
+                      <EyeOff className="h-4 w-4 text-slate-500" />
                     ) : (
-                      <Eye className="h-3.5 w-3.5 text-slate-500" />
+                      <Eye className="h-4 w-4 text-slate-500" />
                     )}
                   </Button>
                 </div>
@@ -459,13 +459,13 @@ export function AuthForm() {
               </div>
 
               {/* Options Row */}
-              <div className="flex items-center justify-between text-[11px] sm:text-xs px-1 pt-0.5">
+              <div className="flex items-center justify-between text-xs px-1 pt-0.5">
                 <label className="flex items-center gap-1.5 cursor-pointer select-none text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors">
                   <input
                     type="checkbox"
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
-                    className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800"
+                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800"
                   />
                   <span>Remember Me</span>
                 </label>
@@ -482,31 +482,31 @@ export function AuthForm() {
               {/* 1. Primary Login Button - Fully Visible & Crisp */}
               <button
                 type="submit"
-                className="liquid-glass-button w-full h-10 rounded-full text-xs sm:text-sm font-bold flex items-center justify-center gap-2 group cursor-pointer shadow-md mt-1"
+                className="liquid-glass-button w-full h-12 rounded-full text-sm sm:text-base font-bold flex items-center justify-center gap-2 group cursor-pointer shadow-lg shadow-blue-500/20 mt-1"
                 disabled={loading}
               >
                 {loading ? (
                   <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
+                    <Loader2 className="h-4 w-4 animate-spin text-white" />
                     <span>{t("common.loading")}</span>
                   </>
                 ) : (
                   <>
                     <span>{t("common.login")}</span>
-                    <span className="h-5 w-5 rounded-full bg-white/20 flex items-center justify-center ml-0.5 group-hover:translate-x-1 transition-transform">
-                      <ArrowRight className="h-3 w-3 text-white" />
+                    <span className="h-6 w-6 rounded-full bg-white/20 flex items-center justify-center ml-0.5 group-hover:translate-x-1 transition-transform">
+                      <ArrowRight className="h-3.5 w-3.5 text-white" />
                     </span>
                   </>
                 )}
               </button>
 
               {/* Divider */}
-              <div className="relative my-2 text-center">
+              <div className="relative my-3 text-center">
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-slate-200 dark:border-slate-800" />
                 </div>
                 <div className="relative flex justify-center">
-                  <span className="px-2.5 bg-white dark:bg-slate-900 rounded-full text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <span className="px-3 bg-white dark:bg-slate-900 rounded-full text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                     Or
                   </span>
                 </div>
@@ -517,10 +517,10 @@ export function AuthForm() {
                 type="button"
                 onClick={handleGoogleSignIn}
                 disabled={loading}
-                className="w-full h-10 rounded-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 shadow-xs flex items-center justify-center gap-2.5 text-xs sm:text-sm font-semibold transition-all active:scale-[0.98]"
+                className="w-full h-12 rounded-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 shadow-xs flex items-center justify-center gap-2.5 text-sm font-semibold transition-all active:scale-[0.98]"
                 title="Sign in with Google"
               >
-                <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24">
+                <svg className="h-4.5 w-4.5 shrink-0" viewBox="0 0 24 24">
                   <path
                     fill="#4285F4"
                     d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -544,7 +544,7 @@ export function AuthForm() {
               {/* 3. Continue as Guest - Dynamically displayed ONLY when allowed in Admin */}
               {!requireStudentLogin && (
                 <div className="pt-2 animate-fade-in">
-                  <div className="relative my-2 text-center">
+                  <div className="relative my-2.5 text-center">
                     <div className="absolute inset-0 flex items-center">
                       <div className="w-full border-t border-dashed border-emerald-300/80 dark:border-emerald-800/80" />
                     </div>
@@ -560,7 +560,7 @@ export function AuthForm() {
                     type="button"
                     onClick={handleGuestEntry}
                     disabled={loading || guestLoading}
-                    className="w-full h-10 rounded-full border border-emerald-500/50 hover:border-emerald-500 bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/10 hover:from-emerald-500/20 hover:to-teal-500/20 text-emerald-700 dark:text-emerald-300 shadow-sm flex items-center justify-center gap-2 text-xs sm:text-sm font-bold transition-all active:scale-[0.98] group cursor-pointer"
+                    className="w-full h-11 sm:h-10 rounded-full border border-emerald-500/50 hover:border-emerald-500 bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/10 hover:from-emerald-500/20 hover:to-teal-500/20 text-emerald-700 dark:text-emerald-300 shadow-sm flex items-center justify-center gap-2 text-xs sm:text-sm font-bold transition-all active:scale-[0.98] group cursor-pointer"
                     title="Enter platform as guest without logging in"
                   >
                     {guestLoading ? (
@@ -584,7 +584,7 @@ export function AuthForm() {
           </TabsContent>
 
           <TabsContent value="signup" className="mt-0">
-            <form onSubmit={handleSignup} className="space-y-2">
+            <form onSubmit={handleSignup} className="space-y-3 sm:space-y-2.5">
               {/* Full Name */}
               <div>
                 <label htmlFor="signup-name" className="sr-only">
@@ -602,7 +602,7 @@ export function AuthForm() {
                       setSignupErrors((prev) => ({ ...prev, name: undefined }));
                     }}
                     className={cn(
-                      "pl-10 h-10 rounded-full liquid-glass-input text-xs sm:text-sm text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500",
+                      "pl-10 h-11 sm:h-10 rounded-full liquid-glass-input text-xs sm:text-sm text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500",
                       signupErrors.name && "border-red-500"
                     )}
                     required
@@ -630,7 +630,7 @@ export function AuthForm() {
                       setSignupErrors((prev) => ({ ...prev, email: undefined }));
                     }}
                     className={cn(
-                      "pl-10 h-10 rounded-full liquid-glass-input text-xs sm:text-sm text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500",
+                      "pl-10 h-11 sm:h-10 rounded-full liquid-glass-input text-xs sm:text-sm text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500",
                       signupErrors.email && "border-red-500"
                     )}
                     required
@@ -650,7 +650,7 @@ export function AuthForm() {
                     setSignupErrors((prev) => ({ ...prev, department: undefined }));
                   }}>
                     <SelectTrigger className={cn(
-                      "pl-10 h-10 rounded-full liquid-glass-input text-xs sm:text-sm text-slate-900 dark:text-slate-50",
+                      "pl-10 h-11 sm:h-10 rounded-full liquid-glass-input text-xs sm:text-sm text-slate-900 dark:text-slate-50",
                       signupErrors.department && "border-red-500"
                     )}>
                       <SelectValue placeholder={t("common.selectDepartment")} />
@@ -692,7 +692,7 @@ export function AuthForm() {
                       setSignupErrors((prev) => ({ ...prev, password: undefined }));
                     }}
                     className={cn(
-                      "pl-10 pr-9 h-10 rounded-full liquid-glass-input text-xs sm:text-sm text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500",
+                      "pl-10 pr-9 h-11 sm:h-10 rounded-full liquid-glass-input text-xs sm:text-sm text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500",
                       signupErrors.password && "border-red-500"
                     )}
                     minLength={6}
@@ -702,14 +702,14 @@ export function AuthForm() {
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 h-7 w-7 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
                     onClick={() => setShowPassword(!showPassword)}
                     tabIndex={-1}
                   >
                     {showPassword ? (
-                      <EyeOff className="h-3.5 w-3.5 text-slate-500" />
+                      <EyeOff className="h-4 w-4 text-slate-500" />
                     ) : (
-                      <Eye className="h-3.5 w-3.5 text-slate-500" />
+                      <Eye className="h-4 w-4 text-slate-500" />
                     )}
                   </Button>
                 </div>
@@ -721,12 +721,12 @@ export function AuthForm() {
               {/* 1. Primary Signup Button */}
               <button
                 type="submit"
-                className="liquid-glass-button w-full h-10 rounded-full text-xs sm:text-sm font-bold flex items-center justify-center gap-2 group cursor-pointer shadow-md mt-1"
+                className="liquid-glass-button w-full h-11 sm:h-10 rounded-full text-xs sm:text-sm font-bold flex items-center justify-center gap-2 group cursor-pointer shadow-md mt-1"
                 disabled={loading}
               >
                 {loading ? (
                   <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
+                    <Loader2 className="h-4 w-4 animate-spin text-white" />
                     <span>{t("common.loading")}</span>
                   </>
                 ) : (
@@ -740,7 +740,7 @@ export function AuthForm() {
               </button>
 
               {/* Divider */}
-              <div className="relative my-2 text-center">
+              <div className="relative my-2.5 text-center">
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-slate-200 dark:border-slate-800" />
                 </div>
@@ -756,7 +756,7 @@ export function AuthForm() {
                 type="button"
                 onClick={handleGoogleSignIn}
                 disabled={loading}
-                className="w-full h-10 rounded-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 shadow-xs flex items-center justify-center gap-2.5 text-xs sm:text-sm font-semibold transition-all active:scale-[0.98]"
+                className="w-full h-11 sm:h-10 rounded-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 shadow-xs flex items-center justify-center gap-2.5 text-xs sm:text-sm font-semibold transition-all active:scale-[0.98]"
                 title="Sign up with Google"
               >
                 <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24">
@@ -783,7 +783,7 @@ export function AuthForm() {
               {/* 3. Continue as Guest - Dynamically displayed ONLY when allowed in Admin */}
               {!requireStudentLogin && (
                 <div className="pt-2 animate-fade-in">
-                  <div className="relative my-2 text-center">
+                  <div className="relative my-2.5 text-center">
                     <div className="absolute inset-0 flex items-center">
                       <div className="w-full border-t border-dashed border-emerald-300/80 dark:border-emerald-800/80" />
                     </div>
@@ -799,7 +799,7 @@ export function AuthForm() {
                     type="button"
                     onClick={handleGuestEntry}
                     disabled={loading || guestLoading}
-                    className="w-full h-10 rounded-full border border-emerald-500/50 hover:border-emerald-500 bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/10 hover:from-emerald-500/20 hover:to-teal-500/20 text-emerald-700 dark:text-emerald-300 shadow-sm flex items-center justify-center gap-2 text-xs sm:text-sm font-bold transition-all active:scale-[0.98] group cursor-pointer"
+                    className="w-full h-11 sm:h-10 rounded-full border border-emerald-500/50 hover:border-emerald-500 bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/10 hover:from-emerald-500/20 hover:to-teal-500/20 text-emerald-700 dark:text-emerald-300 shadow-sm flex items-center justify-center gap-2 text-xs sm:text-sm font-bold transition-all active:scale-[0.98] group cursor-pointer"
                     title="Enter platform as guest without logging in"
                   >
                     {guestLoading ? (

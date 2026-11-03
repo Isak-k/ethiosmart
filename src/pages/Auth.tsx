@@ -162,10 +162,10 @@ const Auth = () => {
           </div>
         </header>
 
-        {/* Form Container - Perfectly Centered, Full Height Reach */}
-        <div className="flex-1 flex items-center justify-center px-4 py-2 sm:px-8 relative z-10 min-h-0 overflow-y-auto scrollbar-none">
-          <div className="w-full max-w-sm sm:max-w-md my-auto py-2">
-            <div className="animate-scale-in">
+        {/* Form Container - Fills the screen gracefully on mobile */}
+        <div className="flex-1 flex flex-col justify-between px-3 sm:px-8 py-2 sm:py-4 relative z-10 min-h-0 overflow-y-auto scrollbar-none">
+          <div className="w-full max-w-sm sm:max-w-md mx-auto flex-1 flex flex-col justify-center py-2 sm:py-4">
+            <div className="animate-scale-in w-full">
               <AuthForm />
             </div>
           </div>

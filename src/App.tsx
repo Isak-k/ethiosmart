@@ -53,6 +53,7 @@ import StudentBooks from "./pages/StudentBooks";
 import BookDetails from "./pages/BookDetails";
 import BookReader from "./pages/BookReader";
 import AdminSystemSettings from "./pages/AdminSystemSettings";
+import StudentVideoTutorials from "./pages/StudentVideoTutorials";
 
 const queryClient = new QueryClient();
 
@@ -259,6 +260,11 @@ function AppRoutes() {
         <Route path="/dashboard/ai-assistant" element={
           <ProtectedRoute allowedRoles={["student","admin"]}>
             <AIStudyAssistant />
+          </ProtectedRoute>
+        } />
+        <Route path="/dashboard/video-tutorials" element={
+          <ProtectedRoute allowedRoles={["student", "admin"]}>
+            <StudentVideoTutorials />
           </ProtectedRoute>
         } />
         <Route path="/dashboard/results/:attemptId/review" element={
