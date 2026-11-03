@@ -71,6 +71,11 @@ export default {
           DEFAULT: "hsl(var(--incorrect))",
           foreground: "hsl(var(--incorrect-foreground))",
         },
+        ethio: {
+          green: "hsl(var(--ethio-green, 152 76% 40%))",
+          yellow: "hsl(var(--ethio-yellow, 45 93% 47%))",
+          red: "hsl(var(--ethio-red, 354 84% 57%))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",

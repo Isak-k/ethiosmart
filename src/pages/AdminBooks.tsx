@@ -885,7 +885,7 @@ export default function AdminBooks() {
             <AlertDialogHeader>
               <AlertDialogTitle>Delete Library Resource?</AlertDialogTitle>
               <AlertDialogDescription>
-                Are you sure you want to permanently remove &quot;{bookToDelete?.title}&quot; from the ExamPro Digital Library?
+                Are you sure you want to permanently remove &quot;{bookToDelete?.title}&quot; from the EthioSmart Digital Library?
                 This action cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>

@@ -337,7 +337,7 @@ export function BookFormDialog({
             {isEditing ? 'Edit Library Resource' : 'Add New Library Resource'}
           </DialogTitle>
           <DialogDescription>
-            Add textbooks and short notes to the ExamPro Digital Library using Google Drive documents.
+            Add textbooks and short notes to the EthioSmart Digital Library using Google Drive documents.
           </DialogDescription>
         </DialogHeader>
 

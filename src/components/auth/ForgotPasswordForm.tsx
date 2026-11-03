@@ -64,37 +64,41 @@ export function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) {
 
   if (sent) {
     return (
-      <div className="text-center space-y-4 py-4">
-        <div className="h-16 w-16 rounded-full bg-success/10 flex items-center justify-center mx-auto">
-          <CheckCircle className="h-8 w-8 text-success" />
+      <div className="text-center space-y-4 py-4 animate-scale-in">
+        <div className="h-16 w-16 rounded-3xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/20">
+          <CheckCircle className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
         </div>
-        <h3 className="font-display font-semibold text-lg">{t("common.resetPassword.checkEmail")}</h3>
-        <p className="text-muted-foreground text-sm">
-          {t("common.resetPassword.sentTo")} <strong>{email}</strong>
+        <h3 className="font-display font-bold text-xl">{t("common.resetPassword.checkEmail")}</h3>
+        <p className="text-muted-foreground text-sm max-w-xs mx-auto">
+          {t("common.resetPassword.sentTo")} <strong className="text-foreground">{email}</strong>
         </p>
-        <Button variant="ghost" onClick={onBack} className="mt-4">
+        <button
+          type="button"
+          onClick={onBack}
+          className="liquid-glass-button-secondary inline-flex items-center justify-center px-6 py-2.5 text-sm mt-3"
+        >
           <ArrowLeft className="h-4 w-4 mr-2" />
           {t("common.resetPassword.backToSignIn")}
-        </Button>
+        </button>
       </div>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="text-center space-y-2 mb-6">
-        <h3 className="font-display font-semibold text-lg">{t("common.resetPassword.title")}</h3>
-        <p className="text-muted-foreground text-sm">
+    <form onSubmit={handleSubmit} className="space-y-4 animate-scale-in">
+      <div className="text-center space-y-1.5 mb-6">
+        <h3 className="font-display font-bold text-2xl">{t("common.resetPassword.title")}</h3>
+        <p className="text-muted-foreground text-xs sm:text-sm">
           {t("common.resetPassword.subtitle")}
         </p>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="reset-email" className="text-sm font-medium">
+        <Label htmlFor="reset-email" className="text-xs sm:text-sm font-semibold pl-1">
           {t("common.email")}
         </Label>
-        <div className="relative">
-          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <div className="relative group">
+          <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 group-focus-within:text-sky-500 transition-colors z-10" />
           <Input
             id="reset-email"
             type="email"
@@ -104,14 +108,18 @@ export function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) {
               setEmail(e.target.value);
               setError("");
             }}
-            className={`pl-10 input-focus ${error ? "border-destructive" : ""}`}
+            className={`pl-12 h-12 rounded-full liquid-glass-input text-sm ${error ? "border-red-500" : ""}`}
             required
           />
         </div>
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p className="text-xs text-red-500 pl-3">{error}</p>}
       </div>
 
-      <Button type="submit" className="w-full btn-primary" disabled={loading}>
+      <button
+        type="submit"
+        className="w-full h-12 rounded-full liquid-glass-button text-sm sm:text-base font-semibold flex items-center justify-center shadow-lg"
+        disabled={loading}
+      >
         {loading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -120,12 +128,16 @@ export function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) {
         ) : (
           "Send Reset Link"
         )}
-      </Button>
+      </button>
 
-      <Button type="button" variant="ghost" onClick={onBack} className="w-full">
+      <button
+        type="button"
+        onClick={onBack}
+        className="w-full h-11 rounded-full liquid-glass-button-secondary text-sm font-medium flex items-center justify-center transition-all"
+      >
         <ArrowLeft className="h-4 w-4 mr-2" />
         Back to sign in
-      </Button>
+      </button>
     </form>
   );
 }

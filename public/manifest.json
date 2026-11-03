@@ -1,56 +1,80 @@
 {
-  "name": "ExamPro - Online Examination Platform",
-  "short_name": "ExamPro",
-  "description": "Secure and efficient online examination platform for students and educators",
+  "name": "EthioSmart - Educational Platform",
+  "short_name": "EthioSmart",
+  "description": "EthioSmart - Comprehensive smart educational platform for textbooks, study notes, practice exams, and AI study assistant. Learn • Practice • Grow.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#06b6d4",
+  "background_color": "#0e2a5e",
+  "theme_color": "#0e2a5e",
   "orientation": "portrait-primary",
   "scope": "/",
   "icons": [
     {
       "src": "/favicon.ico",
-      "sizes": "64x64 32x32 24x24 16x16",
+      "sizes": "48x48 32x32 16x16",
       "type": "image/x-icon"
     },
     {
-      "src": "/ExamPro.png",
+      "src": "/favicon.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/EthioSmart-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/ExamPro.png",
+      "src": "/EthioSmart-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/EthioSmart.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
     }
   ],
-  "categories": ["education", "productivity"],
+  "categories": ["education", "books", "productivity"],
   "screenshots": [],
   "shortcuts": [
     {
       "name": "Dashboard",
       "short_name": "Dashboard",
-      "description": "Go to dashboard",
+      "description": "Go to student dashboard",
       "url": "/dashboard",
       "icons": [
         {
-          "src": "/ExamPro.png",
+          "src": "/EthioSmart-192.png",
           "sizes": "192x192",
           "type": "image/png"
         }
       ]
     },
     {
-      "name": "Available Exams",
+      "name": "Digital Library",
+      "short_name": "Study",
+      "description": "Explore curriculum textbooks and study notes",
+      "url": "/dashboard/books",
+      "icons": [
+        {
+          "src": "/EthioSmart-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Exams & Practice",
       "short_name": "Exams",
-      "description": "View available exams",
+      "description": "View examinations and practice tests",
       "url": "/dashboard/exams",
       "icons": [
         {
-          "src": "/ExamPro.png",
+          "src": "/EthioSmart-192.png",
           "sizes": "192x192",
           "type": "image/png"
         }

@@ -313,7 +313,7 @@ export function BookCard({
             <div className="flex items-center shrink-0">
               {isSavedOffline ? (
                 <span
-                  title="Available offline inside ExamPro"
+                  title="Available offline inside EthioSmart"
                   className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />

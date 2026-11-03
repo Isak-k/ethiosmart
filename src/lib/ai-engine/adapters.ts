@@ -237,8 +237,8 @@ export async function callOpenRouter(
         headers: {
           'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
-          'HTTP-Referer': 'https://exampro.app',
-          'X-Title': 'ExamPro AI Generator'
+          'HTTP-Referer': 'https://ethiosmart.app',
+          'X-Title': 'EthioSmart AI Generator'
         },
         body: JSON.stringify({
           model,

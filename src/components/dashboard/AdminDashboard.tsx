@@ -251,36 +251,36 @@ export function AdminDashboard() {
       )}
 
       {loading ? (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-32 rounded-xl bg-muted animate-pulse" />
+            <div key={i} className="h-28 sm:h-32 rounded-2xl bg-muted animate-pulse" />
           ))}
         </div>
       ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
           <StatCard
             title={t("dashboard.stats.totalExams")}
             value={stats.totalExams}
             icon={<FileText className="h-6 w-6" />}
-            className="bg-gradient-to-br from-blue-50 to-white dark:from-blue-950/20 dark:to-background border-blue-100 dark:border-blue-900/50"
+            className="bg-gradient-to-br from-blue-50/80 to-white dark:from-blue-950/30 dark:to-background border-blue-100 dark:border-blue-900/50 shadow-xs"
           />
           <StatCard
             title={t("dashboard.stats.activeExams")}
             value={stats.activeExams}
             icon={<TrendingUp className="h-6 w-6" />}
-            className="bg-gradient-to-br from-green-50 to-white dark:from-green-950/20 dark:to-background border-green-100 dark:border-green-900/50"
+            className="bg-gradient-to-br from-emerald-50/80 to-white dark:from-emerald-950/30 dark:to-background border-emerald-100 dark:border-emerald-900/50 shadow-xs"
           />
           <StatCard
             title={t("dashboard.stats.totalStudents")}
             value={stats.totalStudents}
             icon={<Users className="h-6 w-6" />}
-            className="bg-gradient-to-br from-amber-50 to-white dark:from-amber-950/20 dark:to-background border-amber-100 dark:border-amber-900/50"
+            className="bg-gradient-to-br from-amber-50/80 to-white dark:from-amber-950/30 dark:to-background border-amber-100 dark:border-amber-900/50 shadow-xs"
           />
           <StatCard
             title={t("dashboard.stats.completedAttempts")}
             value={stats.completedAttempts}
             icon={<ClipboardCheck className="h-6 w-6" />}
-            className="bg-gradient-to-br from-purple-50 to-white dark:from-purple-950/20 dark:to-background border-purple-100 dark:border-purple-900/50"
+            className="bg-gradient-to-br from-purple-50/80 to-white dark:from-purple-950/30 dark:to-background border-purple-100 dark:border-purple-900/50 shadow-xs"
           />
         </div>
       )}

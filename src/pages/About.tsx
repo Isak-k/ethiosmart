@@ -1,8 +1,10 @@
 import { Link } from "react-router-dom";
-import { GraduationCap, ArrowLeft, Shield, Clock, BarChart3, Zap, CheckCircle } from "lucide-react";
+import { GraduationCap, ArrowLeft, Shield, Clock, BarChart3, Zap, CheckCircle, BookOpen, Brain, Trophy } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { LanguageToggle } from "@/components/ui/language-toggle";
 import { useTranslation } from "react-i18next";
+import { EthioSmartLogo } from "@/components/ui/EthioSmartLogo";
+import { EthioAccentBar } from "@/components/ui/EthioAccentBar";
 
 const About = () => {
   const { t } = useTranslation();
@@ -48,12 +50,7 @@ const About = () => {
             <div className="flex items-center gap-4">
               <LanguageToggle />
               <ThemeToggle />
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center shadow-md shadow-primary/20">
-                  <GraduationCap className="h-5 w-5 text-primary-foreground" />
-                </div>
-                <span className="font-display font-bold text-lg tracking-tight">ExamPro</span>
-              </div>
+              <EthioSmartLogo variant="compact" size="xs" />
             </div>
         </div>
       </header>
@@ -114,12 +111,7 @@ const About = () => {
       <footer className="py-12 border-t bg-card/50">
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row items-center justify-between gap-8">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-                <GraduationCap className="h-5 w-5 text-primary-foreground" />
-              </div>
-              <span className="font-display font-bold text-lg">ExamPro</span>
-            </div>
+            <EthioSmartLogo variant="compact" size="xs" />
             
             <div className="flex flex-wrap justify-center gap-8 text-sm font-medium text-muted-foreground">
               <a href="#" className="hover:text-primary transition-colors">{t("common.footer.privacy")}</a>

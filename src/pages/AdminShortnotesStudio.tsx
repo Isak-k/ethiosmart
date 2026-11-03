@@ -158,7 +158,7 @@ export default function AdminShortnotesStudio() {
   const [customChapterTitle, setCustomChapterTitle] = useState<string>(paramChapterTitle);
   const [customCoverUrl, setCustomCoverUrl] = useState<string>('');
   const [noteTitle, setNoteTitle] = useState<string>('');
-  const [authorName, setAuthorName] = useState<string>('ExamPro Academic Team');
+  const [authorName, setAuthorName] = useState<string>('EthioSmart Academic Team');
   const [status, setStatus] = useState<'published' | 'draft'>('published');
   const [allowDownload, setAllowDownload] = useState<boolean>(true);
   const [gradeLevel, setGradeLevel] = useState<string>('Grade 12');
@@ -303,7 +303,7 @@ export default function AdminShortnotesStudio() {
           const existing = await getBook(editNoteId);
           if (existing) {
             setNoteTitle(existing.title || '');
-            setAuthorName(existing.author || 'ExamPro Academic Team');
+            setAuthorName(existing.author || 'EthioSmart Academic Team');
             setSelectedDeptId(existing.departmentId || '');
             setSelectedSubjectId(existing.subjectId || '');
             setSelectedChapterId(existing.chapterId || '');
@@ -969,7 +969,7 @@ export default function AdminShortnotesStudio() {
 
         const input: BookInput = {
           title: result.title,
-          author: authorName.trim() || 'ExamPro Curriculum Team',
+          author: authorName.trim() || 'EthioSmart Curriculum Team',
           description: result.summary,
           resourceType: 'short_note',
           sourceType: 'resource',
@@ -1111,7 +1111,7 @@ export default function AdminShortnotesStudio() {
 
       const input: BookInput = {
         title: noteTitle.trim(),
-        author: authorName.trim() || 'ExamPro Academic Team',
+        author: authorName.trim() || 'EthioSmart Academic Team',
         description: summary || `High-yield interactive study notes for ${currentChapterTitle || noteTitle}.`,
         resourceType: 'short_note',
         sourceType: shortNoteSourceType,
@@ -1208,7 +1208,7 @@ export default function AdminShortnotesStudio() {
     return {
       id: editNoteId || 'preview-temp-id',
       title: noteTitle || 'Chapter Shortnotes Preview',
-      author: authorName || 'ExamPro Academic Team',
+      author: authorName || 'EthioSmart Academic Team',
       description: summary || 'High-yield interactive short notes.',
       resourceType: 'short_note',
       sourceType: shortNoteSourceType,
@@ -1934,7 +1934,7 @@ export default function AdminShortnotesStudio() {
                         Workflow A: Library Resource Chapter Extraction
                       </CardTitle>
                       <CardDescription className="text-xs mt-0.5">
-                        Select a digital textbook from your ExamPro library under {currentSubject?.name || 'the selected subject'}.
+                        Select a digital textbook from your EthioSmart library under {currentSubject?.name || 'the selected subject'}.
                       </CardDescription>
                     </div>
                   </div>

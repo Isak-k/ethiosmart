@@ -1011,7 +1011,7 @@ export function InteractiveShortNoteReader({
 
             {/* Note Subtitle / Author Info */}
             <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-muted-foreground">
-              <span>{book.author ? `Author: ${book.author}` : 'Official ExamPro Curriculum Team'}</span>
+              <span>{book.author ? `Author: ${book.author}` : 'Official EthioSmart Curriculum Team'}</span>
               {book.chapterTitle && (
                 <>
                   <span>•</span>

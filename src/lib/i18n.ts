@@ -6,7 +6,8 @@ const resources = {
   en: {
     translation: {
       "common": {
-        "examPro": "ExamPro",
+        "examPro": "EthioSmart",
+        "tagline": "Learn • Practice • Grow",
         "signIn": "Sign In",
         "back": "Back",
         "getStarted": "Get Started Now",
@@ -32,7 +33,7 @@ const resources = {
         "loading": "Loading...",
         "noDepartments": "No departments available",
         "install": {
-          "title": "Install ExamPro",
+          "title": "Install EthioSmart",
           "desc": "Add to your home screen for easier access",
           "button": "Install",
           "ios": {
@@ -50,7 +51,7 @@ const resources = {
           "terms": "Terms of Service",
           "support": "Support",
           "contact": "Contact",
-          "rights": "© {{year}} ExamPro. All rights reserved."
+          "rights": "© {{year}} EthioSmart. All rights reserved."
         },
         "resetPassword": {
           "sentTitle": "Reset email sent",
@@ -563,14 +564,14 @@ const resources = {
         }
       },
       "hero": {
-        "badge": "The #1 Assessment Platform",
-        "titlePre": "Master Your",
-        "titleHighlight": "Assessments",
-        "description": "Empower your institution with secure, scalable, and intelligent examination solutions. Designed for modern education."
+        "badge": "Smart Educational Platform",
+        "titlePre": "Learn • Practice",
+        "titleHighlight": "Grow With Us",
+        "description": "Ethiopia's comprehensive smart educational platform for curriculum textbooks, high-yield notes, practice exams, and AI-powered study assistance."
       },
       "features": {
-        "heading": "Everything You Need",
-        "subheading": "A complete suite of tools designed to make online examinations effortless and effective.",
+        "heading": "Everything You Need to Excel",
+        "subheading": "A complete educational suite designed to make learning, practicing, and mastering academic knowledge effortless.",
         "secure": {
           "title": "Secure & Reliable",
           "desc": "Enterprise-grade security with role-based access control and anti-cheating measures."
@@ -632,7 +633,8 @@ const resources = {
   om: {
     translation: {
       "common": {
-        "examPro": "ExamPro",
+        "examPro": "EthioSmart",
+        "tagline": "Baradhu • Shaakali • Guddisi",
         "signIn": "Seeni",
         "back": "Duubatti",
         "getStarted": "Amma Jalqabi",
@@ -658,7 +660,7 @@ const resources = {
         "loading": "Fe'aa jira...",
         "noDepartments":  "Department hin jiru",
         "install": {
-          "title": "ExamPro Fe'i",
+          "title": "EthioSmart Fe'i",
           "desc": "Salphaatti argachuuf gara home screen kee galchi",
           "button": "Fe'i",
           "ios": {
@@ -676,7 +678,7 @@ const resources = {
           "terms": "Waliigaltee Tajaajilaa",
           "support": "Deeggarsa",
           "contact": "Quunnamtii",
-          "rights": "© {{year}} ExamPro. Mirgi Abbummaa Seeraan Eegamaadha."
+          "rights": "© {{year}} EthioSmart. Mirgi Abbummaa Seeraan Eegamaadha."
         },
         "resetPassword": {
           "sentTitle": "Ergaan deebisanii saaguu ergameera",
@@ -1123,14 +1125,14 @@ const resources = {
         }
       },
       "hero": {
-        "badge": "Platformii Madaallii #1",
-        "titlePre": "Madaallii Keessan",
-        "titleHighlight": "To'adhaa",
-        "description": "Dhaabbata keessan furmaata qormaataa amansiisaa, babal'achuu danda'u fi hayyamaa ta'een humneessaa. Barnoota ammayyaaf kan qophaa'e."
+        "badge": "Platformii Barnootaa Ammayyaa",
+        "titlePre": "Baradhu • Shaakali",
+        "titleHighlight": "Nuu Wajjiin Guddisi",
+        "description": "Platformii barnootaa Itoophiyaa ammayyaa: kitaabota barnootaa, qabxiiwwan qo'annoo, qormaata shaakalaa fi gargaaraa qo'annoo AI."
       },
       "features": {
-        "heading": "Wanta Isin Barbaaddan Hunda",
-        "subheading": "Qormaata onlaayinii salphaa fi bu'a qabeessa taasisuuf wanti hundi qophaahee jira .",
+        "heading": "Milkaa'inaaf Wanta Isin Barbaaddan Hunda",
+        "subheading": "Meeshaalee barnootaa, kitaabota, qormaata shaakalaa fi gargaaraa AI barattoota ammayyaaf qophaa'an.",
         "secure": {
           "title": "Amansiisaa fi Wabii",
           "desc": "Nageenya sadarkaa dhaabbataa kan to'annoo gahee irratti hundaa'e fi tooftaa qorannoo eegu."
@@ -1192,7 +1194,8 @@ const resources = {
   am: {
     translation: {
       "common": {
-        "examPro": "ExamPro",
+        "examPro": "EthioSmart",
+        "tagline": "ይማሩ • ይለማመዱ • ያድጉ",
         "signIn": "ግባ",
         "back": "ተመለስ",
         "getStarted": "አሁን ይጀምሩ",
@@ -1218,7 +1221,7 @@ const resources = {
         "loading": "በመጫን ላይ...",
         "noDepartments": "ምንም የትምህርት ክፍል የለም",
         "install": {
-          "title": "ExamPro ን ይጫኑ",
+          "title": "EthioSmart ን ይጫኑ",
           "desc": "በቀላሉ ለመድረስ ወደ መነሻ ገጽዎ ያክሉ",
           "button": "ይጫኑ",
           "ios": {
@@ -1236,7 +1239,7 @@ const resources = {
           "terms": "የአገልግሎት ውል",
           "support": "ድጋፍ",
           "contact": "እኛን ያግኙ",
-          "rights": "© {{year}} ExamPro. መብቱ በህግ የተጠበቀ ነው።"
+          "rights": "© {{year}} EthioSmart. መብቱ በህግ የተጠበቀ ነው።"
         },
         "resetPassword": {
           "sentTitle": "የዳግም ማስጀመሪያ ኢሜይል ተልኳል",
@@ -1792,14 +1795,14 @@ const resources = {
         }
       },
       "hero": {
-        "badge": "የ #1 የምዘና መድረክ",
-        "titlePre": "ምዘናዎን በብቃት",
-        "titleHighlight": "ይምሩ",
-        "description": "ተቋምዎን አስተማማኝ፣ ሊሰፋ የሚችል እና ብልህ በሆነ የፈተና መፍትሄ ያጠናክሩ። ለዘመናዊ ትምህርት የተነደፈ።"
+        "badge": "ዘመናዊ የትምህርት መድረክ",
+        "titlePre": "ይማሩ • ይለማመዱ",
+        "titleHighlight": "አብረውን ያድጉ",
+        "description": "የኢትዮጵያ ዘመናዊ የትምህርት መድረክ: የመማሪያ መጽሐፍት፣ የአጭር ማስታወሻዎች፣ የልምምድ ፈተናዎች እና በAI የታገዘ የጥናት ረዳት።"
       },
       "features": {
-        "heading": "የሚያስፈልግዎት ነገር ሁሉ",
-        "subheading": "የመስመር ላይ ፈተናዎችን ቀላል እና ውጤታማ ለማድረግ የተነደፉ የተሟሉ መሳሪያዎች።",
+        "heading": "ለትምህርት ስኬትዎ የሚያስፈልግዎት ነገር ሁሉ",
+        "subheading": "የመማሪያ መጽሐፍት፣ የልምምድ ፈተናዎች እና የAI ጥናት ረዳትን ያካተተ የተሟላ የትምህርት ሥርዓት።",
         "secure": {
           "title": "አስተማማኝ እና ደህንነቱ የተጠበቀ",
           "desc": "በሚና ላይ የተመሰረተ የመዳረሻ ቁጥጥር እና የማጭበርበር መከላከያ እርምጃዎች ያለው የድርጅት ደረጃ ደህንነት።"

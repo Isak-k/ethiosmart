@@ -165,7 +165,7 @@ export default function BookDetails() {
       setIsSavedOffline(true);
       toast({
         title: 'Downloaded for Offline Reading',
-        description: `"${book.title}" is now available offline inside ExamPro!`,
+        description: `"${book.title}" is now available offline inside EthioSmart!`,
       });
     } catch (err: any) {
       toast({

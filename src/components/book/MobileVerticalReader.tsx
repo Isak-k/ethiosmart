@@ -375,7 +375,7 @@ function MobileTextReader({
             >
               <div className="flex items-center justify-between text-xs opacity-50 font-mono select-none pt-2">
                 <span>Page {pageNum}</span>
-                <span>ExamPro Reader</span>
+                <span>EthioSmart Reader</span>
               </div>
 
               {content === undefined ? (

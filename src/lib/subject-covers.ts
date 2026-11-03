@@ -750,11 +750,11 @@ const SVG_TEMPLATES: Record<SubjectCategory, string> = {
       <circle cx="660" cy="180" r="140" fill="#ffffff" opacity="0.06"/>
       <polygon points="680,480 780,320 860,480" fill="#ffffff" opacity="0.07"/>
 
-      <!-- Graduation Cap and Book (ExamPro Core Symbol) -->
+      <!-- Graduation Cap and Book (EthioSmart Core Symbol) -->
       <g filter="url(#shadow-gen)" transform="translate(400, 270)">
         <!-- Open Book Base -->
-        <path d="M-150,90 C-80,70 0,85 0,90 C0,85 80,70 150,90 L140,110 C70,90 0,105 0,110 C0,105 -70,90 -140,110 Z" fill="#164e63"/>
-        <path d="M-140,70 C-70,50 0,65 0,70 L0,-20 C0,-25 -70,-40 -140,-20 Z" fill="#f0fdfa"/>
+        <path d="M-150,90 C-80,70 0,85 0,90 C0,85 80,70 150,90 L140,110 C70,90 0,105 0,110 C0,105 -70,90 -140,110 Z" fill="#0f2a5e"/>
+        <path d="M-140,70 C-70,50 0,65 0,70 L0,-20 C0,-25 -70,-40 -140,-20 Z" fill="#f0f7ff"/>
         <path d="M140,70 C70,50 0,65 0,70 L0,-20 C0,-25 70,-40 140,-20 Z" fill="#ffffff"/>
 
         <!-- Graduation Mortarboard Cap -->
@@ -769,8 +769,8 @@ const SVG_TEMPLATES: Record<SubjectCategory, string> = {
       </g>
 
       <!-- Label Banner -->
-      <rect x="300" y="490" width="200" height="48" rx="24" fill="#164e63" opacity="0.85"/>
-      <text x="400" y="522" font-family="system-ui, sans-serif" font-size="20" font-weight="700" fill="#ccfbf1" text-anchor="middle" letter-spacing="3">EXAMPRO</text>
+      <rect x="280" y="490" width="240" height="48" rx="24" fill="#0f2a5e" opacity="0.9"/>
+      <text x="400" y="522" font-family="system-ui, sans-serif" font-size="18" font-weight="700" fill="#bae6fd" text-anchor="middle" letter-spacing="3">ETHIOSMART</text>
     </svg>`,
 };
 
@@ -894,7 +894,7 @@ export const SUBJECT_COVER_PRESETS: SubjectCoverPreset[] = [
     accentColor: '#0891b2',
     badgeBg: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-950 dark:text-cyan-300',
     textColor: 'text-cyan-600 dark:text-cyan-400',
-    description: 'Signature ExamPro graduation mortarboard and academic star',
+    description: 'Signature EthioSmart graduation mortarboard and academic star',
     svgDataUri: getSvgDataUri('general'),
   },
 ];

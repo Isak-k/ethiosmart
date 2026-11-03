@@ -626,7 +626,7 @@ export default function BookReader() {
                   >
                     click here to open directly in Google Drive <ExternalLink className="h-3 w-3" />
                   </a>
-                  , or click <strong>Save Offline</strong> above to read it directly inside ExamPro.
+                  , or click <strong>Save Offline</strong> above to read it directly inside EthioSmart.
                 </AlertDescription>
               </Alert>
             </div>

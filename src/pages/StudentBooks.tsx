@@ -663,7 +663,7 @@ export default function StudentBooks() {
             <div className="text-center space-y-1.5 sm:space-y-2.5">
               <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] sm:text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
                 <Library className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                ExamPro Academic Library
+                EthioSmart Academic Library
               </div>
               <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground tracking-tight">
                 What would you like to study?

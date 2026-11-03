@@ -1,8 +1,8 @@
-// Service Worker for ExamPro - Enhanced Offline Support
-const CACHE_VERSION = 'v2';
-const CACHE_NAME = `exampro-${CACHE_VERSION}`;
-const RUNTIME_CACHE = `exampro-runtime-${CACHE_VERSION}`;
-const IMAGE_CACHE = `exampro-images-${CACHE_VERSION}`;
+// Service Worker for EthioSmart - Enhanced Offline Support
+const CACHE_VERSION = 'v3';
+const CACHE_NAME = `ethiosmart-${CACHE_VERSION}`;
+const RUNTIME_CACHE = `ethiosmart-runtime-${CACHE_VERSION}`;
+const IMAGE_CACHE = `ethiosmart-images-${CACHE_VERSION}`;
 
 // Assets to cache on install
 const PRECACHE_ASSETS = [
@@ -10,7 +10,10 @@ const PRECACHE_ASSETS = [
   '/index.html',
   '/offline.html',
   '/favicon.ico',
-  '/placeholder.svg',
+  '/favicon.png',
+  '/EthioSmart-192.png',
+  '/EthioSmart-512.png',
+  '/EthioSmart.png',
   '/manifest.json'
 ];
 
@@ -215,7 +218,7 @@ async function syncExamData() {
 // Push notifications (future feature)
 self.addEventListener('push', (event) => {
   const data = event.data ? event.data.json() : {};
-  const title = data.title || 'ExamPro Notification';
+  const title = data.title || 'EthioSmart Notification';
   const options = {
     body: data.body || 'You have a new notification',
     icon: '/favicon.ico',

@@ -64,27 +64,27 @@ export function GoogleProfileSetup({ email, displayName, onComplete, loading }: 
 
   return (
     <div className="space-y-6">
-      <div className="text-center space-y-2">
+      <div className="text-center space-y-1.5">
         <h3 className="text-2xl font-display font-bold">Complete Your Profile</h3>
-        <p className="text-muted-foreground">
+        <p className="text-muted-foreground text-xs sm:text-sm">
           Welcome! Please complete your profile to continue.
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label className="text-sm font-semibold">Email</Label>
-          <div className="px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700">
-            <p className="text-sm">{email}</p>
+          <Label className="text-xs sm:text-sm font-semibold pl-1">Email</Label>
+          <div className="px-5 py-3 rounded-full liquid-glass-input">
+            <p className="text-sm font-medium">{email}</p>
           </div>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="full-name" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+          <Label htmlFor="full-name" className="text-xs sm:text-sm font-semibold pl-1">
             {t("common.fullName")} *
           </Label>
           <div className="relative group">
-            <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 group-focus-within:text-cyan-500 transition-colors z-10" />
+            <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 group-focus-within:text-sky-500 transition-colors z-10" />
             <Input
               id="full-name"
               type="text"
@@ -95,46 +95,46 @@ export function GoogleProfileSetup({ email, displayName, onComplete, loading }: 
                 setErrors(prev => ({ ...prev, name: undefined }));
               }}
               className={cn(
-                "pl-12 h-12 rounded-xl border-2 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 focus:border-cyan-500 focus:bg-white dark:focus:bg-gray-900 transition-all",
-                errors.name && "border-red-500 focus:border-red-500"
+                "pl-12 h-12 rounded-full liquid-glass-input text-sm",
+                errors.name && "border-red-500"
               )}
               required
             />
           </div>
           {errors.name && (
-            <p className="text-sm text-red-500 pl-2 flex items-center gap-1">
-              <span className="text-xs">⚠</span> {errors.name}
+            <p className="text-xs text-red-500 pl-3 flex items-center gap-1">
+              <span>⚠</span> {errors.name}
             </p>
           )}
-          <p className="text-xs text-muted-foreground pl-2">
+          <p className="text-xs text-muted-foreground pl-3">
             You can edit this if needed
           </p>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="dept-select" className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+          <Label htmlFor="dept-select" className="text-xs sm:text-sm font-semibold pl-1">
             {t("common.department")} *
           </Label>
           <div className="relative group">
-            <Building className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 group-focus-within:text-cyan-500 transition-colors z-10" />
+            <Building className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 group-focus-within:text-sky-500 transition-colors z-10" />
             <Select value={selectedDept} onValueChange={(v) => {
               setSelectedDept(v);
               setErrors(prev => ({ ...prev, department: undefined }));
             }}>
               <SelectTrigger className={cn(
-                "pl-12 h-12 rounded-xl border-2 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 focus:border-cyan-500 transition-all",
+                "pl-12 h-12 rounded-full liquid-glass-input text-sm",
                 errors.department && "border-red-500"
               )}>
                 <SelectValue placeholder={t("common.selectDepartment")} />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="rounded-2xl border border-white/20 backdrop-blur-xl bg-card/95">
                 {loadingDepts ? (
                   <div className="p-2 text-sm text-muted-foreground text-center">{t("common.loading")}</div>
                 ) : departments.length === 0 ? (
                   <div className="p-2 text-sm text-muted-foreground text-center">{t("common.noDepartments")}</div>
                 ) : (
                   departments.map((dept) => (
-                    <SelectItem key={dept.id} value={dept.id}>
+                    <SelectItem key={dept.id} value={dept.id} className="rounded-xl">
                       {dept.name}
                     </SelectItem>
                   ))
@@ -143,15 +143,15 @@ export function GoogleProfileSetup({ email, displayName, onComplete, loading }: 
             </Select>
           </div>
           {errors.department && (
-            <p className="text-sm text-red-500 pl-2 flex items-center gap-1">
-              <span className="text-xs">⚠</span> {errors.department}
+            <p className="text-xs text-red-500 pl-3 flex items-center gap-1">
+              <span>⚠</span> {errors.department}
             </p>
           )}
         </div>
 
-        <Button
+        <button
           type="submit"
-          className="w-full h-12 rounded-xl text-base font-semibold bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-600 hover:to-teal-600 shadow-lg shadow-cyan-500/30 hover:shadow-xl hover:shadow-cyan-500/40 transition-all duration-300 hover:scale-[1.02] active:scale-95"
+          className="w-full h-12 rounded-full liquid-glass-button text-sm sm:text-base font-semibold flex items-center justify-center shadow-lg mt-2"
           disabled={loading || loadingDepts}
         >
           {loading ? (
@@ -162,7 +162,7 @@ export function GoogleProfileSetup({ email, displayName, onComplete, loading }: 
           ) : (
             "Complete Setup"
           )}
-        </Button>
+        </button>
       </form>
     </div>
   );

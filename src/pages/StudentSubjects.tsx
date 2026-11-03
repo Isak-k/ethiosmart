@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { EthioSmartLogo } from "@/components/ui/EthioSmartLogo";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -286,13 +287,8 @@ export default function StudentSubjects() {
     <div className="min-h-screen bg-background">
       {/* Public Header */}
       <header className="sticky top-0 z-40 h-16 border-b bg-card/95 backdrop-blur-sm px-4 sm:px-8 flex items-center justify-between shadow-xs">
-        <Link to="/" className="flex items-center gap-2.5">
-          <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center text-white shadow-md">
-            <GraduationCap className="h-5 w-5" />
-          </div>
-          <span className="font-display font-bold text-xl tracking-tight text-foreground">
-            ExamPro
-          </span>
+        <Link to="/" className="flex items-center">
+          <EthioSmartLogo variant="compact" size="sm" />
         </Link>
 
         <div className="flex items-center gap-3">

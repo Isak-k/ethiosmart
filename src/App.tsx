@@ -62,24 +62,31 @@ function AppRoutes() {
   // Show loading screen while auth initializes
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-cyan-50 via-teal-50 to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-        <div className="text-center space-y-6 animate-fade-in">
-          <div className="relative">
-            <div className="h-20 w-20 mx-auto rounded-2xl bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center shadow-2xl shadow-cyan-500/30 animate-pulse">
-              <GraduationCap className="h-10 w-10 text-white" />
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-white p-4">
+        <div className="text-center space-y-6 animate-fade-in max-w-xs mx-auto">
+          <div className="relative mx-auto w-24 h-24">
+            <div className="w-24 h-24 rounded-3xl overflow-hidden shadow-2xl shadow-sky-500/30 ring-2 ring-white/20 animate-pulse">
+              <img
+                src="/EthioSmart-192.png"
+                alt="EthioSmart"
+                className="w-full h-full object-cover"
+              />
             </div>
-            <div className="absolute inset-0 h-20 w-20 mx-auto rounded-2xl bg-gradient-to-br from-cyan-500 to-teal-500 blur-xl opacity-50 animate-pulse" />
+            <div className="absolute inset-0 w-24 h-24 rounded-3xl bg-sky-500 blur-2xl opacity-40 animate-pulse -z-10" />
           </div>
-          <div>
-            <h2 className="text-2xl font-display font-bold bg-gradient-to-r from-cyan-600 to-teal-600 bg-clip-text text-transparent">
-              ExamPro
+          <div className="space-y-1">
+            <h2 className="text-3xl font-display font-bold tracking-tight text-white">
+              Ethio<span className="text-sky-400">Smart</span>
             </h2>
-            <p className="text-sm text-muted-foreground mt-2">Loading your experience...</p>
+            <p className="text-xs font-medium tracking-widest uppercase text-sky-200/80">
+              Learn • Practice • Grow
+            </p>
+            <p className="text-xs text-slate-400 pt-2">Loading your learning space...</p>
           </div>
-          <div className="flex items-center justify-center gap-2">
-            <div className="h-2 w-2 rounded-full bg-cyan-500 animate-bounce" style={{ animationDelay: '0ms' }} />
-            <div className="h-2 w-2 rounded-full bg-cyan-500 animate-bounce" style={{ animationDelay: '150ms' }} />
-            <div className="h-2 w-2 rounded-full bg-cyan-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+          <div className="flex items-center justify-center gap-2 pt-1">
+            <div className="h-2 w-2 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+            <div className="h-2 w-2 rounded-full bg-amber-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+            <div className="h-2 w-2 rounded-full bg-rose-400 animate-bounce" style={{ animationDelay: '300ms' }} />
           </div>
         </div>
       </div>

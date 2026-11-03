@@ -130,10 +130,10 @@ export function GuestSetupDialog({
           </div>
 
           <DialogTitle className="text-xl sm:text-2xl font-display font-bold text-foreground">
-            Welcome to ExamPro
+            Welcome to EthioSmart
           </DialogTitle>
           <DialogDescription className="text-xs sm:text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">
-            Select your department to view curriculum exams and high-yield notes.
+            Select your department to explore textbooks, chapter notes, and practice exams.
           </DialogDescription>
         </DialogHeader>
 
