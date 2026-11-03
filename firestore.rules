@@ -73,7 +73,9 @@ service cloud.firestore {
               get(/databases/$(database)/documents/exams/$(examId)).data.get('isPublished', false) != true
             );
         }
-        allow read: if isAuthenticated() || get(/databases/$(database)/documents/exams/$(examId)).data.isPublished == true;
+        allow read: if isAuthenticated() || 
+          get(/databases/$(database)/documents/exams/$(examId)).data.get('isPublished', false) == true ||
+          get(/databases/$(database)/documents/exams/$(examId)).data.get('published', false) == true;
         allow create, update: if (isAdmin() || isParentExamCreator()) && canSaveQuestionData();
         allow delete: if isAdmin() || isParentExamCreator();
       }

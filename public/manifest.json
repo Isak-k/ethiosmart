@@ -2,7 +2,7 @@
   "name": "EthioSmart - Educational Platform",
   "short_name": "EthioSmart",
   "description": "EthioSmart - Comprehensive smart educational platform for textbooks, study notes, practice exams, and AI study assistant. Learn • Practice • Grow.",
-  "start_url": "/",
+  "start_url": "/dashboard/exams",
   "display": "standalone",
   "background_color": "#0e2a5e",
   "theme_color": "#0e2a5e",

@@ -6,7 +6,7 @@ import { getCachedDefaultDepartmentId } from "@/lib/system-settings";
 import { SimpleLeaderboard } from "@/components/SimpleLeaderboard";
 import { StatCard } from "./StatCard";
 import { ExamCard } from "@/components/exam/ExamCard";
-import { ClipboardList, Trophy, Clock, CheckCircle, ArrowRight, BookOpen, Brain, Sparkles, GraduationCap } from "lucide-react";
+import { ClipboardList, Trophy, Clock, CheckCircle, BookOpen, Sparkles, GraduationCap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -144,78 +144,6 @@ export function StudentDashboard() {
         </div>
         <EthioAccentBar className="absolute bottom-0 left-0 right-0" size="sm" />
       </LiquidTiltCard>
-
-      {/* Educational Quick Launch Hub - Mobile First 3 Actions in Interactive Liquid Glass Tilt Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-        {/* Action 1: Digital Library */}
-        <LiquidTiltCard maxTilt={6}>
-          <Link
-            to="/dashboard/books"
-            className="liquid-glass-card group relative p-4 sm:p-5 rounded-3xl hover:border-sky-400/60 shadow-xs hover:shadow-xl transition-all duration-300 flex items-center sm:flex-col sm:items-start gap-3.5 active:scale-[0.98] h-full"
-          >
-            <div className="h-12 w-12 rounded-2xl liquid-glass-squircle bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-              <BookOpen className="h-6 w-6" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between">
-                <h3 className="font-display font-bold text-sm sm:text-base text-foreground group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors">
-                  Digital Library
-                </h3>
-                <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-sky-500 group-hover:translate-x-0.5 transition-all sm:hidden" />
-              </div>
-              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1 sm:line-clamp-2">
-                Curriculum textbooks & high-yield chapter notes
-              </p>
-            </div>
-          </Link>
-        </LiquidTiltCard>
-
-        {/* Action 2: Practice & Exams */}
-        <LiquidTiltCard maxTilt={6}>
-          <Link
-            to="/dashboard/exams"
-            className="liquid-glass-card group relative p-4 sm:p-5 rounded-3xl hover:border-sky-400/60 shadow-xs hover:shadow-xl transition-all duration-300 flex items-center sm:flex-col sm:items-start gap-3.5 active:scale-[0.98] h-full"
-          >
-            <div className="h-12 w-12 rounded-2xl liquid-glass-squircle bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-              <ClipboardList className="h-6 w-6" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between">
-                <h3 className="font-display font-bold text-sm sm:text-base text-foreground group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                  Practice & Exams
-                </h3>
-                <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-emerald-500 group-hover:translate-x-0.5 transition-all sm:hidden" />
-              </div>
-              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1 sm:line-clamp-2">
-                Practice tests, model questions & official examinations
-              </p>
-            </div>
-          </Link>
-        </LiquidTiltCard>
-
-        {/* Action 3: AI Study Assistant */}
-        <LiquidTiltCard maxTilt={6}>
-          <Link
-            to="/dashboard/ai-assistant"
-            className="liquid-glass-card group relative p-4 sm:p-5 rounded-3xl hover:border-sky-400/60 shadow-xs hover:shadow-xl transition-all duration-300 flex items-center sm:flex-col sm:items-start gap-3.5 active:scale-[0.98] h-full"
-          >
-            <div className="h-12 w-12 rounded-2xl liquid-glass-squircle bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-              <Brain className="h-6 w-6" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between">
-                <h3 className="font-display font-bold text-sm sm:text-base text-foreground group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
-                  AI Study Assistant
-                </h3>
-                <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-purple-500 group-hover:translate-x-0.5 transition-all sm:hidden" />
-              </div>
-              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1 sm:line-clamp-2">
-                Ask doubts, explain concepts & test understanding
-              </p>
-            </div>
-          </Link>
-        </LiquidTiltCard>
-      </div>
 
       {/* Academic Stats */}
       <div className="space-y-3">

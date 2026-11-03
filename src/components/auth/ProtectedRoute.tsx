@@ -65,13 +65,13 @@ export function ProtectedRoute({ children, allowedRoles, requireAnyPermissions, 
 
       // 4. Standard role verification for authenticated users
       if (allowedRoles && role && !allowedRoles.includes(role)) {
-        navigate("/dashboard", { replace: true });
+        navigate(role === "admin" ? "/dashboard" : "/dashboard/exams", { replace: true });
         return;
       }
 
       // 5. Super admin gate
       if (requireSuperAdmin && !isSuperAdmin) {
-        navigate("/dashboard", { replace: true });
+        navigate(role === "admin" ? "/dashboard" : "/dashboard/exams", { replace: true });
         return;
       }
 
@@ -79,7 +79,7 @@ export function ProtectedRoute({ children, allowedRoles, requireAnyPermissions, 
       if ((requireAnyPermissions && requireAnyPermissions.length > 0) || (requireAllPermissions && requireAllPermissions.length > 0)) {
         // Students never pass permission checks
         if (role !== "admin") {
-          navigate("/dashboard", { replace: true });
+          navigate("/dashboard/exams", { replace: true });
           return;
         }
         // Super admin bypass

@@ -277,8 +277,17 @@ const TakeExam = () => {
         if (firebaseExam) {
           let firebaseQuestions = await getQuestions(id);
           
+          if ((!firebaseQuestions || firebaseQuestions.length === 0) && firebaseExam.examId && firebaseExam.examId !== id) {
+            firebaseQuestions = await getQuestions(firebaseExam.examId);
+          }
+
           if ((!firebaseQuestions || firebaseQuestions.length === 0) && Array.isArray((firebaseExam as any).questions)) {
             firebaseQuestions = (firebaseExam as any).questions;
+          }
+
+          if ((!firebaseQuestions || firebaseQuestions.length === 0) && offlineExam) {
+            const offlineQ = await getOfflineQuestions(id).catch(() => []);
+            if (offlineQ.length > 0) firebaseQuestions = offlineQ;
           }
 
           return {

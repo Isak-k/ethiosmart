@@ -13,7 +13,8 @@ import {
   writeBatch,
   deleteField,
   getDocFromCache,
-  getDocsFromCache
+  getDocsFromCache,
+  limit
 } from 'firebase/firestore';
 import { db } from '@/integrations/firebase/client';
 import { Exam, Question } from '@/integrations/firebase/types';
@@ -73,6 +74,20 @@ export async function getExam(examId: string): Promise<Exam | null> {
       console.error('Cache fetch failed:', cacheError);
     }
   }
+
+  // Fallback: Query by examId field in case doc.id differs from examId
+  try {
+    const q = query(collection(db, 'exams'), where('examId', '==', examId), limit(1));
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      const foundDoc = snap.docs[0];
+      const data = foundDoc.data();
+      return {
+        examId: data.examId || foundDoc.id,
+        ...data
+      } as Exam;
+    }
+  } catch {}
   
   // Final offline fallback to device storage
   try {
@@ -446,6 +461,24 @@ export async function getQuestions(examId: string): Promise<Question[]> {
       console.warn(`Cache questions fetch failed for ${examId}:`, cacheErr);
     }
   }
+
+  // 1b. Fallback: If no questions found and examId was a custom field rather than doc.id
+  try {
+    const q = query(collection(db, 'exams'), where('examId', '==', examId), limit(1));
+    const snap = await getDocs(q);
+    if (!snap.empty && snap.docs[0].id !== examId) {
+      const altDocId = snap.docs[0].id;
+      const altColRef = collection(db, 'exams', altDocId, 'questions');
+      const altSnap = await getDocs(altColRef);
+      if (!altSnap.empty) {
+        const list = altSnap.docs.map(doc => ({
+          questionId: doc.id,
+          ...doc.data()
+        })) as Question[];
+        return list.sort((a, b) => (Number(a.orderIndex) || 0) - (Number(b.orderIndex) || 0));
+      }
+    }
+  } catch {}
 
   // 2. Fallback to offline IndexedDB questions
   try {

@@ -62,9 +62,11 @@ const Index = () => {
 
   useEffect(() => {
     if (!loading) {
-      // Only auto-redirect signed-in staff/admin to admin dashboard
+      // Auto-redirect signed-in users: admin to /dashboard, students & guests to /dashboard/exams
       if (user && !isGuest && role === "admin") {
         navigate("/dashboard", { replace: true });
+      } else if (user || isGuest) {
+        navigate("/dashboard/exams", { replace: true });
       }
     }
   }, [user, role, isGuest, loading, navigate]);
@@ -219,35 +221,11 @@ const Index = () => {
             >
               Dashboard
             </button>
-          ) : requireStudentLogin ? (
-            <button
-              type="button"
-              className="liquid-glass-button-secondary rounded-full h-8 sm:h-9 px-3 sm:px-4 text-xs sm:text-sm font-semibold transition-all hover:scale-105 active:scale-95"
-              onClick={() => navigate("/auth")}
-            >
-              {t("common.signIn")}
-            </button>
           ) : (
             <div className="flex items-center gap-1.5 sm:gap-2">
               <button
                 type="button"
-                className="liquid-glass-button rounded-full h-8 sm:h-9 px-3 sm:px-4 text-xs sm:text-sm font-bold shadow-sm flex items-center gap-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:opacity-95 text-white active:scale-95 transition-transform"
-                onClick={async () => {
-                  try {
-                    if (continueAsGuest) await continueAsGuest();
-                    navigate("/dashboard/exams");
-                  } catch {
-                    navigate("/dashboard/exams");
-                  }
-                }}
-                title="Explore curriculum as a guest"
-              >
-                <Sparkles className="h-3 w-3 text-amber-300 shrink-0" />
-                <span>Continue as Guest</span>
-              </button>
-              <button
-                type="button"
-                className="liquid-glass-button-secondary rounded-full h-8 sm:h-9 px-2.5 sm:px-3 text-xs sm:text-sm font-semibold transition-all hover:scale-105 active:scale-95"
+                className="liquid-glass-button-secondary rounded-full h-8 sm:h-9 px-3 sm:px-4 text-xs sm:text-sm font-semibold transition-all hover:scale-105 active:scale-95"
                 onClick={() => navigate("/auth")}
                 title="Sign in to your account"
               >
@@ -318,35 +296,34 @@ const Index = () => {
             {t("hero.description")}
           </p>
 
-          {/* Responsive Action Buttons */}
-          <div className="flex flex-row items-center justify-center gap-2 sm:gap-3 max-w-sm mx-auto w-full shrink-0">
-            {/* Primary Start Learning Button */}
+          {/* Responsive Action Buttons (Touch-Optimized for Mobile) */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2.5 sm:gap-3 max-w-sm mx-auto w-full shrink-0">
+            {/* Primary Get Started Button */}
             <button
               type="button"
-              className="liquid-glass-button h-11 sm:h-12 px-6 sm:px-8 text-xs sm:text-sm font-bold rounded-full flex items-center justify-center gap-2 shadow-md flex-1"
-              onClick={async () => {
-                if (requireStudentLogin) {
-                  navigate("/auth");
-                } else {
+              className="liquid-glass-button h-11 sm:h-12 px-6 sm:px-8 text-xs sm:text-sm font-bold rounded-full flex items-center justify-center gap-2 shadow-lg hover:shadow-blue-500/25 active:scale-95 transition-all w-full sm:w-auto sm:flex-1"
+              onClick={() => navigate("/auth")}
+            >
+              <span>{t("common.getStarted", "Get Started Now")}</span>
+              <ArrowRight className="h-4 w-4 text-white shrink-0" />
+            </button>
+
+            {/* Continue as Guest Button */}
+            {!requireStudentLogin && (
+              <button
+                type="button"
+                className="liquid-glass-button-secondary h-11 sm:h-12 px-5 sm:px-6 text-xs sm:text-sm font-bold rounded-full flex items-center justify-center gap-2 text-sky-700 dark:text-sky-300 hover:text-sky-800 dark:hover:text-white border border-sky-400/40 dark:border-sky-500/40 bg-sky-500/10 hover:bg-sky-500/20 active:scale-95 transition-all w-full sm:w-auto sm:flex-1 shadow-sm"
+                onClick={async () => {
                   try {
                     if (continueAsGuest) await continueAsGuest();
                   } catch {}
                   navigate("/dashboard/exams");
-                }
-              }}
-            >
-              <span>{requireStudentLogin ? t("common.getStarted") : "Continue as Guest"}</span>
-              <ArrowRight className="h-4 w-4 text-white" />
-            </button>
-
-            {/* Learn More */}
-            <button
-              type="button"
-              className="liquid-glass-button-secondary h-11 sm:h-12 px-5 sm:px-6 text-xs sm:text-sm font-semibold rounded-full items-center justify-center text-slate-700 dark:text-slate-200"
-              onClick={() => navigate("/about")}
-            >
-              {t("common.learnMore")}
-            </button>
+                }}
+              >
+                <Sparkles className="h-4 w-4 text-amber-500 shrink-0" />
+                <span>{t("auth.continueAsGuest", "Continue as Guest")}</span>
+              </button>
+            )}
           </div>
 
           {/* Trust Indicators in Frosted Glass Badges */}

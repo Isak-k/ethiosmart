@@ -520,7 +520,7 @@ export function AuthForm() {
                 className="w-full h-12 rounded-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 shadow-xs flex items-center justify-center gap-2.5 text-sm font-semibold transition-all active:scale-[0.98]"
                 title="Sign in with Google"
               >
-                <svg className="h-4.5 w-4.5 shrink-0" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 min-w-[20px] min-h-[20px] shrink-0" width="20" height="20" viewBox="0 0 24 24">
                   <path
                     fill="#4285F4"
                     d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -584,14 +584,14 @@ export function AuthForm() {
           </TabsContent>
 
           <TabsContent value="signup" className="mt-0">
-            <form onSubmit={handleSignup} className="space-y-3 sm:space-y-2.5">
+            <form onSubmit={handleSignup} className="space-y-3.5 sm:space-y-4">
               {/* Full Name */}
               <div>
                 <label htmlFor="signup-name" className="sr-only">
                   {t("common.fullName")}
                 </label>
                 <div className="relative group">
-                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-600 transition-colors z-10" />
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-blue-600 transition-colors z-10" />
                   <Input
                     id="signup-name"
                     type="text"
@@ -602,7 +602,7 @@ export function AuthForm() {
                       setSignupErrors((prev) => ({ ...prev, name: undefined }));
                     }}
                     className={cn(
-                      "pl-10 h-11 sm:h-10 rounded-full liquid-glass-input text-xs sm:text-sm text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500",
+                      "pl-11 h-12 rounded-2xl liquid-glass-input text-sm text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500",
                       signupErrors.name && "border-red-500"
                     )}
                     required
@@ -619,7 +619,7 @@ export function AuthForm() {
                   {t("common.email")}
                 </label>
                 <div className="relative group">
-                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-600 transition-colors z-10" />
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-blue-600 transition-colors z-10" />
                   <Input
                     id="signup-email"
                     type="email"
@@ -630,7 +630,7 @@ export function AuthForm() {
                       setSignupErrors((prev) => ({ ...prev, email: undefined }));
                     }}
                     className={cn(
-                      "pl-10 h-11 sm:h-10 rounded-full liquid-glass-input text-xs sm:text-sm text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500",
+                      "pl-11 h-12 rounded-2xl liquid-glass-input text-sm text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500",
                       signupErrors.email && "border-red-500"
                     )}
                     required
@@ -644,13 +644,13 @@ export function AuthForm() {
               {/* Department */}
               <div>
                 <div className="relative group">
-                  <Building className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-600 transition-colors z-10" />
+                  <Building className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-blue-600 transition-colors z-10" />
                   <Select value={selectedDept} onValueChange={(v) => {
                     setSelectedDept(v);
                     setSignupErrors((prev) => ({ ...prev, department: undefined }));
                   }}>
                     <SelectTrigger className={cn(
-                      "pl-10 h-11 sm:h-10 rounded-full liquid-glass-input text-xs sm:text-sm text-slate-900 dark:text-slate-50",
+                      "pl-11 h-12 rounded-2xl liquid-glass-input text-sm text-slate-900 dark:text-slate-50",
                       signupErrors.department && "border-red-500"
                     )}>
                       <SelectValue placeholder={t("common.selectDepartment")} />
@@ -681,7 +681,7 @@ export function AuthForm() {
                   {t("common.password")}
                 </label>
                 <div className="relative group">
-                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-600 transition-colors z-10" />
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-blue-600 transition-colors z-10" />
                   <Input
                     id="signup-password"
                     type={showPassword ? "text" : "password"}
@@ -692,7 +692,7 @@ export function AuthForm() {
                       setSignupErrors((prev) => ({ ...prev, password: undefined }));
                     }}
                     className={cn(
-                      "pl-10 pr-9 h-11 sm:h-10 rounded-full liquid-glass-input text-xs sm:text-sm text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500",
+                      "pl-11 pr-10 h-12 rounded-2xl liquid-glass-input text-sm text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500",
                       signupErrors.password && "border-red-500"
                     )}
                     minLength={6}
@@ -702,7 +702,7 @@ export function AuthForm() {
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
                     onClick={() => setShowPassword(!showPassword)}
                     tabIndex={-1}
                   >
@@ -721,7 +721,7 @@ export function AuthForm() {
               {/* 1. Primary Signup Button */}
               <button
                 type="submit"
-                className="liquid-glass-button w-full h-11 sm:h-10 rounded-full text-xs sm:text-sm font-bold flex items-center justify-center gap-2 group cursor-pointer shadow-md mt-1"
+                className="liquid-glass-button w-full h-12 rounded-full text-sm sm:text-base font-bold flex items-center justify-center gap-2 group cursor-pointer shadow-lg shadow-blue-500/20 mt-1"
                 disabled={loading}
               >
                 {loading ? (
@@ -732,20 +732,20 @@ export function AuthForm() {
                 ) : (
                   <>
                     <span>{t("common.signup")}</span>
-                    <span className="h-5 w-5 rounded-full bg-white/20 flex items-center justify-center ml-0.5 group-hover:translate-x-1 transition-transform">
-                      <ArrowRight className="h-3 w-3 text-white" />
+                    <span className="h-6 w-6 rounded-full bg-white/20 flex items-center justify-center ml-0.5 group-hover:translate-x-1 transition-transform">
+                      <ArrowRight className="h-3.5 w-3.5 text-white" />
                     </span>
                   </>
                 )}
               </button>
 
               {/* Divider */}
-              <div className="relative my-2.5 text-center">
+              <div className="relative my-3 text-center">
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-slate-200 dark:border-slate-800" />
                 </div>
                 <div className="relative flex justify-center">
-                  <span className="px-2.5 bg-white dark:bg-slate-900 rounded-full text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  <span className="px-3 bg-white dark:bg-slate-900 rounded-full text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                     Or
                   </span>
                 </div>
@@ -756,10 +756,10 @@ export function AuthForm() {
                 type="button"
                 onClick={handleGoogleSignIn}
                 disabled={loading}
-                className="w-full h-11 sm:h-10 rounded-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 shadow-xs flex items-center justify-center gap-2.5 text-xs sm:text-sm font-semibold transition-all active:scale-[0.98]"
+                className="w-full h-12 rounded-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 shadow-xs flex items-center justify-center gap-2.5 text-sm font-semibold transition-all active:scale-[0.98]"
                 title="Sign up with Google"
               >
-                <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 min-w-[20px] min-h-[20px] shrink-0" width="20" height="20" viewBox="0 0 24 24">
                   <path
                     fill="#4285F4"
                     d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -799,18 +799,18 @@ export function AuthForm() {
                     type="button"
                     onClick={handleGuestEntry}
                     disabled={loading || guestLoading}
-                    className="w-full h-11 sm:h-10 rounded-full border border-emerald-500/50 hover:border-emerald-500 bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/10 hover:from-emerald-500/20 hover:to-teal-500/20 text-emerald-700 dark:text-emerald-300 shadow-sm flex items-center justify-center gap-2 text-xs sm:text-sm font-bold transition-all active:scale-[0.98] group cursor-pointer"
+                    className="w-full h-12 rounded-full border border-emerald-500/50 hover:border-emerald-500 bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/10 hover:from-emerald-500/20 hover:to-teal-500/20 text-emerald-700 dark:text-emerald-300 shadow-sm flex items-center justify-center gap-2 text-sm font-bold transition-all active:scale-[0.98] group cursor-pointer"
                     title="Enter platform as guest without logging in"
                   >
                     {guestLoading ? (
                       <>
-                        <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-600 dark:text-emerald-400" />
+                        <Loader2 className="h-4 w-4 animate-spin text-emerald-600 dark:text-emerald-400" />
                         <span>Entering as Guest...</span>
                       </>
                     ) : (
                       <>
                         <span className="h-5 w-5 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
-                          <User className="h-3 w-3" />
+                          <User className="h-3.5 w-3.5" />
                         </span>
                         <span>Continue as Guest</span>
                         <ArrowRight className="h-3.5 w-3.5 ml-0.5 text-emerald-600 dark:text-emerald-400 group-hover:translate-x-1 transition-transform" />

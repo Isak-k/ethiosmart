@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { useSectionPermissions } from "@/hooks/useSectionPermissions";
 import { signOut } from "@/lib/auth";
+import { clearGuestProfile } from "@/lib/guest-session";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { LanguageToggle } from "@/components/ui/language-toggle";
@@ -434,6 +435,9 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
   const { t } = useTranslation();
 
   const handleSignOut = async () => {
+    try {
+      clearGuestProfile();
+    } catch {}
     await signOut();
     navigate("/");
   };
@@ -533,7 +537,7 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
           >
             {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
-          <Link to={role === "admin" ? "/dashboard" : "/dashboard"} className="flex items-center">
+          <Link to={role === "admin" ? "/dashboard" : "/dashboard/exams"} className="flex items-center">
             <EthioSmartLogo variant="compact" size="xs" textColor="auto" />
           </Link>
         </div>
@@ -555,15 +559,23 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48 rounded-2xl shadow-xl liquid-glass-card">
-              <DropdownMenuItem onClick={() => navigate("/settings")}>
-                <Settings className="mr-2 h-4 w-4" />
-                {t("common.settings")}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
+            <DropdownMenuContent align="end" className="w-52 rounded-2xl shadow-xl liquid-glass-card">
+              <div className="px-3 py-2 text-xs border-b border-border/50">
+                <p className="font-semibold text-foreground truncate">{profile?.full_name || (isGuest ? "Guest Student" : "User")}</p>
+                <p className="text-[10px] text-muted-foreground">{isGuest ? "Guest Access" : role ? t(`common.${role}`) : ""}</p>
+              </div>
+              {!isGuest && (
+                <>
+                  <DropdownMenuItem onClick={() => navigate("/settings")}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    {t("common.settings")}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              <DropdownMenuItem onClick={handleSignOut} className="text-destructive font-semibold">
                 <LogOut className="mr-2 h-4 w-4" />
-                {t("common.signOut")}
+                {t("common.signOut", "Sign Out")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -589,7 +601,7 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
 
           {/* Logo */}
           <Link
-            to={role === "admin" ? "/dashboard" : "/dashboard"}
+            to={role === "admin" ? "/dashboard" : "/dashboard/exams"}
             className="relative h-20 flex flex-col justify-center px-5 border-b border-white/10 bg-black/30 backdrop-blur-md hover:opacity-95 transition-all shrink-0"
           >
             <EthioSmartLogo variant="compact" size="sm" textColor="light" />
@@ -683,17 +695,10 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 {isGuest ? (
-                  <>
-                    <DropdownMenuItem onClick={() => setShowGuestEditDialog(true)}>
-                      <User className="mr-2 h-4 w-4" />
-                      Edit Name & Department
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => navigate("/auth?role=admin")}>
-                      <Shield className="mr-2 h-4 w-4" />
-                      Staff / Admin Sign In
-                    </DropdownMenuItem>
-                  </>
+                  <DropdownMenuItem onClick={handleSignOut} className="text-destructive font-semibold">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    {t("common.signOut", "Sign Out")}
+                  </DropdownMenuItem>
                 ) : (
                   <>
                     <DropdownMenuItem onClick={() => navigate("/settings")}>
@@ -728,7 +733,7 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
 
       {/* Mobile Bottom Navigation - Liquid Glass Floating Dock (Optimized for 98% mobile user base) */}
       <nav className="liquid-glass-dock lg:hidden fixed bottom-0 left-0 right-0 z-50 pb-[env(safe-area-inset-bottom)]">
-        <div className={cn("grid gap-1 px-2 py-1.5", role === "admin" ? "grid-cols-4" : "grid-cols-5")}>
+        <div className="grid grid-cols-4 gap-1 px-2 py-1.5">
           {role === "admin" ? (
             <>
               {links.slice(0, 3).map((link) => {
@@ -781,29 +786,78 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
               </Link>
             </>
           ) : (
-            links.slice(0, 5).map((link) => {
-              const isActive = location.pathname === link.href || (link.href !== "/dashboard" && location.pathname.startsWith(link.href));
-              const theme = CATEGORY_THEMES[link.href] || CATEGORY_THEMES["/dashboard"];
+            [
+              {
+                href: "/dashboard",
+                label: "Dashboard",
+                icon: LayoutDashboard,
+                activeBg: "bg-gradient-to-tr from-sky-500 to-blue-600 text-white shadow-lg shadow-sky-500/35 border-sky-300/40",
+                inactiveBg: "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20",
+                activeText: "text-sky-600 dark:text-sky-400 font-bold",
+                inactiveText: "text-slate-600 dark:text-slate-400 font-semibold",
+                dot: "bg-sky-500 shadow-[0_0_8px_#38bdf8]",
+              },
+              {
+                href: "/dashboard/books",
+                label: "Study",
+                icon: BookOpen,
+                activeBg: "bg-gradient-to-tr from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/35 border-emerald-300/40",
+                inactiveBg: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+                activeText: "text-emerald-600 dark:text-emerald-400 font-bold",
+                inactiveText: "text-slate-600 dark:text-slate-400 font-semibold",
+                dot: "bg-emerald-500 shadow-[0_0_8px_#34d399]",
+              },
+              {
+                href: "/dashboard/exams",
+                label: "Exam",
+                icon: ClipboardList,
+                activeBg: "bg-gradient-to-tr from-purple-500 to-indigo-600 text-white shadow-lg shadow-purple-500/35 border-purple-300/40",
+                inactiveBg: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
+                activeText: "text-purple-600 dark:text-purple-400 font-bold",
+                inactiveText: "text-slate-600 dark:text-slate-400 font-semibold",
+                dot: "bg-purple-500 shadow-[0_0_8px_#a855f7]",
+              },
+              {
+                href: "/dashboard/messages",
+                label: "Message",
+                icon: MessageSquare,
+                activeBg: "bg-gradient-to-tr from-cyan-500 to-teal-600 text-white shadow-lg shadow-cyan-500/35 border-cyan-300/40",
+                inactiveBg: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20",
+                activeText: "text-cyan-600 dark:text-cyan-400 font-bold",
+                inactiveText: "text-slate-600 dark:text-slate-400 font-semibold",
+                dot: "bg-cyan-500 shadow-[0_0_8px_#22d3ee]",
+              },
+            ].map((item) => {
+              const isActive = location.pathname === item.href || (item.href !== "/dashboard" && location.pathname.startsWith(item.href));
               return (
                 <Link
-                  key={link.href}
-                  to={link.href}
+                  key={item.href}
+                  to={item.href}
                   className={cn(
-                    "flex flex-col items-center justify-center gap-1 py-1.5 px-0.5 rounded-2xl transition-all min-h-[50px] active:scale-95",
-                    isActive
-                      ? cn("backdrop-blur-md shadow-xs font-bold border", theme.activeBg, theme.activeText, theme.activeBorder)
-                      : "text-slate-600 dark:text-slate-400 hover:text-foreground"
+                    "group relative flex flex-col items-center justify-center py-1 px-0.5 rounded-2xl transition-all duration-300 min-h-[54px] active:scale-95",
+                    isActive ? "bg-white/50 dark:bg-slate-800/50 shadow-xs backdrop-blur-md" : "hover:bg-black/5 dark:hover:bg-white/5"
                   )}
                 >
-                  <link.icon className={cn(
-                    "h-5 w-5 transition-transform",
-                    isActive ? cn("scale-110", theme.iconColorInactive) : "text-slate-500"
-                  )} />
-                  <span className="text-[10px] font-medium truncate max-w-full">
-                    {link.label}
+                  <div
+                    className={cn(
+                      "w-11 h-7.5 rounded-xl flex items-center justify-center transition-all duration-300 border",
+                      isActive
+                        ? cn(item.activeBg, "scale-105")
+                        : item.inactiveBg
+                    )}
+                  >
+                    <item.icon className="h-4.5 w-4.5 transition-transform" />
+                  </div>
+                  <span
+                    className={cn(
+                      "text-[10px] sm:text-[11px] mt-0.5 tracking-tight transition-colors truncate max-w-full",
+                      isActive ? item.activeText : item.inactiveText
+                    )}
+                  >
+                    {item.label}
                   </span>
                   {isActive && (
-                    <div className={cn("w-1.5 h-1.5 rounded-full", theme.activeIndicator)} />
+                    <div className={cn("w-1.5 h-1.5 rounded-full mt-0.5", item.dot)} />
                   )}
                 </Link>
               );
@@ -850,33 +904,18 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
           {/* Menu Items */}
           <div className="space-y-2 pb-4">
             {isGuest ? (
-              <>
-                <button
-                  onClick={() => {
-                    setShowGuestEditDialog(true);
-                    setProfileSheetOpen(false);
-                  }}
-                  className="w-full flex items-center gap-4 px-4 py-4 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                >
-                  <div className="h-10 w-10 rounded-full bg-purple-500/10 text-purple-600 flex items-center justify-center">
-                    <User className="h-5 w-5" />
-                  </div>
-                  <span className="text-base font-medium">Edit Name & Department</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    navigate("/auth?role=admin");
-                    setProfileSheetOpen(false);
-                  }}
-                  className="w-full flex items-center gap-4 px-4 py-4 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                >
-                  <div className="h-10 w-10 rounded-full bg-indigo-500/10 text-indigo-600 flex items-center justify-center">
-                    <Shield className="h-5 w-5" />
-                  </div>
-                  <span className="text-base font-medium">Staff / Admin Sign In</span>
-                </button>
-              </>
+              <button
+                onClick={() => {
+                  setProfileSheetOpen(false);
+                  handleSignOut();
+                }}
+                className="w-full flex items-center gap-4 px-4 py-4 rounded-2xl hover:bg-red-50 dark:hover:bg-red-950/30 text-red-600 dark:text-red-400 border border-red-200/50 dark:border-red-900/40 transition-colors"
+              >
+                <div className="h-10 w-10 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 flex items-center justify-center">
+                  <LogOut className="h-5 w-5" />
+                </div>
+                <span className="text-base font-semibold">{t("common.signOut", "Sign Out")}</span>
+              </button>
             ) : (
               <button
                 onClick={() => {
