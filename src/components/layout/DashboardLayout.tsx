@@ -56,6 +56,352 @@ interface DashboardLayoutProps {
   contentClassName?: string;
 }
 
+export interface CategoryTheme {
+  category: string;
+  label: string;
+  colorName: string;
+  accentHex: string;
+  sidebarGradient: string;
+  headerGradient: string;
+  activeBg: string;
+  activeText: string;
+  activeBorder: string;
+  activeIndicator: string;
+  iconBgActive: string;
+  iconBgInactive: string;
+  iconColorActive: string;
+  iconColorInactive: string;
+  hoverBg: string;
+  hoverText: string;
+  badgeStyle: string;
+}
+
+export const CATEGORY_THEMES: Record<string, CategoryTheme> = {
+  "/dashboard": {
+    category: "home",
+    label: "Home",
+    colorName: "sky",
+    accentHex: "#0ea5e9",
+    sidebarGradient: "bg-gradient-to-b from-[#0b2447] via-[#081b36] to-[#040d1c]",
+    headerGradient: "from-sky-950 via-blue-950 to-slate-950",
+    activeBg: "bg-sky-500/20 shadow-md shadow-sky-500/15",
+    activeText: "text-white font-bold",
+    activeBorder: "border-sky-400/40",
+    activeIndicator: "bg-sky-400 shadow-[0_0_10px_#38bdf8]",
+    iconBgActive: "bg-sky-500 text-white shadow-md shadow-sky-500/30",
+    iconBgInactive: "bg-sky-500/15 text-sky-300 group-hover:bg-sky-500/25 group-hover:text-sky-200",
+    iconColorActive: "text-white",
+    iconColorInactive: "text-sky-300",
+    hoverBg: "hover:bg-sky-500/10",
+    hoverText: "hover:text-sky-100",
+    badgeStyle: "bg-sky-500/20 text-sky-300 border-sky-400/30",
+  },
+  "/dashboard/books": {
+    category: "study",
+    label: "Study",
+    colorName: "emerald",
+    accentHex: "#10b981",
+    sidebarGradient: "bg-gradient-to-b from-[#063024] via-[#05241b] to-[#02130e]",
+    headerGradient: "from-emerald-950 via-teal-950 to-slate-950",
+    activeBg: "bg-emerald-500/20 shadow-md shadow-emerald-500/15",
+    activeText: "text-white font-bold",
+    activeBorder: "border-emerald-400/40",
+    activeIndicator: "bg-emerald-400 shadow-[0_0_10px_#34d399]",
+    iconBgActive: "bg-emerald-500 text-white shadow-md shadow-emerald-500/30",
+    iconBgInactive: "bg-emerald-500/15 text-emerald-300 group-hover:bg-emerald-500/25 group-hover:text-emerald-200",
+    iconColorActive: "text-white",
+    iconColorInactive: "text-emerald-300",
+    hoverBg: "hover:bg-emerald-500/10",
+    hoverText: "hover:text-emerald-100",
+    badgeStyle: "bg-emerald-500/20 text-emerald-300 border-emerald-400/30",
+  },
+  "/dashboard/exams": {
+    category: "exams",
+    label: "Exams",
+    colorName: "purple",
+    accentHex: "#a855f7",
+    sidebarGradient: "bg-gradient-to-b from-[#1e0f3d] via-[#160a2f] to-[#0a0317]",
+    headerGradient: "from-purple-950 via-indigo-950 to-slate-950",
+    activeBg: "bg-purple-500/20 shadow-md shadow-purple-500/15",
+    activeText: "text-white font-bold",
+    activeBorder: "border-purple-400/40",
+    activeIndicator: "bg-purple-400 shadow-[0_0_10px_#c084fc]",
+    iconBgActive: "bg-purple-500 text-white shadow-md shadow-purple-500/30",
+    iconBgInactive: "bg-purple-500/15 text-purple-300 group-hover:bg-purple-500/25 group-hover:text-purple-200",
+    iconColorActive: "text-white",
+    iconColorInactive: "text-purple-300",
+    hoverBg: "hover:bg-purple-500/10",
+    hoverText: "hover:text-purple-100",
+    badgeStyle: "bg-purple-500/20 text-purple-300 border-purple-400/30",
+  },
+  "/dashboard/admin/exams": {
+    category: "exams",
+    label: "Manage Exams",
+    colorName: "purple",
+    accentHex: "#a855f7",
+    sidebarGradient: "bg-gradient-to-b from-[#1e0f3d] via-[#160a2f] to-[#0a0317]",
+    headerGradient: "from-purple-950 via-indigo-950 to-slate-950",
+    activeBg: "bg-purple-500/20 shadow-md shadow-purple-500/15",
+    activeText: "text-white font-bold",
+    activeBorder: "border-purple-400/40",
+    activeIndicator: "bg-purple-400 shadow-[0_0_10px_#c084fc]",
+    iconBgActive: "bg-purple-500 text-white shadow-md shadow-purple-500/30",
+    iconBgInactive: "bg-purple-500/15 text-purple-300 group-hover:bg-purple-500/25 group-hover:text-purple-200",
+    iconColorActive: "text-white",
+    iconColorInactive: "text-purple-300",
+    hoverBg: "hover:bg-purple-500/10",
+    hoverText: "hover:text-purple-100",
+    badgeStyle: "bg-purple-500/20 text-purple-300 border-purple-400/30",
+  },
+  "/dashboard/ai-assistant": {
+    category: "ai",
+    label: "AI Tutor",
+    colorName: "fuchsia",
+    accentHex: "#d946ef",
+    sidebarGradient: "bg-gradient-to-b from-[#2d0933] via-[#210526] to-[#110114]",
+    headerGradient: "from-fuchsia-950 via-pink-950 to-slate-950",
+    activeBg: "bg-fuchsia-500/20 shadow-md shadow-fuchsia-500/15",
+    activeText: "text-white font-bold",
+    activeBorder: "border-fuchsia-400/40",
+    activeIndicator: "bg-fuchsia-400 shadow-[0_0_10px_#f472b6]",
+    iconBgActive: "bg-fuchsia-500 text-white shadow-md shadow-fuchsia-500/30",
+    iconBgInactive: "bg-fuchsia-500/15 text-fuchsia-300 group-hover:bg-fuchsia-500/25 group-hover:text-fuchsia-200",
+    iconColorActive: "text-white",
+    iconColorInactive: "text-fuchsia-300",
+    hoverBg: "hover:bg-fuchsia-500/10",
+    hoverText: "hover:text-fuchsia-100",
+    badgeStyle: "bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-400/30",
+  },
+  "/dashboard/admin/ai-generator": {
+    category: "ai",
+    label: "AI Generator",
+    colorName: "fuchsia",
+    accentHex: "#d946ef",
+    sidebarGradient: "bg-gradient-to-b from-[#2d0933] via-[#210526] to-[#110114]",
+    headerGradient: "from-fuchsia-950 via-pink-950 to-slate-950",
+    activeBg: "bg-fuchsia-500/20 shadow-md shadow-fuchsia-500/15",
+    activeText: "text-white font-bold",
+    activeBorder: "border-fuchsia-400/40",
+    activeIndicator: "bg-fuchsia-400 shadow-[0_0_10px_#f472b6]",
+    iconBgActive: "bg-fuchsia-500 text-white shadow-md shadow-fuchsia-500/30",
+    iconBgInactive: "bg-fuchsia-500/15 text-fuchsia-300 group-hover:bg-fuchsia-500/25 group-hover:text-fuchsia-200",
+    iconColorActive: "text-white",
+    iconColorInactive: "text-fuchsia-300",
+    hoverBg: "hover:bg-fuchsia-500/10",
+    hoverText: "hover:text-fuchsia-100",
+    badgeStyle: "bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-400/30",
+  },
+  "/dashboard/results": {
+    category: "results",
+    label: "Results",
+    colorName: "amber",
+    accentHex: "#f59e0b",
+    sidebarGradient: "bg-gradient-to-b from-[#2e1903] via-[#221201] to-[#120900]",
+    headerGradient: "from-amber-950 via-orange-950 to-slate-950",
+    activeBg: "bg-amber-500/20 shadow-md shadow-amber-500/15",
+    activeText: "text-white font-bold",
+    activeBorder: "border-amber-400/40",
+    activeIndicator: "bg-amber-400 shadow-[0_0_10px_#fbbf24]",
+    iconBgActive: "bg-amber-500 text-white shadow-md shadow-amber-500/30",
+    iconBgInactive: "bg-amber-500/15 text-amber-300 group-hover:bg-amber-500/25 group-hover:text-amber-200",
+    iconColorActive: "text-white",
+    iconColorInactive: "text-amber-300",
+    hoverBg: "hover:bg-amber-500/10",
+    hoverText: "hover:text-amber-100",
+    badgeStyle: "bg-amber-500/20 text-amber-300 border-amber-400/30",
+  },
+  "/dashboard/all-results": {
+    category: "results",
+    label: "All Results",
+    colorName: "amber",
+    accentHex: "#f59e0b",
+    sidebarGradient: "bg-gradient-to-b from-[#2e1903] via-[#221201] to-[#120900]",
+    headerGradient: "from-amber-950 via-orange-950 to-slate-950",
+    activeBg: "bg-amber-500/20 shadow-md shadow-amber-500/15",
+    activeText: "text-white font-bold",
+    activeBorder: "border-amber-400/40",
+    activeIndicator: "bg-amber-400 shadow-[0_0_10px_#fbbf24]",
+    iconBgActive: "bg-amber-500 text-white shadow-md shadow-amber-500/30",
+    iconBgInactive: "bg-amber-500/15 text-amber-300 group-hover:bg-amber-500/25 group-hover:text-amber-200",
+    iconColorActive: "text-white",
+    iconColorInactive: "text-amber-300",
+    hoverBg: "hover:bg-amber-500/10",
+    hoverText: "hover:text-amber-100",
+    badgeStyle: "bg-amber-500/20 text-amber-300 border-amber-400/30",
+  },
+  "/dashboard/leaderboard-admin": {
+    category: "results",
+    label: "Leaderboard",
+    colorName: "amber",
+    accentHex: "#f59e0b",
+    sidebarGradient: "bg-gradient-to-b from-[#2e1903] via-[#221201] to-[#120900]",
+    headerGradient: "from-amber-950 via-orange-950 to-slate-950",
+    activeBg: "bg-amber-500/20 shadow-md shadow-amber-500/15",
+    activeText: "text-white font-bold",
+    activeBorder: "border-amber-400/40",
+    activeIndicator: "bg-amber-400 shadow-[0_0_10px_#fbbf24]",
+    iconBgActive: "bg-amber-500 text-white shadow-md shadow-amber-500/30",
+    iconBgInactive: "bg-amber-500/15 text-amber-300 group-hover:bg-amber-500/25 group-hover:text-amber-200",
+    iconColorActive: "text-white",
+    iconColorInactive: "text-amber-300",
+    hoverBg: "hover:bg-amber-500/10",
+    hoverText: "hover:text-amber-100",
+    badgeStyle: "bg-amber-500/20 text-amber-300 border-amber-400/30",
+  },
+  "/dashboard/messages": {
+    category: "messages",
+    label: "Messages",
+    colorName: "cyan",
+    accentHex: "#06b6d4",
+    sidebarGradient: "bg-gradient-to-b from-[#062933] via-[#041d24] to-[#020e12]",
+    headerGradient: "from-cyan-950 via-teal-950 to-slate-950",
+    activeBg: "bg-cyan-500/20 shadow-md shadow-cyan-500/15",
+    activeText: "text-white font-bold",
+    activeBorder: "border-cyan-400/40",
+    activeIndicator: "bg-cyan-400 shadow-[0_0_10px_#22d3ee]",
+    iconBgActive: "bg-cyan-500 text-white shadow-md shadow-cyan-500/30",
+    iconBgInactive: "bg-cyan-500/15 text-cyan-300 group-hover:bg-cyan-500/25 group-hover:text-cyan-200",
+    iconColorActive: "text-white",
+    iconColorInactive: "text-cyan-300",
+    hoverBg: "hover:bg-cyan-500/10",
+    hoverText: "hover:text-cyan-100",
+    badgeStyle: "bg-cyan-500/20 text-cyan-300 border-cyan-400/30",
+  },
+  "/dashboard/feedback": {
+    category: "messages",
+    label: "Feedback",
+    colorName: "cyan",
+    accentHex: "#06b6d4",
+    sidebarGradient: "bg-gradient-to-b from-[#062933] via-[#041d24] to-[#020e12]",
+    headerGradient: "from-cyan-950 via-teal-950 to-slate-950",
+    activeBg: "bg-cyan-500/20 shadow-md shadow-cyan-500/15",
+    activeText: "text-white font-bold",
+    activeBorder: "border-cyan-400/40",
+    activeIndicator: "bg-cyan-400 shadow-[0_0_10px_#22d3ee]",
+    iconBgActive: "bg-cyan-500 text-white shadow-md shadow-cyan-500/30",
+    iconBgInactive: "bg-cyan-500/15 text-cyan-300 group-hover:bg-cyan-500/25 group-hover:text-cyan-200",
+    iconColorActive: "text-white",
+    iconColorInactive: "text-cyan-300",
+    hoverBg: "hover:bg-cyan-500/10",
+    hoverText: "hover:text-cyan-100",
+    badgeStyle: "bg-cyan-500/20 text-cyan-300 border-cyan-400/30",
+  },
+  "/dashboard/admin/books": {
+    category: "books",
+    label: "Books",
+    colorName: "emerald",
+    accentHex: "#10b981",
+    sidebarGradient: "bg-gradient-to-b from-[#063024] via-[#05241b] to-[#02130e]",
+    headerGradient: "from-emerald-950 via-teal-950 to-slate-950",
+    activeBg: "bg-emerald-500/20 shadow-md shadow-emerald-500/15",
+    activeText: "text-white font-bold",
+    activeBorder: "border-emerald-400/40",
+    activeIndicator: "bg-emerald-400 shadow-[0_0_10px_#34d399]",
+    iconBgActive: "bg-emerald-500 text-white shadow-md shadow-emerald-500/30",
+    iconBgInactive: "bg-emerald-500/15 text-emerald-300 group-hover:bg-emerald-500/25 group-hover:text-emerald-200",
+    iconColorActive: "text-white",
+    iconColorInactive: "text-emerald-300",
+    hoverBg: "hover:bg-emerald-500/10",
+    hoverText: "hover:text-emerald-100",
+    badgeStyle: "bg-emerald-500/20 text-emerald-300 border-emerald-400/30",
+  },
+  "/dashboard/students": {
+    category: "students",
+    label: "Students",
+    colorName: "blue",
+    accentHex: "#3b82f6",
+    sidebarGradient: "bg-gradient-to-b from-[#0b2447] via-[#081b36] to-[#040d1c]",
+    headerGradient: "from-blue-950 via-sky-950 to-slate-950",
+    activeBg: "bg-blue-500/20 shadow-md shadow-blue-500/15",
+    activeText: "text-white font-bold",
+    activeBorder: "border-blue-400/40",
+    activeIndicator: "bg-blue-400 shadow-[0_0_10px_#60a5fa]",
+    iconBgActive: "bg-blue-500 text-white shadow-md shadow-blue-500/30",
+    iconBgInactive: "bg-blue-500/15 text-blue-300 group-hover:bg-blue-500/25 group-hover:text-blue-200",
+    iconColorActive: "text-white",
+    iconColorInactive: "text-blue-300",
+    hoverBg: "hover:bg-blue-500/10",
+    hoverText: "hover:text-blue-100",
+    badgeStyle: "bg-blue-500/20 text-blue-300 border-blue-400/30",
+  },
+  "/dashboard/admin/subjects": {
+    category: "subjects",
+    label: "Subjects",
+    colorName: "teal",
+    accentHex: "#14b8a6",
+    sidebarGradient: "bg-gradient-to-b from-[#052b27] via-[#041f1c] to-[#02100e]",
+    headerGradient: "from-teal-950 via-emerald-950 to-slate-950",
+    activeBg: "bg-teal-500/20 shadow-md shadow-teal-500/15",
+    activeText: "text-white font-bold",
+    activeBorder: "border-teal-400/40",
+    activeIndicator: "bg-teal-400 shadow-[0_0_10px_#2dd4bf]",
+    iconBgActive: "bg-teal-500 text-white shadow-md shadow-teal-500/30",
+    iconBgInactive: "bg-teal-500/15 text-teal-300 group-hover:bg-teal-500/25 group-hover:text-teal-200",
+    iconColorActive: "text-white",
+    iconColorInactive: "text-teal-300",
+    hoverBg: "hover:bg-teal-500/10",
+    hoverText: "hover:text-teal-100",
+    badgeStyle: "bg-teal-500/20 text-teal-300 border-teal-400/30",
+  },
+  "/dashboard/departments": {
+    category: "departments",
+    label: "Departments",
+    colorName: "indigo",
+    accentHex: "#6366f1",
+    sidebarGradient: "bg-gradient-to-b from-[#18123d] via-[#110c2c] to-[#070518]",
+    headerGradient: "from-indigo-950 via-purple-950 to-slate-950",
+    activeBg: "bg-indigo-500/20 shadow-md shadow-indigo-500/15",
+    activeText: "text-white font-bold",
+    activeBorder: "border-indigo-400/40",
+    activeIndicator: "bg-indigo-400 shadow-[0_0_10px_#818cf8]",
+    iconBgActive: "bg-indigo-500 text-white shadow-md shadow-indigo-500/30",
+    iconBgInactive: "bg-indigo-500/15 text-indigo-300 group-hover:bg-indigo-500/25 group-hover:text-indigo-200",
+    iconColorActive: "text-white",
+    iconColorInactive: "text-indigo-300",
+    hoverBg: "hover:bg-indigo-500/10",
+    hoverText: "hover:text-indigo-100",
+    badgeStyle: "bg-indigo-500/20 text-indigo-300 border-indigo-400/30",
+  },
+  "/settings": {
+    category: "settings",
+    label: "Settings",
+    colorName: "slate",
+    accentHex: "#94a3b8",
+    sidebarGradient: "bg-gradient-to-b from-[#1e293b] via-[#0f172a] to-[#020617]",
+    headerGradient: "from-slate-900 via-slate-950 to-black",
+    activeBg: "bg-slate-500/25 shadow-md shadow-slate-500/15",
+    activeText: "text-white font-bold",
+    activeBorder: "border-slate-400/40",
+    activeIndicator: "bg-slate-300 shadow-[0_0_10px_#cbd5e1]",
+    iconBgActive: "bg-slate-600 text-white shadow-md shadow-slate-600/30",
+    iconBgInactive: "bg-slate-500/20 text-slate-300 group-hover:bg-slate-500/30 group-hover:text-slate-200",
+    iconColorActive: "text-white",
+    iconColorInactive: "text-slate-300",
+    hoverBg: "hover:bg-slate-500/10",
+    hoverText: "hover:text-slate-100",
+    badgeStyle: "bg-slate-500/20 text-slate-300 border-slate-400/30",
+  },
+  "/dashboard/super-admin": {
+    category: "super-admin",
+    label: "Super Admin",
+    colorName: "rose",
+    accentHex: "#f43f5e",
+    sidebarGradient: "bg-gradient-to-b from-[#330814] via-[#24040c] to-[#120105]",
+    headerGradient: "from-rose-950 via-red-950 to-slate-950",
+    activeBg: "bg-rose-500/20 shadow-md shadow-rose-500/15",
+    activeText: "text-white font-bold",
+    activeBorder: "border-rose-400/40",
+    activeIndicator: "bg-rose-400 shadow-[0_0_10px_#fb7185]",
+    iconBgActive: "bg-rose-500 text-white shadow-md shadow-rose-500/30",
+    iconBgInactive: "bg-rose-500/15 text-rose-300 group-hover:bg-rose-500/25 group-hover:text-rose-200",
+    iconColorActive: "text-white",
+    iconColorInactive: "text-rose-300",
+    hoverBg: "hover:bg-rose-500/10",
+    hoverText: "hover:text-rose-100",
+    badgeStyle: "bg-rose-500/20 text-rose-300 border-rose-400/30",
+  },
+};
+
 export function DashboardLayout({ children, contentClassName }: DashboardLayoutProps) {
   const { profile, role, isGuest, updateGuestProfile } = useAuth();
   const { hasPermission, isSuperAdmin } = usePermissions();
@@ -120,6 +466,15 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
   ), [allAdminLinks, hasPermission]);
 
   const links = role === "admin" ? adminLinks : studentLinks;
+
+  const currentPath = location.pathname;
+  const activeCategoryTheme = React.useMemo(() => {
+    if (CATEGORY_THEMES[currentPath]) return CATEGORY_THEMES[currentPath];
+    const match = Object.entries(CATEGORY_THEMES).find(
+      ([prefix]) => prefix !== "/dashboard" && currentPath.startsWith(prefix)
+    );
+    return match ? match[1] : CATEGORY_THEMES["/dashboard"];
+  }, [currentPath]);
 
   const initials = profile?.full_name
     ?.split(" ")
@@ -194,25 +549,37 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
         </div>
       </header>
 
-      {/* Sidebar */}
+      {/* Sidebar - The Left Bar */}
       <aside
         className={cn(
-          "fixed top-0 left-0 z-40 h-full w-64 bg-sidebar/95 backdrop-blur-sm border-r border-sidebar-border/50 shadow-lg transform transition-transform duration-300 ease-out lg:translate-x-0",
+          "fixed top-0 left-0 z-40 h-full w-64 shadow-2xl transform transition-all duration-500 ease-out lg:translate-x-0 border-r border-white/10",
+          activeCategoryTheme.sidebarGradient,
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full relative overflow-hidden">
+          {/* Subtle Ambient Radial Glow of the Active Category */}
+          <div 
+            className="absolute top-0 left-0 right-0 h-80 opacity-40 pointer-events-none transition-all duration-700 blur-3xl"
+            style={{
+              background: `radial-gradient(circle at 50% 15%, ${activeCategoryTheme.accentHex}, transparent 70%)`
+            }}
+          />
+
           {/* Logo */}
           <Link
             to={role === "admin" ? "/dashboard" : "/dashboard"}
-            className="relative h-20 flex flex-col justify-center px-5 border-b border-white/10 bg-gradient-to-r from-slate-950 via-blue-950 to-slate-900 hover:opacity-95 transition-opacity"
+            className="relative h-20 flex flex-col justify-center px-5 border-b border-white/10 bg-black/30 backdrop-blur-md hover:opacity-95 transition-all shrink-0"
           >
             <EthioSmartLogo variant="compact" size="sm" textColor="light" />
             <div className="flex items-center justify-between mt-1 pl-12 pr-1">
-              <span className="text-[10px] font-semibold tracking-wider uppercase text-sky-300">
-                {role === "admin" ? "Admin Portal" : "Student Platform"}
+              <span className={cn(
+                "text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full border transition-all duration-300 shadow-xs",
+                activeCategoryTheme.badgeStyle
+              )}>
+                {activeCategoryTheme.label}
               </span>
-              <span className="text-[9px] font-medium text-slate-400">
+              <span className="text-[9px] font-medium text-slate-300">
                 EthioSmart
               </span>
             </div>
@@ -220,28 +587,45 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
           </Link>
 
           {/* Navigation */}
-          <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto">
+          <nav className="flex-1 px-3 py-4 space-y-1.5 overflow-y-auto relative z-10">
             {links.map((link) => {
-              const isActive = location.pathname === link.href;
+              const isActive = location.pathname === link.href || (link.href !== "/dashboard" && location.pathname.startsWith(link.href));
+              const theme = CATEGORY_THEMES[link.href] || CATEGORY_THEMES["/dashboard"];
+
               return (
                 <Link
                   key={link.href}
                   to={link.href}
                   onClick={() => setSidebarOpen(false)}
                   className={cn(
-                    "group flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium",
+                    "group relative flex items-center gap-3 px-3.5 py-2.5 rounded-2xl transition-all duration-300 font-medium",
                     isActive
-                      ? "bg-white/20 text-white font-semibold shadow-md backdrop-blur-sm"
-                      : "text-white/80 hover:bg-white/10 hover:text-white"
+                      ? cn("backdrop-blur-md border", theme.activeBg, theme.activeText, theme.activeBorder)
+                      : cn("text-white/80 hover:text-white", theme.hoverBg, theme.hoverText)
                   )}
                 >
-                  <link.icon className={cn(
-                    "h-5 w-5 transition-transform group-hover:scale-110", 
-                    isActive ? "text-white" : "text-white/70 group-hover:text-white"
-                  )} />
-                  <span className="text-sm">{link.label}</span>
+                  {/* Left Bar Glowing Indicator */}
                   {isActive && (
-                    <div className="ml-auto w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                    <div className={cn("absolute left-1 top-1/2 -translate-y-1/2 w-1.5 h-6 rounded-full transition-all duration-300", theme.activeIndicator)} />
+                  )}
+
+                  {/* Category-Colored Icon Container */}
+                  <div className={cn(
+                    "p-2 rounded-xl transition-all duration-300 shrink-0",
+                    isActive ? theme.iconBgActive : theme.iconBgInactive,
+                    isActive ? "ml-1" : ""
+                  )}>
+                    <link.icon className={cn("h-4 w-4 transition-transform group-hover:scale-110", isActive ? theme.iconColorActive : theme.iconColorInactive)} />
+                  </div>
+
+                  {/* Category Label */}
+                  <span className={cn("text-xs sm:text-sm tracking-wide", isActive ? "font-bold text-white" : "font-medium")}>
+                    {link.label}
+                  </span>
+
+                  {/* Right Glowing Pill for Active Category */}
+                  {isActive && (
+                    <div className={cn("ml-auto w-2 h-2 rounded-full animate-pulse", theme.activeIndicator)} />
                   )}
                 </Link>
               );
@@ -249,12 +633,12 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
           </nav>
 
           {/* User section */}
-          <div className="p-3.5 border-t border-white/10 bg-gradient-to-r from-slate-950 via-blue-950 to-slate-900">
+          <div className="p-3 border-t border-white/10 bg-black/35 backdrop-blur-md relative z-10 shrink-0">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/10 transition-all border border-transparent hover:border-white/15">
-                  <Avatar className="h-9 w-9 ring-2 ring-sky-400/30 shadow-sm shrink-0">
-                    <AvatarFallback className="bg-sky-600/30 backdrop-blur-sm text-white text-xs font-bold">
+                <button className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-white/10 transition-all border border-transparent hover:border-white/15">
+                  <Avatar className="h-9 w-9 ring-2 ring-white/20 shadow-sm shrink-0">
+                    <AvatarFallback className={cn("backdrop-blur-sm text-white text-xs font-bold transition-colors", activeCategoryTheme.iconBgActive)}>
                       {initials}
                     </AvatarFallback>
                   </Avatar>
@@ -262,11 +646,11 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
                     <p className="text-sm font-semibold text-white truncate">
                       {profile?.full_name || (isGuest ? "Guest Student" : "User")}
                     </p>
-                    <p className="text-[11px] text-sky-200/80 capitalize truncate">
+                    <p className="text-[11px] text-white/70 capitalize truncate">
                       {isGuest ? "Guest Access" : role ? t(`common.${role}`) : ""}
                     </p>
                   </div>
-                  <Settings className="h-4 w-4 text-white/70" />
+                  <Settings className="h-4 w-4 text-white/60" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
@@ -320,7 +704,8 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
           {role === "admin" ? (
             <>
               {links.slice(0, 3).map((link) => {
-                const isActive = location.pathname === link.href;
+                const isActive = location.pathname === link.href || (link.href !== "/dashboard" && location.pathname.startsWith(link.href));
+                const theme = CATEGORY_THEMES[link.href] || CATEGORY_THEMES["/dashboard"];
                 return (
                   <Link
                     key={link.href}
@@ -328,19 +713,19 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
                     className={cn(
                       "flex flex-col items-center justify-center gap-1 py-1.5 px-1 rounded-2xl transition-all min-h-[50px] active:scale-95",
                       isActive
-                        ? "bg-sky-500/15 dark:bg-sky-500/20 text-sky-700 dark:text-sky-300 font-bold border border-sky-400/30 shadow-xs"
+                        ? cn("backdrop-blur-md shadow-xs font-bold border", theme.activeBg, theme.activeText, theme.activeBorder)
                         : "text-slate-600 dark:text-slate-400 hover:text-foreground"
                     )}
                   >
                     <link.icon className={cn(
                       "h-5 w-5 transition-transform",
-                      isActive && "scale-110 text-sky-600 dark:text-sky-400"
+                      isActive ? cn("scale-110", theme.iconColorInactive) : "text-slate-500"
                     )} />
                     <span className="text-[10px] font-medium truncate max-w-full">
                       {link.label}
                     </span>
                     {isActive && (
-                      <div className="w-1.5 h-1.5 rounded-full bg-sky-500 shadow-[0_0_8px_#0ea5e9]" />
+                      <div className={cn("w-1.5 h-1.5 rounded-full", theme.activeIndicator)} />
                     )}
                   </Link>
                 );
@@ -351,25 +736,26 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
                 className={cn(
                   "flex flex-col items-center justify-center gap-1 py-1.5 px-1 rounded-2xl transition-all min-h-[50px] active:scale-95",
                   location.pathname === "/dashboard/students"
-                    ? "bg-sky-500/15 dark:bg-sky-500/20 text-sky-700 dark:text-sky-300 font-bold border border-sky-400/30 shadow-xs"
+                    ? "bg-blue-500/20 text-blue-300 font-bold border border-blue-400/40 shadow-xs"
                     : "text-slate-600 dark:text-slate-400 hover:text-foreground"
                 )}
               >
                 <Users className={cn(
                   "h-5 w-5 transition-transform",
-                  location.pathname === "/dashboard/students" && "scale-110 text-sky-600 dark:text-sky-400"
+                  location.pathname === "/dashboard/students" && "scale-110 text-blue-400"
                 )} />
                 <span className="text-[10px] font-medium truncate max-w-full">
                   {t("dashboard.menu.students")}
                 </span>
                 {location.pathname === "/dashboard/students" && (
-                  <div className="w-1.5 h-1.5 rounded-full bg-sky-500 shadow-[0_0_8px_#0ea5e9]" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-blue-400 shadow-[0_0_8px_#60a5fa]" />
                 )}
               </Link>
             </>
           ) : (
             links.slice(0, 5).map((link) => {
-              const isActive = location.pathname === link.href;
+              const isActive = location.pathname === link.href || (link.href !== "/dashboard" && location.pathname.startsWith(link.href));
+              const theme = CATEGORY_THEMES[link.href] || CATEGORY_THEMES["/dashboard"];
               return (
                 <Link
                   key={link.href}
@@ -377,19 +763,19 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
                   className={cn(
                     "flex flex-col items-center justify-center gap-1 py-1.5 px-0.5 rounded-2xl transition-all min-h-[50px] active:scale-95",
                     isActive
-                      ? "bg-sky-500/15 dark:bg-sky-500/20 text-sky-700 dark:text-sky-300 font-bold border border-sky-400/30 shadow-xs"
+                      ? cn("backdrop-blur-md shadow-xs font-bold border", theme.activeBg, theme.activeText, theme.activeBorder)
                       : "text-slate-600 dark:text-slate-400 hover:text-foreground"
                   )}
                 >
                   <link.icon className={cn(
                     "h-5 w-5 transition-transform",
-                    isActive && "scale-110 text-sky-600 dark:text-sky-400"
+                    isActive ? cn("scale-110", theme.iconColorInactive) : "text-slate-500"
                   )} />
                   <span className="text-[10px] font-medium truncate max-w-full">
                     {link.label}
                   </span>
                   {isActive && (
-                    <div className="w-1.5 h-1.5 rounded-full bg-sky-500 shadow-[0_0_8px_#0ea5e9]" />
+                    <div className={cn("w-1.5 h-1.5 rounded-full", theme.activeIndicator)} />
                   )}
                 </Link>
               );
@@ -406,10 +792,10 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
           </SheetHeader>
           
           {/* User Info Section */}
-          <div className="relative bg-gradient-to-r from-slate-950 via-blue-950 to-slate-900 -mx-6 -mt-6 px-6 py-6 rounded-t-3xl mb-4 overflow-hidden">
+          <div className={cn("relative -mx-6 -mt-6 px-6 py-6 rounded-t-3xl mb-4 overflow-hidden", activeCategoryTheme.sidebarGradient)}>
             <div className="flex items-center gap-4">
               <Avatar className="h-16 w-16 ring-4 ring-white/20 shadow-lg">
-                <AvatarFallback className="bg-sky-600/30 backdrop-blur-sm text-white text-xl font-bold">
+                <AvatarFallback className={cn("backdrop-blur-sm text-white text-xl font-bold", activeCategoryTheme.iconBgActive)}>
                   {initials}
                 </AvatarFallback>
               </Avatar>

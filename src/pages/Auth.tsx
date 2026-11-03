@@ -24,42 +24,34 @@ const Auth = () => {
 
         {/* Content Showcase */}
         <div className="relative z-10 flex flex-col justify-between p-8 xl:p-14 text-slate-900 dark:text-white h-full w-full">
-          {/* Top Brand & Tagline */}
-          <div className="space-y-4 animate-slide-up">
-            <div className="flex items-center gap-3">
-              <EthioSmartLogo variant="full" size="md" textColor="auto" />
-              <span className="hidden xl:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-sky-300 border border-blue-200 dark:border-blue-800">
-                <Sparkles className="h-3 w-3 text-blue-600 dark:text-sky-400" />
-                <span>Learn • Practice • Grow</span>
-              </span>
+          {/* Top Brand & Header - Clean & Minimal */}
+          <div className="space-y-3 animate-slide-up">
+            <div className="flex items-center gap-2.5">
+              <EthioSmartLogo variant="full" size="md" textColor="auto" showTagline={true} />
             </div>
             
-            <h1 className="text-3xl xl:text-4xl font-display font-extrabold leading-tight tracking-tight text-slate-900 dark:text-white max-w-lg">
-              Empowering Students Across Ethiopia to{" "}
+            <h1 className="text-2xl xl:text-3xl font-display font-extrabold leading-tight tracking-tight text-slate-900 dark:text-white">
+              Smart Learning for{" "}
               <span className="bg-gradient-to-r from-blue-600 via-sky-600 to-cyan-500 dark:from-sky-400 dark:via-cyan-300 dark:to-blue-400 bg-clip-text text-transparent">
-                Excel & Achieve
+                Every Student
               </span>
             </h1>
-            
-            <p className="text-xs xl:text-sm text-slate-600 dark:text-slate-300 leading-relaxed max-w-md font-medium">
-              Ethiopia&apos;s complete smart education ecosystem: official curriculum textbooks, high-yield revision notes, 24/7 AI tutoring, and timed national practice exams.
-            </p>
           </div>
 
-          {/* Centerpiece: Beautiful Frosted Glass Showcase Card */}
+          {/* Centerpiece: Clean, Concise Feature Showcase (Minimal Text) */}
           <div className="my-auto py-2 animate-scale-in">
-            <div className="relative rounded-3xl p-5 xl:p-6 bg-white/85 dark:bg-slate-900/80 backdrop-blur-xl border border-white/80 dark:border-slate-800 shadow-xl shadow-blue-500/5 space-y-3.5 max-w-lg">
-              {/* Feature 1: Digital Curriculum Library */}
-              <div className="flex items-start gap-3.5 group">
-                <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
-                  <BookOpen className="h-5 w-5" />
+            <div className="relative rounded-3xl p-4 xl:p-5 bg-white/85 dark:bg-slate-900/80 backdrop-blur-xl border border-white/80 dark:border-slate-800 shadow-xl shadow-blue-500/5 space-y-3 max-w-md">
+              {/* Feature 1: Digital Textbooks */}
+              <div className="flex items-center gap-3 group">
+                <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
+                  <BookOpen className="h-4.5 w-4.5" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <h4 className="text-xs xl:text-sm font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-sky-400 transition-colors">
-                    Official Curriculum Textbooks & Notes
+                    Curriculum Textbooks & Notes
                   </h4>
-                  <p className="text-[11px] xl:text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed font-normal">
-                    Complete textbooks with chapter study summaries, readable 100% offline anywhere.
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                    Grades 7–12 • 100% Offline
                   </p>
                 </div>
               </div>
@@ -68,21 +60,21 @@ const Auth = () => {
               <div className="border-t border-slate-200/80 dark:border-slate-800/80" />
 
               {/* Feature 2: AI Study Assistant */}
-              <div className="flex items-start gap-3.5 group">
-                <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-purple-500/20 group-hover:scale-105 transition-transform">
-                  <Brain className="h-5 w-5" />
+              <div className="flex items-center gap-3 group">
+                <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-purple-500/20 group-hover:scale-105 transition-transform">
+                  <Brain className="h-4.5 w-4.5" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     <h4 className="text-xs xl:text-sm font-bold text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
-                      24/7 AI Study Assistant & Tutor
+                      24/7 AI Study Assistant
                     </h4>
-                    <span className="px-1.5 py-0.2 text-[9px] font-bold rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-                      Smart AI
+                    <span className="px-1.5 py-0.2 text-[9px] font-bold rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300">
+                      AI
                     </span>
                   </div>
-                  <p className="text-[11px] xl:text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed font-normal">
-                    Get instant step-by-step problem breakdowns and generate practice MCQs on demand.
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                    Instant step-by-step explanations
                   </p>
                 </div>
               </div>
@@ -91,35 +83,35 @@ const Auth = () => {
               <div className="border-t border-slate-200/80 dark:border-slate-800/80" />
 
               {/* Feature 3: Timed Practice & National Exams */}
-              <div className="flex items-start gap-3.5 group">
-                <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-emerald-500/20 group-hover:scale-105 transition-transform">
-                  <ClipboardList className="h-5 w-5" />
+              <div className="flex items-center gap-3 group">
+                <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-emerald-500/20 group-hover:scale-105 transition-transform">
+                  <ClipboardList className="h-4.5 w-4.5" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <h4 className="text-xs xl:text-sm font-bold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                    Timed Examinations & Explanations
+                    National Practice Exams
                   </h4>
-                  <p className="text-[11px] xl:text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed font-normal">
-                    Practice with verified question banks, instant answers, and department analytics.
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                    Timed mock tests & analytics
                   </p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Bottom Trust Indicators in Frosted Badges */}
+          {/* Bottom Trust Indicators - Concise */}
           <div className="flex flex-wrap items-center gap-2 pt-1 animate-slide-up">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 text-[11px] font-semibold text-slate-700 dark:text-slate-300 shadow-xs">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>100% Offline Access</span>
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 text-[10px] xl:text-[11px] font-semibold text-slate-700 dark:text-slate-300 shadow-xs">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              <span>Offline Ready</span>
             </div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 text-[11px] font-semibold text-slate-700 dark:text-slate-300 shadow-xs">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 text-[10px] xl:text-[11px] font-semibold text-slate-700 dark:text-slate-300 shadow-xs">
               <CheckCircle2 className="h-3 w-3 text-blue-600 dark:text-sky-400" />
               <span>Curriculum Aligned</span>
             </div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 text-[11px] font-semibold text-slate-700 dark:text-slate-300 shadow-xs">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/70 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 text-[10px] xl:text-[11px] font-semibold text-slate-700 dark:text-slate-300 shadow-xs">
               <Shield className="h-3 w-3 text-purple-600 dark:text-purple-400" />
-              <span>Cross-Device Sync</span>
+              <span>Cloud Sync</span>
             </div>
           </div>
         </div>
@@ -157,14 +149,8 @@ const Auth = () => {
         </div>
 
         {/* EthioSmart Tagline & Footer (Fixed Bottom within Viewport) */}
-        <footer className="relative z-10 text-center py-1.5 px-4 shrink-0 space-y-0.5">
-          <p className="text-[11px] text-slate-500 dark:text-slate-400">
-            By continuing, you agree to our{" "}
-            <Link to="/about" className="text-blue-600 dark:text-sky-400 font-semibold hover:underline">
-              Terms & Guidelines
-            </Link>
-          </p>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+        <footer className="relative z-10 text-center py-1 px-4 shrink-0">
+          <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
             EthioSmart • Learn • Practice • Grow
           </p>
         </footer>

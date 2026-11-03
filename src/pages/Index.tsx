@@ -207,14 +207,14 @@ const Index = () => {
         {/* Dynamic Liquid Glass Canvas with Interactive Cursor Spotlight & Ripples */}
         <LiquidBackdrop showDroplets={true} showSplash={true} showRipples={true} interactive={true} variant="hero" />
 
-        {/* 1. Sleek Navigation Bar */}
+        {/* 1. Sleek Navigation Bar with Prominent Brand Logo */}
         <header className="relative z-20 px-4 py-2.5 sm:px-8 sm:py-3.5 flex items-center justify-between shrink-0">
           {/* Logo */}
           <div
             className="cursor-pointer transition-transform hover:scale-105 active:scale-95"
             onClick={() => navigate("/")}
           >
-            <EthioSmartLogo variant="compact" size="sm" textColor="auto" />
+            <EthioSmartLogo variant="full" size="md" textColor="auto" showTagline={true} />
           </div>
 
           {/* Navigation Actions */}
@@ -270,21 +270,31 @@ const Index = () => {
           </div>
         </header>
 
-        {/* 2. Hero Center Card - Perfectly Proportionate to Fit Screen */}
+        {/* 2. Hero Center Card - Logo as the Primary Visual Anchor */}
         <div className="flex-1 flex items-center justify-center px-3 sm:px-6 py-1 sm:py-2 relative z-10 min-h-0">
           <LiquidTiltCard
             maxTilt={3}
             glareOpacity={0.15}
-            className="max-w-2xl lg:max-w-3xl w-full mx-auto text-center space-y-2.5 sm:space-y-4 p-4 sm:p-7 md:p-8 liquid-glass-card rounded-3xl sm:rounded-[36px] shadow-xl relative overflow-hidden"
+            className="max-w-2xl lg:max-w-3xl w-full mx-auto text-center space-y-2.5 sm:space-y-3.5 p-4 sm:p-6 md:p-8 liquid-glass-card rounded-3xl sm:rounded-[36px] shadow-xl relative overflow-hidden"
           >
-            {/* Floating EthioSmart Liquid Emblem Squircle */}
-            <div className="flex justify-center -mt-1 sm:-mt-2">
-              <div className="liquid-glass-squircle w-12 h-12 sm:w-14 sm:h-14 p-1.5 flex items-center justify-center shadow-md shadow-blue-500/10 group hover:scale-105 transition-transform duration-300">
-                <img
-                  src="/EthioSmart-192.png"
-                  alt="EthioSmart"
-                  className="w-full h-full object-contain drop-shadow-sm rounded-xl"
-                />
+            {/* Primary Visual Logo Showcase - Clearly Visible & Proud */}
+            <div className="flex justify-center -mt-1 sm:-mt-2 mb-1 sm:mb-2">
+              <div className="relative group">
+                {/* Luminous blue/cyan aura behind the primary logo */}
+                <div className="absolute -inset-2.5 bg-gradient-to-r from-blue-500/25 via-sky-400/20 to-cyan-400/25 rounded-[32px] blur-xl opacity-80 group-hover:opacity-100 transition-opacity duration-500" />
+                
+                <div className="relative liquid-glass-squircle w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-[24px] sm:rounded-[28px] p-2 sm:p-2.5 flex items-center justify-center shadow-xl shadow-blue-500/15 group-hover:scale-105 transition-all duration-300">
+                  <img
+                    src="/EthioSmart.png"
+                    alt="EthioSmart"
+                    className="w-full h-full object-contain drop-shadow-md rounded-xl sm:rounded-2xl"
+                    loading="eager"
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      if (target.src !== "/EthioSmart-512.png") target.src = "/EthioSmart-512.png";
+                    }}
+                  />
+                </div>
               </div>
             </div>
 
@@ -300,7 +310,7 @@ const Index = () => {
             </div>
 
             {/* Main Heading */}
-            <h1 className="text-2xl sm:text-4xl md:text-5xl font-display font-extrabold leading-tight tracking-tight text-slate-900 dark:text-white">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-display font-extrabold leading-tight tracking-tight text-slate-900 dark:text-white">
               <span>{t("hero.titlePre")}</span>{" "}
               <span className="bg-gradient-to-r from-blue-600 via-sky-600 to-cyan-500 dark:from-sky-400 dark:via-cyan-300 dark:to-blue-400 bg-clip-text text-transparent">
                 {t("hero.titleHighlight")}

@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 
 export interface EthioSmartLogoProps {
   variant?: "full" | "compact" | "icon";
-  size?: "xs" | "sm" | "md" | "lg" | "xl";
+  size?: "xs" | "sm" | "md" | "lg" | "xl" | "2xl";
   textColor?: "light" | "dark" | "auto";
   showTagline?: boolean;
   className?: string;
@@ -40,6 +40,12 @@ const sizeConfig = {
     img: "h-20 w-20",
     title: "text-3xl sm:text-4xl",
     tagline: "text-sm",
+  },
+  "2xl": {
+    badge: "h-24 w-24 sm:h-28 sm:w-28 rounded-3xl",
+    img: "h-24 w-24 sm:h-28 sm:w-28",
+    title: "text-4xl sm:text-5xl",
+    tagline: "text-sm sm:text-base tracking-wider",
   },
 };
 
