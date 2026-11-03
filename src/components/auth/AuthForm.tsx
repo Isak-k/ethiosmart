@@ -19,15 +19,15 @@ import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { signInWithGoogle, completeGoogleSignUpProfile } from "@/lib/firebase-auth";
 import { getFriendlyAuthErrorMessage } from "@/lib/firebase-utils";
-import { LiquidTiltCard } from "@/components/ui/LiquidTiltCard";
 
 export function AuthForm() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
-  const { refreshProfile } = useAuth();
+  const { refreshProfile, requireStudentLogin, continueAsGuest } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [guestLoading, setGuestLoading] = useState(false);
   const [tab, setTab] = useState("login");
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -283,6 +283,28 @@ export function AuthForm() {
     }
   };
 
+  const handleGuestEntry = async () => {
+    setGuestLoading(true);
+    try {
+      if (continueAsGuest) {
+        await continueAsGuest();
+      }
+      toast({
+        title: "Welcome, Guest Student!",
+        description: "Entering learning dashboard. No account required.",
+      });
+      navigate("/dashboard/exams");
+    } catch (error: any) {
+      toast({
+        title: "Guest Access Error",
+        description: error?.message || "Could not start guest session.",
+        variant: "destructive",
+      });
+    } finally {
+      setGuestLoading(false);
+    }
+  };
+
   if (showForgotPassword) {
     return (
       <Card className="w-full max-w-md card-elevated animate-scale-in">
@@ -307,7 +329,7 @@ export function AuthForm() {
   }
 
   return (
-    <LiquidTiltCard maxTilt={3} glareOpacity={0.15} className="w-full liquid-glass-card rounded-3xl sm:rounded-[36px] overflow-hidden relative shadow-xl">
+    <div className="w-full relative">
       <Tabs value={tab} onValueChange={setTab}>
         {/* Liquid Glass Header with Prominent High-Visibility Brand Emblem */}
         <div className="pt-3.5 pb-1 px-4 sm:px-6 text-center relative">
@@ -518,6 +540,46 @@ export function AuthForm() {
                 </svg>
                 <span>Continue with Google</span>
               </button>
+
+              {/* 3. Continue as Guest - Dynamically displayed ONLY when allowed in Admin */}
+              {!requireStudentLogin && (
+                <div className="pt-2 animate-fade-in">
+                  <div className="relative my-2 text-center">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-dashed border-emerald-300/80 dark:border-emerald-800/80" />
+                    </div>
+                    <div className="relative flex justify-center">
+                      <span className="px-2.5 bg-white dark:bg-slate-900 rounded-full text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1 shadow-xs border border-emerald-200/50 dark:border-emerald-800/50">
+                        <Sparkles className="h-2.5 w-2.5 text-amber-500" />
+                        Guest Access Allowed
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleGuestEntry}
+                    disabled={loading || guestLoading}
+                    className="w-full h-10 rounded-full border border-emerald-500/50 hover:border-emerald-500 bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/10 hover:from-emerald-500/20 hover:to-teal-500/20 text-emerald-700 dark:text-emerald-300 shadow-sm flex items-center justify-center gap-2 text-xs sm:text-sm font-bold transition-all active:scale-[0.98] group cursor-pointer"
+                    title="Enter platform as guest without logging in"
+                  >
+                    {guestLoading ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-600 dark:text-emerald-400" />
+                        <span>Entering as Guest...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="h-5 w-5 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
+                          <User className="h-3 w-3" />
+                        </span>
+                        <span>Continue as Guest</span>
+                        <ArrowRight className="h-3.5 w-3.5 ml-0.5 text-emerald-600 dark:text-emerald-400 group-hover:translate-x-1 transition-transform" />
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
             </form>
           </TabsContent>
 
@@ -717,10 +779,50 @@ export function AuthForm() {
                 </svg>
                 <span>Continue with Google</span>
               </button>
+
+              {/* 3. Continue as Guest - Dynamically displayed ONLY when allowed in Admin */}
+              {!requireStudentLogin && (
+                <div className="pt-2 animate-fade-in">
+                  <div className="relative my-2 text-center">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-dashed border-emerald-300/80 dark:border-emerald-800/80" />
+                    </div>
+                    <div className="relative flex justify-center">
+                      <span className="px-2.5 bg-white dark:bg-slate-900 rounded-full text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1 shadow-xs border border-emerald-200/50 dark:border-emerald-800/50">
+                        <Sparkles className="h-2.5 w-2.5 text-amber-500" />
+                        Guest Access Allowed
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleGuestEntry}
+                    disabled={loading || guestLoading}
+                    className="w-full h-10 rounded-full border border-emerald-500/50 hover:border-emerald-500 bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/10 hover:from-emerald-500/20 hover:to-teal-500/20 text-emerald-700 dark:text-emerald-300 shadow-sm flex items-center justify-center gap-2 text-xs sm:text-sm font-bold transition-all active:scale-[0.98] group cursor-pointer"
+                    title="Enter platform as guest without logging in"
+                  >
+                    {guestLoading ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-600 dark:text-emerald-400" />
+                        <span>Entering as Guest...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="h-5 w-5 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform">
+                          <User className="h-3 w-3" />
+                        </span>
+                        <span>Continue as Guest</span>
+                        <ArrowRight className="h-3.5 w-3.5 ml-0.5 text-emerald-600 dark:text-emerald-400 group-hover:translate-x-1 transition-transform" />
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
             </form>
           </TabsContent>
         </div>
       </Tabs>
-    </LiquidTiltCard>
+    </div>
   );
 }

@@ -1,5 +1,5 @@
 import { AuthForm } from "@/components/auth/AuthForm";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Sparkles, BookOpen, Brain, ClipboardList, Shield, Award, CheckCircle2 } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { LanguageToggle } from "@/components/ui/language-toggle";
@@ -7,9 +7,12 @@ import { useTranslation } from "react-i18next";
 import { EthioSmartLogo } from "@/components/ui/EthioSmartLogo";
 import { EthioAccentBar } from "@/components/ui/EthioAccentBar";
 import { LiquidBackdrop } from "@/components/ui/LiquidBackdrop";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Auth = () => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const { requireStudentLogin, continueAsGuest } = useAuth();
 
   return (
     <div className="h-[100dvh] max-h-[100dvh] flex flex-col lg:flex-row bg-background relative overflow-hidden">
@@ -24,13 +27,14 @@ const Auth = () => {
 
         {/* Content Showcase */}
         <div className="relative z-10 flex flex-col justify-between p-8 xl:p-14 text-slate-900 dark:text-white h-full w-full">
-          {/* Top Brand & Header - Clean & Minimal */}
-          <div className="space-y-3 animate-slide-up">
-            <div className="flex items-center gap-2.5">
-              <EthioSmartLogo variant="full" size="md" textColor="auto" showTagline={true} />
+          {/* Top Brand & Header - Large & Prominent EthioSmart Logo */}
+          <div className="space-y-4 animate-slide-up">
+            <div className="relative group inline-block">
+              <div className="absolute -inset-3 bg-gradient-to-r from-blue-500/25 via-sky-400/20 to-cyan-400/25 rounded-3xl blur-xl opacity-75 group-hover:opacity-100 transition-opacity" />
+              <EthioSmartLogo variant="full" size="xl" textColor="auto" showTagline={true} className="relative z-10" />
             </div>
             
-            <h1 className="text-2xl xl:text-3xl font-display font-extrabold leading-tight tracking-tight text-slate-900 dark:text-white">
+            <h1 className="text-xl xl:text-2xl font-display font-extrabold leading-tight tracking-tight text-slate-900 dark:text-white">
               Smart Learning for{" "}
               <span className="bg-gradient-to-r from-blue-600 via-sky-600 to-cyan-500 dark:from-sky-400 dark:via-cyan-300 dark:to-blue-400 bg-clip-text text-transparent">
                 Every Student
@@ -118,39 +122,58 @@ const Auth = () => {
         <EthioAccentBar className="absolute bottom-0 left-0 right-0" size="xs" />
       </div>
 
-      {/* Right Side - Liquid Glass Auth Viewport (Guaranteed to Fit Screen with Zero Cut-off) */}
-      <div className="flex-1 flex flex-col h-full max-h-[100dvh] relative overflow-hidden justify-between">
-        {/* Full Liquid Glass Backdrop with fluid ripples and subtle droplets */}
-        <LiquidBackdrop showDroplets={true} showSplash={true} showRipples={true} interactive={true} />
+      {/* Right Side - Full-Height Edge-to-Edge Login Surface (Touches upper and lower height) */}
+      <div className="flex-1 flex flex-col h-full max-h-[100dvh] relative overflow-hidden justify-between bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border-l border-slate-200/80 dark:border-slate-800/80 shadow-2xl">
+        {/* Soft liquid caustic orbs for refraction */}
+        <div className="absolute top-0 right-0 w-80 h-80 bg-blue-400/10 dark:bg-sky-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-80 h-80 bg-cyan-400/10 dark:bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Top Header Bar */}
-        <header className="relative z-10 px-4 py-2 sm:px-6 sm:py-2.5 flex justify-between items-center shrink-0">
+        {/* Top Header Bar - Touches upper screen edge */}
+        <header className="relative z-10 px-5 py-3 sm:px-8 flex justify-between items-center shrink-0 border-b border-slate-200/60 dark:border-slate-800/60 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md">
           <Link
             to="/"
-            className="liquid-glass-button-secondary inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-slate-800 dark:text-slate-200 hover:text-foreground transition-all group"
+            className="liquid-glass-button-secondary inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-800 dark:text-slate-200 hover:text-foreground transition-all group"
           >
             <ArrowLeft className="h-3.5 w-3.5 group-hover:-translate-x-1 transition-transform" />
             {t("common.back")}
           </Link>
-          <div className="flex items-center gap-2 [&_button]:liquid-glass-squircle [&_button]:rounded-xl [&_button]:h-7.5 [&_button]:w-7.5">
+          <div className="flex items-center gap-2 [&_button]:liquid-glass-squircle [&_button]:rounded-xl [&_button]:h-8 [&_button]:w-8">
+            {!requireStudentLogin && (
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    if (continueAsGuest) await continueAsGuest();
+                    navigate("/dashboard/exams");
+                  } catch {
+                    navigate("/dashboard/exams");
+                  }
+                }}
+                className="!h-auto !w-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 transition-all shadow-xs mr-1 active:scale-95 cursor-pointer"
+                title="Enter directly as guest without signing in"
+              >
+                <Sparkles className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                <span className="hidden sm:inline">Guest Access</span>
+                <span className="sm:hidden">Guest</span>
+              </button>
+            )}
             <LanguageToggle />
             <ThemeToggle />
           </div>
         </header>
 
-        {/* Form Container - Centered and Perfectly Sized with Smooth Overflow Handling */}
-        <div className="flex-1 flex items-center justify-center px-3 py-1 sm:px-6 relative z-10 min-h-0 overflow-y-auto scrollbar-none">
-          <div className="w-full max-w-sm sm:max-w-md my-auto">
-            {/* Auth Form with Liquid Glass styling */}
+        {/* Form Container - Perfectly Centered, Full Height Reach */}
+        <div className="flex-1 flex items-center justify-center px-4 py-2 sm:px-8 relative z-10 min-h-0 overflow-y-auto scrollbar-none">
+          <div className="w-full max-w-sm sm:max-w-md my-auto py-2">
             <div className="animate-scale-in">
               <AuthForm />
             </div>
           </div>
         </div>
 
-        {/* EthioSmart Tagline & Footer (Fixed Bottom within Viewport) */}
-        <footer className="relative z-10 text-center py-1 px-4 shrink-0">
-          <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+        {/* EthioSmart Footer - Touches lower screen edge */}
+        <footer className="relative z-10 text-center py-2.5 px-4 shrink-0 border-t border-slate-200/60 dark:border-slate-800/60 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md">
+          <p className="text-[11px] text-slate-400 dark:text-slate-500 font-medium tracking-wide">
             EthioSmart • Learn • Practice • Grow
           </p>
         </footer>

@@ -164,10 +164,10 @@ export function AdminSystemSettings() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
-            <Label htmlFor="require-login" className="flex-1">
+            <Label htmlFor="require-login" className="flex-1 cursor-pointer">
               <span className="font-medium">Require Student Login</span>
               <p className="text-sm text-gray-600">
-                When enabled, students must sign in. When disabled, students can access exams and study notes directly as guests without logging in.
+                When enabled, students must sign in (guest access buttons are hidden). When disabled, a &quot;Continue as Guest&quot; button appears across the platform so students can access exams and study materials directly without signing in.
               </p>
             </Label>
             <Switch

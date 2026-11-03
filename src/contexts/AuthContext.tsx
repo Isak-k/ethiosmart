@@ -60,6 +60,7 @@ interface AuthContextType {
   isGuest: boolean;
   requireStudentLogin: boolean;
   updateGuestProfile: (data: { full_name: string; departmentId: string; departmentName?: string }) => void;
+  continueAsGuest: () => Promise<void>;
 }
 
 // Global flag to track if auth has been initialized across component remounts
@@ -75,6 +76,7 @@ const AuthContext = createContext<AuthContextType>({
   isGuest: false,
   requireStudentLogin: true,
   updateGuestProfile: () => {},
+  continueAsGuest: async () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -127,6 +129,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const updateGuestProfile = useCallback((data: { full_name: string; departmentId: string; departmentName?: string }) => {
     const saved = saveGuestProfile(data);
     applyGuestProfile(saved);
+  }, [applyGuestProfile]);
+
+  // Enter session as guest student (when allowed by administrator)
+  const continueAsGuest = useCallback(async () => {
+    const currentRequireLogin = getCachedRequireStudentLogin();
+    if (currentRequireLogin) {
+      throw new Error('Guest access is currently disabled by administrator.');
+    }
+
+    try {
+      if (auth.currentUser?.email !== GUEST_AUTH_EMAIL && !auth.currentUser?.isAnonymous) {
+        try {
+          await signInWithEmailAndPassword(auth, GUEST_AUTH_EMAIL, GUEST_AUTH_PASSWORD);
+        } catch (signInErr) {
+          try {
+            await createUserWithEmailAndPassword(auth, GUEST_AUTH_EMAIL, GUEST_AUTH_PASSWORD);
+          } catch (createErr) {
+            console.warn('Guest account fallback creation failed:', createErr);
+          }
+        }
+      }
+    } catch (authErr) {
+      console.warn('Firebase guest sign-in warning:', authErr);
+    }
+
+    const stored = getStoredGuestProfile();
+    if (stored) {
+      applyGuestProfile(stored);
+    }
   }, [applyGuestProfile]);
 
   const refreshProfile = useCallback(async () => {
@@ -381,6 +412,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isGuest,
     requireStudentLogin,
     updateGuestProfile,
+    continueAsGuest,
   }), [
     user, 
     session, 
@@ -392,7 +424,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refreshProfile,
     isGuest,
     requireStudentLogin,
-    updateGuestProfile
+    updateGuestProfile,
+    continueAsGuest,
   ]);
 
   return (

@@ -40,7 +40,7 @@ import { LiquidTiltCard } from "@/components/ui/LiquidTiltCard";
 
 const Index = () => {
   const navigate = useNavigate();
-  const { user, role, loading, isGuest, requireStudentLogin } = useAuth();
+  const { user, role, loading, isGuest, requireStudentLogin, continueAsGuest } = useAuth();
   const { t } = useTranslation();
   const { toast } = useToast();
 
@@ -240,26 +240,51 @@ const Index = () => {
               <ThemeToggle />
             </div>
 
-            {requireStudentLogin ? (
+            {user && !isGuest ? (
               <button
                 type="button"
-                className="hidden sm:inline-flex liquid-glass-button-secondary rounded-full h-9 px-4 text-xs sm:text-sm font-semibold transition-all hover:scale-105 active:scale-95"
+                className="liquid-glass-button rounded-full h-8 sm:h-9 px-3 sm:px-4 text-xs sm:text-sm font-semibold transition-all hover:scale-105 active:scale-95 shadow-sm"
+                onClick={() => navigate(role === "admin" ? "/dashboard" : "/dashboard/exams")}
+              >
+                Dashboard
+              </button>
+            ) : requireStudentLogin ? (
+              <button
+                type="button"
+                className="liquid-glass-button-secondary rounded-full h-8 sm:h-9 px-3 sm:px-4 text-xs sm:text-sm font-semibold transition-all hover:scale-105 active:scale-95"
                 onClick={() => navigate("/auth")}
               >
                 {t("common.signIn")}
               </button>
             ) : (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 <button
                   type="button"
-                  className="hidden sm:inline-flex liquid-glass-button rounded-full h-9 px-4 text-xs sm:text-sm font-semibold shadow-sm"
-                  onClick={() => navigate("/dashboard/exams")}
+                  className="liquid-glass-button rounded-full h-8 sm:h-9 px-3 sm:px-4 text-xs sm:text-sm font-bold shadow-sm flex items-center gap-1.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:opacity-95 text-white active:scale-95 transition-transform"
+                  onClick={async () => {
+                    try {
+                      if (continueAsGuest) await continueAsGuest();
+                      navigate("/dashboard/exams");
+                    } catch {
+                      navigate("/dashboard/exams");
+                    }
+                  }}
+                  title="Explore curriculum as a guest"
                 >
-                  Enter App
+                  <Sparkles className="h-3 w-3 text-amber-300 shrink-0" />
+                  <span>Continue as Guest</span>
                 </button>
                 <button
                   type="button"
-                  className="hidden sm:inline-flex text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 text-xs px-2"
+                  className="liquid-glass-button-secondary rounded-full h-8 sm:h-9 px-2.5 sm:px-3 text-xs sm:text-sm font-semibold transition-all hover:scale-105 active:scale-95"
+                  onClick={() => navigate("/auth")}
+                  title="Sign in to your account"
+                >
+                  {t("common.signIn")}
+                </button>
+                <button
+                  type="button"
+                  className="hidden md:inline-flex text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 text-xs px-1.5"
                   onClick={() => navigate("/admin/login")}
                   title="Staff sign in"
                 >
@@ -328,9 +353,18 @@ const Index = () => {
               <button
                 type="button"
                 className="liquid-glass-button h-10 sm:h-11 px-6 sm:px-8 text-xs sm:text-sm font-bold rounded-full flex items-center justify-center gap-2 shadow-md flex-1 sm:flex-initial"
-                onClick={() => navigate(requireStudentLogin ? "/auth" : "/dashboard/exams")}
+                onClick={async () => {
+                  if (requireStudentLogin) {
+                    navigate("/auth");
+                  } else {
+                    try {
+                      if (continueAsGuest) await continueAsGuest();
+                    } catch {}
+                    navigate("/dashboard/exams");
+                  }
+                }}
               >
-                <span>{requireStudentLogin ? t("common.getStarted") : "Start Learning"}</span>
+                <span>{requireStudentLogin ? t("common.getStarted") : "Continue as Guest"}</span>
                 <ArrowRight className="h-4 w-4 text-white" />
               </button>
 
@@ -425,9 +459,18 @@ const Index = () => {
               <button
                 type="button"
                 className="liquid-glass-button w-full sm:w-auto h-13 sm:h-14 px-9 text-base sm:text-lg font-bold rounded-full shadow-2xl flex items-center justify-center gap-2"
-                onClick={() => navigate(requireStudentLogin ? "/auth" : "/dashboard/exams")}
+                onClick={async () => {
+                  if (requireStudentLogin) {
+                    navigate("/auth");
+                  } else {
+                    try {
+                      if (continueAsGuest) await continueAsGuest();
+                    } catch {}
+                    navigate("/dashboard/exams");
+                  }
+                }}
               >
-                <span>{requireStudentLogin ? "Get Started Free" : "Start Learning"}</span>
+                <span>{requireStudentLogin ? "Get Started Free" : "Start Learning (Guest Access)"}</span>
                 <ArrowRight className="h-5 w-5" />
               </button>
             </div>
