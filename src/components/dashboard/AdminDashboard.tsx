@@ -3,12 +3,15 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getAdminDashboardData } from "@/lib/firebase-admin";
 import { StatCard } from "./StatCard";
 import { ExamCard } from "@/components/exam/ExamCard";
-import { FileText, Users, ClipboardCheck, TrendingUp, Plus, AlertCircle } from "lucide-react";
+import { FileText, Users, ClipboardCheck, TrendingUp, Plus, AlertCircle, Lock, Globe, Loader2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useSectionPermissions } from "@/hooks/useSectionPermissions";
+import { useToast } from "@/hooks/use-toast";
+import { setRequireStudentLogin } from "@/lib/system-settings";
 
 interface ExamWithStats {
   id: string;
@@ -30,8 +33,9 @@ interface DashboardStats {
 }
 
 export function AdminDashboard() {
-  const { profile } = useAuth();
+  const { profile, user, requireStudentLogin } = useAuth();
   const { t } = useTranslation();
+  const { toast } = useToast();
   const { canEdit } = useSectionPermissions();
   const [stats, setStats] = useState<DashboardStats>({
     totalExams: 0,
@@ -42,6 +46,29 @@ export function AdminDashboard() {
   const [recentExams, setRecentExams] = useState<ExamWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isTogglingLogin, setIsTogglingLogin] = useState(false);
+
+  const handleToggleStudentLogin = async () => {
+    setIsTogglingLogin(true);
+    const newRequirement = !requireStudentLogin;
+    try {
+      await setRequireStudentLogin(newRequirement, user?.uid || 'admin');
+      toast({
+        title: newRequirement ? "🔒 Login Enforced" : "🌐 Open Access Enabled",
+        description: newRequirement
+          ? "Students must now log in or sign up before accessing the app."
+          : "Students can now use the app directly without logging in (Guest Mode active).",
+      });
+    } catch (err: any) {
+      toast({
+        title: "Failed to update access mode",
+        description: err.message || "An error occurred while updating settings.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsTogglingLogin(false);
+    }
+  };
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -114,6 +141,86 @@ export function AdminDashboard() {
           <p className="text-muted-foreground mt-1">
             {t("dashboard.adminSubtitle")}
           </p>
+        </div>
+      </div>
+
+      {/* Student Access Mode Control Card */}
+      <div className={`p-4 sm:p-5 rounded-2xl sm:rounded-3xl border transition-all ${
+        requireStudentLogin 
+          ? "bg-card border-border/80 shadow-xs" 
+          : "bg-emerald-500/10 border-emerald-500/30 dark:bg-emerald-950/20 shadow-sm"
+      }`}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className={`h-11 w-11 rounded-2xl flex items-center justify-center shrink-0 ${
+              requireStudentLogin 
+                ? "bg-purple-500/10 text-purple-600 dark:text-purple-400" 
+                : "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+            }`}>
+              {requireStudentLogin ? <Lock className="h-5 w-5" /> : <Globe className="h-5 w-5" />}
+            </div>
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-display font-bold text-base text-foreground">
+                  Student Access Control
+                </h3>
+                <Badge
+                  variant="outline"
+                  className={
+                    requireStudentLogin
+                      ? "border-purple-500/40 text-purple-700 dark:text-purple-300 bg-purple-500/10 font-bold text-[11px]"
+                      : "border-emerald-500/40 text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 font-bold text-[11px]"
+                  }
+                >
+                  {requireStudentLogin ? "🔒 Login Required (Enforced)" : "🌐 Open Access (Login Hidden)"}
+                </Badge>
+              </div>
+              <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                {requireStudentLogin
+                  ? "Students must log in or register before accessing exams and study notes."
+                  : "Students can freely access exams and study notes without logging in. First-time students simply enter their name and department."}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
+            <div className="text-right hidden sm:block">
+              <span className="text-xs font-semibold text-foreground block">
+                {requireStudentLogin ? "Enforce Login" : "Guest Mode"}
+              </span>
+              <span className="text-[11px] text-muted-foreground block">
+                {requireStudentLogin ? "Click to open for all" : "Click to require login"}
+              </span>
+            </div>
+            <Button
+              variant={requireStudentLogin ? "outline" : "default"}
+              size="sm"
+              disabled={isTogglingLogin}
+              onClick={handleToggleStudentLogin}
+              className={`rounded-xl font-bold text-xs h-9 px-4 ${
+                !requireStudentLogin
+                  ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                  : "border-purple-500/30 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/30"
+              }`}
+            >
+              {isTogglingLogin ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                  Updating...
+                </>
+              ) : requireStudentLogin ? (
+                <>
+                  <Globe className="h-3.5 w-3.5 mr-1.5 text-emerald-600" />
+                  Make Open (Hide Login)
+                </>
+              ) : (
+                <>
+                  <Lock className="h-3.5 w-3.5 mr-1.5" />
+                  Require Student Login
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
 

@@ -33,7 +33,7 @@ import {
 
 const Index = () => {
   const navigate = useNavigate();
-  const { user, role, loading } = useAuth();
+  const { user, role, loading, isGuest, requireStudentLogin } = useAuth();
   const { t } = useTranslation();
   const { toast } = useToast();
 
@@ -54,10 +54,13 @@ const Index = () => {
   const [installModalOpen, setInstallModalOpen] = useState(false);
 
   useEffect(() => {
-    if (!loading && user && role) {
-      navigate(role === "admin" ? "/dashboard" : "/dashboard/exams");
+    if (!loading) {
+      // Only auto-redirect signed-in staff/admin to admin dashboard
+      if (user && !isGuest && role === "admin") {
+        navigate("/dashboard", { replace: true });
+      }
     }
-  }, [user, role, loading, navigate]);
+  }, [user, role, isGuest, loading, navigate]);
 
   useEffect(() => {
     const checkStandalone = () =>
@@ -242,13 +245,33 @@ const Index = () => {
                 <ThemeToggle />
               </div>
 
-              <Button
-                variant="ghost"
-                className="hidden sm:flex text-white bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 shadow-lg rounded-xl font-semibold"
-                onClick={() => navigate("/auth")}
-              >
-                {t("common.signIn")}
-              </Button>
+              {requireStudentLogin ? (
+                <Button
+                  variant="ghost"
+                  className="hidden sm:flex text-white bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 shadow-lg rounded-xl font-semibold"
+                  onClick={() => navigate("/auth")}
+                >
+                  {t("common.signIn")}
+                </Button>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    variant="ghost"
+                    className="hidden sm:flex text-white bg-white/15 backdrop-blur-sm border border-white/30 hover:bg-white/25 shadow-lg rounded-xl font-semibold"
+                    onClick={() => navigate("/dashboard/exams")}
+                  >
+                    Enter App
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="hidden sm:flex text-white/80 hover:text-white text-xs px-2"
+                    onClick={() => navigate("/admin/login")}
+                    title="Staff sign in"
+                  >
+                    Admin
+                  </Button>
+                </div>
+              )}
             </div>
           </nav>
 
@@ -286,9 +309,9 @@ const Index = () => {
                 <Button
                   size="lg"
                   className="group h-13 sm:h-14 px-8 text-base sm:text-lg font-bold rounded-2xl bg-white hover:bg-gray-50 text-cyan-700 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-105 active:scale-95 flex-1"
-                  onClick={() => navigate("/auth")}
+                  onClick={() => navigate(requireStudentLogin ? "/auth" : "/dashboard/exams")}
                 >
-                  {t("common.getStarted")}
+                  {requireStudentLogin ? t("common.getStarted") : "Start Learning"}
                   <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                 </Button>
 
@@ -394,9 +417,9 @@ const Index = () => {
               <Button
                 size="lg"
                 className="w-full sm:w-auto h-13 sm:h-14 px-9 text-base sm:text-lg font-bold rounded-2xl bg-white text-cyan-700 hover:bg-cyan-50 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-105 active:scale-95"
-                onClick={() => navigate("/auth")}
+                onClick={() => navigate(requireStudentLogin ? "/auth" : "/dashboard/exams")}
               >
-                Get Started Free
+                {requireStudentLogin ? "Get Started Free" : "Start Learning"}
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
 

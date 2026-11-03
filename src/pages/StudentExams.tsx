@@ -7,6 +7,7 @@ import { getSubjects, getChapters } from "@/lib/subjects";
 import { getBooks } from "@/lib/books";
 import { calculateAllSubjectsProgress } from "@/lib/subject-progress";
 import { getSubjectCover } from "@/lib/subject-covers";
+import { getCachedDefaultDepartmentId } from "@/lib/system-settings";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ExamCard } from "@/components/exam/ExamCard";
 import { SubjectCard } from "@/components/subject/SubjectCard";
@@ -121,11 +122,14 @@ const StudentExams = () => {
     try {
       setLoading(true);
 
+      const defaultDeptId = getCachedDefaultDepartmentId();
+      const effectiveDeptId = defaultDeptId || profile?.departmentId;
+
       // 1. Fetch exams visible to user (admins/examiners see all including drafts; students see published)
       const isAdminUser = profile?.role === "admin" || (profile as any)?.isSuperAdmin || (profile as any)?.role === "examiner";
       const examsData = isAdminUser
-        ? await getAllExams().catch(() => getPublishedExams(profile?.departmentId))
-        : await getPublishedExams(profile?.departmentId);
+        ? await getAllExams().catch(() => getPublishedExams(effectiveDeptId))
+        : await getPublishedExams(effectiveDeptId);
       const attempts = await getStudentAttempts(user.uid).catch(() => []);
 
       // Count attempts per exam
@@ -169,19 +173,19 @@ const StudentExams = () => {
 
       // 2. Fetch subjects available to student's department and curriculum textbooks
       const [subjectsList, textbooks] = await Promise.all([
-        getSubjects(profile?.departmentId).catch(() => []),
+        getSubjects(effectiveDeptId).catch(() => []),
         getBooks({ resourceType: 'textbook' }, 'student').catch(() => []),
       ]);
 
       let activeSubjects = subjectsList.filter((s) => s.isActive !== false);
 
       // Strict department assignment rule: students only see subjects explicitly assigned to their department
-      if (profile?.departmentId && profile.departmentId !== 'all') {
+      if (effectiveDeptId && effectiveDeptId !== 'all') {
         activeSubjects = activeSubjects.filter((s) => {
           if (s.departmentIds && s.departmentIds.length > 0) {
-            return s.departmentIds.includes(profile.departmentId!) || s.departmentIds.includes('all');
+            return s.departmentIds.includes(effectiveDeptId) || s.departmentIds.includes('all');
           }
-          return (s as any).departmentId === profile.departmentId;
+          return (s as any).departmentId === effectiveDeptId;
         });
       }
 
@@ -209,7 +213,7 @@ const StudentExams = () => {
         const prog = await calculateAllSubjectsProgress(
           enrichedSubjects,
           user.uid,
-          profile?.departmentId,
+          effectiveDeptId,
           examsData,
           attempts
         ).catch(() => ({}));

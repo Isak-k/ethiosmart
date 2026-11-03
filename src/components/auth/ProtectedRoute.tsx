@@ -1,9 +1,11 @@
-import { ReactNode, useEffect } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/PermissionsContext";
+import { GuestSetupDialog } from "@/components/auth/GuestSetupDialog";
+import { getStoredGuestProfile, isGuestProfileComplete } from "@/lib/guest-session";
 import type { PermissionKey } from "@/types/permissions";
 
 interface ProtectedRouteProps {
@@ -15,29 +17,65 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, allowedRoles, requireAnyPermissions, requireAllPermissions, requireSuperAdmin }: ProtectedRouteProps) {
-  const { user, role, loading } = useAuth();
+  const { user, role, loading, isGuest, requireStudentLogin, updateGuestProfile } = useAuth();
   const { hasAnyPermission, hasAllPermissions, isSuperAdmin } = usePermissions();
   const navigate = useNavigate();
 
+  // Dialog state for guest students when profile is incomplete
+  const [showGuestDialog, setShowGuestDialog] = useState(false);
+
+  // Check if current route is student-accessible
+  const isStudentAccessible = !allowedRoles || allowedRoles.includes("student");
+
   useEffect(() => {
     if (!loading) {
+      // 1. Unauthenticated case
       if (!user) {
-        navigate("/auth", { replace: true });
+        // If Open Access (student login is not required) and this is a student route, allow guest
+        if (!requireStudentLogin && isStudentAccessible) {
+          const stored = getStoredGuestProfile();
+          if (!isGuestProfileComplete(stored)) {
+            setShowGuestDialog(true);
+          }
+          return;
+        }
+
+        // Otherwise redirect to auth (direct admins to admin login)
+        if (allowedRoles && !allowedRoles.includes("student")) {
+          navigate("/auth?role=admin", { replace: true });
+        } else {
+          navigate("/auth", { replace: true });
+        }
         return;
       }
 
+      // 2. Guest user trying to access admin route
+      if (isGuest && allowedRoles && !allowedRoles.includes("student")) {
+        navigate("/auth?role=admin", { replace: true });
+        return;
+      }
+
+      // 3. Check guest profile completeness on student routes
+      if (isGuest && isStudentAccessible) {
+        const stored = getStoredGuestProfile();
+        if (!isGuestProfileComplete(stored)) {
+          setShowGuestDialog(true);
+        }
+      }
+
+      // 4. Standard role verification for authenticated users
       if (allowedRoles && role && !allowedRoles.includes(role)) {
         navigate("/dashboard", { replace: true });
         return;
       }
 
-      // Super admin gate
+      // 5. Super admin gate
       if (requireSuperAdmin && !isSuperAdmin) {
         navigate("/dashboard", { replace: true });
         return;
       }
 
-      // Permission gates (admins only unless super admin)
+      // 6. Permission gates (admins only unless super admin)
       if ((requireAnyPermissions && requireAnyPermissions.length > 0) || (requireAllPermissions && requireAllPermissions.length > 0)) {
         // Students never pass permission checks
         if (role !== "admin") {
@@ -57,7 +95,22 @@ export function ProtectedRoute({ children, allowedRoles, requireAnyPermissions, 
         }
       }
     }
-  }, [user, role, loading, allowedRoles, requireAnyPermissions, requireAllPermissions, requireSuperAdmin, navigate, hasAnyPermission, hasAllPermissions, isSuperAdmin]);
+  }, [
+    user,
+    role,
+    loading,
+    isGuest,
+    requireStudentLogin,
+    isStudentAccessible,
+    allowedRoles,
+    requireAnyPermissions,
+    requireAllPermissions,
+    requireSuperAdmin,
+    navigate,
+    hasAnyPermission,
+    hasAllPermissions,
+    isSuperAdmin
+  ]);
 
   if (loading) {
     return (
@@ -70,7 +123,8 @@ export function ProtectedRoute({ children, allowedRoles, requireAnyPermissions, 
     );
   }
 
-  if (!user) {
+  // If user is absent, only allow if student login is not required and route is student-accessible
+  if (!user && (requireStudentLogin || !isStudentAccessible)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <div className="flex flex-col items-center gap-3">
@@ -92,7 +146,7 @@ export function ProtectedRoute({ children, allowedRoles, requireAnyPermissions, 
           <p className="text-sm text-muted-foreground leading-relaxed">
             Your current account role does not have permission to access this page.
           </p>
-          <Button onClick={() => navigate("/dashboard")} className="rounded-xl">
+          <Button onClick={() => navigate(role === "admin" ? "/dashboard" : "/dashboard/exams")} className="rounded-xl">
             Go to Dashboard
           </Button>
         </div>
@@ -149,5 +203,23 @@ export function ProtectedRoute({ children, allowedRoles, requireAnyPermissions, 
     }
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      {/* Guest setup prompt if in open access mode and guest has not selected name/department */}
+      <GuestSetupDialog
+        open={showGuestDialog}
+        onOpenChange={setShowGuestDialog}
+        onCompleted={(profile) => {
+          updateGuestProfile({
+            full_name: profile.full_name,
+            departmentId: profile.departmentId,
+            departmentName: profile.departmentName,
+          });
+          setShowGuestDialog(false);
+        }}
+        allowCloseWithoutSave={false}
+      />
+    </>
+  );
 }

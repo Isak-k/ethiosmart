@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getPublishedExams } from "@/lib/firebase-exams";
 import { getStudentAttempts } from "@/lib/firebase-attempts";
+import { getCachedDefaultDepartmentId } from "@/lib/system-settings";
 import { SimpleLeaderboard } from "@/components/SimpleLeaderboard";
 import { StatCard } from "./StatCard";
 import { ExamCard } from "@/components/exam/ExamCard";
@@ -45,8 +46,11 @@ export function StudentDashboard() {
       if (!user) return;
 
       try {
+        const defaultDeptId = getCachedDefaultDepartmentId();
+        const effectiveDeptId = defaultDeptId || profile?.departmentId;
+
         // Fetch published exams with department filter
-        const examsData = await getPublishedExams(profile?.departmentId);
+        const examsData = await getPublishedExams(effectiveDeptId);
         
         // Fetch user's attempts
         const attempts = await getStudentAttempts(user.uid);
@@ -151,9 +155,9 @@ export function StudentDashboard() {
       </div>
 
       {/* Leaderboard Section */}
-      {profile?.departmentId && (
+      {(getCachedDefaultDepartmentId() || profile?.departmentId) && (
         <div className="w-full">
-          <SimpleLeaderboard departmentId={profile.departmentId} />
+          <SimpleLeaderboard departmentId={(getCachedDefaultDepartmentId() || profile?.departmentId)!} />
         </div>
       )}
 

@@ -52,6 +52,7 @@ import AdminShortnotesStudio from "./pages/AdminShortnotesStudio";
 import StudentBooks from "./pages/StudentBooks";
 import BookDetails from "./pages/BookDetails";
 import BookReader from "./pages/BookReader";
+import AdminSystemSettings from "./pages/AdminSystemSettings";
 
 const queryClient = new QueryClient();
 
@@ -206,6 +207,11 @@ function AppRoutes() {
             <PermissionTest />
           </ProtectedRoute>
         } />
+        <Route path="/dashboard/admin/settings" element={
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <AdminSystemSettings />
+          </ProtectedRoute>
+        } />
         
         {/* Student Routes */}
         <Route path="/dashboard/subjects" element={
@@ -283,6 +289,8 @@ function AppRoutes() {
         <Route path="/admin/ai-generator" element={<Navigate to="/dashboard/admin/ai-generator" replace />} />
         <Route path="/exams" element={<Navigate to="/dashboard/exams" replace />} />
         <Route path="/admin/exams" element={<Navigate to="/dashboard/admin/exams" replace />} />
+        <Route path="/admin/login" element={<Navigate to="/auth?role=admin" replace />} />
+        <Route path="/admin" element={<Navigate to="/auth?role=admin" replace />} />
         
         <Route path="*" element={<NotFound />} />
       </Routes>

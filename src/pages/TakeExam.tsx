@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { getStoredGuestProfile } from "@/lib/guest-session";
 import { getExam, getQuestions } from "@/lib/firebase-exams";
 import { 
   createAttempt, 
@@ -88,7 +89,7 @@ interface LoadedExamData {
  */
 const TakeExam = () => {
   const { id } = useParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, profile: authProfile, isGuest, requireStudentLogin } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { t } = useTranslation();
@@ -127,6 +128,7 @@ const TakeExam = () => {
   // Password
   const [enteredPassword, setEnteredPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // ============== Effects ==============
 
@@ -150,26 +152,36 @@ const TakeExam = () => {
    * Load exam and check for existing attempts
    */
   const loadExamAndCheckAttempts = useCallback(async () => {
-    if (!user || !id) return;
+    if (!id) return;
+
+    const effectiveUserId = user?.uid || getStoredGuestProfile()?.id || 'guest_student';
 
     try {
-      await initOfflineDB();
+      setLoadError(null);
+      await initOfflineDB().catch(() => {});
       
       const examData = await loadExamData();
-      if (!examData) {
-        navigate("/dashboard");
+      if (!examData || !examData.exam) {
+        setLoadError("Assessment not found or unavailable. Please return to assessments.");
+        setLoading(false);
         return;
       }
 
       const { exam: loadedExam, questions: loadedQuestions, practiceConfig: loadedConfig, isOfflineMode: isOffline } = examData;
       setExam(loadedExam);
-      setQuestions(loadedQuestions);
+      setQuestions(loadedQuestions || []);
       setPracticeConfig(loadedConfig);
       setExamType(loadedExam.examType || 'normal');
       setIsOfflineMode(isOffline);
 
+      if (!loadedQuestions || loadedQuestions.length === 0) {
+        setLoadError("This assessment does not have any questions uploaded yet. Please check back later.");
+        setLoading(false);
+        return;
+      }
+
       // Check for existing attempts
-      const attempts = await getStudentAttempts(user.uid, id, loadedExam.examType === 'practice');
+      const attempts = await getStudentAttempts(effectiveUserId, id, loadedExam.examType === 'practice');
 
       // Find incomplete attempt to resume
       const incompleteAttempt = attempts.find(a => !a.isSubmitted);
@@ -192,13 +204,13 @@ const TakeExam = () => {
         
         // Check max attempts
         const submittedCount = attempts.filter(a => a.isSubmitted).length;
-        if (submittedCount >= loadedExam.maxAttempts) {
+        if (loadedExam.maxAttempts && submittedCount >= loadedExam.maxAttempts) {
           toast({
             title: "Maximum attempts reached",
             description: `You have already taken this exam ${submittedCount} times.`,
             variant: "destructive",
           });
-          navigate("/dashboard");
+          navigate("/dashboard/exams");
           return;
         }
 
@@ -221,8 +233,9 @@ const TakeExam = () => {
       }
 
       setLoading(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error loading exam:", error);
+      setLoadError(error?.message || "Error loading exam. Please try again.");
       toast({
         title: "Error loading exam",
         description: "Please try again",
@@ -234,7 +247,7 @@ const TakeExam = () => {
 
   // Load exam on mount
   useEffect(() => {
-    if (id && user) {
+    if (id) {
       loadExamAndCheckAttempts();
     }
   }, [id, user, loadExamAndCheckAttempts]);
@@ -247,9 +260,9 @@ const TakeExam = () => {
 
     try {
       // Try offline first (for practice exams downloaded locally)
-      const offlineExam = await getOfflineExam(id);
+      const offlineExam = await getOfflineExam(id).catch(() => null);
       if (offlineExam?.examType === 'practice') {
-        const questions = await getOfflineQuestions(id);
+        const questions = await getOfflineQuestions(id).catch(() => []);
         return {
           exam: offlineExam,
           questions,
@@ -258,21 +271,35 @@ const TakeExam = () => {
         };
       }
 
-      // Try Firebase for normal exams
+      // Try Firebase / Cache for normal exams
       try {
         const firebaseExam = await getExam(id);
-        const firebaseQuestions = await getQuestions(id);
-        
-        return {
-          exam: firebaseExam,
-          questions: firebaseQuestions,
-          practiceConfig: firebaseExam.practiceConfig || null,
-          isOfflineMode: false,
-        };
+        if (firebaseExam) {
+          let firebaseQuestions = await getQuestions(id);
+          
+          if ((!firebaseQuestions || firebaseQuestions.length === 0) && Array.isArray((firebaseExam as any).questions)) {
+            firebaseQuestions = (firebaseExam as any).questions;
+          }
+
+          return {
+            exam: firebaseExam,
+            questions: firebaseQuestions || [],
+            practiceConfig: firebaseExam.practiceConfig || null,
+            isOfflineMode: false,
+          };
+        } else if (offlineExam) {
+          const questions = await getOfflineQuestions(id).catch(() => []);
+          return {
+            exam: offlineExam,
+            questions,
+            practiceConfig: offlineExam.practiceConfig || null,
+            isOfflineMode: true,
+          };
+        }
       } catch (firebaseError) {
-        // Fall back to offline if available
+        console.warn("Firebase exam load error, checking offline fallback:", firebaseError);
         if (offlineExam) {
-          const questions = await getOfflineQuestions(id);
+          const questions = await getOfflineQuestions(id).catch(() => []);
           return {
             exam: offlineExam,
             questions,
@@ -282,6 +309,7 @@ const TakeExam = () => {
         }
         throw firebaseError;
       }
+      return null;
     } catch (error) {
       console.error("Failed to load exam from any source:", error);
       return null;
@@ -405,7 +433,10 @@ const TakeExam = () => {
   // ============== Start Exam ==============
 
   const startExam = async (mode: 'practice' | 'exam' | null) => {
-    if (!user || !exam || !user.uid) return;
+    if (!exam) return;
+    const effectiveUserId = user?.uid || getStoredGuestProfile()?.id || 'guest_student';
+    const studentName = authProfile?.full_name || user?.displayName || 'Student';
+    const studentEmail = user?.email || (isGuest ? 'guest@exampro.local' : '');
 
     try {
       let attemptId: string;
@@ -413,35 +444,33 @@ const TakeExam = () => {
 
       if (examType === 'practice') {
         // Create practice attempt
-        await initOfflineDB();
+        await initOfflineDB().catch(() => {});
         
         const maxScore = questions.reduce((sum, q) => sum + (q.marks || 0), 0);
-        attemptId = await createPracticeAttempt(exam.examId, user.uid, maxScore);
+        attemptId = await createPracticeAttempt(exam.examId, effectiveUserId, maxScore);
         setIsOfflineMode(true);
       } else {
         // Create normal attempt
         try {
-          const profile = await import("@/lib/auth").then(m => m.getUserProfile(user.uid));
-          
           attemptId = await createAttempt(
             exam.examId,
-            user.uid,
+            effectiveUserId,
             exam.title,
-            profile?.full_name || user.email || 'Student',
-            user.email || ''
+            studentName,
+            studentEmail
           );
         } catch (error) {
           console.warn("Firebase attempt creation failed, using offline:", error);
           
-          await initOfflineDB();
+          await initOfflineDB().catch(() => {});
           attemptId = `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
           const offlineAttempt = {
             attemptId,
             examId: exam.examId,
-            studentId: user.uid,
+            studentId: effectiveUserId,
             examTitle: exam.title,
-            studentName: user.displayName || user.email || 'Student',
-            studentEmail: user.email || '',
+            studentName,
+            studentEmail,
             startedAt: new Date(),
             submittedAt: null,
             isSubmitted: false,
@@ -747,7 +776,43 @@ const TakeExam = () => {
     );
   }
 
-  if (!exam) return null;
+  // Resilient Error State - Never show a blank screen!
+  if (loadError || !exam) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="max-w-md w-full p-6 sm:p-8 rounded-3xl border bg-card text-center space-y-4 shadow-sm animate-fade-in">
+          <div className="h-14 w-14 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto">
+            <AlertCircle className="h-7 w-7" />
+          </div>
+          <h2 className="text-xl font-bold font-display text-foreground">
+            {loadError || "Assessment Unavailable"}
+          </h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            We couldn't open this assessment. The questions may not be published yet, or your connection was interrupted.
+          </p>
+          <div className="pt-2 flex flex-col sm:flex-row gap-2 justify-center">
+            <Button
+              onClick={() => navigate("/dashboard/exams")}
+              className="rounded-xl bg-[#7c3aed] hover:bg-[#6d28d9] text-white"
+            >
+              Back to Assessments
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setLoading(true);
+                setLoadError(null);
+                loadExamAndCheckAttempts();
+              }}
+              className="rounded-xl"
+            >
+              Try Again
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const currentQuestion = questions[currentIndex];
   const answeredCount = Array.from(answers.values()).filter((value) =>
@@ -775,7 +840,7 @@ const TakeExam = () => {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => navigate("/dashboard")}>
+              <AlertDialogCancel onClick={() => navigate("/dashboard/exams")}>
                 Cancel
               </AlertDialogCancel>
               <AlertDialogAction onClick={() => startExam(null)}>
@@ -812,7 +877,7 @@ const TakeExam = () => {
               )}
             </div>
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => navigate("/dashboard")}>
+              <AlertDialogCancel onClick={() => navigate("/dashboard/exams")}>
                 Cancel
               </AlertDialogCancel>
               <AlertDialogAction onClick={handlePasswordSubmit}>
@@ -830,7 +895,7 @@ const TakeExam = () => {
           examTitle={exam.title}
           durationMinutes={practiceConfig?.timeLimit ? Math.ceil(practiceConfig.timeLimit / 60) : undefined}
           onSelect={handleModeSelected}
-          onCancel={() => navigate("/dashboard")}
+          onCancel={() => navigate("/dashboard/exams")}
         />
       )}
 

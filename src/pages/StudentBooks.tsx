@@ -19,6 +19,7 @@ import { Subject } from '@/types/subject';
 import { BookCard } from '@/components/book/BookCard';
 import { getPublishedExams } from '@/lib/firebase-exams';
 import { getSubjectVisualTheme } from '@/components/book/InteractiveShortNoteReader';
+import { getCachedDefaultDepartmentId } from '@/lib/system-settings';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -66,7 +67,8 @@ export default function StudentBooks() {
   const { toast } = useToast();
 
   const isAdmin = role === 'admin' || role === 'superadmin';
-  const userDeptId = profile?.departmentId || (profile as any)?.department_id;
+  const defaultDeptId = getCachedDefaultDepartmentId();
+  const userDeptId = defaultDeptId || profile?.departmentId || (profile as any)?.department_id;
 
   const [books, setBooks] = useState<Book[]>([]);
   const [bookmarkedIds, setBookmarkedIds] = useState<string[]>([]);

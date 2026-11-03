@@ -46,6 +46,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { syncAllDeviceData } from "@/lib/device-storage-sync";
+import { GuestSetupDialog } from "@/components/auth/GuestSetupDialog";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -53,13 +54,14 @@ interface DashboardLayoutProps {
 }
 
 export function DashboardLayout({ children, contentClassName }: DashboardLayoutProps) {
-  const { profile, role } = useAuth();
+  const { profile, role, isGuest, updateGuestProfile } = useAuth();
   const { hasPermission, isSuperAdmin } = usePermissions();
   const { canView } = useSectionPermissions();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileSheetOpen, setProfileSheetOpen] = useState(false);
+  const [showGuestEditDialog, setShowGuestEditDialog] = useState(false);
   const { t } = useTranslation();
 
   const handleSignOut = async () => {
@@ -106,6 +108,7 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
     { href: "/dashboard/leaderboard-admin", label: "Leaderboard Admin", icon: Trophy, permission: 'viewLeaderboard' },
     { href: "/dashboard/admin/subjects", label: "Subjects", icon: BookOpen },
     { href: "/dashboard/departments", label: t("dashboard.menu.departments", "Departments"), icon: Building, permission: 'viewDepartments' },
+    { href: "/settings", label: t("common.settings", "Settings"), icon: Settings, permission: 'viewDashboard' },
     ...(isSuperAdmin ? [{ href: "/dashboard/super-admin", label: "Super Admin", icon: Shield, permission: 'viewExaminers' }] : []),
   ], [t, isSuperAdmin]);
 
@@ -245,25 +248,41 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
                   </Avatar>
                   <div className="flex-1 text-left overflow-hidden">
                     <p className="text-sm font-semibold text-white truncate">
-                      {profile?.full_name}
+                      {profile?.full_name || (isGuest ? "Guest Student" : "User")}
                     </p>
                     <p className="text-xs text-white/70 capitalize truncate">
-                      {role ? t(`common.${role}`) : ""}
+                      {isGuest ? "Guest Access" : role ? t(`common.${role}`) : ""}
                     </p>
                   </div>
                   <Settings className="h-4 w-4 text-white/70" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem onClick={() => navigate("/settings")}>
-                  <Settings className="mr-2 h-4 w-4" />
-                  {t("common.settings")}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSignOut}>
-                  <LogOut className="mr-2 h-4 w-4" />
-                  {t("common.signOut")}
-                </DropdownMenuItem>
+                {isGuest ? (
+                  <>
+                    <DropdownMenuItem onClick={() => setShowGuestEditDialog(true)}>
+                      <User className="mr-2 h-4 w-4" />
+                      Edit Name & Department
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => navigate("/auth?role=admin")}>
+                      <Shield className="mr-2 h-4 w-4" />
+                      Staff / Admin Sign In
+                    </DropdownMenuItem>
+                  </>
+                ) : (
+                  <>
+                    <DropdownMenuItem onClick={() => navigate("/settings")}>
+                      <Settings className="mr-2 h-4 w-4" />
+                      {t("common.settings")}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleSignOut}>
+                      <LogOut className="mr-2 h-4 w-4" />
+                      {t("common.signOut")}
+                    </DropdownMenuItem>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -380,8 +399,12 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1">
-                <h3 className="text-xl font-bold text-white">{profile?.full_name}</h3>
-                <p className="text-sm text-white/80 capitalize">{role ? t(`common.${role}`) : ""}</p>
+                <h3 className="text-xl font-bold text-white">
+                  {profile?.full_name || (isGuest ? "Guest Student" : "User")}
+                </h3>
+                <p className="text-sm text-white/80 capitalize">
+                  {isGuest ? "Guest Access" : role ? t(`common.${role}`) : ""}
+                </p>
               </div>
               <button
                 onClick={() => setProfileSheetOpen(false)}
@@ -394,21 +417,66 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
 
           {/* Menu Items */}
           <div className="space-y-2 pb-4">
-            <button
-              onClick={() => {
-                navigate("/settings");
-                setProfileSheetOpen(false);
-              }}
-              className="w-full flex items-center gap-4 px-4 py-4 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-            >
-              <div className="h-10 w-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                <Settings className="h-5 w-5 text-gray-700 dark:text-gray-300" />
-              </div>
-              <span className="text-base font-medium">{t("common.settings")}</span>
-            </button>
+            {isGuest ? (
+              <>
+                <button
+                  onClick={() => {
+                    setShowGuestEditDialog(true);
+                    setProfileSheetOpen(false);
+                  }}
+                  className="w-full flex items-center gap-4 px-4 py-4 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                >
+                  <div className="h-10 w-10 rounded-full bg-purple-500/10 text-purple-600 flex items-center justify-center">
+                    <User className="h-5 w-5" />
+                  </div>
+                  <span className="text-base font-medium">Edit Name & Department</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    navigate("/auth?role=admin");
+                    setProfileSheetOpen(false);
+                  }}
+                  className="w-full flex items-center gap-4 px-4 py-4 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                >
+                  <div className="h-10 w-10 rounded-full bg-indigo-500/10 text-indigo-600 flex items-center justify-center">
+                    <Shield className="h-5 w-5" />
+                  </div>
+                  <span className="text-base font-medium">Staff / Admin Sign In</span>
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => {
+                  navigate("/settings");
+                  setProfileSheetOpen(false);
+                }}
+                className="w-full flex items-center gap-4 px-4 py-4 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
+                <div className="h-10 w-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                  <Settings className="h-5 w-5 text-gray-700 dark:text-gray-300" />
+                </div>
+                <span className="text-base font-medium">{t("common.settings")}</span>
+              </button>
+            )}
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Guest setup/edit dialog */}
+      <GuestSetupDialog
+        open={showGuestEditDialog}
+        onOpenChange={setShowGuestEditDialog}
+        onCompleted={(p) => {
+          updateGuestProfile({
+            full_name: p.full_name,
+            departmentId: p.departmentId,
+            departmentName: p.departmentName,
+          });
+          setShowGuestEditDialog(false);
+        }}
+        allowCloseWithoutSave={true}
+      />
     </div>
   );
 }

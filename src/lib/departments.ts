@@ -19,10 +19,12 @@ export const getDepartments = async (): Promise<Department[]> => {
   try {
     const q = query(collection(db, "departments"), orderBy("name"));
     const snapshot = await getDocs(q);
-    const list = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as Department));
+    const list = snapshot.docs
+      .filter((doc) => doc.id !== '_app_config' && doc.data()?.name)
+      .map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as Department));
 
     saveDeviceDepartments(list).catch(() => {});
     return list;

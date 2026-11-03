@@ -7,6 +7,7 @@ import { getSubjects, seedDefaultSubjects } from "@/lib/subjects";
 import { getBooks } from "@/lib/books";
 import { calculateAllSubjectsProgress } from "@/lib/subject-progress";
 import { getSubjectCover } from "@/lib/subject-covers";
+import { getCachedDefaultDepartmentId } from "@/lib/system-settings";
 import { Subject, StudentSubjectProgress } from "@/types/subject";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -76,28 +77,32 @@ export default function StudentSubjects() {
   const fetchSubjectsAndProgress = async () => {
     try {
       setLoading(true);
+
+      const defaultDeptId = getCachedDefaultDepartmentId();
+      const effectiveDeptId = defaultDeptId || profile?.departmentId;
+
       const [listRaw, textbooks] = await Promise.all([
-        getSubjects(profile?.departmentId),
+        getSubjects(effectiveDeptId),
         getBooks({ resourceType: 'textbook' }, 'student').catch(() => []),
       ]);
       let list = listRaw;
 
       // If database has no subjects yet and no department filter, seed the default curriculum
-      if (list.length === 0 && !profile?.departmentId) {
+      if (list.length === 0 && !effectiveDeptId) {
         await seedDefaultSubjects().catch(() => 0);
-        list = await getSubjects(profile?.departmentId);
+        list = await getSubjects(effectiveDeptId);
       }
 
       // Filter only active subjects for students
       let activeSubjects = list.filter((s) => s.isActive !== false);
 
       // Strict department assignment rule: students only see subjects explicitly assigned to their department
-      if (profile?.departmentId && profile.departmentId !== 'all') {
+      if (effectiveDeptId && effectiveDeptId !== 'all') {
         activeSubjects = activeSubjects.filter((s) => {
           if (s.departmentIds && s.departmentIds.length > 0) {
-            return s.departmentIds.includes(profile.departmentId!) || s.departmentIds.includes('all');
+            return s.departmentIds.includes(effectiveDeptId) || s.departmentIds.includes('all');
           }
-          return (s as any).departmentId === profile.departmentId;
+          return (s as any).departmentId === effectiveDeptId;
         });
       }
 
@@ -125,7 +130,7 @@ export default function StudentSubjects() {
         const progress = await calculateAllSubjectsProgress(
           enrichedSubjects,
           user.uid,
-          profile?.departmentId
+          effectiveDeptId
         ).catch(() => ({}));
         setProgressMap(progress);
       }

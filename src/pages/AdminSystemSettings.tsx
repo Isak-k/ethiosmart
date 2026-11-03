@@ -11,10 +11,22 @@ import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Slider } from '@/components/ui/slider';
-import { Loader2, AlertCircle, Check } from 'lucide-react';
+import { Loader2, AlertCircle, Check, Building } from 'lucide-react';
 import { getSystemSettings, updateSystemSettings } from '@/lib/system-settings';
+import { getDepartments } from '@/lib/departments';
+import { Department } from '@/integrations/firebase/types';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface Settings {
+  requireStudentLogin: boolean;
+  defaultDepartmentId?: string | null;
+  defaultDepartmentName?: string | null;
   practiceExamsEnabled: boolean;
   defaultPassingScore: number;
   sessionDurationDays: number;
@@ -30,8 +42,12 @@ export function AdminSystemSettings() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
+  const [departments, setDepartments] = useState<Department[]>([]);
 
   const [settings, setSettings] = useState<Settings>({
+    requireStudentLogin: true,
+    defaultDepartmentId: 'qzw7P8fCSFpnRGqdAgxW',
+    defaultDepartmentName: 'Freshman',
     practiceExamsEnabled: true,
     defaultPassingScore: 50,
     sessionDurationDays: 30,
@@ -46,10 +62,14 @@ export function AdminSystemSettings() {
       try {
         setLoading(true);
         setError(null);
-        const loaded = await getSystemSettings();
+        const [loaded, depts] = await Promise.all([
+          getSystemSettings(),
+          getDepartments().catch(() => []),
+        ]);
         if (loaded) {
           setSettings(loaded as Settings);
         }
+        setDepartments(depts);
       } catch (err) {
         console.error('Error loading settings:', err);
         setError('Failed to load system settings');
@@ -143,6 +163,63 @@ export function AdminSystemSettings() {
           <CardDescription>Enable or disable system features</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+            <Label htmlFor="require-login" className="flex-1">
+              <span className="font-medium">Require Student Login</span>
+              <p className="text-sm text-gray-600">
+                When enabled, students must sign in. When disabled, students can access exams and study notes directly as guests without logging in.
+              </p>
+            </Label>
+            <Switch
+              id="require-login"
+              checked={settings.requireStudentLogin}
+              onCheckedChange={(v) => handleChange('requireStudentLogin', v)}
+            />
+          </div>
+
+          <div className="p-3 border rounded-lg hover:bg-gray-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex-1">
+              <span className="font-medium text-sm">Default Department (Direct Open)</span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Automatically opens this department's curriculum for all guests and students without asking for department selection.
+              </p>
+            </div>
+            <div className="w-full sm:w-64">
+              <Select
+                value={settings.defaultDepartmentId || "none"}
+                onValueChange={(val) => {
+                  if (val === "none") {
+                    setSettings((prev) => ({
+                      ...prev,
+                      defaultDepartmentId: null,
+                      defaultDepartmentName: null,
+                    }));
+                  } else {
+                    const dept = departments.find((d) => d.id === val);
+                    setSettings((prev) => ({
+                      ...prev,
+                      defaultDepartmentId: val,
+                      defaultDepartmentName: dept?.name || null,
+                    }));
+                  }
+                  setIsDirty(true);
+                }}
+              >
+                <SelectTrigger className="h-9 text-xs">
+                  <SelectValue placeholder="Choose default department..." />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  <SelectItem value="none">None (Per-user selection)</SelectItem>
+                  {departments.map((dept) => (
+                    <SelectItem key={dept.id} value={dept.id} className="text-xs">
+                      {dept.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           <div className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
             <Label htmlFor="practice-exams" className="flex-1">
               <span className="font-medium">Practice Exams</span>

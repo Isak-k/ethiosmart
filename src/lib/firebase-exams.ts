@@ -22,6 +22,7 @@ import {
   getDeviceExams,
   getDeviceExam,
 } from '@/lib/device-storage';
+import { getOfflineQuestions } from '@/lib/offline-storage';
 
 export async function createExam(examData: Omit<Exam, 'examId' | 'createdAt' | 'updatedAt'>) {
   const base = { ...examData };
@@ -414,16 +415,55 @@ export async function addQuestion(examId: string, questionData: Omit<Question, '
 }
 
 export async function getQuestions(examId: string): Promise<Question[]> {
-  const q = query(
-    collection(db, 'exams', examId, 'questions'),
-    orderBy('orderIndex', 'asc')
-  );
-  
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({
-    questionId: doc.id,
-    ...doc.data()
-  })) as Question[];
+  if (!examId) return [];
+
+  // 1. Fetch from Firestore subcollection (simple query, client-side sorted)
+  try {
+    const colRef = collection(db, 'exams', examId, 'questions');
+    const snap = await getDocs(colRef);
+    
+    if (!snap.empty) {
+      const list = snap.docs.map(doc => ({
+        questionId: doc.id,
+        ...doc.data()
+      })) as Question[];
+
+      return list.sort((a, b) => (Number(a.orderIndex) || 0) - (Number(b.orderIndex) || 0));
+    }
+  } catch (error) {
+    console.warn(`Direct fetch for questions in exam ${examId} failed, trying cache:`, error);
+    try {
+      const colRef = collection(db, 'exams', examId, 'questions');
+      const cached = await getDocsFromCache(colRef);
+      if (!cached.empty) {
+        const list = cached.docs.map(doc => ({
+          questionId: doc.id,
+          ...doc.data()
+        })) as Question[];
+        return list.sort((a, b) => (Number(a.orderIndex) || 0) - (Number(b.orderIndex) || 0));
+      }
+    } catch (cacheErr) {
+      console.warn(`Cache questions fetch failed for ${examId}:`, cacheErr);
+    }
+  }
+
+  // 2. Fallback to offline IndexedDB questions
+  try {
+    const offlineQuestions = await getOfflineQuestions(examId);
+    if (offlineQuestions && offlineQuestions.length > 0) {
+      return offlineQuestions;
+    }
+  } catch {}
+
+  // 3. Fallback to questions embedded directly on device exam
+  try {
+    const deviceExam = await getDeviceExam(examId);
+    if (deviceExam && Array.isArray((deviceExam as any).questions) && (deviceExam as any).questions.length > 0) {
+      return (deviceExam as any).questions;
+    }
+  } catch {}
+
+  return [];
 }
 
 export async function updateQuestion(examId: string, questionId: string, updates: Partial<Question>) {
