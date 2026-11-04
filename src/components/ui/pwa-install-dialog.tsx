@@ -85,26 +85,26 @@ export function PwaInstallDialog({
           </div>
         ) : (
           <div className="space-y-3 pt-2">
-            {deferredPrompt && onInstallClick && (
+            {onInstallClick && (
               <Button
                 onClick={onInstallClick}
-                className="w-full h-11 rounded-xl bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:opacity-95 text-white font-bold shadow-md"
+                className="w-full h-11 rounded-xl bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:opacity-95 text-white font-bold shadow-md flex items-center justify-center gap-2"
               >
-                <Download className="h-4 w-4 mr-2" />
-                Install EthioSmart App Now
+                <Download className="h-4 w-4" />
+                <span>Install EthioSmart App</span>
               </Button>
             )}
 
             <div className="p-4 rounded-2xl bg-muted/50 border space-y-2 text-xs sm:text-sm">
               <p className="font-semibold text-foreground">
-                To install in Chrome, Edge, Brave, or Android:
+                In Microsoft Edge, Chrome, Brave, or Android:
               </p>
               <ul className="space-y-2 text-muted-foreground list-disc list-inside">
                 <li>
-                  Click the <b>Install App icon</b> (<Download className="h-3.5 w-3.5 inline mx-0.5 text-sky-600" />) in your browser address bar.
+                  <b>Desktop (Edge / Chrome):</b> Click the <b>App Install icon</b> in the right side of your browser&apos;s address bar (next to the URL / favorite ⭐ star).
                 </li>
                 <li>
-                  Or open your browser menu (<b>⋮</b> or <b>⋯</b>) and tap <b>&ldquo;Install EthioSmart&rdquo;</b> or <b>&ldquo;Add to Home Screen&rdquo;</b>.
+                  <b>Mobile (Android):</b> Tap the browser menu (<b>⋮</b>) and select <b>&ldquo;Install app&rdquo;</b> or <b>&ldquo;Add to Home screen&rdquo;</b>.
                 </li>
               </ul>
             </div>

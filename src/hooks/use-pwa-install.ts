@@ -59,42 +59,57 @@ export function usePWAInstall() {
     mediaQuery.addEventListener?.('change', handleDisplayChange);
 
     // Listen for custom beforeinstallprompt event
-    const handlePromptAvailable = () => {
-      setDeferredPrompt(cachedDeferredPrompt || (window as any).__pwaInstallPrompt);
+    const handlePromptAvailable = (e: any) => {
+      const p = e?.detail || cachedDeferredPrompt || (window as any).__pwaInstallPrompt;
+      cachedDeferredPrompt = p;
+      setDeferredPrompt(p);
+    };
+
+    const directHandler = (e: Event) => {
+      e.preventDefault();
+      cachedDeferredPrompt = e;
+      (window as any).__pwaInstallPrompt = e;
+      setDeferredPrompt(e);
     };
 
     const handleInstalled = () => {
       setIsStandalone(true);
+      cachedDeferredPrompt = null;
+      if (typeof window !== 'undefined') (window as any).__pwaInstallPrompt = null;
       setDeferredPrompt(null);
       setInstallModalOpen(false);
     };
 
+    window.addEventListener('beforeinstallprompt', directHandler);
     window.addEventListener('pwa-prompt-available', handlePromptAvailable);
     window.addEventListener('pwa-installed-success', handleInstalled);
 
     return () => {
       mediaQuery.removeEventListener?.('change', handleDisplayChange);
+      window.removeEventListener('beforeinstallprompt', directHandler);
       window.removeEventListener('pwa-prompt-available', handlePromptAvailable);
       window.removeEventListener('pwa-installed-success', handleInstalled);
     };
   }, []);
 
   const promptInstall = useCallback(async (): Promise<boolean> => {
-    const prompt = deferredPrompt || cachedDeferredPrompt || (typeof window !== 'undefined' ? (window as any).__pwaInstallPrompt : null);
+    const prompt =
+      deferredPrompt ||
+      cachedDeferredPrompt ||
+      (typeof window !== 'undefined' ? (window as any).__pwaInstallPrompt : null);
 
-    if (prompt) {
+    if (prompt && typeof prompt.prompt === 'function') {
       try {
-        prompt.prompt();
+        await prompt.prompt();
         const choice = await prompt.userChoice;
         if (choice && choice.outcome === 'accepted') {
           setIsStandalone(true);
           cachedDeferredPrompt = null;
+          if (typeof window !== 'undefined') (window as any).__pwaInstallPrompt = null;
           setDeferredPrompt(null);
           setInstallModalOpen(false);
           return true;
         }
-        cachedDeferredPrompt = null;
-        setDeferredPrompt(null);
         return false;
       } catch (err) {
         console.warn('Install prompt execution error:', err);

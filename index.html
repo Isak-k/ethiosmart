@@ -4,6 +4,21 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>EthioSmart - Learn • Practice • Grow</title>
+    
+    <!-- Synchronous early PWA install prompt capture (runs before React bundle parses) -->
+    <script>
+      window.__pwaInstallPrompt = null;
+      window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        window.__pwaInstallPrompt = e;
+        window.dispatchEvent(new CustomEvent('pwa-prompt-available', { detail: e }));
+        console.log('✓ Captured PWA beforeinstallprompt in head');
+      });
+      window.addEventListener('appinstalled', function() {
+        window.__pwaInstallPrompt = null;
+        window.dispatchEvent(new CustomEvent('pwa-installed-success'));
+      });
+    </script>
     <meta name="description" content="EthioSmart - Comprehensive smart educational platform for textbooks, study notes, practice exams, tests, and AI-assisted learning.">
     <meta name="author" content="EthioSmart" />
     

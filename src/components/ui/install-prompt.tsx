@@ -33,15 +33,17 @@ export function InstallPrompt() {
     const handler = (e: Event) => {
       // Prevent the mini-infobar from appearing on mobile
       e.preventDefault();
-      // Stash the event so it can be triggered later.
+      // Stash the event so it can be triggered later globally.
+      (window as any).__pwaInstallPrompt = e;
       setDeferredPrompt(e);
+      window.dispatchEvent(new CustomEvent('pwa-prompt-available', { detail: e }));
       // Update UI notify the user they can install the PWA
       setIsVisible(true);
     };
 
     const installedHandler = () => {
       setIsVisible(false);
-      localStorage.setItem('pwa_installed', 'true');
+      (window as any).__pwaInstallPrompt = null;
     };
 
     window.addEventListener("beforeinstallprompt", handler);
