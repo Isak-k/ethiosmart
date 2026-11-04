@@ -15,7 +15,6 @@ import {
 import { db } from '@/integrations/firebase/client';
 import { CommunityChannel, CommunityMessage, ReplyReference } from '@/types/community';
 import { Department } from '@/integrations/firebase/types';
-import { Subject } from '@/types/subject';
 
 export const BUILTIN_SYSTEM_CHANNELS: CommunityChannel[] = [
   {
@@ -35,54 +34,89 @@ export const BUILTIN_SYSTEM_CHANNELS: CommunityChannel[] = [
     icon: '🌍',
     displayOrder: 2,
   },
-  {
-    id: 'study-tips',
-    name: 'Study Tips & Exam Prep',
-    description: 'Share past exam tips, revision guides, mnemonics, and preparation strategies.',
-    category: 'general',
-    icon: '💡',
-    displayOrder: 3,
-  },
 ];
 
 /**
- * Builds the complete list of community channels combining built-in lounges,
- * department study halls, and subject-specific discussion rooms.
+ * Builds the list of community channels according to user role:
+ * - Student: Sees Official Announcements and ONLY their assigned department chat.
+ * - Admin / Instructor: Sees Official Announcements, General Lounge, and ALL department chats.
+ * - Chat by subject is removed.
  */
 export function buildCommunityChannels(
   departments: Department[] = [],
-  subjects: Subject[] = []
+  options?: {
+    userRole?: string;
+    userDepartmentId?: string;
+  }
 ): CommunityChannel[] {
-  const channels: CommunityChannel[] = [...BUILTIN_SYSTEM_CHANNELS];
+  const { userRole = 'student', userDepartmentId } = options || {};
+  const isAdmin =
+    userRole === 'admin' ||
+    userRole === 'examiner' ||
+    userRole === 'teacher' ||
+    userRole === 'superadmin';
 
-  // Department channels
-  departments.forEach((dept, idx) => {
-    if (!dept.id || !dept.name) return;
+  if (isAdmin) {
+    // Admin sees Announcements + General Lounge + ALL Department channels
+    const channels: CommunityChannel[] = [...BUILTIN_SYSTEM_CHANNELS];
+
+    departments.forEach((dept, idx) => {
+      if (!dept.id || !dept.name) return;
+      channels.push({
+        id: `dept_${dept.id}`,
+        name: `${dept.name} Department`,
+        description: `Discussions and group study for ${dept.name} students.`,
+        category: 'department',
+        departmentId: dept.id,
+        icon: '🏛️',
+        displayOrder: 10 + idx,
+      });
+    });
+
+    return channels;
+  }
+
+  // Student role:
+  // 1. Official Announcements
+  const channels: CommunityChannel[] = [BUILTIN_SYSTEM_CHANNELS[0]];
+
+  // 2. ONLY their assigned department chat
+  const matchingDept = departments.find(
+    (d) => d.id === userDepartmentId || d.name?.toLowerCase() === userDepartmentId?.toLowerCase()
+  );
+
+  if (matchingDept) {
     channels.push({
-      id: `dept_${dept.id}`,
-      name: dept.name,
-      description: `Discussions, group study, and notices for ${dept.name} students.`,
+      id: `dept_${matchingDept.id}`,
+      name: `${matchingDept.name} Department`,
+      description: `Discussions and study group for ${matchingDept.name} students.`,
       category: 'department',
-      departmentId: dept.id,
+      departmentId: matchingDept.id,
       icon: '🏛️',
-      displayOrder: 10 + idx,
+      displayOrder: 2,
     });
-  });
-
-  // Subject channels
-  subjects.forEach((subj, idx) => {
-    if (!subj.id || !subj.name) return;
+  } else if (userDepartmentId) {
     channels.push({
-      id: `subject_${subj.id}`,
-      name: subj.name,
-      description: `Course questions, practice problem reviews, and study group for ${subj.name}.`,
-      category: 'subject',
-      subjectId: subj.id,
-      departmentId: subj.departmentIds?.[0],
-      icon: '📚',
-      displayOrder: 100 + idx,
+      id: `dept_${userDepartmentId}`,
+      name: 'My Department Chat',
+      description: 'Discussions and group study with department peers.',
+      category: 'department',
+      departmentId: userDepartmentId,
+      icon: '🏛️',
+      displayOrder: 2,
     });
-  });
+  } else if (departments.length > 0) {
+    const firstDept = departments[0];
+    channels.push({
+      id: `dept_${firstDept.id}`,
+      name: `${firstDept.name} Department`,
+      description: `Discussions and group study for ${firstDept.name} students.`,
+      category: 'department',
+      departmentId: firstDept.id,
+      icon: '🏛️',
+      displayOrder: 2,
+    });
+  }
 
   return channels;
 }

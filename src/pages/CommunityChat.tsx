@@ -56,9 +56,8 @@ import {
   deleteCommunityMessage,
 } from '@/lib/community';
 import { getDepartments } from '@/lib/departments';
-import { getSubjects } from '@/lib/subjects';
+import { getCachedDefaultDepartmentId } from '@/lib/system-settings';
 import { Department } from '@/integrations/firebase/types';
-import { Subject } from '@/types/subject';
 
 const QUICK_EMOJIS = ['👍', '❤️', '🔥', '🧠', '💡', '🎉'];
 
@@ -67,12 +66,11 @@ export default function CommunityChat() {
   const { toast } = useToast();
 
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loadingInitial, setLoadingInitial] = useState(true);
 
   // Channels & active selection
   const [channels, setChannels] = useState<CommunityChannel[]>([]);
-  const [activeChannelId, setActiveChannelId] = useState<string>('general');
+  const [activeChannelId, setActiveChannelId] = useState<string>('announcements');
   const [channelSearch, setChannelSearch] = useState<string>('');
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<string>('all');
 
@@ -136,20 +134,31 @@ export default function CommunityChat() {
 
   const isAdminOrExaminer = userRole === 'admin' || userRole === 'examiner' || userRole === 'teacher';
 
-  // Load departments and subjects on mount
+  // Load departments on mount and build role-scoped channels
   useEffect(() => {
     let isMounted = true;
     async function loadData() {
       try {
-        const [deptList, subjList] = await Promise.all([
-          getDepartments(),
-          getSubjects(),
-        ]);
+        const deptList = await getDepartments();
         if (!isMounted) return;
         setDepartments(deptList);
-        setSubjects(subjList);
-        const allChannels = buildCommunityChannels(deptList, subjList);
+
+        const defaultDeptId = getCachedDefaultDepartmentId();
+        const effectiveDeptId = profile?.departmentId || (profile as any)?.department_id || defaultDeptId;
+
+        const allChannels = buildCommunityChannels(deptList, {
+          userRole,
+          userDepartmentId: effectiveDeptId || undefined,
+        });
+
         setChannels(allChannels);
+
+        // Auto select first channel (department channel or announcements)
+        if (allChannels.length > 0) {
+          const deptChannel = allChannels.find((c) => c.category === 'department');
+          const defaultChannel = deptChannel ? deptChannel.id : allChannels[0].id;
+          setActiveChannelId((prev) => (allChannels.some((c) => c.id === prev) ? prev : defaultChannel));
+        }
       } catch (err) {
         console.error('Failed to load community channel data:', err);
       } finally {
@@ -160,7 +169,7 @@ export default function CommunityChat() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [profile, userRole]);
 
   // Subscribe to active channel messages
   useEffect(() => {
@@ -409,7 +418,7 @@ export default function CommunityChat() {
                   </Badge>
                 </div>
                 <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-                  Connect, collaborate, and study together across departments, subjects, and lounges.
+                  Connect, collaborate, and study together in official announcements and your department study hall.
                 </p>
               </div>
             </div>
@@ -418,7 +427,7 @@ export default function CommunityChat() {
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="rounded-xl px-3 py-1.5 bg-background/80 backdrop-blur-md border-border/80 text-xs font-medium flex items-center gap-1.5 shadow-xs">
                 <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>{channels.length} Study Channels</span>
+                <span>{channels.length} {channels.length === 1 ? 'Channel' : 'Channels'}</span>
               </Badge>
             </div>
           </div>
@@ -441,7 +450,7 @@ export default function CommunityChat() {
                 <Input
                   value={channelSearch}
                   onChange={(e) => setChannelSearch(e.target.value)}
-                  placeholder="Search channels & subjects..."
+                  placeholder="Search channels..."
                   className="pl-9 h-9 rounded-2xl text-xs bg-muted/40 border-border/70"
                 />
                 {channelSearch && (
@@ -455,29 +464,30 @@ export default function CommunityChat() {
                 )}
               </div>
 
-              {/* Category Pills */}
-              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
-                {[
-                  { id: 'all', label: 'All' },
-                  { id: 'announcements', label: 'Official' },
-                  { id: 'general', label: 'Lounges' },
-                  { id: 'department', label: 'Depts' },
-                  { id: 'subject', label: 'Subjects' },
-                ].map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setActiveCategoryFilter(tab.id)}
-                    className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all ${
-                      activeCategoryFilter === tab.id
-                        ? 'bg-sky-500 text-white shadow-xs'
-                        : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground'
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
+              {/* Category Pills (for Admins who manage multiple channels) */}
+              {isAdminOrExaminer && channels.length > 2 && (
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+                  {[
+                    { id: 'all', label: 'All' },
+                    { id: 'announcements', label: 'Official' },
+                    { id: 'department', label: 'Departments' },
+                    { id: 'general', label: 'Lounge' },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setActiveCategoryFilter(tab.id)}
+                      className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all ${
+                        activeCategoryFilter === tab.id
+                          ? 'bg-sky-500 text-white shadow-xs'
+                          : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Channels List */}
@@ -511,7 +521,7 @@ export default function CommunityChat() {
                             : 'bg-muted/80 text-foreground'
                         }`}
                       >
-                        {channel.icon || (channel.category === 'subject' ? '📚' : '#')}
+                        {channel.icon || (channel.category === 'department' ? '🏛️' : '#')}
                       </div>
 
                       <div className="flex-1 min-w-0">
