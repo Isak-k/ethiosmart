@@ -173,7 +173,7 @@ export default function StudentBooks() {
   useEffect(() => {
     fetchLibraryData();
     loadOfflineData();
-  }, [user, userDeptId]);
+  }, [user?.uid, userDeptId]);
 
   const loadOfflineData = async () => {
     try {

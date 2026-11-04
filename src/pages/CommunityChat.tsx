@@ -31,7 +31,17 @@ import {
   ThumbsUp,
   Brain,
   MessageCircle,
+  Copy,
+  ExternalLink,
+  ShieldAlert,
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   CommunityChannel,
   CommunityMessage,
@@ -82,6 +92,37 @@ export default function CommunityChat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatScrollContainerRef = useRef<HTMLDivElement>(null);
   const [showScrollBottomPill, setShowScrollBottomPill] = useState(false);
+
+  // Firestore permission helper modal state
+  const [permissionErrorDetected, setPermissionErrorDetected] = useState(false);
+  const [rulesModalOpen, setRulesModalOpen] = useState(false);
+  const [copiedRule, setCopiedRule] = useState(false);
+
+  const FIRESTORE_COMMUNITY_RULE_SNIPPET = `    // --- Community Channels & Messages Collection ---
+    match /communityChannels/{channelId} {
+      allow read: if true;
+      allow write: if isAuthenticated() || isAdminOrSuper();
+
+      match /{allChildren=**} {
+        allow read: if true;
+        allow write: if isAuthenticated();
+      }
+    }
+
+    match /communityMessages/{document=**} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }`;
+
+  const handleCopyRule = () => {
+    navigator.clipboard.writeText(FIRESTORE_COMMUNITY_RULE_SNIPPET);
+    setCopiedRule(true);
+    toast({
+      title: 'Rule Copied to Clipboard! 📋',
+      description: 'Paste it into Firebase Console > Firestore Database > Rules before the closing "}".',
+    });
+    setTimeout(() => setCopiedRule(false), 3000);
+  };
 
   // User role determination
   const userRole: 'admin' | 'examiner' | 'student' | 'teacher' =
@@ -237,11 +278,25 @@ export default function CommunityChat() {
       }, 80);
     } catch (err: any) {
       console.error('Failed to send message:', err);
-      toast({
-        title: 'Error sending message',
-        description: err.message || 'Check your internet connection and try again.',
-        variant: 'destructive',
-      });
+      const isPermError =
+        err?.code === 'permission-denied' ||
+        String(err?.message || '').toLowerCase().includes('permission') ||
+        String(err?.message || '').toLowerCase().includes('missing or insufficient');
+
+      if (isPermError) {
+        setPermissionErrorDetected(true);
+        toast({
+          title: 'Firestore Permission Rule Required',
+          description: 'Firebase security rules need to be published for communityChannels. Click the alert banner to copy the rule.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Error sending message',
+          description: err.message || 'Check your internet connection and try again.',
+          variant: 'destructive',
+        });
+      }
       setInputText(messageText); // restore text on error
     } finally {
       setIsSending(false);
@@ -565,6 +620,44 @@ export default function CommunityChat() {
               </div>
             </div>
 
+            {/* Firestore Permission Alert Banner */}
+            {permissionErrorDetected && (
+              <div className="p-3 bg-rose-500/10 border-b border-rose-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 animate-fade-in">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <ShieldAlert className="h-4 w-4 text-rose-500 shrink-0" />
+                  <div className="text-xs min-w-0">
+                    <p className="font-bold text-rose-600 dark:text-rose-400">
+                      Firebase Rule Update Required:
+                    </p>
+                    <p className="text-muted-foreground truncate text-[11px]">
+                      Firestore security rules blocked writing to communityChannels until published.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setRulesModalOpen(true)}
+                    className="h-7 text-xs font-semibold rounded-xl border-rose-400/40 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10"
+                  >
+                    View Rule & Steps
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleCopyRule}
+                    className="h-7 text-xs font-semibold rounded-xl bg-rose-600 hover:bg-rose-700 text-white"
+                  >
+                    <Copy className="h-3 w-3 mr-1" />
+                    Copy Rule
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* Pinned Message Banner (if any) */}
             {pinnedMessage && (
               <div className="px-4 py-2 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border-b border-amber-500/30 flex items-center justify-between gap-2 animate-fade-in">
@@ -875,6 +968,57 @@ export default function CommunityChat() {
             )}
           </Card>
         </div>
+
+        {/* Firestore Rules Instructions Dialog */}
+        <Dialog open={rulesModalOpen} onOpenChange={setRulesModalOpen}>
+          <DialogContent className="max-w-xl rounded-3xl p-6">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-lg">
+                <ShieldAlert className="h-5 w-5 text-rose-500" />
+                Firestore Security Rules Update
+              </DialogTitle>
+              <DialogDescription className="text-xs">
+                To enable live chat in production, your Firebase project requires permissions for communityChannels.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 pt-2">
+              <div className="space-y-2 text-xs">
+                <p className="font-semibold text-foreground">Steps to enable (Takes ~30 seconds):</p>
+                <ol className="list-decimal list-inside space-y-1.5 text-muted-foreground pl-1">
+                  <li>Open the <a href="https://console.firebase.google.com" target="_blank" rel="noreferrer" className="text-sky-500 hover:text-sky-600 underline font-semibold inline-flex items-center gap-1">Firebase Console <ExternalLink className="h-3 w-3" /></a></li>
+                  <li>Select your project <strong>online-exam-f443c</strong></li>
+                  <li>Navigate to <strong>Firestore Database</strong> → <strong>Rules</strong> tab</li>
+                  <li>Paste the snippet below right before the last closing brace <code>{"}"}</code></li>
+                  <li>Click <strong>Publish</strong></li>
+                </ol>
+              </div>
+
+              <div className="relative">
+                <pre className="p-3.5 rounded-2xl bg-slate-950 text-slate-100 font-mono text-[11px] overflow-x-auto leading-relaxed border border-slate-800">
+                  {FIRESTORE_COMMUNITY_RULE_SNIPPET}
+                </pre>
+                <Button
+                  size="sm"
+                  onClick={handleCopyRule}
+                  className="absolute top-2.5 right-2.5 h-7 px-2.5 rounded-xl text-xs bg-sky-600 hover:bg-sky-700 text-white font-semibold"
+                >
+                  {copiedRule ? (
+                    <>
+                      <Check className="h-3 w-3 mr-1" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3 w-3 mr-1" />
+                      Copy Snippet
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );

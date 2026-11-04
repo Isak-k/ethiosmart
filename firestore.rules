@@ -210,5 +210,21 @@ service cloud.firestore {
         isAdminOrSuper()
       );
     }
+
+    // --- Community Channels & Messages Collection ---
+    match /communityChannels/{channelId} {
+      allow read: if true;
+      allow write: if isAuthenticated() || isAdminOrSuper();
+
+      match /{allChildren=**} {
+        allow read: if true;
+        allow write: if isAuthenticated();
+      }
+    }
+
+    match /communityMessages/{document=**} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
   }
 }

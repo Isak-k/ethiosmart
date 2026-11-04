@@ -1,7 +1,8 @@
 import React from 'react';
+import '@testing-library/jest-dom';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { BrowserRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router-dom';
 import StudentBooks from './StudentBooks';
 
 vi.mock('@/contexts/AuthContext', () => ({
@@ -69,6 +70,10 @@ vi.mock('@/lib/firebase-exams', () => ({
   getPublishedExams: vi.fn().mockResolvedValue([]),
 }));
 
+vi.mock('@/lib/system-settings', () => ({
+  getCachedDefaultDepartmentId: vi.fn().mockReturnValue('dept-1'),
+}));
+
 vi.mock('@/components/layout/DashboardLayout', () => ({
   DashboardLayout: ({ children }: { children: React.ReactNode }) => <div data-testid="dashboard-layout">{children}</div>,
 }));
@@ -78,36 +83,43 @@ describe('StudentBooks component', () => {
     vi.clearAllMocks();
   });
 
-  it('renders choice screen without crashing', async () => {
+  it('renders choice screen without crashing after data loads', async () => {
     render(
-      <BrowserRouter>
+      <MemoryRouter initialEntries={['/dashboard/books']}>
         <StudentBooks />
-      </BrowserRouter>
+      </MemoryRouter>
     );
 
-    await waitFor(() => {
-      expect(screen.getByText(/What would you like to study\?/i)).toBeInTheDocument();
-    });
-
-    expect(screen.getByText(/Chapter Study Notes/i)).toBeInTheDocument();
-    expect(screen.getByText(/Books & Textbooks/i)).toBeInTheDocument();
+    const heading = await screen.findByRole('heading', { name: /What would you like to study\?/i });
+    expect(heading).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Chapter Study Notes/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Books & Textbooks/i })).toBeInTheDocument();
   });
 
   it('navigates to confirmed view when Next is clicked', async () => {
     render(
-      <BrowserRouter>
+      <MemoryRouter initialEntries={['/dashboard/books']}>
         <StudentBooks />
-      </BrowserRouter>
+      </MemoryRouter>
     );
 
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Next/i })).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByRole('button', { name: /Next/i }));
+    const nextBtn = await screen.findByRole('button', { name: /Next/i });
+    fireEvent.click(nextBtn);
 
     await waitFor(() => {
       expect(screen.getByText(/Change: Notes \/ Books/i)).toBeInTheDocument();
+    });
+  });
+
+  it('renders Level 2 chapter view directly if subjectId is in URL', async () => {
+    render(
+      <MemoryRouter initialEntries={['/dashboard/books?tab=notes&subjectId=sub-physics']}>
+        <StudentBooks />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/Back to All Subjects/i)).toBeInTheDocument();
     });
   });
 });
