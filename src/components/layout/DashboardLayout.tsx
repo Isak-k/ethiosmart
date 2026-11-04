@@ -47,7 +47,10 @@ import {
   Library,
   Sparkles,
   Video,
+  Download,
 } from "lucide-react";
+import { usePWAInstall } from "@/hooks/use-pwa-install";
+import { PwaInstallDialog } from "@/components/ui/pwa-install-dialog";
 import { cn } from "@/lib/utils";
 import { syncAllDeviceData } from "@/lib/device-storage-sync";
 import { GuestSetupDialog } from "@/components/auth/GuestSetupDialog";
@@ -474,6 +477,15 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
   const [showGuestEditDialog, setShowGuestEditDialog] = useState(false);
   const { t } = useTranslation();
 
+  const {
+    isStandalone,
+    isIOS,
+    deferredPrompt,
+    promptInstall,
+    installModalOpen,
+    setInstallModalOpen,
+  } = usePWAInstall();
+
   const handleSignOut = async () => {
     try {
       clearGuestProfile();
@@ -584,6 +596,17 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
             )}
           </div>
           <div className="flex items-center gap-3">
+            {!isStandalone && (
+              <button
+                type="button"
+                onClick={promptInstall}
+                className="h-9 px-3.5 rounded-full text-xs font-bold flex items-center gap-1.5 bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 text-white shadow-sm hover:scale-105 active:scale-95 transition-all shrink-0"
+                title="Install EthioSmart as an app"
+              >
+                <Download className="h-3.5 w-3.5" />
+                <span>Install App</span>
+              </button>
+            )}
             <div className="[&_button]:liquid-glass-squircle [&_button]:rounded-2xl">
               <LanguageToggle />
             </div>
@@ -623,6 +646,17 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-2">
+          {!isStandalone && (
+            <button
+              type="button"
+              onClick={promptInstall}
+              className="h-8 px-2.5 rounded-full text-[11px] font-bold flex items-center gap-1 bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 text-white shadow-xs hover:scale-105 active:scale-95 transition-all shrink-0"
+              title="Install EthioSmart as an app"
+            >
+              <Download className="h-3 w-3" />
+              <span>Install</span>
+            </button>
+          )}
           {isGuest && (
             <button
               type="button"
@@ -1080,6 +1114,16 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
           setShowGuestEditDialog(false);
         }}
         allowCloseWithoutSave={true}
+      />
+
+      {/* Cross-Device PWA Installation Instructions Modal */}
+      <PwaInstallDialog
+        open={installModalOpen}
+        onOpenChange={setInstallModalOpen}
+        isIOS={isIOS}
+        isStandalone={isStandalone}
+        deferredPrompt={deferredPrompt}
+        onInstallClick={promptInstall}
       />
     </div>
   );

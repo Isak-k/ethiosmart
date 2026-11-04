@@ -12,11 +12,11 @@ export function InstallPrompt() {
   useEffect(() => {
     // Check if it's iOS
     const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
-    // Check if it's already installed (standalone mode or previous install recorded)
+    // Check if it's already running in standalone PWA mode
     const isStandalone =
       window.matchMedia('(display-mode: standalone)').matches ||
-      (navigator as any).standalone ||
-      localStorage.getItem('pwa_installed') === 'true';
+      (navigator as any).standalone === true ||
+      document.referrer.startsWith('android-app://');
     
     if (isStandalone) {
       setIsVisible(false);
