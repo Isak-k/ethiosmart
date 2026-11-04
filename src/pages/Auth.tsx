@@ -48,7 +48,7 @@ const Auth = () => {
               {/* Feature 1: Digital Textbooks */}
               <div className="flex items-center gap-3 group">
                 <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
-                  <BookOpen className="h-4.5 w-4.5" />
+                  <BookOpen className="h-5 w-5" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <h4 className="text-xs xl:text-sm font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-sky-400 transition-colors">
@@ -66,7 +66,7 @@ const Auth = () => {
               {/* Feature 2: AI Study Assistant */}
               <div className="flex items-center gap-3 group">
                 <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-white flex items-center justify-center shrink-0 shadow-md shadow-purple-500/20 group-hover:scale-105 transition-transform">
-                  <Brain className="h-4.5 w-4.5" />
+                  <Brain className="h-5 w-5" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
@@ -89,7 +89,7 @@ const Auth = () => {
               {/* Feature 3: Timed Practice & National Exams */}
               <div className="flex items-center gap-3 group">
                 <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-emerald-500/20 group-hover:scale-105 transition-transform">
-                  <ClipboardList className="h-4.5 w-4.5" />
+                  <ClipboardList className="h-5 w-5" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <h4 className="text-xs xl:text-sm font-bold text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">

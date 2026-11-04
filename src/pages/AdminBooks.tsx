@@ -11,6 +11,7 @@ import { Department } from '@/integrations/firebase/types';
 import { Subject } from '@/types/subject';
 import { BookCard } from '@/components/book/BookCard';
 import { BookFormDialog } from '@/components/book/BookFormDialog';
+import { ImportShortnoteDialog } from '@/components/book/ImportShortnoteDialog';
 import { SubjectFormDialog } from '@/components/subject/SubjectFormDialog';
 import { SubjectNotesManagerDialog } from '@/components/book/SubjectNotesManagerDialog';
 import { Progress } from '@/components/ui/progress';
@@ -39,6 +40,7 @@ import {
 import {
   BookOpen,
   FileText,
+  FileUp,
   Plus,
   Search,
   Filter,
@@ -79,6 +81,7 @@ export default function AdminBooks() {
   // Dialog states
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingBook, setEditingBook] = useState<Book | null>(null);
+  const [importNoteOpen, setImportNoteOpen] = useState(false);
 
   // Study Notes Subject Book Management States
   const [studyNotesViewMode, setStudyNotesViewMode] = useState<'by_subject' | 'all_notes'>('by_subject');
@@ -353,6 +356,14 @@ export default function AdminBooks() {
             >
               <FileText className="w-4 h-4 mr-2" />
               Chapter Shortnotes Studio
+            </Button>
+
+            <Button
+              onClick={() => setImportNoteOpen(true)}
+              className="rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-xs font-semibold"
+            >
+              <FileUp className="w-4 h-4 mr-1.5" />
+              Import Shortnote
             </Button>
 
             <Button
@@ -847,6 +858,15 @@ export default function AdminBooks() {
           }}
           book={editingBook}
           onSave={handleSaveBook}
+          defaultDepartmentId={selectedDept !== 'all' ? selectedDept : undefined}
+          defaultSubjectId={selectedSubject !== 'all' ? selectedSubject : undefined}
+        />
+
+        {/* Import Shortnote Dialog */}
+        <ImportShortnoteDialog
+          open={importNoteOpen}
+          onOpenChange={setImportNoteOpen}
+          onImportSuccess={fetchData}
           defaultDepartmentId={selectedDept !== 'all' ? selectedDept : undefined}
           defaultSubjectId={selectedSubject !== 'all' ? selectedSubject : undefined}
         />

@@ -6,9 +6,8 @@ import { getCachedDefaultDepartmentId } from "@/lib/system-settings";
 import { SimpleLeaderboard } from "@/components/SimpleLeaderboard";
 import { StatCard } from "./StatCard";
 import { ExamCard } from "@/components/exam/ExamCard";
-import { ClipboardList, Trophy, Clock, CheckCircle, BookOpen, Sparkles, GraduationCap } from "lucide-react";
+import { ClipboardList, Trophy, Clock, CheckCircle, Sparkles, GraduationCap } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { EthioAccentBar } from "@/components/ui/EthioAccentBar";
 import { LiquidTiltCard } from "@/components/ui/LiquidTiltCard";
@@ -123,23 +122,6 @@ export function StudentDashboard() {
             <p className="text-muted-foreground dark:text-slate-300 text-xs sm:text-sm max-w-md leading-relaxed font-normal">
               Your smart educational hub for textbooks, practice exams, and AI-powered learning.
             </p>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0 pt-1 sm:pt-0">
-            <Link
-              to="/dashboard/books"
-              className="liquid-glass-button inline-flex items-center justify-center text-xs sm:text-sm h-10 px-4 active:scale-95 transition-all shadow-md"
-            >
-              <BookOpen className="h-4 w-4 mr-2" />
-              Study Library
-            </Link>
-            <Link
-              to="/dashboard/exams"
-              className="liquid-glass-button-secondary inline-flex items-center justify-center text-xs sm:text-sm h-10 px-3.5 active:scale-95 transition-all"
-            >
-              <ClipboardList className="h-4 w-4 mr-1.5 text-sky-500 dark:text-sky-300" />
-              Exams
-            </Link>
           </div>
         </div>
         <EthioAccentBar className="absolute bottom-0 left-0 right-0" size="sm" />

@@ -42,6 +42,7 @@ import {
   MULTI_SUBJECT_SAMPLE_NOTES,
 } from '@/lib/shortnotes-organizer';
 import { InteractiveShortNoteReader } from '@/components/book/InteractiveShortNoteReader';
+import { ImportShortnoteDialog } from '@/components/book/ImportShortnoteDialog';
 import { Department, Exam } from '@/integrations/firebase/types';
 import { getAllExams } from '@/lib/firebase-exams';
 import { Subject, Chapter } from '@/types/subject';
@@ -217,6 +218,7 @@ export default function AdminShortnotesStudio() {
   const [activeTab, setActiveTab] = useState<'input' | 'editor' | 'preview'>('input');
   const [isSaving, setIsSaving] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   // Cover Image File Upload State
   const [uploadingCover, setUploadingCover] = useState(false);
@@ -336,6 +338,33 @@ export default function AdminShortnotesStudio() {
               setActiveTab('preview');
             }
           }
+        } else {
+          // Check if user imported a draft from library dialog
+          const draftStr = sessionStorage.getItem('ethiosmart_imported_note_draft');
+          if (draftStr) {
+            try {
+              const draft = JSON.parse(draftStr);
+              if (draft.title) setNoteTitle(draft.title);
+              if (draft.author) setAuthorName(draft.author);
+              if (draft.departmentId) setSelectedDeptId(draft.departmentId);
+              if (draft.subjectId) setSelectedSubjectId(draft.subjectId);
+              if (draft.chapterTitle) setCustomChapterTitle(draft.chapterTitle);
+              if (draft.summary) setSummary(draft.summary);
+              if (draft.learningOutcomes) setLearningOutcomes(draft.learningOutcomes);
+              if (draft.keyTakeaways) setKeyTakeaways(draft.keyTakeaways);
+              if (draft.keyTerms) setKeyTerms(draft.keyTerms);
+              if (draft.sections) setSections(draft.sections);
+              if (draft.examId) setSelectedExamId(draft.examId);
+              setActiveTab('editor');
+              sessionStorage.removeItem('ethiosmart_imported_note_draft');
+              toast({
+                title: 'Imported Note Loaded! 📝',
+                description: `Loaded "${draft.title}" with ${draft.sections?.length || 0} sections into Studio editor.`,
+              });
+            } catch (e) {
+              console.warn('Failed to parse draft from sessionStorage:', e);
+            }
+          }
         }
       } catch (err: any) {
         console.error('Failed to load initial studio data:', err);
@@ -350,6 +379,38 @@ export default function AdminShortnotesStudio() {
     }
     initData();
   }, [editNoteId]);
+
+  // Load imported data into studio editor
+  const handleLoadImportedData = (draft: {
+    title?: string;
+    author?: string;
+    departmentId?: string;
+    subjectId?: string;
+    chapterTitle?: string;
+    summary?: string;
+    learningOutcomes?: string[];
+    keyTakeaways?: string[];
+    keyTerms?: any[];
+    sections?: any[];
+    examId?: string;
+  }) => {
+    if (draft.title) setNoteTitle(draft.title);
+    if (draft.author) setAuthorName(draft.author);
+    if (draft.departmentId) setSelectedDeptId(draft.departmentId);
+    if (draft.subjectId) setSelectedSubjectId(draft.subjectId);
+    if (draft.chapterTitle) setCustomChapterTitle(draft.chapterTitle);
+    if (draft.summary) setSummary(draft.summary);
+    if (draft.learningOutcomes) setLearningOutcomes(draft.learningOutcomes);
+    if (draft.keyTakeaways) setKeyTakeaways(draft.keyTakeaways);
+    if (draft.keyTerms) setKeyTerms(draft.keyTerms);
+    if (draft.sections) setSections(draft.sections);
+    if (draft.examId) setSelectedExamId(draft.examId);
+    setActiveTab('editor');
+    toast({
+      title: 'Imported Note Loaded! 📝',
+      description: `Loaded "${draft.title || 'study note'}" with ${draft.sections?.length || 0} sections into Studio editor.`,
+    });
+  };
 
   // Load chapters when selected subject changes
   useEffect(() => {
@@ -1401,12 +1462,25 @@ export default function AdminShortnotesStudio() {
 
           {/* Action Toolbar */}
           <div className="flex items-center gap-2.5 flex-wrap">
+            {/* Import Shortnote Button */}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setImportDialogOpen(true)}
+              className="rounded-xl border-purple-500/40 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/40 text-xs font-semibold h-9 px-3 gap-1.5 shadow-xs"
+              title="Import structured JSON/Markdown notes directly"
+            >
+              <FileUp className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+              <span>Import Note</span>
+            </Button>
+
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={handleOpenBrowseNotes}
-              className="rounded-xl border-purple-500/30 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/40 text-xs font-semibold h-9 px-3"
+              className="rounded-xl border-border text-foreground hover:bg-muted text-xs font-semibold h-9 px-3"
             >
               <FolderOpen className="h-4 w-4 mr-1.5" />
               <span>Edit Existing Notes</span>
@@ -1829,7 +1903,7 @@ export default function AdminShortnotesStudio() {
           {/* TAB 1: THREE DEDICATED WORKFLOWS & SETTINGS */}
           <TabsContent value="input" className="space-y-6 animate-fade-in">
             {/* WORKFLOW SELECTOR TABS */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {/* Option A */}
               <button
                 type="button"
@@ -1916,6 +1990,30 @@ export default function AdminShortnotesStudio() {
                   </h3>
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     Paste raw text directly. Strictly treats the entire text as ONE complete chapter or learning unit without unwanted splitting.
+                  </p>
+                </div>
+              </button>
+
+              {/* Option D: Direct JSON / Markdown Import */}
+              <button
+                type="button"
+                onClick={() => setImportDialogOpen(true)}
+                className="p-4 rounded-2xl border text-left transition-all flex flex-col justify-between border-purple-500/40 bg-gradient-to-br from-purple-500/5 via-card to-background hover:border-purple-500/80 hover:bg-purple-500/10 group shadow-xs cursor-pointer"
+              >
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <div className="h-8 w-8 rounded-xl bg-purple-500/20 text-purple-600 dark:text-purple-400 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <FileUp className="h-4 w-4" />
+                    </div>
+                    <Badge variant="secondary" className="text-[10px] h-4 px-1.5 bg-purple-500/20 text-purple-700 dark:text-purple-300 font-semibold">
+                      Direct Import
+                    </Badge>
+                  </div>
+                  <h3 className="text-sm font-bold text-foreground flex items-center gap-1.5">
+                    Workflow D: Direct JSON / Markdown Import
+                  </h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Import structured notes or raw Markdown/JSON from course materials. Auto-extracts sections and 100+ MCQs with instant interactive practice exams.
                   </p>
                 </div>
               </button>
@@ -3195,6 +3293,24 @@ export default function AdminShortnotesStudio() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Shortnote Import Dialog */}
+        <ImportShortnoteDialog
+          open={importDialogOpen}
+          onOpenChange={setImportDialogOpen}
+          defaultDepartmentId={selectedDeptId !== 'all' ? selectedDeptId : undefined}
+          defaultSubjectId={selectedSubjectId || undefined}
+          onLoadToStudio={(draft) => {
+            handleLoadImportedData(draft as any);
+          }}
+          onImportSuccess={(newBookId, createdExamId) => {
+            toast({
+              title: 'Import Complete! 🎉',
+              description: `Shortnote saved to library with ${createdExamId ? 'linked interactive exam.' : 'all interactive sections.'}`,
+            });
+            navigate(`/dashboard/books/${newBookId}`);
+          }}
+        />
       </div>
     </DashboardLayout>
   );

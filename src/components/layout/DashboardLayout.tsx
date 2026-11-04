@@ -31,6 +31,8 @@ import {
   BarChart3,
   Settings,
   LogOut,
+  Home,
+  ArrowLeft,
   ClipboardList,
   Trophy,
   Menu,
@@ -79,6 +81,25 @@ export interface CategoryTheme {
 }
 
 export const CATEGORY_THEMES: Record<string, CategoryTheme> = {
+  "/": {
+    category: "home",
+    label: "First Page",
+    colorName: "sky",
+    accentHex: "#0ea5e9",
+    sidebarGradient: "bg-gradient-to-b from-[#0b2447] via-[#081b36] to-[#040d1c]",
+    headerGradient: "from-sky-950 via-blue-950 to-slate-950",
+    activeBg: "bg-sky-500/20 shadow-md shadow-sky-500/15",
+    activeText: "text-white font-bold",
+    activeBorder: "border-sky-400/40",
+    activeIndicator: "bg-sky-400 shadow-[0_0_10px_#38bdf8]",
+    iconBgActive: "bg-sky-500 text-white shadow-md shadow-sky-500/30",
+    iconBgInactive: "bg-sky-500/15 text-sky-300 group-hover:bg-sky-500/25 group-hover:text-sky-200",
+    iconColorActive: "text-white",
+    iconColorInactive: "text-sky-300",
+    hoverBg: "hover:bg-sky-500/10",
+    hoverText: "hover:text-sky-100",
+    badgeStyle: "bg-sky-500/20 text-sky-300 border-sky-400/30",
+  },
   "/dashboard": {
     category: "home",
     label: "Home",
@@ -460,15 +481,27 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
     };
   }, [profile?.departmentId]);
 
-  const studentLinks = React.useMemo(() => [
-    { href: "/dashboard", label: t("dashboard.menu.dashboard", "Home"), icon: LayoutDashboard },
-    { href: "/dashboard/books", label: "Study", icon: BookOpen },
-    { href: "/dashboard/exams", label: "Exams", icon: ClipboardList },
-    { href: "/dashboard/video-tutorials", label: "Video Tutorials", icon: Video, badge: "Soon" },
-    { href: "/dashboard/ai-assistant", label: "AI Tutor", icon: Brain, badge: "Soon" },
-    { href: "/dashboard/results", label: t("dashboard.menu.myResults", "Results"), icon: Trophy },
-    { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
-  ], [t]);
+  const studentLinks = React.useMemo(() => {
+    if (isGuest) {
+      return [
+        { href: "/dashboard/exams", label: "Exams", icon: ClipboardList },
+        { href: "/dashboard/books", label: "Study", icon: BookOpen },
+        { href: "/dashboard/video-tutorials", label: "Videos", icon: Video, badge: "Soon" },
+        { href: "/dashboard/ai-assistant", label: "AI Tutor", icon: Brain, badge: "Soon" },
+        { href: "/dashboard/results", label: t("dashboard.menu.myResults", "Results"), icon: Trophy },
+        { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
+      ];
+    }
+    return [
+      { href: "/dashboard", label: t("dashboard.menu.dashboard", "Home"), icon: LayoutDashboard },
+      { href: "/dashboard/books", label: "Study", icon: BookOpen },
+      { href: "/dashboard/exams", label: "Exams", icon: ClipboardList },
+      { href: "/dashboard/video-tutorials", label: "Video Tutorials", icon: Video, badge: "Soon" },
+      { href: "/dashboard/ai-assistant", label: "AI Tutor", icon: Brain, badge: "Soon" },
+      { href: "/dashboard/results", label: t("dashboard.menu.myResults", "Results"), icon: Trophy },
+      { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
+    ];
+  }, [t, isGuest]);
 
   const allAdminLinks = React.useMemo(() => [
     { href: "/dashboard", label: t("dashboard.menu.dashboard"), icon: LayoutDashboard, permission: 'viewDashboard' },
@@ -496,7 +529,7 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
   const activeCategoryTheme = React.useMemo(() => {
     if (CATEGORY_THEMES[currentPath]) return CATEGORY_THEMES[currentPath];
     const match = Object.entries(CATEGORY_THEMES).find(
-      ([prefix]) => prefix !== "/dashboard" && currentPath.startsWith(prefix)
+      ([prefix]) => prefix !== "/dashboard" && prefix !== "/" && currentPath.startsWith(prefix)
     );
     return match ? match[1] : CATEGORY_THEMES["/dashboard"];
   }, [currentPath]);
@@ -515,12 +548,38 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
 
       {/* Desktop header - Translucent Frosted Glass */}
       <header className="hidden lg:block fixed top-0 left-64 right-0 z-40 h-16 border-b border-white/60 dark:border-white/10 bg-white/60 dark:bg-slate-950/60 backdrop-blur-xl">
-        <div className="h-full px-6 flex items-center justify-end gap-4">
-          <div className="[&_button]:liquid-glass-squircle [&_button]:rounded-2xl">
-            <LanguageToggle />
+        <div className="h-full px-6 flex items-center justify-between">
+          <div>
+            {isGuest && (
+              <button
+                type="button"
+                onClick={() => navigate("/")}
+                className="liquid-glass-button-secondary rounded-full h-9 px-4 text-xs sm:text-sm font-bold flex items-center gap-2 text-sky-700 dark:text-sky-300 border border-sky-400/40 bg-sky-500/10 hover:bg-sky-500/20 active:scale-95 transition-all shadow-xs"
+                title="Back to First Page"
+              >
+                <ArrowLeft className="h-4 w-4 shrink-0" />
+                <span>Back to First Page</span>
+              </button>
+            )}
           </div>
-          <div className="[&_button]:liquid-glass-squircle [&_button]:rounded-2xl">
-            <ThemeToggle />
+          <div className="flex items-center gap-3">
+            <div className="[&_button]:liquid-glass-squircle [&_button]:rounded-2xl">
+              <LanguageToggle />
+            </div>
+            <div className="[&_button]:liquid-glass-squircle [&_button]:rounded-2xl">
+              <ThemeToggle />
+            </div>
+            {isGuest && (
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="liquid-glass-button-secondary rounded-full h-9 px-3.5 text-xs font-bold flex items-center gap-1.5 text-red-600 dark:text-red-400 border border-red-400/30 bg-red-500/10 hover:bg-red-500/20 active:scale-95 transition-all shadow-xs"
+                title="Exit guest mode and return to first page"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                <span>{t("common.signOut", "Sign Out")}</span>
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -543,6 +602,18 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-2">
+          {isGuest && (
+            <button
+              type="button"
+              onClick={() => navigate("/")}
+              className="liquid-glass-button-secondary rounded-full h-8 px-2.5 text-[11px] sm:text-xs font-bold flex items-center gap-1 text-sky-700 dark:text-sky-300 border border-sky-400/40 bg-sky-500/10 hover:bg-sky-500/20 active:scale-95 transition-all shadow-xs"
+              title="Back to First Page"
+            >
+              <ArrowLeft className="h-3.5 w-3.5 shrink-0" />
+              <span>First Page</span>
+            </button>
+          )}
+
           <div className="[&_button]:liquid-glass-squircle [&_button]:rounded-2xl">
             <LanguageToggle />
           </div>
@@ -564,6 +635,15 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
                 <p className="font-semibold text-foreground truncate">{profile?.full_name || (isGuest ? "Guest Student" : "User")}</p>
                 <p className="text-[10px] text-muted-foreground">{isGuest ? "Guest Access" : role ? t(`common.${role}`) : ""}</p>
               </div>
+              {isGuest && (
+                <>
+                  <DropdownMenuItem onClick={() => navigate("/")} className="font-semibold text-sky-600 dark:text-sky-400">
+                    <Home className="mr-2 h-4 w-4" />
+                    First Page
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
               {!isGuest && (
                 <>
                   <DropdownMenuItem onClick={() => navigate("/settings")}>
@@ -695,10 +775,17 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 {isGuest ? (
-                  <DropdownMenuItem onClick={handleSignOut} className="text-destructive font-semibold">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    {t("common.signOut", "Sign Out")}
-                  </DropdownMenuItem>
+                  <>
+                    <DropdownMenuItem onClick={() => navigate("/")} className="font-semibold text-sky-600 dark:text-sky-400">
+                      <Home className="mr-2 h-4 w-4" />
+                      First Page
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleSignOut} className="text-destructive font-semibold">
+                      <LogOut className="mr-2 h-4 w-4" />
+                      {t("common.signOut", "Sign Out")}
+                    </DropdownMenuItem>
+                  </>
                 ) : (
                   <>
                     <DropdownMenuItem onClick={() => navigate("/settings")}>
@@ -846,7 +933,7 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
                         : item.inactiveBg
                     )}
                   >
-                    <item.icon className="h-4.5 w-4.5 transition-transform" />
+                    <item.icon className="h-5 w-5 transition-transform" />
                   </div>
                   <span
                     className={cn(
@@ -904,18 +991,33 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
           {/* Menu Items */}
           <div className="space-y-2 pb-4">
             {isGuest ? (
-              <button
-                onClick={() => {
-                  setProfileSheetOpen(false);
-                  handleSignOut();
-                }}
-                className="w-full flex items-center gap-4 px-4 py-4 rounded-2xl hover:bg-red-50 dark:hover:bg-red-950/30 text-red-600 dark:text-red-400 border border-red-200/50 dark:border-red-900/40 transition-colors"
-              >
-                <div className="h-10 w-10 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 flex items-center justify-center">
-                  <LogOut className="h-5 w-5" />
-                </div>
-                <span className="text-base font-semibold">{t("common.signOut", "Sign Out")}</span>
-              </button>
+              <>
+                <button
+                  onClick={() => {
+                    setProfileSheetOpen(false);
+                    navigate("/");
+                  }}
+                  className="w-full flex items-center gap-4 px-4 py-4 rounded-2xl hover:bg-sky-50 dark:hover:bg-sky-950/30 text-sky-600 dark:text-sky-400 border border-sky-200/50 dark:border-sky-900/40 transition-colors"
+                >
+                  <div className="h-10 w-10 rounded-full bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center">
+                    <Home className="h-5 w-5" />
+                  </div>
+                  <span className="text-base font-semibold">First Page</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setProfileSheetOpen(false);
+                    handleSignOut();
+                  }}
+                  className="w-full flex items-center gap-4 px-4 py-4 rounded-2xl hover:bg-red-50 dark:hover:bg-red-950/30 text-red-600 dark:text-red-400 border border-red-200/50 dark:border-red-900/40 transition-colors"
+                >
+                  <div className="h-10 w-10 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 flex items-center justify-center">
+                    <LogOut className="h-5 w-5" />
+                  </div>
+                  <span className="text-base font-semibold">{t("common.signOut", "Sign Out")}</span>
+                </button>
+              </>
             ) : (
               <button
                 onClick={() => {

@@ -62,11 +62,10 @@ const Index = () => {
 
   useEffect(() => {
     if (!loading) {
-      // Auto-redirect signed-in users: admin to /dashboard, students & guests to /dashboard/exams
+      // Auto-redirect ONLY signed-in admin/staff users to their dashboard
+      // Guest students and regular visitors MUST see the first page by default
       if (user && !isGuest && role === "admin") {
         navigate("/dashboard", { replace: true });
-      } else if (user || isGuest) {
-        navigate("/dashboard/exams", { replace: true });
       }
     }
   }, [user, role, isGuest, loading, navigate]);
@@ -321,7 +320,7 @@ const Index = () => {
                 }}
               >
                 <Sparkles className="h-4 w-4 text-amber-500 shrink-0" />
-                <span>{t("auth.continueAsGuest", "Continue as Guest")}</span>
+                <span>{t("auth.signInAsGuest", "Sign in as Guest")}</span>
               </button>
             )}
           </div>
