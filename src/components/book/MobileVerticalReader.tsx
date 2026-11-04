@@ -222,22 +222,22 @@ const LazyPdfPage = memo(function LazyPdfPage({
     <div
       ref={pageRef}
       data-page-number={pageNum}
-      className={`relative flex justify-center items-center select-none shadow-md my-1.5 rounded-sm overflow-hidden ${
+      className={`relative flex justify-center items-center select-none overflow-hidden ${
         theme === 'dark' ? 'bg-[#0f1117]' : theme === 'sepia' ? 'bg-[#f4ecd8]' : 'bg-[#e5e7eb]'
-      }`}
+      } md:my-1.5 md:rounded-sm md:shadow-md my-0 rounded-none shadow-none`}
       style={{
         width: `${Math.round(containerWidth * zoomFactor)}px`,
         maxWidth: 'none',
         minHeight: `${estimatedHeight}px`,
-        marginBottom: zoomFactor > 1.2 ? '14px' : '10px',
+        marginBottom: zoomFactor > 1.2 ? '14px' : '0px',
       }}
     >
       {/* High-Resolution Canvas with crisp font contrast */}
       <canvas
         ref={canvasRef}
         className={`block transition-opacity duration-200 ${
-          isRendered ? 'opacity-100 shadow-md' : 'opacity-0'
-        }`}
+          isRendered ? 'opacity-100' : 'opacity-0'
+        } ${zoomFactor > 1.0 ? 'shadow-md' : 'shadow-none'}`}
         style={{
           width: `${Math.round(containerWidth * zoomFactor)}px`,
           height: `${Math.round(containerWidth * zoomFactor * aspectRatio)}px`,
@@ -430,17 +430,15 @@ export function MobileVerticalReader({
   const [error, setError] = useState<string | null>(null);
 
   // Engine: Canvas (PDF.js continuous vertical canvas) vs Cloud (Google Drive streaming iframe)
-  const [viewEngine, setViewEngine] = useState<ViewEngine>('canvas');
-  const [cloudIframeLoading, setCloudIframeLoading] = useState<boolean>(true);
+  // If local binary is already cached offline/pre-fetched, start with Canvas; otherwise start Cloud immediately for 0-second display
+  const [viewEngine, setViewEngine] = useState<ViewEngine>(() => (pdfData ? 'canvas' : 'cloud'));
+  const [cloudIframeLoading, setCloudIframeLoading] = useState<boolean>(false);
 
   // Settings & Customization
   const [viewMode, setViewMode] = useState<ViewMode>('page');
   
-  // Default zoom is 1.40 for mobile (fit text) or 1.0 for desktop
-  const [zoomFactor, setZoomFactor] = useState<number>(() => {
-    if (typeof window !== 'undefined' && window.innerWidth >= 768) return 1.0;
-    return 1.40;
-  });
+  // Default zoom is 1.0 (exact fit-width edge-to-edge on mobile)
+  const [zoomFactor, setZoomFactor] = useState<number>(() => 1.0);
   const [livePinchScale, setLivePinchScale] = useState<number | null>(null);
   const [livePinchPercent, setLivePinchPercent] = useState<number | null>(null);
 
@@ -606,15 +604,17 @@ export function MobileVerticalReader({
       const directUrl = book?.driveUrl;
 
       if (fileId) {
-        // Prioritize HD Canvas mode with full-fidelity rendering
+        // If not already stored locally, display the Cloud Stream immediately on frame 1
+        // so the user never faces a blocking loading spinner
         if (!isCancelled) {
-          setLoading(true);
-          setViewEngine('canvas');
+          setViewEngine('cloud');
+          setLoading(false);
+          setCloudIframeLoading(false);
         }
 
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 30000);
+          const timeoutId = setTimeout(() => controller.abort(), 12000);
 
           const res = await fetch(
             `/api/drive/download?fileId=${encodeURIComponent(fileId)}`,
@@ -635,7 +635,7 @@ export function MobileVerticalReader({
           console.warn('Canvas binary proxy fetch notice:', fetchErr);
         }
 
-        // If binary fetch couldn't be loaded on canvas, fall back to cloud stream viewer
+        // If binary fetch couldn't be loaded on canvas, ensure cloud viewer remains active
         if (!isCancelled) {
           setViewEngine('cloud');
           setLoading(false);
@@ -1139,6 +1139,25 @@ export function MobileVerticalReader({
             </Button>
           )}
 
+          {/* Direct Open in Google Drive Link (Zero wait alternative) */}
+          {(effectiveDriveFileId || activeUrl) && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const driveLink = effectiveDriveFileId
+                  ? buildDriveViewUrl(effectiveDriveFileId)
+                  : activeUrl;
+                if (driveLink) window.open(driveLink, '_blank', 'noopener,noreferrer');
+              }}
+              className="h-8 px-2 text-[10px] sm:text-xs font-bold rounded-lg flex items-center gap-1 shrink-0 border-blue-500/40 text-blue-400 bg-blue-500/10 hover:bg-blue-500/20"
+              title="Open directly in Google Drive in a new browser tab (Instant native viewer)"
+            >
+              <ExternalLink className="h-3 w-3 text-blue-400" />
+              <span>Drive</span>
+            </Button>
+          )}
+
           {/* Save Offline / Download if allowed */}
           {isSavedOffline ? (
             <span className="text-[10px] font-bold text-emerald-400 px-1.5 py-0.5 rounded bg-emerald-500/10 flex items-center gap-0.5 hidden xs:flex">
@@ -1333,7 +1352,7 @@ export function MobileVerticalReader({
                 style={{
                   width: zoomFactor > 1.0 ? `${Math.round(basePageWidth * zoomFactor)}px` : `${basePageWidth}px`,
                   minWidth: isDesktop ? `${basePageWidth}px` : '100%',
-                  maxWidth: '100%',
+                  maxWidth: zoomFactor > 1.0 ? 'none' : '100%',
                   margin: '0 auto',
                   transform: livePinchScale ? `scale(${livePinchScale})` : undefined,
                   transformOrigin: 'top center',

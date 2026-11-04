@@ -7,7 +7,7 @@ import { getBook, getBooks, toggleBookBookmark, getUserBookBookmarks, incrementB
 import { getSubject } from '@/lib/subjects';
 import { isBookSavedOffline, downloadAndSaveBookOffline, deleteOfflineBook } from '@/lib/offline-books';
 import { getSubjectCover } from '@/lib/subject-covers';
-import { buildDriveDownloadUrl, buildDriveViewUrl } from '@/lib/google-drive';
+import { buildDriveDownloadUrl, buildDriveViewUrl, extractDriveFileId } from '@/lib/google-drive';
 import { BookCard } from '@/components/book/BookCard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -225,6 +225,8 @@ export default function BookDetails() {
 
   const effectiveCover = getSubjectCover(book.subjectName || book.title, book.coverImageUrl);
   const isShortNote = book.resourceType === 'short_note';
+  const driveFileId = book.driveFileId || extractDriveFileId(book.driveUrl || '');
+  const driveViewUrl = driveFileId ? buildDriveViewUrl(driveFileId) : book.driveUrl;
 
   return (
     <DashboardLayout>
@@ -332,6 +334,19 @@ export default function BookDetails() {
                     ? 'Read Note Directly'
                     : 'Read Book Directly'}
                 </Button>
+
+                {driveViewUrl && (
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    onClick={() => window.open(driveViewUrl, '_blank', 'noopener,noreferrer')}
+                    className="rounded-xl font-semibold text-sm border-blue-500/30 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+                    title="Open directly in Google Drive in a new browser tab (Instant display)"
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Open in Google Drive
+                  </Button>
+                )}
 
                 {role === 'admin' && isShortNote && (
                   <Button

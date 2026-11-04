@@ -20,11 +20,19 @@ import { BookCard } from '@/components/book/BookCard';
 import { getPublishedExams } from '@/lib/firebase-exams';
 import { getSubjectVisualTheme } from '@/components/book/InteractiveShortNoteReader';
 import { getCachedDefaultDepartmentId } from '@/lib/system-settings';
+import { buildDriveViewUrl, extractDriveFileId } from '@/lib/google-drive';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -59,6 +67,7 @@ import {
   Ruler,
   ChevronRight,
   Eye,
+  ExternalLink,
 } from 'lucide-react';
 
 export default function StudentBooks() {
@@ -77,6 +86,7 @@ export default function StudentBooks() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [availableExams, setAvailableExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
+  const [quickSummaryNote, setQuickSummaryNote] = useState<Book | null>(null);
 
   // Offline state
   const [offlineRecords, setOfflineRecords] = useState<OfflineBookRecord[]>([]);
@@ -1461,8 +1471,44 @@ export default function StudentBooks() {
                                   </div>
                                 </div>
 
-                                {/* Right Side: Exam Link (if any) & Right Chevron */}
-                                <div className="flex items-center gap-2 shrink-0 pr-1">
+                                {/* Right Side: Drive Link, Summary Button, Exam Link & Right Chevron */}
+                                <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 pr-1 flex-wrap justify-end">
+                                  {/* Direct Google Drive Link (Alternative: Zero-wait native viewing) */}
+                                  {(() => {
+                                    const driveId = unit.note?.driveFileId || (unit.note?.driveUrl ? extractDriveFileId(unit.note.driveUrl) : null);
+                                    const driveLink = driveId ? buildDriveViewUrl(driveId) : unit.note?.driveUrl;
+                                    if (!driveLink) return null;
+                                    return (
+                                      <a
+                                        href={driveLink}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onClick={(e) => e.stopPropagation()}
+                                        title="Open directly in Google Drive in a new tab (Instant display)"
+                                        className="h-8 px-2 sm:px-2.5 rounded-xl bg-blue-500/10 hover:bg-blue-600 hover:text-white text-blue-600 dark:text-blue-400 text-xs font-bold flex items-center gap-1 transition-all shadow-xs border border-blue-500/25"
+                                      >
+                                        <ExternalLink className="h-3.5 w-3.5" />
+                                        <span className="hidden sm:inline">Drive</span>
+                                      </a>
+                                    );
+                                  })()}
+
+                                  {/* Quick Chapter Summary (Alternative: Read notes text instantly) */}
+                                  {unit.note && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setQuickSummaryNote(unit.note);
+                                      }}
+                                      title="Read Chapter Summary & Key Concepts"
+                                      className="h-8 px-2 sm:px-2.5 rounded-xl bg-slate-100 hover:bg-purple-600 hover:text-white text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-xs font-bold flex items-center gap-1 transition-all border border-border/80 shadow-xs"
+                                    >
+                                      <FileText className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                                      <span className="hidden md:inline">Summary</span>
+                                    </button>
+                                  )}
+
                                   {unit.matchedExam && (
                                     <button
                                       type="button"
@@ -1539,6 +1585,123 @@ export default function StudentBooks() {
             )}
           </div>
         )}
+        {/* Quick Chapter Summary Dialog (Instant Text Reading Alternative) */}
+        <Dialog open={Boolean(quickSummaryNote)} onOpenChange={(open) => !open && setQuickSummaryNote(null)}>
+          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto rounded-3xl p-6 sm:p-7">
+            {quickSummaryNote && (() => {
+              const driveId = quickSummaryNote.driveFileId || (quickSummaryNote.driveUrl ? extractDriveFileId(quickSummaryNote.driveUrl) : null);
+              const driveLink = driveId ? buildDriveViewUrl(driveId) : quickSummaryNote.driveUrl;
+              const matchedExam = findExamForNote(quickSummaryNote);
+
+              return (
+                <div className="space-y-5">
+                  <DialogHeader className="space-y-2 text-left">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge className="bg-purple-600 text-white font-bold text-[10px] rounded-lg">
+                        Unit {quickSummaryNote.chapterNumber || 'Guide'}
+                      </Badge>
+                      {quickSummaryNote.departmentName && (
+                        <Badge variant="outline" className="text-[10px]">
+                          {quickSummaryNote.departmentName}
+                        </Badge>
+                      )}
+                      {quickSummaryNote.readingTimeMinutes && (
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-purple-500" />
+                          ~{quickSummaryNote.readingTimeMinutes} min read
+                        </span>
+                      )}
+                    </div>
+
+                    <DialogTitle className="text-xl sm:text-2xl font-bold font-display text-foreground">
+                      {quickSummaryNote.chapterTitle || quickSummaryNote.title}
+                    </DialogTitle>
+                    <DialogDescription className="text-xs sm:text-sm text-muted-foreground">
+                      Study guide key concepts and direct document access options.
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  {/* Summary Body */}
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
+                      Chapter Key Summary
+                    </h4>
+                    <div className="p-4 rounded-2xl bg-muted/40 border border-border/80 text-sm leading-relaxed text-foreground whitespace-pre-line">
+                      {quickSummaryNote.summary || quickSummaryNote.description || 'No written summary provided for this unit yet.'}
+                    </div>
+                  </div>
+
+                  {/* Interactive Sections Preview if available */}
+                  {Array.isArray(quickSummaryNote.sections) && quickSummaryNote.sections.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
+                        Interactive Topics ({quickSummaryNote.sections.length})
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {quickSummaryNote.sections.map((sec, idx) => (
+                          <div key={sec.id || idx} className="p-2.5 rounded-xl border bg-card text-xs flex items-center gap-2">
+                            <span className="w-5 h-5 rounded-full bg-purple-500/10 text-purple-600 font-bold flex items-center justify-center text-[10px] shrink-0">
+                              {idx + 1}
+                            </span>
+                            <span className="font-medium truncate">{sec.title}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Alternative Action Buttons */}
+                  <div className="pt-2 border-t flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+                    {/* Alternative 1: Google Drive Direct Link */}
+                    {driveLink && (
+                      <a
+                        href={driveLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl font-bold text-xs bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-colors"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Open in Google Drive (Instant)
+                      </a>
+                    )}
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {/* Alternative 2: Open in App Reader */}
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => {
+                          setQuickSummaryNote(null);
+                          navigate(`/dashboard/books/${quickSummaryNote.id}/read`);
+                        }}
+                        className="rounded-xl text-xs font-semibold h-9"
+                      >
+                        <Eye className="w-3.5 h-3.5 mr-1" />
+                        Open in App Reader
+                      </Button>
+
+                      {/* Alternative 3: Take Practice Exam */}
+                      {matchedExam && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setQuickSummaryNote(null);
+                            navigate(`/exam/${matchedExam.examId}`);
+                          }}
+                          className="rounded-xl text-xs font-semibold h-9 border-purple-500/30 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/40"
+                        >
+                          <GraduationCap className="w-3.5 h-3.5 mr-1" />
+                          Take Chapter Exam
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );

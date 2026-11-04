@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { Book, ShortNoteSection, KeyTerm, NoteExercise, NoteContentBlock } from '@/types/book';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -60,7 +61,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { getExamsBySubject } from '@/lib/firebase-exams';
-import { buildDriveViewUrl, extractDriveFileId } from '@/lib/google-drive';
+import { buildDrivePreviewUrl, buildDriveViewUrl, extractDriveFileId } from '@/lib/google-drive';
 import { FormattedProseWithMath, MathContent } from '@/components/notes/MathContent';
 import { ContentBlockRenderer } from '@/components/notes/ContentBlockRenderer';
 import { InteractiveExerciseCard } from '@/components/notes/InteractiveExerciseCard';
@@ -312,6 +313,7 @@ export function InteractiveShortNoteReader({
 }: InteractiveShortNoteReaderProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { role } = useAuth();
 
   const sections: ShortNoteSection[] = Array.isArray(book?.sections) ? book.sections : [];
   const keyTerms: KeyTerm[] = Array.isArray(book?.keyTerms) ? book.keyTerms : [];
@@ -437,6 +439,7 @@ export function InteractiveShortNoteReader({
   // Modals & Panels
   const [isTocOpen, setIsTocOpen] = useState(false);
   const [isAppearanceOpen, setIsAppearanceOpen] = useState(false);
+  const [isDrivePreviewFullscreen, setIsDrivePreviewFullscreen] = useState(false);
 
   // In-note search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -732,10 +735,10 @@ export function InteractiveShortNoteReader({
     }
   };
 
-  // Width Class: Reaching screen edges vs centered column (Full width on mobile)
+  // Width Class: Wide reading canvas reaching display edges comfortably (edge-to-edge on mobile)
   const contentWidthClass = isEdgeToEdge
-    ? 'w-full max-w-none px-1 sm:px-2 md:px-4'
-    : 'w-full max-w-5xl mx-auto px-1.5 sm:px-3 md:px-5';
+    ? 'w-full max-w-[98%] mx-auto px-0 sm:px-4 md:px-6'
+    : 'w-full max-w-7xl mx-auto px-2 sm:px-6 md:px-8';
 
   // Mastery percentage
   const masteryPercentage =
@@ -780,7 +783,7 @@ export function InteractiveShortNoteReader({
       {/* Main Reading Container */}
       <div className={`${contentWidthClass} space-y-5 pt-2 transition-all duration-200`}>
         {/* Top Reading Toolbar */}
-        <div className={`sticky top-2 z-40 flex flex-col gap-2 p-3 sm:p-3.5 rounded-2xl backdrop-blur-md border shadow-md print:hidden ${themeCardClass}`}>
+        <div className={`sticky top-0 sm:top-2 z-40 flex flex-col gap-2 p-2.5 sm:p-3.5 rounded-none sm:rounded-2xl backdrop-blur-md border-b sm:border border-x-0 sm:border-x shadow-xs sm:shadow-md print:hidden ${themeCardClass}`}>
           <div className="flex items-center justify-between gap-2">
             {/* Back Button & Breadcrumbs */}
             <div className="flex items-center gap-2 min-w-0">
@@ -843,6 +846,18 @@ export function InteractiveShortNoteReader({
               >
                 <Palette className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Theme</span>
+              </Button>
+
+              {/* Quick Width Toggle: Wide / Centered */}
+              <Button
+                variant={isEdgeToEdge ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={toggleEdgeToEdge}
+                className="h-8 px-2 rounded-xl text-xs font-semibold gap-1 text-muted-foreground hover:text-foreground font-sans hidden sm:inline-flex"
+                title={isEdgeToEdge ? 'Switch to Standard Reading Width' : 'Expand to Full Edge-to-Edge Display Width'}
+              >
+                {isEdgeToEdge ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+                <span className="hidden md:inline">{isEdgeToEdge ? 'Wide' : 'Normal'}</span>
               </Button>
 
               {/* Table of Contents Button */}
@@ -966,7 +981,7 @@ export function InteractiveShortNoteReader({
         </div>
 
         {/* TOP CHAPTER BANNER (Prominently showing Chapter Name with subject-relevant colors & emojis) */}
-        <div className={`rounded-3xl border-2 p-4 sm:p-6 shadow-sm transition-all ${subjectVisual.bannerBg} ${subjectVisual.bannerBorder}`}>
+        <div className={`rounded-2xl sm:rounded-3xl border-2 mx-2 sm:mx-0 p-4 sm:p-6 shadow-sm transition-all ${subjectVisual.bannerBg} ${subjectVisual.bannerBorder}`}>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3.5 min-w-0">
               <div className={`h-12 w-12 sm:h-14 sm:w-14 rounded-2xl flex items-center justify-center text-2xl sm:text-3xl shrink-0 shadow-xs border ${subjectVisual.badgeBorder} ${subjectVisual.iconBg}`}>
@@ -996,7 +1011,7 @@ export function InteractiveShortNoteReader({
         </div>
 
         {/* BOOK FRONT MATTER & COVER HEADER */}
-        <div className={`relative overflow-hidden rounded-3xl border p-5 sm:p-8 shadow-sm transition-all ${themeCardClass}`}>
+        <div className={`relative overflow-hidden rounded-2xl sm:rounded-3xl border mx-2 sm:mx-0 p-5 sm:p-8 shadow-sm transition-all ${themeCardClass}`}>
           <div className="absolute top-4 right-4 sm:top-6 sm:right-6 opacity-10 pointer-events-none">
             <BookOpen className="h-28 w-28 text-primary" />
           </div>
@@ -1048,7 +1063,7 @@ export function InteractiveShortNoteReader({
         </div>
 
         {/* SECTIONS LIST HEADER & CONTROLS */}
-        <div className="space-y-4">
+        <div className="space-y-4 px-2 sm:px-0">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2">
             <div>
               <h2 className="text-xl sm:text-2xl font-display font-bold text-foreground">
@@ -1292,40 +1307,83 @@ export function InteractiveShortNoteReader({
               })}
             </div>
           ) : (
-            <div className={`p-8 text-center rounded-3xl border border-dashed text-foreground space-y-4 ${themeCardClass}`}>
+            <div className="space-y-4">
               {driveFileId || book?.driveUrl ? (
-                <>
-                  <div className="h-12 w-12 mx-auto rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
-                    <FileText className="h-6 w-6" />
-                  </div>
-                  <div className="space-y-1">
-                    <h4 className="text-base font-bold">Document Note Available</h4>
-                    <p className="text-xs text-muted-foreground max-w-md mx-auto">
-                      This note is linked to a Google Drive document. You can open and read the full original document in the continuous document reader.
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
-                    <Button
-                      onClick={() => navigate(`/dashboard/books/${book.id}/read?viewer=document`)}
-                      className="rounded-xl text-xs font-semibold gap-1.5"
-                    >
-                      <FileText className="h-3.5 w-3.5" />
-                      Open Document Reader
-                    </Button>
-                    {externalDriveUrl && (
+                <div className={`p-0 sm:p-6 rounded-none sm:rounded-3xl border-y sm:border border-x-0 sm:border-x text-foreground space-y-3 sm:space-y-4 ${themeCardClass}`}>
+                  <div className="px-3 pt-3 sm:px-0 sm:pt-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-purple-500/15 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
+                        <FileText className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm sm:text-base font-bold">Document Study Guide</h4>
+                        <p className="text-xs text-muted-foreground">
+                          Linked Google Drive document. Read directly below or open in the native Google Drive viewer.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                       <Button
                         variant="outline"
-                        onClick={() => window.open(externalDriveUrl, '_blank')}
-                        className="rounded-xl text-xs gap-1.5"
+                        size="sm"
+                        onClick={() => setIsDrivePreviewFullscreen(true)}
+                        className="rounded-xl text-xs font-semibold gap-1.5 h-8 border-primary/30 text-primary bg-primary/5 hover:bg-primary/15"
+                        title="Expand document viewer to full screen"
                       >
-                        <ExternalLink className="h-3.5 w-3.5" />
-                        Open in Google Drive
+                        <Maximize2 className="h-3.5 w-3.5" />
+                        Fullscreen Document
                       </Button>
-                    )}
+                      {externalDriveUrl && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.open(externalDriveUrl, '_blank')}
+                          className="rounded-xl text-xs gap-1.5 h-8 border-blue-500/30 text-blue-600 dark:text-blue-400 bg-blue-500/5 hover:bg-blue-500/15"
+                          title="Open directly in Google Drive in a new browser tab"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                          Open in Google Drive
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`/dashboard/books/${book.id}/read?viewer=document`)}
+                        className="rounded-xl text-xs font-semibold gap-1.5 h-8"
+                        title="Open in continuous multi-page PDF reader"
+                      >
+                        <FileText className="h-3.5 w-3.5" />
+                        Continuous PDF Reader
+                      </Button>
+                      {role === 'admin' && (
+                        <Button
+                          size="sm"
+                          onClick={() => navigate(`/dashboard/admin/shortnotes/edit/${book.id}`)}
+                          className="rounded-xl text-xs font-semibold gap-1.5 h-8 bg-purple-600 hover:bg-purple-700 text-white shadow-xs"
+                          title="Convert this document into structured AI textbook sections with formulas, worked examples & exercises"
+                        >
+                          <Sparkles className="h-3.5 w-3.5" />
+                          AI Generate Interactive Sections
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </>
+
+                  {/* Embedded Google Drive Preview (Loads instantly, 100% edge-to-edge on mobile screen) */}
+                  {(driveFileId || book?.driveUrl) && (
+                    <div className="relative w-full rounded-none sm:rounded-2xl overflow-hidden border-x-0 sm:border border-y sm:border-y border-border/80 bg-slate-950 h-[86vh] sm:h-[82vh] min-h-[580px] sm:min-h-[720px] shadow-none sm:shadow-sm">
+                      <iframe
+                        src={driveFileId ? buildDrivePreviewUrl(driveFileId) : (book?.driveUrl || '')}
+                        className="w-full h-full border-0 block"
+                        title={book.title}
+                        allow="autoplay"
+                      />
+                    </div>
+                  )}
+                </div>
               ) : (
-                <>
+                <div className={`p-8 text-center rounded-3xl border border-dashed text-foreground space-y-4 ${themeCardClass}`}>
                   <Search className="h-8 w-8 mx-auto text-muted-foreground" />
                   <p className="text-sm font-semibold">
                     {searchQuery ? `No topics match "${searchQuery}"` : 'No section content available.'}
@@ -1335,7 +1393,7 @@ export function InteractiveShortNoteReader({
                       Clear Search
                     </Button>
                   )}
-                </>
+                </div>
               )}
             </div>
           )}
@@ -1343,7 +1401,7 @@ export function InteractiveShortNoteReader({
 
         {/* TOP LEVEL COMPREHENSIVE EXERCISES */}
         {topExercises.length > 0 && (
-          <div className={`rounded-3xl border p-5 sm:p-7 space-y-4 shadow-sm ${themeCardClass}`}>
+          <div className={`rounded-2xl sm:rounded-3xl border mx-2 sm:mx-0 p-5 sm:p-7 space-y-4 shadow-sm ${themeCardClass}`}>
             <div className="flex items-center gap-2">
               <BookCheck className="h-5 w-5 text-primary" />
               <h3 className="text-base sm:text-lg font-bold text-foreground">
@@ -1365,7 +1423,7 @@ export function InteractiveShortNoteReader({
 
         {/* CHAPTER GLOSSARY & EXPERT FLASHCARDS */}
         {keyTerms.length > 0 && (
-          <div className={`rounded-3xl border p-5 sm:p-7 space-y-5 shadow-sm font-sans ${themeCardClass}`}>
+          <div className={`rounded-2xl sm:rounded-3xl border mx-2 sm:mx-0 p-5 sm:p-7 space-y-5 shadow-sm font-sans ${themeCardClass}`}>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <div className="h-7 w-7 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
@@ -1426,7 +1484,7 @@ export function InteractiveShortNoteReader({
         )}
 
         {/* CHAPTER COMPLETED TEST YOUR RECALL (Exact match to image media_1792949865916_19ceec0c.png) */}
-        <div className="rounded-3xl bg-gradient-to-r from-amber-600 via-orange-600 to-amber-600 p-6 sm:p-8 text-white shadow-xl flex flex-col md:flex-row items-center justify-between gap-6 w-full font-sans print:hidden">
+        <div className="rounded-2xl sm:rounded-3xl mx-2 sm:mx-0 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-600 p-6 sm:p-8 text-white shadow-xl flex flex-col md:flex-row items-center justify-between gap-6 font-sans print:hidden">
           <div className="space-y-2 text-center md:text-left flex-1 min-w-0">
             <div className="flex items-center justify-center md:justify-start gap-3">
               <div className="h-10 w-10 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
@@ -1824,6 +1882,48 @@ export function InteractiveShortNoteReader({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Fullscreen Overlay for Embedded Google Drive Preview */}
+      {isDrivePreviewFullscreen && (
+        <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-md p-0 sm:p-5 flex flex-col animate-fade-in">
+          <div className="flex items-center justify-between p-2.5 sm:p-0 sm:pb-3 shrink-0 border-b sm:border-b-0 border-border/50">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-sm sm:text-base font-bold text-foreground truncate">{formattedChapterHeading}</span>
+              <Badge variant="outline" className="text-[10px] sm:text-xs shrink-0">Document View</Badge>
+            </div>
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              {externalDriveUrl && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(externalDriveUrl, '_blank')}
+                  className="h-7 sm:h-8 px-2 rounded-xl text-xs gap-1"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Open in Drive</span>
+                </Button>
+              )}
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setIsDrivePreviewFullscreen(false)}
+                className="h-7 sm:h-8 px-2.5 rounded-xl text-xs gap-1 font-semibold"
+              >
+                <Minimize2 className="h-3.5 w-3.5" />
+                Exit
+              </Button>
+            </div>
+          </div>
+          <div className="flex-1 w-full rounded-none sm:rounded-2xl overflow-hidden border-0 sm:border border-border/80 bg-slate-950 shadow-2xl">
+            <iframe
+              src={driveFileId ? buildDrivePreviewUrl(driveFileId) : (book?.driveUrl || '')}
+              className="w-full h-full border-0 block"
+              title={book.title}
+              allow="autoplay"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

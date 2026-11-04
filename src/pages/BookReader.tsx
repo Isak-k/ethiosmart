@@ -386,19 +386,19 @@ export default function BookReader() {
   const isShortNote = book.resourceType === 'short_note';
   const hasInteractiveSections = Array.isArray(book.sections) && book.sections.length > 0;
 
-  // Study notes with structured interactive sections render in the native interactive reader
-  if (isShortNote && hasInteractiveSections && !forceDocumentMode) {
+  // All short notes open in the interactive AI notes reader by default!
+  // Rendered full-width without dashboard sidebar constraints for maximum screen space and immersive reading.
+  // If the user specifically wants the raw continuous PDF viewer, they can use ?viewer=document
+  if (isShortNote && !forceDocumentMode) {
     return (
-      <DashboardLayout contentClassName="p-0 w-full min-h-screen">
-        <div className="w-full pb-12 animate-fade-in pt-0">
-          <InteractiveShortNoteReader
-            book={book}
-            isBookmarked={isBookmarked}
-            onToggleBookmark={handleToggleBookmark}
-            onBack={() => navigate(`/dashboard/books/${book.id}`)}
-          />
-        </div>
-      </DashboardLayout>
+      <div className="min-h-screen w-full bg-background animate-fade-in">
+        <InteractiveShortNoteReader
+          book={book}
+          isBookmarked={isBookmarked}
+          onToggleBookmark={handleToggleBookmark}
+          onBack={() => navigate(`/dashboard/books/${book.id}`)}
+        />
+      </div>
     );
   }
 
@@ -432,7 +432,7 @@ export default function BookReader() {
   }
 
   return (
-    <DashboardLayout>
+    <DashboardLayout contentClassName="p-2 sm:p-4 lg:p-6 w-full max-w-none">
       <div
         ref={containerRef}
         className={`flex flex-col space-y-2 animate-fade-in ${
@@ -480,6 +480,20 @@ export default function BookReader() {
 
           {/* Right: Controls & Actions */}
           <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+            {/* Open in Google Drive Link (Zero wait alternative) */}
+            {viewUrl && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(viewUrl, '_blank', 'noopener,noreferrer')}
+                className="h-7 px-2 text-[11px] font-semibold rounded-lg border-blue-500/30 text-blue-600 dark:text-blue-400 bg-blue-500/5 hover:bg-blue-500/10"
+                title="Open directly in Google Drive in a new browser tab (Instant display)"
+              >
+                <ExternalLink className="h-3 w-3 mr-1" />
+                Open in Drive
+              </Button>
+            )}
+
             {/* Zoom Controls */}
             <div className="flex items-center gap-1 border-r pr-2 mr-1">
               <Button

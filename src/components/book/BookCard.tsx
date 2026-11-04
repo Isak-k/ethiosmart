@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Book } from '@/types/book';
 import { getSubjectCover } from '@/lib/subject-covers';
-import { buildDriveDownloadUrl } from '@/lib/google-drive';
+import { buildDriveDownloadUrl, buildDriveViewUrl, extractDriveFileId } from '@/lib/google-drive';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -69,6 +69,8 @@ export function BookCard({
 
   const isShortNote = book.resourceType === 'short_note';
   const effectiveCover = getSubjectCover(book.subjectName || book.title, book.coverImageUrl);
+  const driveFileId = book.driveFileId || (book.driveUrl ? extractDriveFileId(book.driveUrl) : null);
+  const driveViewUrl = driveFileId ? buildDriveViewUrl(driveFileId) : book.driveUrl;
 
   // Directly open reader on click
   const handleRead = (e?: React.MouseEvent) => {
@@ -322,6 +324,21 @@ export function BookCard({
                 <Info className="w-3.5 h-3.5 mr-1 text-primary shrink-0" />
                 <span>Detail</span>
               </Button>
+
+              {/* Direct Open in Google Drive Link (Zero wait alternative) */}
+              {driveViewUrl && (
+                <a
+                  href={driveViewUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  title="Open directly in Google Drive (Fast New Tab - Zero Wait)"
+                  className="h-8 px-2 sm:px-2.5 text-xs font-semibold rounded-xl border border-blue-500/30 text-blue-600 dark:text-blue-400 bg-blue-500/5 hover:bg-blue-500/15 flex items-center justify-center shrink-0 transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 sm:mr-1 text-blue-600 dark:text-blue-400" />
+                  <span className="hidden sm:inline">Drive</span>
+                </a>
+              )}
             </div>
 
             {/* Right Action: Download or Saved Offline */}
@@ -492,6 +509,22 @@ export function BookCard({
                 <Eye className="w-4 h-4 mr-2" />
                 Open & Read {isShortNote ? 'Note' : 'Book'} Directly
               </Button>
+
+              {driveViewUrl && (
+                <a
+                  href={driveViewUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDetailsOpen(false);
+                  }}
+                  className="w-full sm:w-auto inline-flex items-center justify-center rounded-xl text-xs font-semibold h-10 px-3.5 border border-blue-500/30 text-blue-600 dark:text-blue-400 bg-blue-500/5 hover:bg-blue-500/15 transition-colors gap-1.5"
+                >
+                  <ExternalLink className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  Open in Google Drive
+                </a>
+              )}
 
               {book.allowDownload && (
                 <Button
