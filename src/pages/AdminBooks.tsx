@@ -257,7 +257,7 @@ export default function AdminBooks() {
         if (searchQuery.trim().length > 0) {
           const q = searchQuery.toLowerCase().trim();
           return (
-            sub.name.toLowerCase().includes(q) ||
+            (sub.name || '').toLowerCase().includes(q) ||
             sub.description?.toLowerCase().includes(q)
           );
         }
@@ -302,6 +302,27 @@ export default function AdminBooks() {
     } catch (err: any) {
       toast({
         title: 'Failed to update status',
+        description: err.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Quick toggle resource type (Curriculum Book <-> Study Note)
+  const handleToggleResourceType = async (book: Book) => {
+    const nextType = book.resourceType === 'short_note' ? 'textbook' : 'short_note';
+    try {
+      await updateBook(book.id, { resourceType: nextType });
+      toast({
+        title: 'Resource Category Updated',
+        description: `"${book.title}" is now categorized as a ${
+          nextType === 'short_note' ? 'Study Note' : 'Curriculum Book'
+        }.`,
+      });
+      fetchData();
+    } catch (err: any) {
+      toast({
+        title: 'Failed to update category',
         description: err.message,
         variant: 'destructive',
       });
@@ -706,7 +727,9 @@ export default function AdminBooks() {
                             alt={sub.name}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                             onError={(e) => {
-                              (e.target as HTMLElement).src = getSubjectCover(sub.name).url;
+                              const target = e.currentTarget as HTMLImageElement;
+                              target.onerror = null;
+                              target.src = getSubjectCover(sub.name).url;
                             }}
                           />
                           {/* Book spine simulation */}
@@ -843,6 +866,7 @@ export default function AdminBooks() {
                   setDeleteDialogOpen(true);
                 }}
                 onToggleStatus={handleToggleStatus}
+                onToggleResourceType={handleToggleResourceType}
                 onGenerateAI={handleGenerateAI}
               />
             ))}
@@ -860,6 +884,7 @@ export default function AdminBooks() {
           onSave={handleSaveBook}
           defaultDepartmentId={selectedDept !== 'all' ? selectedDept : undefined}
           defaultSubjectId={selectedSubject !== 'all' ? selectedSubject : undefined}
+          defaultResourceType={selectedType === 'short_note' ? 'short_note' : 'textbook'}
         />
 
         {/* Import Shortnote Dialog */}

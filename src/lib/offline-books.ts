@@ -1,6 +1,6 @@
 import { Book } from '@/types/book';
 import { incrementBookDownload } from '@/lib/books';
-import { formatFileSize } from '@/lib/google-drive';
+import { formatFileSize, extractDriveFileId } from '@/lib/google-drive';
 
 const DB_NAME = 'exam_pro_offline_books';
 const DB_VERSION = 1;
@@ -195,7 +195,8 @@ export async function downloadAndSaveBookOffline(
   book: Book,
   onProgress?: (message: string) => void
 ): Promise<void> {
-  if (!book.driveFileId) {
+  const fileId = book.driveFileId || extractDriveFileId(book.driveUrl || '');
+  if (!fileId) {
     throw new Error('This resource does not have a valid Google Drive file ID.');
   }
 
@@ -207,7 +208,7 @@ export async function downloadAndSaveBookOffline(
   // 1. Try local dev bridge / proxy first
   try {
     onProgress?.('Downloading document file...');
-    const proxyUrl = `/api/drive/download?fileId=${encodeURIComponent(book.driveFileId)}`;
+    const proxyUrl = `/api/drive/download?fileId=${encodeURIComponent(fileId)}`;
     const res = await fetch(proxyUrl);
     if (res.ok) {
       const contentType = res.headers.get('content-type') || '';
@@ -235,7 +236,7 @@ export async function downloadAndSaveBookOffline(
   // 2. Fallback to direct Google Drive export download
   if (!blob || blob.size === 0) {
     try {
-      const directUrl = `https://drive.google.com/uc?export=download&id=${encodeURIComponent(book.driveFileId)}`;
+      const directUrl = `https://drive.google.com/uc?export=download&id=${encodeURIComponent(fileId)}`;
       const res = await fetch(directUrl, { mode: 'cors' });
       if (res.ok) {
         blob = await res.blob();

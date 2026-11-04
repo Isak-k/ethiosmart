@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Book } from '@/types/book';
@@ -43,6 +43,7 @@ import {
 
 export default function BookReader() {
   const { bookId } = useParams<{ bookId: string }>();
+  const [searchParams] = useSearchParams();
   const { user, role } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -54,6 +55,7 @@ export default function BookReader() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [zoomScale, setZoomScale] = useState(100);
   const [iframeError, setIframeError] = useState(false);
+  const [desktopEngine, setDesktopEngine] = useState<'canvas' | 'browser'>('canvas');
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window === 'undefined') return false;
     return window.innerWidth < 768 || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
@@ -67,10 +69,11 @@ export default function BookReader() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Offline reader state
+  // Offline and online blob state
   const [isSavedOffline, setIsSavedOffline] = useState(false);
   const [isReadingOffline, setIsReadingOffline] = useState(false);
   const [offlineBlobUrl, setOfflineBlobUrl] = useState<string | null>(null);
+  const [onlineBlobUrl, setOnlineBlobUrl] = useState<string | null>(null);
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
   const [isDownloadingOffline, setIsDownloadingOffline] = useState(false);
   const [downloadProgressMsg, setDownloadProgressMsg] = useState('');
@@ -115,24 +118,27 @@ export default function BookReader() {
     }
   };
 
-  // Clean up blob URL when unmounting or changing document
+  // Clean up blob URLs when unmounting or changing document
   useEffect(() => {
     return () => {
       if (offlineBlobUrl) {
         URL.revokeObjectURL(offlineBlobUrl);
       }
+      if (onlineBlobUrl) {
+        URL.revokeObjectURL(onlineBlobUrl);
+      }
     };
-  }, [offlineBlobUrl]);
+  }, [offlineBlobUrl, onlineBlobUrl]);
 
-  // Ensure iframe loading overlay dismisses for offline blobs (since browser PDF plugins might not fire iframe.onload)
+  // Ensure iframe loading overlay dismisses for blobs (since browser PDF plugins might not fire iframe.onload)
   useEffect(() => {
-    if (isReadingOffline && offlineBlobUrl) {
+    if ((isReadingOffline && offlineBlobUrl) || onlineBlobUrl) {
       const timer = setTimeout(() => {
         setIframeLoading(false);
       }, 350);
       return () => clearTimeout(timer);
     }
-  }, [isReadingOffline, offlineBlobUrl]);
+  }, [isReadingOffline, offlineBlobUrl, onlineBlobUrl]);
 
   const loadBook = async (id: string) => {
     setLoading(true);
@@ -161,14 +167,19 @@ export default function BookReader() {
         return;
       }
 
-      setBook(data);
+      const normalizedBook: Book = {
+        ...data,
+        driveFileId: data.driveFileId || extractDriveFileId(data.driveUrl || '') || undefined,
+      };
+      setBook(normalizedBook);
       const saved = await isBookSavedOffline(id);
       setIsSavedOffline(saved);
       incrementBookView(id);
 
       // Pre-fetch document binary via proxy for responsive Canvas reading on mobile and desktop
-      if (data.driveFileId) {
-        fetch(`/api/drive/download?fileId=${encodeURIComponent(data.driveFileId)}`)
+      const targetFileId = normalizedBook.driveFileId;
+      if (targetFileId) {
+        fetch(`/api/drive/download?fileId=${encodeURIComponent(targetFileId)}`)
           .then(async (res) => {
             if (res.ok) {
               const contentType = res.headers.get('content-type') || '';
@@ -177,6 +188,8 @@ export default function BookReader() {
                 const head = new Uint8Array(await blob.slice(0, 5).arrayBuffer());
                 if (head[0] === 0x25 && head[1] === 0x50 && head[2] === 0x44 && head[3] === 0x46) {
                   setPdfBlob(blob);
+                  const blobUrl = URL.createObjectURL(blob);
+                  setOnlineBlobUrl(blobUrl);
                 }
               }
               setIframeLoading(false);
@@ -369,10 +382,12 @@ export default function BookReader() {
     );
   }
 
+  const forceDocumentMode = searchParams.get('viewer') === 'document' || searchParams.get('mode') === 'document';
   const isShortNote = book.resourceType === 'short_note';
+  const hasInteractiveSections = Array.isArray(book.sections) && book.sections.length > 0;
 
-  // Any study note renders in the native interactive reader on both mobile and desktop
-  if (isShortNote) {
+  // Study notes with structured interactive sections render in the native interactive reader
+  if (isShortNote && hasInteractiveSections && !forceDocumentMode) {
     return (
       <DashboardLayout contentClassName="p-0 w-full min-h-screen">
         <div className="w-full pb-12 animate-fade-in pt-0">
@@ -393,11 +408,11 @@ export default function BookReader() {
   const viewUrl = fileId ? buildDriveViewUrl(fileId) : (book.driveUrl || '');
   const downloadUrl = fileId ? buildDriveDownloadUrl(fileId) : (book.driveUrl || '');
 
-  // Active rendering URL: either local offline blob URL or Google Drive preview iframe
-  const activeViewerUrl = isReadingOffline && offlineBlobUrl ? offlineBlobUrl : previewUrl;
+  // Active rendering URL: either local offline blob URL, online fetched blob URL, or Google Drive preview iframe
+  const activeViewerUrl = offlineBlobUrl || onlineBlobUrl || previewUrl;
 
-  // On Mobile Phone: Use Dedicated Full-Screen Vertical-Scroll Reader
-  if (isMobile) {
+  // Dedicated High-Definition Continuous Canvas Reader (Used for Mobile, or for Desktop when canvas engine is active - DEFAULT)
+  if (isMobile || desktopEngine === 'canvas') {
     return (
       <MobileVerticalReader
         book={book}
@@ -406,6 +421,12 @@ export default function BookReader() {
         onBack={() => navigate(`/dashboard/books/${book.id}`)}
         onSaveOffline={book.allowDownload ? handleSaveForOffline : undefined}
         isDownloadingOffline={isDownloadingOffline}
+        isAdmin={role === 'admin'}
+        onGenerateExam={() =>
+          navigate(
+            `/dashboard/admin/ai-generator?source=book&bookId=${book.id}&deptId=${book.departmentId}&subjectId=${book.subjectId}`
+          )
+        }
       />
     );
   }
@@ -543,6 +564,18 @@ export default function BookReader() {
               </Button>
             ) : null}
 
+            {/* Toggle back to HD Continuous Canvas Reader */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDesktopEngine('canvas')}
+              className="h-7 px-2 text-[11px] font-semibold text-primary border-primary/30 bg-primary/5 hover:bg-primary/10 rounded-lg"
+              title="Switch to High-Definition Continuous Canvas Reader"
+            >
+              <Sparkles className="h-3 w-3 mr-1 text-primary" />
+              HD Canvas
+            </Button>
+
             {/* Fullscreen Button */}
             <Button
               variant="outline"
@@ -610,23 +643,31 @@ export default function BookReader() {
             </div>
           )}
 
-          {/* Iframe error fallback notice (for online Drive preview) */}
-          {!isReadingOffline && iframeError && (
+          {/* Iframe fallback notice (for online Drive preview when blob is not yet cached) */}
+          {!isReadingOffline && !onlineBlobUrl && (
             <div className="absolute inset-x-6 top-6 z-20">
-              <Alert variant="destructive" className="rounded-xl shadow-lg">
+              <Alert className="rounded-xl shadow-lg border-amber-500/30 bg-amber-500/10 text-amber-500 dark:text-amber-400">
                 <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Viewer Connection Notice</AlertTitle>
-                <AlertDescription className="text-xs">
-                  If the Google Drive document does not render automatically inside your browser due to third-party cookie restrictions,{' '}
-                  <a
-                    href={viewUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline font-bold text-white ml-1 inline-flex items-center gap-1"
-                  >
-                    click here to open directly in Google Drive <ExternalLink className="h-3 w-3" />
-                  </a>
-                  , or click <strong>Save Offline</strong> above to read it directly inside EthioSmart.
+                <AlertTitle className="text-xs font-bold">Document Connection Notice</AlertTitle>
+                <AlertDescription className="text-xs flex items-center justify-between gap-3 flex-wrap">
+                  <span>If Google Drive does not render automatically inside your browser due to third-party cookie restrictions, switch to HD Canvas or open in Drive.</span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => setDesktopEngine('canvas')}
+                      className="h-6 text-[10px] px-2.5 rounded-lg bg-primary text-primary-foreground font-semibold"
+                    >
+                      Switch to HD Canvas
+                    </Button>
+                    <a
+                      href={viewUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline font-bold text-xs inline-flex items-center gap-1 text-foreground"
+                    >
+                      Open in Google Drive <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
                 </AlertDescription>
               </Alert>
             </div>

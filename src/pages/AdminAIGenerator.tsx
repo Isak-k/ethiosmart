@@ -47,8 +47,8 @@ import {
   Settings,
   KeyRound,
 } from 'lucide-react';
-import { AIProviderSettingsDialog } from '@/components/admin/AIProviderSettingsDialog';
 import { AIProviderSettingsSection } from '@/components/admin/AIProviderSettingsSection';
+import { EthioAccentBar } from '@/components/ui/EthioAccentBar';
 import { getEffectiveProviderKeys } from '@/lib/ai-settings';
 import { cn } from '@/lib/utils';
 import { getOfflineBook } from '@/lib/offline-books';
@@ -126,9 +126,6 @@ export default function AdminAIGenerator() {
 
   // Active view tab: 'configure' | 'progress' | 'review' | 'history' | 'settings'
   const [activeTab, setActiveTab] = useState<'configure' | 'progress' | 'review' | 'history' | 'settings'>('configure');
-
-  // AI Provider Settings Modal
-  const [showAISettingsDialog, setShowAISettingsDialog] = useState(false);
 
   // Provider health statuses
   const [providerStatuses, setProviderStatuses] = useState<ProviderStatusInfo[]>([]);
@@ -270,6 +267,7 @@ export default function AdminAIGenerator() {
   const [generationLogs, setGenerationLogs] = useState<string[]>([]);
   const [generatedQuestions, setGeneratedQuestions] = useState<NormalizedQuestion[]>([]);
   const [recentJobsList, setRecentJobsList] = useState<AIGenerationJob[]>([]);
+  const [isSavingExam, setIsSavingExam] = useState(false);
 
   // Load initial metadata & provider health
   const refreshStatuses = async () => {
@@ -335,6 +333,47 @@ export default function AdminAIGenerator() {
   const selectedBook = useMemo(() => {
     return libraryBooks.find(b => b.id === selectedBookId) || null;
   }, [libraryBooks, selectedBookId]);
+
+  // Subject chapters for selected book
+  const [bookSubjectChapters, setBookSubjectChapters] = useState<Chapter[]>([]);
+
+  useEffect(() => {
+    if (selectedBook?.subjectId) {
+      getChapters(selectedBook.subjectId)
+        .then(setBookSubjectChapters)
+        .catch(() => setBookSubjectChapters([]));
+    } else {
+      setBookSubjectChapters([]);
+    }
+  }, [selectedBook?.subjectId]);
+
+  // Combined available chapters for the selected book
+  const availableBookChapters = useMemo(() => {
+    const list: string[] = [];
+    const seen = new Set<string>();
+
+    const add = (val?: string) => {
+      if (!val) return;
+      const trimmed = val.trim();
+      if (!trimmed || seen.has(trimmed.toLowerCase())) return;
+      seen.add(trimmed.toLowerCase());
+      list.push(trimmed);
+    };
+
+    if (selectedBook?.chapterTitle) {
+      add(selectedBook.chapterTitle);
+    }
+    if (Array.isArray(selectedBook?.chapterLabels)) {
+      selectedBook.chapterLabels.forEach(add);
+    }
+    bookSubjectChapters.forEach(c => {
+      const formatted = `Chapter ${c.chapterNumber ?? ''}: ${c.title}`.trim();
+      add(formatted);
+      add(c.title);
+    });
+
+    return list;
+  }, [selectedBook, bookSubjectChapters]);
 
   // Filtered books based on selected department and subject
   const filteredLibraryBooks = useMemo(() => {
@@ -1090,6 +1129,7 @@ export default function AdminAIGenerator() {
       return;
     }
 
+    setIsSavingExam(true);
     try {
       let targetExamId = selectedExistingExamId;
 
@@ -1133,6 +1173,8 @@ export default function AdminAIGenerator() {
         description: err.message || 'Could not save questions to exam',
         variant: 'destructive'
       });
+    } finally {
+      setIsSavingExam(false);
     }
   };
 
@@ -1151,85 +1193,105 @@ export default function AdminAIGenerator() {
   return (
     <DashboardLayout contentClassName="p-0 sm:px-6 lg:px-8 py-2 sm:py-6">
       <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 lg:px-6 py-2 sm:py-4 space-y-3.5 sm:space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/60">
-          <div className="flex items-center gap-2.5 sm:gap-3">
-            <div className="p-2 sm:p-2.5 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-xl sm:rounded-2xl text-white shadow-md shadow-purple-500/10 shrink-0">
-              <Sparkles className="h-5 w-5 sm:h-6 sm:w-6" />
+        {/* Colorful EthioSmart AI Hero Header */}
+        <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-indigo-500/25 bg-gradient-to-br from-indigo-950/20 via-blue-900/10 to-cyan-900/15 dark:from-indigo-950/60 dark:via-slate-900/70 dark:to-cyan-950/40 p-4 sm:p-6 backdrop-blur-md shadow-sm">
+          {/* Ambient luminous glow orbs */}
+          <div className="absolute -top-12 -right-12 w-48 h-48 bg-gradient-to-br from-cyan-500/20 via-indigo-500/20 to-purple-500/15 rounded-full blur-2xl pointer-events-none" />
+          <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-gradient-to-tr from-emerald-500/15 via-blue-500/15 to-transparent rounded-full blur-2xl pointer-events-none" />
+
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-start sm:items-center gap-3 sm:gap-4">
+              <div className="p-2.5 sm:p-3 bg-gradient-to-br from-indigo-500 via-purple-600 to-pink-500 rounded-2xl text-white shadow-lg shadow-indigo-500/30 shrink-0">
+                <Sparkles className="h-6 w-6 sm:h-7 sm:w-7" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <Badge variant="outline" className="bg-indigo-500/15 border-indigo-500/30 text-indigo-700 dark:text-indigo-300 text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full">
+                    EthioSmart AI Curriculum Engine
+                  </Badge>
+                  <span className="text-[11px] text-muted-foreground hidden sm:inline">•</span>
+                  <span className="text-[11px] text-muted-foreground hidden sm:inline">Multilingual & Syllabus-Aligned</span>
+                </div>
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight truncate bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-900 dark:from-white dark:via-blue-100 dark:to-cyan-200 bg-clip-text text-transparent">
+                  AI Exam Generator Studio
+                </h1>
+                <p className="text-muted-foreground text-xs sm:text-sm mt-0.5 line-clamp-1 sm:line-clamp-none">
+                  Generate high-yield exam questions instantly from national textbooks, university lecture notes, or syllabus topics.
+                </p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight truncate">
-                AI Exam Generator
-              </h1>
-              <p className="text-muted-foreground text-xs sm:text-sm mt-0.5 line-clamp-1 sm:line-clamp-none">
-                Generate curriculum-aligned exam questions instantly from books, PDFs, or topics.
-              </p>
+
+            <div className="flex items-center gap-2 self-start md:self-auto shrink-0 flex-wrap">
+              <Badge
+                variant="outline"
+                className={cn(
+                  "py-1.5 px-3.5 text-xs font-semibold rounded-full flex items-center gap-2 cursor-pointer shadow-xs transition hover:scale-105 active:scale-95 border",
+                  configuredProvidersCount > 0
+                    ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/25"
+                    : "bg-amber-500/15 border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/25"
+                )}
+                onClick={() => setActiveTab('settings')}
+                title="Click to view & configure AI engines and API keys"
+              >
+                <span className={cn("h-2 w-2 rounded-full", configuredProvidersCount > 0 ? "bg-emerald-500 animate-pulse shadow-sm shadow-emerald-500" : "bg-amber-500")} />
+                <span>{configuredProvidersCount > 0 ? `${configuredProvidersCount} AI Engines Ready` : 'Configure AI Engines'}</span>
+              </Badge>
+
+              <Button asChild variant="outline" size="sm" className="rounded-full text-xs font-semibold h-8.5 px-4 bg-background/80 hover:bg-background border-border/80 shadow-xs">
+                <Link to="/dashboard/admin/exams">Manage Exams</Link>
+              </Button>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 self-start sm:self-auto shrink-0 flex-wrap">
-            <Badge
-              variant="outline"
-              className={cn(
-                "py-1 px-2.5 text-[11px] sm:text-xs font-medium flex items-center gap-1.5 cursor-pointer shadow-xs transition",
-                configuredProvidersCount > 0
-                  ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-500/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10"
-                  : "bg-amber-50/50 dark:bg-amber-950/20 border-amber-500/30 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10"
-              )}
-              onClick={() => setActiveTab('settings')}
-              title="Click to view & configure AI engines and API keys"
-            >
-              <span className={cn("h-2 w-2 rounded-full", configuredProvidersCount > 0 ? "bg-emerald-500 animate-pulse" : "bg-amber-500")} />
-              <span>{configuredProvidersCount > 0 ? `${configuredProvidersCount} AI Engines Ready` : 'Configure AI Engines'}</span>
-            </Badge>
-
-            <Button
-              variant={activeTab === 'settings' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setActiveTab('settings')}
-              className={cn(
-                "rounded-xl text-xs font-medium h-7 sm:h-8 px-2.5 sm:px-3 flex items-center gap-1.5 transition shadow-xs",
-                activeTab !== 'settings' && "border-primary/30 text-primary hover:bg-primary/10"
-              )}
-            >
-              <Settings className="h-3.5 w-3.5" />
-              <span>AI Provider Settings</span>
-            </Button>
-
-            <Button asChild variant="ghost" size="sm" className="rounded-xl text-xs font-medium h-7 sm:h-8 px-2.5 sm:px-3">
-              <Link to="/dashboard/admin/exams">Manage Exams</Link>
-            </Button>
-          </div>
+          {/* Ethiopian Accent Ribbon at bottom of hero */}
+          <EthioAccentBar className="absolute bottom-0 left-0 right-0 opacity-80" size="sm" />
         </div>
 
-        {/* Navigation Tabs */}
-        <Tabs value={activeTab} onValueChange={(val: any) => setActiveTab(val)} className="space-y-3.5 sm:space-y-6">
-          <TabsList className="grid grid-cols-5 w-full max-w-3xl p-1 bg-muted/60 rounded-xl sm:rounded-2xl gap-0.5 sm:gap-1">
-            <TabsTrigger value="configure" className="px-1 sm:px-2.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[10.5px] sm:text-xs md:text-sm font-semibold flex items-center justify-center gap-1 sm:gap-1.5 transition-all">
+        {/* Navigation Tabs with Vibrant Active Theming */}
+        <Tabs value={activeTab} onValueChange={(val: any) => setActiveTab(val)} className="space-y-4 sm:space-y-6">
+          <TabsList className="flex items-center w-full max-w-3xl p-1.5 bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl border border-border/60 overflow-x-auto no-scrollbar gap-1.5 shadow-xs">
+            <TabsTrigger
+              value="configure"
+              className="flex-1 min-w-[75px] sm:min-w-0 py-2 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-600 data-[state=active]:to-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-indigo-500/25 transition-all cursor-pointer"
+            >
               <Layers className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
-              <span className="hidden sm:inline">Configure</span>
-              <span className="sm:hidden">Setup</span>
+              <span>Configure</span>
             </TabsTrigger>
-            <TabsTrigger value="progress" className="px-1 sm:px-2.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[10.5px] sm:text-xs md:text-sm font-semibold flex items-center justify-center gap-1 sm:gap-1.5 transition-all" disabled={!isGenerating && generationLogs.length === 0}>
-              <RefreshCw className={cn("h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0", isGenerating && "animate-spin text-purple-600")} />
-              <span className="hidden sm:inline">Progress</span>
-              <span className="sm:hidden">Status</span>
-              {isGenerating && <span className="h-1.5 w-1.5 rounded-full bg-purple-500 animate-pulse" />}
+            <TabsTrigger
+              value="progress"
+              className="flex-1 min-w-[75px] sm:min-w-0 py-2 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:to-pink-600 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-purple-500/25 transition-all cursor-pointer"
+              disabled={!isGenerating && generationLogs.length === 0}
+            >
+              <RefreshCw className={cn("h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0", isGenerating && "animate-spin")} />
+              <span>Progress</span>
+              {isGenerating && <span className="h-2 w-2 rounded-full bg-white animate-pulse shrink-0" />}
             </TabsTrigger>
-            <TabsTrigger value="review" className="px-1 sm:px-2.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[10.5px] sm:text-xs md:text-sm font-semibold flex items-center justify-center gap-1 sm:gap-1.5 transition-all">
+            <TabsTrigger
+              value="review"
+              className="flex-1 min-w-[75px] sm:min-w-0 py-2 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-600 data-[state=active]:to-teal-600 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-emerald-500/25 transition-all cursor-pointer"
+            >
               <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
-              <span className="truncate">Review ({generatedQuestions.length})</span>
+              <span>Review</span>
+              {generatedQuestions.length > 0 && (
+                <span className="h-4.5 px-1.5 rounded-full bg-white/20 text-white text-[10px] font-bold flex items-center shadow-xs">
+                  {generatedQuestions.length}
+                </span>
+              )}
             </TabsTrigger>
-            <TabsTrigger value="history" className="px-1 sm:px-2.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[10.5px] sm:text-xs md:text-sm font-semibold flex items-center justify-center gap-1 sm:gap-1.5 transition-all">
+            <TabsTrigger
+              value="history"
+              className="flex-1 min-w-[75px] sm:min-w-0 py-2 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-500 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-amber-500/25 transition-all cursor-pointer"
+            >
               <History className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
-              <span className="hidden sm:inline">Recent Jobs</span>
-              <span className="sm:hidden">History</span>
+              <span>History</span>
             </TabsTrigger>
-            <TabsTrigger value="settings" className="px-1 sm:px-2.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[10.5px] sm:text-xs md:text-sm font-semibold flex items-center justify-center gap-1 sm:gap-1.5 transition-all">
-              <SlidersHorizontal className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 text-primary" />
-              <span className="hidden sm:inline">AI Providers</span>
-              <span className="sm:hidden">Engines</span>
-              <span className={cn("h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full shrink-0", configuredProvidersCount > 0 ? "bg-emerald-500" : "bg-amber-500")} />
+            <TabsTrigger
+              value="settings"
+              className="flex-1 min-w-[75px] sm:min-w-0 py-2 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-600 data-[state=active]:to-sky-600 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-cyan-500/25 transition-all cursor-pointer"
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+              <span>Engines</span>
+              <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", configuredProvidersCount > 0 ? "bg-emerald-400" : "bg-amber-400")} />
             </TabsTrigger>
           </TabsList>
 
@@ -1239,16 +1301,16 @@ export default function AdminAIGenerator() {
               {/* Left Column: Source Material & AI Instructions (7 cols) */}
               <div className="lg:col-span-7 space-y-3.5 sm:space-y-6">
                 {/* 1. Source Material */}
-                <Card className="border-border shadow-sm rounded-xl sm:rounded-2xl overflow-hidden">
-                  <CardHeader className="p-3.5 sm:p-5 pb-2.5 sm:pb-3 border-b bg-muted/20">
+                <Card className="border-blue-500/20 shadow-xs rounded-xl sm:rounded-2xl overflow-hidden">
+                  <CardHeader className="p-3.5 sm:p-5 pb-2.5 sm:pb-3 border-b bg-gradient-to-r from-blue-500/10 via-indigo-500/5 to-transparent border-blue-500/15">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-sm sm:text-base font-bold flex items-center gap-2">
-                        <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+                        <div className="p-2 rounded-xl bg-blue-500/15 text-blue-600 dark:text-blue-400 shadow-2xs">
                           <BookOpen className="h-4 w-4" />
                         </div>
                         1. Select Material Source
                       </CardTitle>
-                      <Badge variant="outline" className="text-[10px] sm:text-[11px] font-normal text-muted-foreground">
+                      <Badge variant="outline" className="text-[10px] sm:text-[11px] font-semibold bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/25">
                         Step 1 of 2
                       </Badge>
                     </div>
@@ -1257,19 +1319,19 @@ export default function AdminAIGenerator() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="p-3 sm:p-5 space-y-3.5 sm:space-y-4">
-                    {/* Source Mode Segmented Switch */}
-                    <div className="flex p-1 bg-muted/60 rounded-xl gap-1">
+                    {/* Source Mode Segmented Switch with Color Accents */}
+                    <div className="flex p-1 bg-slate-100 dark:bg-slate-900 rounded-xl gap-1 border border-border/60">
                       <button
                         type="button"
                         onClick={() => setSourceType('book')}
                         className={cn(
-                          "flex-1 flex items-center justify-center gap-1 sm:gap-1.5 py-1.5 sm:py-2 px-1 sm:px-2 text-[11px] sm:text-xs md:text-sm font-semibold rounded-lg transition-all",
+                          "flex-1 flex items-center justify-center gap-1 sm:gap-1.5 py-2 px-1 sm:px-2 text-[11px] sm:text-xs font-semibold rounded-lg transition-all cursor-pointer",
                           sourceType === 'book'
-                            ? "bg-background text-foreground shadow-sm"
+                            ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm shadow-blue-500/25"
                             : "text-muted-foreground hover:text-foreground"
                         )}
                       >
-                        <BookOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary shrink-0" />
+                        <BookOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
                         <span className="truncate">Digital Library</span>
                       </button>
 
@@ -1277,13 +1339,13 @@ export default function AdminAIGenerator() {
                         type="button"
                         onClick={() => setSourceType('upload')}
                         className={cn(
-                          "flex-1 flex items-center justify-center gap-1 sm:gap-1.5 py-1.5 sm:py-2 px-1 sm:px-2 text-[11px] sm:text-xs md:text-sm font-semibold rounded-lg transition-all",
+                          "flex-1 flex items-center justify-center gap-1 sm:gap-1.5 py-2 px-1 sm:px-2 text-[11px] sm:text-xs font-semibold rounded-lg transition-all cursor-pointer",
                           sourceType === 'upload'
-                            ? "bg-background text-foreground shadow-sm"
+                            ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-sm shadow-purple-500/25"
                             : "text-muted-foreground hover:text-foreground"
                         )}
                       >
-                        <Upload className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary shrink-0" />
+                        <Upload className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
                         <span className="truncate">Upload File</span>
                       </button>
 
@@ -1291,13 +1353,13 @@ export default function AdminAIGenerator() {
                         type="button"
                         onClick={() => setSourceType('topic')}
                         className={cn(
-                          "flex-1 flex items-center justify-center gap-1 sm:gap-1.5 py-1.5 sm:py-2 px-1 sm:px-2 text-[11px] sm:text-xs md:text-sm font-semibold rounded-lg transition-all",
+                          "flex-1 flex items-center justify-center gap-1 sm:gap-1.5 py-2 px-1 sm:px-2 text-[11px] sm:text-xs font-semibold rounded-lg transition-all cursor-pointer",
                           sourceType === 'topic'
-                            ? "bg-background text-foreground shadow-sm"
+                            ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-sm shadow-emerald-500/25"
                             : "text-muted-foreground hover:text-foreground"
                         )}
                       >
-                        <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary shrink-0" />
+                        <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
                         <span className="truncate">Topic & Notes</span>
                       </button>
                     </div>
@@ -1360,7 +1422,7 @@ export default function AdminAIGenerator() {
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="all">All Chapters</SelectItem>
-                                {selectedBook.chapterLabels?.map((ch, idx) => (
+                                {availableBookChapters.map((ch, idx) => (
                                   <SelectItem key={idx} value={ch}>
                                     {ch}
                                   </SelectItem>
@@ -1464,7 +1526,7 @@ export default function AdminAIGenerator() {
                     {/* MODE 2: UPLOAD DOCUMENT */}
                     {sourceType === 'upload' && (
                       <div className="space-y-3.5 pt-1">
-                        <div className="border-2 border-dashed border-border hover:border-primary/50 rounded-2xl p-6 text-center hover:bg-muted/20 transition cursor-pointer relative">
+                        <div className="border-2 border-dashed border-purple-400/40 hover:border-purple-500 rounded-2xl p-6 text-center bg-gradient-to-b from-purple-500/5 via-indigo-500/5 to-transparent hover:bg-purple-500/10 transition cursor-pointer relative shadow-xs">
                           <input
                             type="file"
                             accept=".pdf,.txt,.md"
@@ -1474,9 +1536,9 @@ export default function AdminAIGenerator() {
                           />
                           <div className="flex flex-col items-center gap-2">
                             {isExtractingFile ? (
-                              <RefreshCw className="h-9 w-9 animate-spin text-primary" />
+                              <RefreshCw className="h-9 w-9 animate-spin text-purple-600" />
                             ) : (
-                              <div className="p-3 bg-primary/10 rounded-2xl text-primary">
+                              <div className="p-3 bg-gradient-to-br from-purple-500 to-indigo-600 text-white rounded-2xl shadow-md shadow-purple-500/20">
                                 <Upload className="h-6 w-6" />
                               </div>
                             )}
@@ -1621,16 +1683,16 @@ export default function AdminAIGenerator() {
                 </Card>
 
                 {/* 2. AI Command / Prompt */}
-                <Card className="border-border shadow-sm rounded-xl sm:rounded-2xl overflow-hidden">
-                  <CardHeader className="p-3.5 sm:p-5 pb-2.5 sm:pb-3 border-b bg-muted/20">
+                <Card className="border-purple-500/20 shadow-xs rounded-xl sm:rounded-2xl overflow-hidden">
+                  <CardHeader className="p-3.5 sm:p-5 pb-2.5 sm:pb-3 border-b bg-gradient-to-r from-purple-500/10 via-pink-500/5 to-transparent border-purple-500/15">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-sm sm:text-base font-bold flex items-center gap-2">
-                        <div className="p-1.5 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                        <div className="p-2 rounded-xl bg-purple-500/15 text-purple-600 dark:text-purple-400 shadow-2xs">
                           <Sparkles className="h-4 w-4" />
                         </div>
                         2. Prompt & Exam Instructions
                       </CardTitle>
-                      <Badge variant="outline" className="text-[10px] sm:text-[11px] font-normal text-muted-foreground">
+                      <Badge variant="outline" className="text-[10px] sm:text-[11px] font-semibold bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/25">
                         Step 2 of 2
                       </Badge>
                     </div>
@@ -1653,10 +1715,10 @@ export default function AdminAIGenerator() {
                             onClick={() => setPrompt(preset.text)}
                             title={preset.description}
                             className={cn(
-                              "px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-medium transition border",
+                              "px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-semibold transition border cursor-pointer",
                               prompt === preset.text
-                                ? "bg-purple-600 text-white border-purple-600 shadow-sm"
-                                : "bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground border-border"
+                                ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white border-purple-600 shadow-xs"
+                                : "bg-purple-500/5 hover:bg-purple-500/15 text-purple-900 dark:text-purple-200 border-purple-500/25"
                             )}
                           >
                             {preset.name}
@@ -1669,22 +1731,22 @@ export default function AdminAIGenerator() {
                       rows={4}
                       value={prompt}
                       onChange={(e) => setPrompt(e.target.value)}
-                      className="rounded-xl text-xs sm:text-sm leading-relaxed"
+                      className="rounded-xl text-xs sm:text-sm leading-relaxed border-purple-500/20 focus-visible:ring-purple-500/30"
                       placeholder="e.g. Generate high-quality exam questions from page 15 to 25. Focus on definitions and practical applications."
                     />
 
                     {/* Prompt Intelligence Scope Badge */}
                     {detectedScope.hasDetectedScope && (
-                      <div className="flex items-center gap-2.5 p-2.5 sm:p-3 rounded-xl border border-purple-500/30 bg-purple-500/10 text-purple-900 dark:text-purple-200 text-xs">
+                      <div className="flex items-center gap-2.5 p-2.5 sm:p-3 rounded-xl border border-purple-500/40 bg-gradient-to-r from-purple-500/15 via-indigo-500/10 to-pink-500/10 text-purple-900 dark:text-purple-100 text-xs shadow-xs">
                         <Sparkles className="h-4 w-4 shrink-0 text-purple-600 dark:text-purple-400" />
                         <div className="flex-1">
-                          <span className="font-semibold text-purple-950 dark:text-purple-100">Prompt Scope Identified: </span>
+                          <span className="font-bold text-purple-950 dark:text-purple-100">Prompt Scope Identified: </span>
                           <span>{detectedScope.explanation}</span>
                           <span className="text-purple-800/80 dark:text-purple-300/80 ml-1.5 block sm:inline">
                             • AI generation will be strictly confined to this specific content (no generalization).
                           </span>
                         </div>
-                        <Badge variant="secondary" className="bg-purple-500/20 text-purple-800 dark:text-purple-200 border-purple-500/30 shrink-0">
+                        <Badge variant="secondary" className="bg-purple-500/25 text-purple-900 dark:text-purple-100 border-purple-500/40 shrink-0 font-bold">
                           Scope Active
                         </Badge>
                       </div>
@@ -1693,7 +1755,7 @@ export default function AdminAIGenerator() {
                     {/* Quick instruction chips */}
                     <div className="space-y-1.5 pt-1">
                       <span className="text-xs text-muted-foreground font-medium flex items-center gap-1">
-                        <Sparkles className="h-3 w-3 text-purple-500" />
+                        <Sparkles className="h-3.5 w-3.5 text-purple-500" />
                         Quick prompt enhancers (click to toggle):
                       </span>
                       <div className="flex flex-wrap gap-1 sm:gap-1.5">
@@ -1705,13 +1767,13 @@ export default function AdminAIGenerator() {
                               type="button"
                               onClick={() => togglePromptChip(chip.text)}
                               className={cn(
-                                "inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-medium transition-all border",
+                                "inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-medium transition-all border cursor-pointer",
                                 isSelected
-                                  ? "bg-purple-600 text-white border-purple-600 shadow-sm"
-                                  : "bg-muted/50 hover:bg-muted text-foreground border-border"
+                                  ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white border-purple-600 shadow-xs"
+                                  : "bg-purple-500/5 hover:bg-purple-500/15 text-foreground border-purple-500/20"
                               )}
                             >
-                              {isSelected ? <Check className="h-3 w-3" /> : <Plus className="h-3 w-3 text-muted-foreground" />}
+                              {isSelected ? <Check className="h-3 w-3" /> : <Plus className="h-3 w-3 text-purple-500" />}
                               {chip.label}
                             </button>
                           );
@@ -1724,14 +1786,16 @@ export default function AdminAIGenerator() {
 
               {/* Right Column: Destination, Question Distribution & Primary CTA (5 cols) */}
               <div className="lg:col-span-5 space-y-3.5 sm:space-y-6">
-                <Card className="border-border shadow-sm rounded-xl sm:rounded-2xl overflow-hidden lg:sticky lg:top-6">
-                  <CardHeader className="p-3.5 sm:p-5 pb-2.5 sm:pb-3 border-b bg-gradient-to-r from-primary/5 via-primary/10 to-transparent">
+                <Card className="border-indigo-500/20 shadow-sm rounded-xl sm:rounded-2xl overflow-hidden lg:sticky lg:top-6">
+                  <CardHeader className="p-3.5 sm:p-5 pb-2.5 sm:pb-3 border-b bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-transparent border-indigo-500/15">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-sm sm:text-base font-bold flex items-center gap-2">
-                        <Layers className="h-4 w-4 text-primary" />
+                        <div className="p-2 rounded-xl bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 shadow-2xs">
+                          <Layers className="h-4 w-4" />
+                        </div>
                         Exam Setup & Breakdown
                       </CardTitle>
-                      <Badge variant="secondary" className="font-bold text-xs px-2.5 py-0.5">
+                      <Badge className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white font-bold text-xs px-3 py-1 rounded-full shadow-xs">
                         {totalCount} Total
                       </Badge>
                     </div>
@@ -1741,14 +1805,14 @@ export default function AdminAIGenerator() {
                   </CardHeader>
                   <CardContent className="p-3 sm:p-5 space-y-3.5 sm:space-y-4">
                     {/* Destination: Mode Toggle */}
-                    <div className="flex p-1 bg-muted/60 rounded-xl gap-1">
+                    <div className="flex p-1 bg-slate-100 dark:bg-slate-900 rounded-xl gap-1 border border-border/60">
                       <button
                         type="button"
                         onClick={() => setDestinationMode('new')}
                         className={cn(
-                          "flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all",
+                          "flex-1 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer",
                           destinationMode === 'new'
-                            ? "bg-background text-foreground shadow-sm"
+                            ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-xs"
                             : "text-muted-foreground hover:text-foreground"
                         )}
                       >
@@ -1758,9 +1822,9 @@ export default function AdminAIGenerator() {
                         type="button"
                         onClick={() => setDestinationMode('existing')}
                         className={cn(
-                          "flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all",
+                          "flex-1 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer",
                           destinationMode === 'existing'
-                            ? "bg-background text-foreground shadow-sm"
+                            ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-xs"
                             : "text-muted-foreground hover:text-foreground"
                         )}
                       >
@@ -1837,10 +1901,10 @@ export default function AdminAIGenerator() {
                               type="button"
                               onClick={() => setExamType('normal')}
                               className={cn(
-                                "py-1.5 px-2 rounded-xl text-xs font-medium border transition-all text-center",
+                                "py-1.5 px-2 rounded-xl text-xs font-semibold border transition-all text-center cursor-pointer",
                                 examType === 'normal'
-                                  ? "bg-primary/10 border-primary text-primary font-semibold"
-                                  : "bg-muted/30 border-border text-muted-foreground"
+                                  ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-xs border-blue-600"
+                                  : "bg-muted/30 border-border text-muted-foreground hover:bg-muted/50"
                               )}
                             >
                               Graded Exam
@@ -1849,10 +1913,10 @@ export default function AdminAIGenerator() {
                               type="button"
                               onClick={() => setExamType('practice')}
                               className={cn(
-                                "py-1.5 px-2 rounded-xl text-xs font-medium border transition-all text-center",
+                                "py-1.5 px-2 rounded-xl text-xs font-semibold border transition-all text-center cursor-pointer",
                                 examType === 'practice'
-                                  ? "bg-primary/10 border-primary text-primary font-semibold"
-                                  : "bg-muted/30 border-border text-muted-foreground"
+                                  ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-xs border-emerald-600"
+                                  : "bg-muted/30 border-border text-muted-foreground hover:bg-muted/50"
                               )}
                             >
                               Practice Mode
@@ -1879,96 +1943,89 @@ export default function AdminAIGenerator() {
                     )}
 
                     {/* Question Type Breakdown */}
-                    <div className="space-y-2.5 pt-2 border-t">
+                    <div className="space-y-3 pt-2 border-t border-border/60">
                       <div className="flex items-center justify-between">
-                        <Label className="text-xs font-semibold text-foreground">Question Distribution</Label>
-                        <span className="text-[11px] text-muted-foreground">Click presets or adjust counts</span>
+                        <Label className="text-xs font-bold text-foreground">Question Distribution</Label>
+                        <span className="text-[11px] text-muted-foreground">Select preset or tune counts</span>
                       </div>
 
-                      {/* Presets Pills */}
-                      <div className="flex flex-wrap gap-1.5">
+                      {/* Presets Grid */}
+                      <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                         <button
                           type="button"
                           className={cn(
-                            "px-2 py-1 rounded-lg text-[11px] font-semibold border transition-all",
+                            "px-2.5 py-2 rounded-xl text-xs font-semibold border transition-all text-left flex items-center justify-between cursor-pointer",
                             tfCount === 8 && mcqCount === 7 && shortCount === 0
-                              ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                              : "bg-muted/40 hover:bg-muted text-muted-foreground border-border"
+                              ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white border-emerald-600 shadow-sm shadow-emerald-500/25"
+                              : "bg-emerald-500/5 hover:bg-emerald-500/15 text-foreground border-emerald-500/25"
                           )}
                           onClick={() => { setTfCount(8); setMcqCount(7); setShortCount(0); }}
                         >
-                          T/F=8, MCQs=7 (15)
+                          <span className="truncate">15 Mixed</span>
+                          <span className={cn("text-[10px] shrink-0 ml-1 font-semibold", tfCount === 8 && mcqCount === 7 && shortCount === 0 ? "text-emerald-100" : "text-emerald-700 dark:text-emerald-300")}>8 TF, 7 MCQ</span>
                         </button>
                         <button
                           type="button"
                           className={cn(
-                            "px-2 py-1 rounded-lg text-[11px] font-semibold border transition-all",
+                            "px-2.5 py-2 rounded-xl text-xs font-semibold border transition-all text-left flex items-center justify-between cursor-pointer",
                             tfCount === 10 && mcqCount === 10 && shortCount === 0
-                              ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                              : "bg-muted/40 hover:bg-muted text-muted-foreground border-border"
+                              ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-blue-600 shadow-sm shadow-blue-500/25"
+                              : "bg-blue-500/5 hover:bg-blue-500/15 text-foreground border-blue-500/25"
                           )}
                           onClick={() => { setTfCount(10); setMcqCount(10); setShortCount(0); }}
                         >
-                          T/F=10, MCQs=10 (20)
+                          <span className="truncate">20 Mixed</span>
+                          <span className={cn("text-[10px] shrink-0 ml-1 font-semibold", tfCount === 10 && mcqCount === 10 && shortCount === 0 ? "text-blue-100" : "text-blue-700 dark:text-blue-300")}>10 TF, 10 MCQ</span>
                         </button>
                         <button
                           type="button"
                           className={cn(
-                            "px-2 py-1 rounded-lg text-[11px] font-semibold border transition-all",
+                            "px-2.5 py-2 rounded-xl text-xs font-semibold border transition-all text-left flex items-center justify-between cursor-pointer",
                             tfCount === 0 && mcqCount === 20 && shortCount === 0
-                              ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                              : "bg-muted/40 hover:bg-muted text-muted-foreground border-border"
+                              ? "bg-gradient-to-r from-purple-600 to-violet-600 text-white border-purple-600 shadow-sm shadow-purple-500/25"
+                              : "bg-purple-500/5 hover:bg-purple-500/15 text-foreground border-purple-500/25"
                           )}
                           onClick={() => { setTfCount(0); setMcqCount(20); setShortCount(0); }}
                         >
-                          20 MCQs
+                          <span className="truncate">20 Pure MCQ</span>
+                          <span className={cn("text-[10px] shrink-0 ml-1 font-semibold", tfCount === 0 && mcqCount === 20 && shortCount === 0 ? "text-purple-100" : "text-purple-700 dark:text-purple-300")}>20 MCQs</span>
                         </button>
                         <button
                           type="button"
                           className={cn(
-                            "px-2 py-1 rounded-lg text-[11px] font-semibold border transition-all",
-                            tfCount === 15 && mcqCount === 0 && shortCount === 0
-                              ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                              : "bg-muted/40 hover:bg-muted text-muted-foreground border-border"
-                          )}
-                          onClick={() => { setTfCount(15); setMcqCount(0); setShortCount(0); }}
-                        >
-                          15 T/F
-                        </button>
-                        <button
-                          type="button"
-                          className={cn(
-                            "px-2 py-1 rounded-lg text-[11px] font-semibold border transition-all",
+                            "px-2.5 py-2 rounded-xl text-xs font-semibold border transition-all text-left flex items-center justify-between cursor-pointer",
                             tfCount === 10 && mcqCount === 15 && shortCount === 5
-                              ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                              : "bg-muted/40 hover:bg-muted text-muted-foreground border-border"
+                              ? "bg-gradient-to-r from-amber-600 to-rose-600 text-white border-amber-600 shadow-sm shadow-amber-500/25"
+                              : "bg-amber-500/5 hover:bg-amber-500/15 text-foreground border-amber-500/25"
                           )}
                           onClick={() => { setTfCount(10); setMcqCount(15); setShortCount(5); }}
                         >
-                          10 T/F, 15 MCQs, 5 Short (30)
+                          <span className="truncate">30 Full Exam</span>
+                          <span className={cn("text-[10px] shrink-0 ml-1 font-semibold", tfCount === 10 && mcqCount === 15 && shortCount === 5 ? "text-amber-100" : "text-amber-700 dark:text-amber-300")}>10 TF, 15 MCQ, 5 SA</span>
                         </button>
                       </div>
 
                       {/* Steppers */}
                       <div className="space-y-2 pt-1">
                         {/* True / False */}
-                        <div className="flex items-center justify-between p-2 rounded-xl border bg-card/60">
+                        <div className="flex items-center justify-between p-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 transition-colors">
                           <div className="flex items-center space-x-2">
                             <Checkbox
                               id="type-tf"
                               checked={tfCount > 0}
                               onCheckedChange={(checked) => setTfCount(checked ? (tfCount > 0 ? tfCount : 8) : 0)}
                             />
-                            <Label htmlFor="type-tf" className="text-xs font-medium cursor-pointer">
+                            <Label htmlFor="type-tf" className="text-xs font-medium cursor-pointer select-none flex items-center gap-1.5">
+                              <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
                               True / False
                             </Label>
                           </div>
-                          <div className="flex items-center space-x-1">
+                          <div className="flex items-center bg-white dark:bg-slate-900 border border-emerald-500/30 rounded-lg p-0.5 shadow-2xs">
                             <Button
                               type="button"
-                              variant="outline"
+                              variant="ghost"
                               size="icon"
-                              className="h-6 w-6 rounded-md"
+                              className="h-6 w-6 rounded-md hover:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
                               disabled={tfCount <= 0}
                               onClick={() => setTfCount(Math.max(0, tfCount - 1))}
                             >
@@ -1980,13 +2037,13 @@ export default function AdminAIGenerator() {
                               max={100}
                               value={tfCount}
                               onChange={(e) => setTfCount(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                              className="h-6 w-12 text-center font-bold text-xs px-1 rounded-md"
+                              className="h-6 w-10 text-center font-bold text-xs p-0 border-0 bg-transparent text-emerald-700 dark:text-emerald-300 focus-visible:ring-0 shadow-none"
                             />
                             <Button
                               type="button"
-                              variant="outline"
+                              variant="ghost"
                               size="icon"
-                              className="h-6 w-6 rounded-md"
+                              className="h-6 w-6 rounded-md hover:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
                               onClick={() => setTfCount(tfCount + 1)}
                             >
                               <Plus className="h-3 w-3" />
@@ -1995,23 +2052,24 @@ export default function AdminAIGenerator() {
                         </div>
 
                         {/* MCQs */}
-                        <div className="flex items-center justify-between p-2 rounded-xl border bg-card/60">
+                        <div className="flex items-center justify-between p-2.5 rounded-xl border border-indigo-500/30 bg-indigo-500/5 hover:bg-indigo-500/10 transition-colors">
                           <div className="flex items-center space-x-2">
                             <Checkbox
                               id="type-mcq"
                               checked={mcqCount > 0}
                               onCheckedChange={(checked) => setMcqCount(checked ? (mcqCount > 0 ? mcqCount : 7) : 0)}
                             />
-                            <Label htmlFor="type-mcq" className="text-xs font-medium cursor-pointer">
+                            <Label htmlFor="type-mcq" className="text-xs font-medium cursor-pointer select-none flex items-center gap-1.5">
+                              <span className="h-2 w-2 rounded-full bg-indigo-500 shrink-0" />
                               Multiple Choice (MCQ)
                             </Label>
                           </div>
-                          <div className="flex items-center space-x-1">
+                          <div className="flex items-center bg-white dark:bg-slate-900 border border-indigo-500/30 rounded-lg p-0.5 shadow-2xs">
                             <Button
                               type="button"
-                              variant="outline"
+                              variant="ghost"
                               size="icon"
-                              className="h-6 w-6 rounded-md"
+                              className="h-6 w-6 rounded-md hover:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300"
                               disabled={mcqCount <= 0}
                               onClick={() => setMcqCount(Math.max(0, mcqCount - 1))}
                             >
@@ -2023,13 +2081,13 @@ export default function AdminAIGenerator() {
                               max={100}
                               value={mcqCount}
                               onChange={(e) => setMcqCount(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                              className="h-6 w-12 text-center font-bold text-xs px-1 rounded-md"
+                              className="h-6 w-10 text-center font-bold text-xs p-0 border-0 bg-transparent text-indigo-700 dark:text-indigo-300 focus-visible:ring-0 shadow-none"
                             />
                             <Button
                               type="button"
-                              variant="outline"
+                              variant="ghost"
                               size="icon"
-                              className="h-6 w-6 rounded-md"
+                              className="h-6 w-6 rounded-md hover:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300"
                               onClick={() => setMcqCount(mcqCount + 1)}
                             >
                               <Plus className="h-3 w-3" />
@@ -2038,23 +2096,24 @@ export default function AdminAIGenerator() {
                         </div>
 
                         {/* Short Answer */}
-                        <div className="flex items-center justify-between p-2 rounded-xl border bg-card/60">
+                        <div className="flex items-center justify-between p-2.5 rounded-xl border border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 transition-colors">
                           <div className="flex items-center space-x-2">
                             <Checkbox
                               id="type-sa"
                               checked={shortCount > 0}
                               onCheckedChange={(checked) => setShortCount(checked ? (shortCount > 0 ? shortCount : 5) : 0)}
                             />
-                            <Label htmlFor="type-sa" className="text-xs font-medium cursor-pointer">
+                            <Label htmlFor="type-sa" className="text-xs font-medium cursor-pointer select-none flex items-center gap-1.5">
+                              <span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />
                               Short Answer
                             </Label>
                           </div>
-                          <div className="flex items-center space-x-1">
+                          <div className="flex items-center bg-white dark:bg-slate-900 border border-amber-500/30 rounded-lg p-0.5 shadow-2xs">
                             <Button
                               type="button"
-                              variant="outline"
+                              variant="ghost"
                               size="icon"
-                              className="h-6 w-6 rounded-md"
+                              className="h-6 w-6 rounded-md hover:bg-amber-500/15 text-amber-700 dark:text-amber-300"
                               disabled={shortCount <= 0}
                               onClick={() => setShortCount(Math.max(0, shortCount - 1))}
                             >
@@ -2066,13 +2125,13 @@ export default function AdminAIGenerator() {
                               max={100}
                               value={shortCount}
                               onChange={(e) => setShortCount(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                              className="h-6 w-12 text-center font-bold text-xs px-1 rounded-md"
+                              className="h-6 w-10 text-center font-bold text-xs p-0 border-0 bg-transparent text-amber-700 dark:text-amber-300 focus-visible:ring-0 shadow-none"
                             />
                             <Button
                               type="button"
-                              variant="outline"
+                              variant="ghost"
                               size="icon"
-                              className="h-6 w-6 rounded-md"
+                              className="h-6 w-6 rounded-md hover:bg-amber-500/15 text-amber-700 dark:text-amber-300"
                               onClick={() => setShortCount(shortCount + 1)}
                             >
                               <Plus className="h-3 w-3" />
@@ -2087,14 +2146,25 @@ export default function AdminAIGenerator() {
                       <Button
                         type="button"
                         onClick={() => handleStartGeneration()}
-                        disabled={isGenerating}
-                        className="w-full h-11 sm:h-12 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-700 hover:to-pink-700 text-white font-bold text-sm sm:text-base shadow-md shadow-purple-500/20 rounded-xl transition-all cursor-pointer active:scale-[0.98]"
+                        disabled={isGenerating || totalCount === 0}
+                        className="w-full h-12 bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 hover:from-blue-700 hover:via-indigo-700 hover:to-cyan-600 text-white font-extrabold text-sm sm:text-base shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 rounded-xl transition-all cursor-pointer active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
                       >
-                        <Sparkles className="h-4 w-4 mr-2" />
-                        Generate {totalCount} Exam Questions
+                        {isGenerating ? (
+                          <>
+                            <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                            Generating Exam Questions...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-5 w-5 mr-2" />
+                            Generate {totalCount} Exam Questions
+                          </>
+                        )}
                       </Button>
-                      <p className="text-[11px] text-center text-muted-foreground mt-1.5">
-                        {totalCount} questions • Estimated time: ~{Math.max(4, Math.ceil(totalCount / 10) * 3)}–{Math.max(8, Math.ceil(totalCount / 10) * 6)}s
+                      <p className="text-[11px] text-center text-muted-foreground mt-1.5 flex items-center justify-center gap-1">
+                        <span className="font-semibold text-foreground">{totalCount} questions</span>
+                        <span>•</span>
+                        <span>Estimated time: ~{Math.max(4, Math.ceil(totalCount / 10) * 3)}–{Math.max(8, Math.ceil(totalCount / 10) * 6)}s</span>
                       </p>
                     </div>
 
@@ -2172,12 +2242,14 @@ export default function AdminAIGenerator() {
 
           {/* TAB 2: LIVE GENERATION PROGRESS */}
           <TabsContent value="progress" className="space-y-4 sm:space-y-6">
-            <Card className="border-border shadow-sm rounded-xl sm:rounded-2xl overflow-hidden">
-              <CardHeader className="p-3.5 sm:p-6 pb-2.5 sm:pb-4 border-b">
+            <Card className="border-purple-500/20 shadow-xs rounded-xl sm:rounded-2xl overflow-hidden">
+              <CardHeader className="p-3.5 sm:p-6 pb-2.5 sm:pb-4 border-b bg-gradient-to-r from-purple-500/10 via-pink-500/5 to-transparent border-purple-500/15">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                   <div>
                     <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
-                      <RefreshCw className={cn("h-4 w-4 sm:h-5 sm:w-5 text-purple-600 shrink-0", isGenerating && "animate-spin")} />
+                      <div className="p-2 rounded-xl bg-purple-500/15 text-purple-600 dark:text-purple-400 shadow-2xs">
+                        <RefreshCw className={cn("h-4 w-4 sm:h-5 sm:w-5", isGenerating && "animate-spin")} />
+                      </div>
                       <span className="truncate">Live Generation Job: {currentJobId || 'Pending'}</span>
                     </CardTitle>
                     <CardDescription className="text-xs mt-0.5">
@@ -2186,11 +2258,11 @@ export default function AdminAIGenerator() {
                   </div>
                   <div className="flex items-center gap-2 self-start sm:self-auto">
                     {isGenerating ? (
-                      <Badge variant="default" className="bg-emerald-600 animate-pulse text-xs">
+                      <Badge variant="default" className="bg-purple-600 animate-pulse text-xs text-white font-semibold">
                         Generating...
                       </Badge>
-                    ) : generatedQuestions.length >= totalCount ? (
-                      <Badge variant="default" className="bg-emerald-600 text-xs">
+                    ) : generatedQuestions.length >= totalCount && totalCount > 0 ? (
+                      <Badge variant="default" className="bg-emerald-600 text-xs text-white font-semibold">
                         Job Completed
                       </Badge>
                     ) : (
@@ -2202,7 +2274,7 @@ export default function AdminAIGenerator() {
               <CardContent className="p-3.5 sm:p-6 space-y-4 sm:space-y-6">
                 {/* Fallback Banner */}
                 {fallbackBanner && (
-                  <Alert className="bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200">
+                  <Alert className="bg-amber-50 dark:bg-amber-950/40 border-amber-400 dark:border-amber-700 text-amber-900 dark:text-amber-200">
                     <AlertTriangle className="h-4 w-4 text-amber-600" />
                     <AlertTitle>Automatic Fallback Activated</AlertTitle>
                     <AlertDescription className="text-xs">
@@ -2213,11 +2285,11 @@ export default function AdminAIGenerator() {
 
                 {/* Progress bar */}
                 <div className="space-y-2">
-                  <div className="flex justify-between text-sm font-medium">
-                    <span>
-                      Generated: {generatedQuestions.length} / {totalCount} Questions
+                  <div className="flex justify-between text-sm font-semibold">
+                    <span className="text-foreground">
+                      Generated: <span className="text-purple-600 dark:text-purple-400 font-bold">{generatedQuestions.length}</span> / {totalCount} Questions
                     </span>
-                    <span>
+                    <span className="text-purple-600 dark:text-purple-400 font-bold">
                       {totalCount > 0 ? Math.round((generatedQuestions.length / totalCount) * 100) : 0}%
                     </span>
                   </div>
@@ -2225,24 +2297,50 @@ export default function AdminAIGenerator() {
                     value={totalCount > 0 ? (generatedQuestions.length / totalCount) * 100 : 0}
                     className="h-3"
                   />
-                  <div className="flex justify-between text-xs text-muted-foreground pt-1">
-                    <span>Current Batch: {currentBatchIndex} of {totalBatches}</span>
-                    <span>Active Provider: {activeProvider ? activeProvider.toUpperCase() : 'Waiting'}</span>
+                  <div className="flex justify-between text-xs text-muted-foreground pt-1 flex-wrap gap-2">
+                    <span>Current Batch: <strong className="text-foreground">{currentBatchIndex}</strong> of {totalBatches}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span>Active Provider:</span>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "text-[10px] font-semibold px-2 py-0 rounded-full capitalize",
+                          activeProvider === 'gemini' && "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30",
+                          activeProvider === 'groq' && "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30",
+                          activeProvider === 'openrouter' && "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30",
+                          activeProvider === 'huggingface' && "bg-yellow-500/15 text-yellow-700 dark:text-yellow-300 border-yellow-500/30",
+                          !activeProvider && "bg-muted/50 text-muted-foreground border-border"
+                        )}
+                      >
+                        {activeProvider ? `${activeProvider.toUpperCase()} Engine` : 'Waiting'}
+                      </Badge>
+                    </div>
                   </div>
                 </div>
 
-                {/* Live Console Output */}
+                {/* Live Console Output with Tech Highlight Colors */}
                 <div className="space-y-2">
-                  <Label className="text-xs font-semibold text-muted-foreground">Execution & Audit Logs</Label>
-                  <div className="bg-slate-950 text-slate-100 p-3 sm:p-4 rounded-xl font-mono text-[11px] sm:text-xs max-h-56 sm:max-h-72 overflow-y-auto space-y-1 shadow-inner">
+                  <Label className="text-xs font-semibold text-muted-foreground">Execution & Audit Stream</Label>
+                  <div className="bg-slate-950 text-slate-100 p-3.5 sm:p-4 rounded-xl font-mono text-[11px] sm:text-xs max-h-56 sm:max-h-72 overflow-y-auto space-y-1 shadow-inner border border-slate-800">
                     {generationLogs.length === 0 ? (
                       <div className="text-slate-500 italic">No logs yet. Start generation to monitor execution.</div>
                     ) : (
-                      generationLogs.map((log, i) => (
-                        <div key={i} className="leading-relaxed">
-                          {log}
-                        </div>
-                      ))
+                      generationLogs.map((log, i) => {
+                        let colorClass = "text-slate-300";
+                        if (log.includes('[Gemini]')) colorClass = "text-cyan-400 font-semibold";
+                        else if (log.includes('[Groq]')) colorClass = "text-amber-400 font-semibold";
+                        else if (log.includes('[OpenRouter]')) colorClass = "text-purple-400 font-semibold";
+                        else if (log.includes('[Batch]')) colorClass = "text-emerald-400 font-semibold";
+                        else if (log.includes('[Error]') || log.includes('Failed')) colorClass = "text-rose-400 font-bold";
+                        else if (log.includes('[Fallback]')) colorClass = "text-orange-400 font-bold";
+                        else if (log.includes('[Resume]')) colorClass = "text-sky-300 font-semibold";
+
+                        return (
+                          <div key={i} className={cn("leading-relaxed", colorClass)}>
+                            {log}
+                          </div>
+                        );
+                      })
                     )}
                   </div>
                 </div>
@@ -2257,38 +2355,27 @@ export default function AdminAIGenerator() {
                         onClick={handleTogglePause}
                         className="rounded-xl text-xs font-semibold h-8"
                       >
-                        {isPaused ? <Play className="h-3.5 w-3.5 mr-1.5" /> : <Pause className="h-3.5 w-3.5 mr-1.5" />}
+                        {isPaused ? <Play className="h-3.5 w-3.5 mr-1.5 text-emerald-500" /> : <Pause className="h-3.5 w-3.5 mr-1.5 text-amber-500" />}
                         {isPaused ? 'Resume Job' : 'Pause Job'}
                       </Button>
                     )}
                     {!isGenerating && generatedQuestions.length < totalCount && (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleStartGeneration({ resume: true })}
-                          className="text-primary border-primary/30 rounded-xl text-xs font-semibold h-8"
-                        >
-                          <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-                          Resume Remaining ({totalCount - generatedQuestions.length})
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setActiveTab('settings')}
-                          className="border-amber-500/30 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10 rounded-xl text-xs font-semibold h-8"
-                        >
-                          <Settings className="h-3.5 w-3.5 mr-1.5" />
-                          AI Provider Settings
-                        </Button>
-                      </>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleStartGeneration({ resume: true })}
+                        className="text-primary border-primary/30 rounded-xl text-xs font-semibold h-8"
+                      >
+                        <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                        Resume Remaining ({totalCount - generatedQuestions.length})
+                      </Button>
                     )}
                   </div>
 
                   {generatedQuestions.length > 0 && (
                     <Button
                       onClick={() => setActiveTab('review')}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold h-8"
+                      className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-xs font-semibold h-8 shadow-xs cursor-pointer"
                       size="sm"
                     >
                       Proceed to Review Questions ({generatedQuestions.length})
@@ -2305,34 +2392,58 @@ export default function AdminAIGenerator() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-2">
               <div>
                 <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2">
-                  Question Review & Quality Editor
-                  <Badge variant="secondary" className="text-xs">{generatedQuestions.length} Questions</Badge>
+                  <div className="p-2 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 shadow-2xs">
+                    <CheckCircle2 className="h-4 w-4" />
+                  </div>
+                  <span>Question Review & Quality Editor</span>
+                  <Badge className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs px-2.5 py-0.5 rounded-full shadow-xs">
+                    {generatedQuestions.length} Questions
+                  </Badge>
                 </h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Carefully edit question text, answer options, explanations, and marks before publishing to students.
                 </p>
               </div>
 
-              <div className="grid grid-cols-3 sm:flex sm:flex-wrap items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
-                <Button variant="outline" size="sm" onClick={handleAddManualQuestion} className="h-8 text-xs font-semibold rounded-xl">
-                  <Plus className="h-3.5 w-3.5 mr-1" /> Add
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddManualQuestion}
+                  className="h-8.5 text-xs font-semibold rounded-xl border-border/80 shadow-xs hover:bg-accent cursor-pointer"
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1 text-primary" /> Add Question
                 </Button>
-                <Button variant="outline" size="sm" onClick={handleExportJson} className="h-8 text-xs font-semibold rounded-xl">
-                  <Download className="h-3.5 w-3.5 mr-1" /> JSON
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportJson}
+                  className="h-8.5 text-xs font-semibold rounded-xl border-border/80 shadow-xs hover:bg-accent cursor-pointer"
+                >
+                  <Download className="h-3.5 w-3.5 mr-1 text-muted-foreground" /> Export JSON
                 </Button>
                 <Button
                   onClick={handleSaveToExam}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold h-8 text-xs rounded-xl"
+                  disabled={isSavingExam || generatedQuestions.length === 0}
+                  className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold h-8.5 text-xs rounded-xl shadow-xs active:scale-[0.98] transition-all cursor-pointer"
                   size="sm"
                 >
-                  <Save className="h-3.5 w-3.5 mr-1.5" /> Save
+                  {isSavingExam ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Saving Draft...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-3.5 w-3.5 mr-1.5" /> Save as Exam Draft
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
 
             {/* Duplicate questions warning */}
             {duplicateIndices.size > 0 && (
-              <Alert className="bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800">
+              <Alert className="bg-amber-50 dark:bg-amber-950/40 border-amber-400 dark:border-amber-700 text-amber-900 dark:text-amber-200">
                 <AlertTriangle className="h-4 w-4 text-amber-600" />
                 <AlertTitle>Potential Duplicate Questions Detected</AlertTitle>
                 <AlertDescription className="text-xs">
@@ -2346,13 +2457,13 @@ export default function AdminAIGenerator() {
               <Card className="text-center py-12 rounded-2xl border-dashed">
                 <CardContent className="space-y-3">
                   <div className="p-3 bg-muted/40 rounded-2xl w-fit mx-auto text-muted-foreground">
-                    <Brain className="h-10 w-10" />
+                    <Brain className="h-10 w-10 text-emerald-600 dark:text-emerald-400" />
                   </div>
                   <h3 className="text-base font-semibold">No Questions Generated Yet</h3>
                   <p className="text-xs text-muted-foreground max-w-sm mx-auto">
                     Select your digital resource, set how many questions you need, and click Generate.
                   </p>
-                  <Button variant="outline" size="sm" onClick={() => setActiveTab('configure')} className="rounded-xl text-xs">
+                  <Button variant="outline" size="sm" onClick={() => setActiveTab('configure')} className="rounded-xl text-xs cursor-pointer">
                     Go to Configure Tab
                   </Button>
                 </CardContent>
@@ -2360,16 +2471,16 @@ export default function AdminAIGenerator() {
             ) : (
               <div className="space-y-3 sm:space-y-4">
                 {/* Filter & Search Toolbar */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 p-2.5 sm:p-3 rounded-xl sm:rounded-2xl border bg-card/60 shadow-sm">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 p-2.5 sm:p-3 rounded-xl sm:rounded-2xl border bg-card/60 shadow-xs">
                   {/* Type Filter Pills */}
                   <div className="flex flex-wrap items-center gap-1 sm:gap-1.5">
                     <button
                       type="button"
                       onClick={() => setReviewTypeFilter('all')}
                       className={cn(
-                        "px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-semibold border transition-all",
+                        "px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-semibold border transition-all cursor-pointer",
                         reviewTypeFilter === 'all'
-                          ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                          ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-xs border-blue-600"
                           : "bg-muted/40 hover:bg-muted text-muted-foreground border-border"
                       )}
                     >
@@ -2379,10 +2490,10 @@ export default function AdminAIGenerator() {
                       type="button"
                       onClick={() => setReviewTypeFilter('truefalse')}
                       className={cn(
-                        "px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-semibold border transition-all",
+                        "px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-semibold border transition-all cursor-pointer",
                         reviewTypeFilter === 'truefalse'
-                          ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                          : "bg-muted/40 hover:bg-muted text-muted-foreground border-border"
+                          ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-xs border-emerald-600"
+                          : "bg-emerald-500/5 hover:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/25"
                       )}
                     >
                       T/F ({generatedQuestions.filter(q => q.questionType === 'truefalse').length})
@@ -2391,10 +2502,10 @@ export default function AdminAIGenerator() {
                       type="button"
                       onClick={() => setReviewTypeFilter('mcq')}
                       className={cn(
-                        "px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-semibold border transition-all",
+                        "px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-semibold border transition-all cursor-pointer",
                         reviewTypeFilter === 'mcq'
-                          ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                          : "bg-muted/40 hover:bg-muted text-muted-foreground border-border"
+                          ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-xs border-indigo-600"
+                          : "bg-indigo-500/5 hover:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/25"
                       )}
                     >
                       MCQs ({generatedQuestions.filter(q => q.questionType === 'mcq').length})
@@ -2403,10 +2514,10 @@ export default function AdminAIGenerator() {
                       type="button"
                       onClick={() => setReviewTypeFilter('shortanswer')}
                       className={cn(
-                        "px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-semibold border transition-all",
+                        "px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-semibold border transition-all cursor-pointer",
                         reviewTypeFilter === 'shortanswer'
-                          ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                          : "bg-muted/40 hover:bg-muted text-muted-foreground border-border"
+                          ? "bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-xs border-amber-600"
+                          : "bg-amber-500/5 hover:bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/25"
                       )}
                     >
                       Short ({generatedQuestions.filter(q => q.questionType === 'shortanswer').length})
@@ -2448,25 +2559,44 @@ export default function AdminAIGenerator() {
                     <Card
                       key={q.id || qIndex}
                       className={cn(
-                        "relative transition rounded-xl sm:rounded-2xl border-border shadow-sm overflow-hidden",
+                        "relative transition-all rounded-xl sm:rounded-2xl border shadow-xs overflow-hidden",
+                        q.questionType === 'mcq' && "border-l-4 border-l-indigo-500 border-border/80",
+                        q.questionType === 'truefalse' && "border-l-4 border-l-emerald-500 border-border/80",
+                        q.questionType === 'shortanswer' && "border-l-4 border-l-amber-500 border-border/80",
                         isDuplicate && "border-amber-400 bg-amber-50/20"
                       )}
                     >
-                      <CardHeader className="p-3 sm:p-4 pb-2.5 border-b bg-muted/10">
+                      <CardHeader className="p-3 sm:p-4 pb-2.5 border-b bg-gradient-to-r from-muted/30 via-muted/15 to-transparent">
                         <div className="flex flex-col gap-2">
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                              <span className="font-bold text-xs sm:text-sm bg-primary/10 text-primary px-2 py-0.5 rounded-md">
+                              <span className="font-extrabold text-xs sm:text-sm bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-2.5 py-0.5 rounded-lg shadow-2xs">
                                 Q{qIndex + 1}
                               </span>
-                              <Badge variant="outline" className="text-[10px] sm:text-xs capitalize">
-                                {q.questionType === 'mcq' ? 'MCQ' : q.questionType === 'truefalse' ? 'True / False' : 'Short Answer'}
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "text-[10px] sm:text-xs font-semibold",
+                                  q.questionType === 'mcq' && "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/30",
+                                  q.questionType === 'truefalse' && "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
+                                  q.questionType === 'shortanswer' && "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30"
+                                )}
+                              >
+                                {q.questionType === 'mcq' ? 'Multiple Choice' : q.questionType === 'truefalse' ? 'True / False' : 'Short Answer'}
                               </Badge>
-                              <Badge variant="secondary" className="text-[10px] sm:text-xs">
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "text-[10px] sm:text-xs font-semibold capitalize",
+                                  q.difficulty === 'Easy' && "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
+                                  q.difficulty === 'Medium' && "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30",
+                                  q.difficulty === 'Hard' && "bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/30"
+                                )}
+                              >
                                 {q.difficulty}
                               </Badge>
                               {isDuplicate && (
-                                <Badge variant="destructive" className="text-[10px]">
+                                <Badge variant="destructive" className="text-[10px] animate-pulse">
                                   Duplicate
                                 </Badge>
                               )}
@@ -2474,10 +2604,10 @@ export default function AdminAIGenerator() {
 
                             <div className="flex items-center gap-1.5 shrink-0">
                               <div className="flex items-center gap-1 text-xs">
-                                <Label className="text-[10px] sm:text-[11px] text-muted-foreground">Pts:</Label>
+                                <Label className="text-[10px] sm:text-[11px] text-muted-foreground font-semibold">Pts:</Label>
                                 <Input
                                   type="number"
-                                  className="w-11 sm:w-12 h-7 text-xs px-1 text-center rounded-lg"
+                                  className="w-11 sm:w-12 h-7 text-xs px-1 text-center rounded-lg font-bold"
                                   min={1}
                                   value={q.marks || 1}
                                   onChange={(e) => handleUpdateQuestion(qIndex, { marks: parseInt(e.target.value, 10) || 1 })}
@@ -2497,11 +2627,11 @@ export default function AdminAIGenerator() {
 
                           {/* Secondary meta info row */}
                           <div className="flex items-center gap-1.5 flex-wrap text-[10px] text-muted-foreground">
-                            <Badge variant="outline" className="text-[10px] text-muted-foreground px-1.5 py-0">
+                            <Badge variant="outline" className="text-[10px] bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/25 px-2 py-0">
                               via {q.providerUsed}
                             </Badge>
                             {q.sourceReference?.bookTitle && (
-                              <Badge variant="outline" className="text-[10px] bg-primary/10 text-primary border-primary/20 flex items-center gap-1 max-w-[260px] truncate px-1.5 py-0">
+                              <Badge variant="outline" className="text-[10px] bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border-cyan-500/25 flex items-center gap-1 max-w-[260px] truncate px-2 py-0">
                                 <BookOpen className="h-2.5 w-2.5 shrink-0" />
                                 <span className="truncate">{q.sourceReference.bookTitle}</span>
                                 {q.sourceReference.pageRange ? ` (p. ${q.sourceReference.pageRange})` : ''}
@@ -2537,11 +2667,12 @@ export default function AdminAIGenerator() {
                                 return (
                                   <div
                                     key={optIndex}
-                                    className={`flex items-center gap-2 p-2 sm:p-2.5 rounded-xl border transition ${
+                                    className={cn(
+                                      "flex items-center gap-2 p-2 sm:p-2.5 rounded-xl border transition-all",
                                       isCorrect
-                                        ? 'border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/20'
-                                        : 'bg-background hover:border-slate-300'
-                                    }`}
+                                        ? "border-emerald-500 bg-emerald-50/80 dark:bg-emerald-950/30 text-emerald-950 dark:text-emerald-100 ring-1 ring-emerald-500/30 shadow-2xs"
+                                        : "bg-card border-border/70 hover:border-slate-300"
+                                    )}
                                   >
                                     <button
                                       type="button"
@@ -2549,11 +2680,12 @@ export default function AdminAIGenerator() {
                                         correctOptionIndex: optIndex,
                                         correctAnswer: opt
                                       })}
-                                      className={`h-6 w-6 rounded-full flex items-center justify-center font-bold text-xs shrink-0 transition ${
+                                      className={cn(
+                                        "h-6 w-6 rounded-full flex items-center justify-center font-bold text-xs shrink-0 transition-all cursor-pointer",
                                         isCorrect
-                                          ? 'bg-emerald-600 text-white'
-                                          : 'border border-slate-300 hover:border-emerald-500 text-muted-foreground'
-                                      }`}
+                                          ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-xs"
+                                          : "border border-slate-300 hover:border-emerald-500 text-muted-foreground"
+                                      )}
                                     >
                                       {optionLetter}
                                     </button>
@@ -2585,7 +2717,10 @@ export default function AdminAIGenerator() {
                                 type="button"
                                 size="sm"
                                 variant={q.correctOptionIndex === 0 ? 'default' : 'outline'}
-                                className={`flex-1 rounded-xl h-8 text-xs font-semibold ${q.correctOptionIndex === 0 ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}`}
+                                className={cn(
+                                  "flex-1 rounded-xl h-8 text-xs font-semibold cursor-pointer",
+                                  q.correctOptionIndex === 0 && "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-xs border-emerald-600"
+                                )}
                                 onClick={() => handleUpdateQuestion(qIndex, { correctOptionIndex: 0, correctAnswer: 'True' })}
                               >
                                 True
@@ -2594,7 +2729,10 @@ export default function AdminAIGenerator() {
                                 type="button"
                                 size="sm"
                                 variant={q.correctOptionIndex === 1 ? 'default' : 'outline'}
-                                className={`flex-1 rounded-xl h-8 text-xs font-semibold ${q.correctOptionIndex === 1 ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}`}
+                                className={cn(
+                                  "flex-1 rounded-xl h-8 text-xs font-semibold cursor-pointer",
+                                  q.correctOptionIndex === 1 && "bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white shadow-xs border-rose-600"
+                                )}
                                 onClick={() => handleUpdateQuestion(qIndex, { correctOptionIndex: 1, correctAnswer: 'False' })}
                               >
                                 False
@@ -2611,7 +2749,7 @@ export default function AdminAIGenerator() {
                               value={q.correctAnswer || ''}
                               onChange={(e) => handleUpdateQuestion(qIndex, { correctAnswer: e.target.value })}
                               placeholder="Key phrase or expected solution..."
-                              className="text-xs sm:text-sm rounded-xl h-8"
+                              className="text-xs sm:text-sm rounded-xl h-8 border-amber-500/30 bg-amber-500/5 focus-visible:ring-amber-500/30"
                             />
                           </div>
                         )}
@@ -2626,7 +2764,7 @@ export default function AdminAIGenerator() {
                             rows={3}
                             value={q.explanation || ''}
                             onChange={(e) => handleUpdateQuestion(qIndex, { explanation: e.target.value })}
-                            className="text-xs sm:text-sm leading-relaxed bg-amber-500/5 dark:bg-amber-500/10 border-amber-500/20 text-foreground focus-visible:ring-amber-500/30 rounded-xl"
+                            className="text-xs sm:text-sm leading-relaxed bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/30 text-foreground focus-visible:ring-amber-500/30 rounded-xl"
                             placeholder="Detailed explanation with concepts, steps, and educational emojis..."
                           />
                         </div>
@@ -2640,9 +2778,14 @@ export default function AdminAIGenerator() {
 
           {/* TAB 4: RECENT AI JOBS */}
           <TabsContent value="history" className="space-y-4 sm:space-y-6">
-            <Card className="border-border shadow-sm rounded-xl sm:rounded-2xl overflow-hidden">
-              <CardHeader className="p-3.5 sm:p-6 pb-2.5 sm:pb-4 border-b">
-                <CardTitle className="text-base sm:text-lg">Recent AI Generation Jobs</CardTitle>
+            <Card className="border-amber-500/20 shadow-xs rounded-xl sm:rounded-2xl overflow-hidden">
+              <CardHeader className="p-3.5 sm:p-6 pb-2.5 sm:pb-4 border-b bg-gradient-to-r from-amber-500/10 via-orange-500/5 to-transparent border-amber-500/15">
+                <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                  <div className="p-2 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 shadow-2xs">
+                    <History className="h-4 w-4" />
+                  </div>
+                  Recent AI Generation Jobs
+                </CardTitle>
                 <CardDescription className="text-xs">
                   Audit and resume past generation batches saved in your organization.
                 </CardDescription>
@@ -2659,18 +2802,26 @@ export default function AdminAIGenerator() {
                         <div className="space-y-1">
                           <div className="font-semibold text-sm flex items-center gap-2">
                             <span className="truncate">{job.title || 'Untitled Exam'}</span>
-                            <Badge variant={job.status === 'completed' ? 'default' : 'secondary'} className="text-[10px] shrink-0">
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "text-[10px] shrink-0 font-semibold capitalize",
+                                job.status === 'completed' && "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
+                                job.status === 'generating' && "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30 animate-pulse",
+                                job.status === 'failed' && "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30"
+                              )}
+                            >
                               {job.status}
                             </Badge>
                           </div>
                           <div className="text-muted-foreground flex flex-wrap gap-2 text-[11px]">
-                            <span>Requested: {job.totalRequested} questions</span>
+                            <span>Requested: <strong className="text-foreground">{job.totalRequested}</strong> questions</span>
                             <span>•</span>
-                            <span>Generated: {job.totalGenerated}</span>
+                            <span>Generated: <strong className="text-foreground">{job.totalGenerated}</strong></span>
                             <span>•</span>
-                            <span>Difficulty: {job.difficulty}</span>
+                            <span>Difficulty: <strong className="text-foreground">{job.difficulty}</strong></span>
                             <span>•</span>
-                            <span>Language: {job.language}</span>
+                            <span>Language: <strong className="text-foreground">{job.language}</strong></span>
                           </div>
                         </div>
 
@@ -2679,7 +2830,7 @@ export default function AdminAIGenerator() {
                             <Button
                               variant="outline"
                               size="sm"
-                              className="rounded-xl text-xs h-7 sm:h-8"
+                              className="rounded-xl text-xs h-7 sm:h-8 font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 cursor-pointer"
                               onClick={() => {
                                 setGeneratedQuestions(job.questions);
                                 setActiveTab('review');
@@ -2704,13 +2855,6 @@ export default function AdminAIGenerator() {
           </TabsContent>
         </Tabs>
       </div>
-
-      {/* AI Provider Engine Settings Dialog */}
-      <AIProviderSettingsDialog
-        open={showAISettingsDialog}
-        onOpenChange={setShowAISettingsDialog}
-        onSaved={refreshStatuses}
-      />
     </DashboardLayout>
   );
 }

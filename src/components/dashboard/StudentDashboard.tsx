@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { getPublishedExams } from "@/lib/firebase-exams";
 import { getStudentAttempts } from "@/lib/firebase-attempts";
@@ -6,7 +7,7 @@ import { getCachedDefaultDepartmentId } from "@/lib/system-settings";
 import { SimpleLeaderboard } from "@/components/SimpleLeaderboard";
 import { StatCard } from "./StatCard";
 import { ExamCard } from "@/components/exam/ExamCard";
-import { ClipboardList, Trophy, Clock, CheckCircle, Sparkles, GraduationCap } from "lucide-react";
+import { ClipboardList, Trophy, Clock, CheckCircle, Sparkles, GraduationCap, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
 import { EthioAccentBar } from "@/components/ui/EthioAccentBar";
@@ -166,6 +167,38 @@ export function StudentDashboard() {
           <SimpleLeaderboard departmentId={(getCachedDefaultDepartmentId() || profile?.departmentId)!} />
         </div>
       )}
+
+      {/* Community Study Lounge Quick Jump Banner */}
+      <Link
+        to="/dashboard/community"
+        className="block group rounded-3xl p-5 border border-indigo-500/30 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-sky-500/10 hover:border-indigo-500/60 hover:shadow-lg transition-all"
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3.5">
+            <div className="h-12 w-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white flex items-center justify-center shadow-md shadow-indigo-500/25 group-hover:scale-105 transition-transform">
+              <Users className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold text-foreground group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                  Join the Student Community Lounge
+                </h3>
+                <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Discuss questions, share exam tips, and study with classmates across all departments.
+              </p>
+            </div>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold self-start sm:self-center h-9 px-4 pointer-events-none"
+          >
+            Open Community Chat →
+          </Button>
+        </div>
+      </Link>
 
       {/* Upcoming Scheduled Exams (only if any are scheduled for future dates) */}
       {!loading && upcomingExams.length > 0 && (

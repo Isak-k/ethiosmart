@@ -309,6 +309,25 @@ export const CATEGORY_THEMES: Record<string, CategoryTheme> = {
     hoverText: "hover:text-cyan-100",
     badgeStyle: "bg-cyan-500/20 text-cyan-300 border-cyan-400/30",
   },
+  "/dashboard/community": {
+    category: "community",
+    label: "Community",
+    colorName: "indigo",
+    accentHex: "#6366f1",
+    sidebarGradient: "bg-gradient-to-b from-[#18123d] via-[#110c2c] to-[#070518]",
+    headerGradient: "from-indigo-950 via-purple-950 to-slate-950",
+    activeBg: "bg-indigo-500/20 shadow-md shadow-indigo-500/15",
+    activeText: "text-white font-bold",
+    activeBorder: "border-indigo-400/40",
+    activeIndicator: "bg-indigo-400 shadow-[0_0_10px_#818cf8]",
+    iconBgActive: "bg-indigo-500 text-white shadow-md shadow-indigo-500/30",
+    iconBgInactive: "bg-indigo-500/15 text-indigo-300 group-hover:bg-indigo-500/25 group-hover:text-indigo-200",
+    iconColorActive: "text-white",
+    iconColorInactive: "text-indigo-300",
+    hoverBg: "hover:bg-indigo-500/10",
+    hoverText: "hover:text-indigo-100",
+    badgeStyle: "bg-indigo-500/20 text-indigo-300 border-indigo-400/30",
+  },
   "/dashboard/feedback": {
     category: "messages",
     label: "Feedback",
@@ -498,6 +517,7 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
       { href: "/dashboard/exams", label: "Exams", icon: ClipboardList },
       { href: "/dashboard/video-tutorials", label: "Video Tutorials", icon: Video, badge: "Soon" },
       { href: "/dashboard/ai-assistant", label: "AI Tutor", icon: Brain, badge: "Soon" },
+      { href: "/dashboard/community", label: "Community", icon: Users, badge: "Live" },
       { href: "/dashboard/results", label: t("dashboard.menu.myResults", "Results"), icon: Trophy },
       { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
     ];
@@ -508,6 +528,7 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
     { href: "/dashboard/admin/exams", label: t("dashboard.menu.manageExams"), icon: FileText, permission: 'viewAllExams' },
     { href: "/dashboard/admin/ai-generator", label: "AI Exam Generator", icon: Sparkles, permission: 'viewAllExams' },
     { href: "/dashboard/admin/books", label: "Books", icon: Library, permission: 'viewAllExams' },
+    { href: "/dashboard/community", label: "Community Chat", icon: Users, permission: 'viewDashboard' },
     { href: "/dashboard/all-results", label: t("dashboard.menu.allResults"), icon: Trophy, permission: 'viewAllResults' },
     { href: "/dashboard/students", label: t("dashboard.menu.students"), icon: Users, permission: 'viewStudents' },
     { href: "/dashboard/feedback", label: "Feedback", icon: MessageSquare, permission: 'viewStudents' },
@@ -820,7 +841,7 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
 
       {/* Mobile Bottom Navigation - Liquid Glass Floating Dock (Optimized for 98% mobile user base) */}
       <nav className="liquid-glass-dock lg:hidden fixed bottom-0 left-0 right-0 z-50 pb-[env(safe-area-inset-bottom)]">
-        <div className="grid grid-cols-4 gap-1 px-2 py-1.5">
+        <div className={cn("px-1.5 sm:px-2 py-1.5", role === "admin" ? "grid grid-cols-4 gap-1" : "grid grid-cols-5 gap-0.5 sm:gap-1")}>
           {role === "admin" ? (
             <>
               {links.slice(0, 3).map((link) => {
@@ -903,6 +924,16 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
                 activeText: "text-purple-600 dark:text-purple-400 font-bold",
                 inactiveText: "text-slate-600 dark:text-slate-400 font-semibold",
                 dot: "bg-purple-500 shadow-[0_0_8px_#a855f7]",
+              },
+              {
+                href: "/dashboard/community",
+                label: "Community",
+                icon: Users,
+                activeBg: "bg-gradient-to-tr from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/35 border-indigo-300/40",
+                inactiveBg: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20",
+                activeText: "text-indigo-600 dark:text-indigo-400 font-bold",
+                inactiveText: "text-slate-600 dark:text-slate-400 font-semibold",
+                dot: "bg-indigo-500 shadow-[0_0_8px_#6366f1]",
               },
               {
                 href: "/dashboard/messages",

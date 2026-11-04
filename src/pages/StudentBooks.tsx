@@ -15,7 +15,7 @@ import { getDepartments } from '@/lib/departments';
 import { getSubjects, getChapters } from '@/lib/subjects';
 import { getSubjectCover } from '@/lib/subject-covers';
 import { Department, Exam } from '@/integrations/firebase/types';
-import { Subject } from '@/types/subject';
+import { Subject, Chapter } from '@/types/subject';
 import { BookCard } from '@/components/book/BookCard';
 import { getPublishedExams } from '@/lib/firebase-exams';
 import { getSubjectVisualTheme } from '@/components/book/InteractiveShortNoteReader';
@@ -58,6 +58,7 @@ import {
   Compass,
   Ruler,
   ChevronRight,
+  Eye,
 } from 'lucide-react';
 
 export default function StudentBooks() {
@@ -68,7 +69,7 @@ export default function StudentBooks() {
 
   const isAdmin = role === 'admin' || role === 'superadmin';
   const defaultDeptId = getCachedDefaultDepartmentId();
-  const userDeptId = defaultDeptId || profile?.departmentId || (profile as any)?.department_id;
+  const userDeptId = profile?.departmentId || (profile as any)?.department_id || defaultDeptId;
 
   const [books, setBooks] = useState<Book[]>([]);
   const [bookmarkedIds, setBookmarkedIds] = useState<string[]>([]);
@@ -94,6 +95,7 @@ export default function StudentBooks() {
   }, [searchParams]);
 
   const [primaryMode, setPrimaryMode] = useState<'books' | 'notes' | 'bookmarks' | 'offline'>(initialMode);
+  const [notesViewMode, setNotesViewMode] = useState<'by_subject' | 'all_notes'>('by_subject');
   const [selectedNotesSubjectId, setSelectedNotesSubjectId] = useState<string | null>(
     searchParams.get('subjectId') || null
   );
@@ -144,19 +146,12 @@ export default function StudentBooks() {
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDept, setSelectedDept] = useState<string>(() => {
-    if (role !== 'admin' && role !== 'superadmin' && userDeptId && userDeptId !== 'all') {
+    if (userDeptId && userDeptId !== 'all') {
       return userDeptId;
     }
     return 'all';
   });
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
-
-  // Keep selectedDept synced to user's assigned department for non-admins
-  useEffect(() => {
-    if (!isAdmin && userDeptId && userDeptId !== 'all') {
-      setSelectedDept(userDeptId);
-    }
-  }, [userDeptId, isAdmin]);
 
   // Monitor network connectivity
   useEffect(() => {
@@ -196,38 +191,26 @@ export default function StudentBooks() {
   const fetchLibraryData = async () => {
     setLoading(true);
     try {
-      const activeDeptId = (!isAdmin && userDeptId && userDeptId !== 'all') ? userDeptId : undefined;
-
       const [booksData, deptsData, rawSubsData, bookmarksData, examsData] = await Promise.all([
-        getBooks(activeDeptId ? { departmentId: activeDeptId } : {}, 'student'),
+        getBooks({}, 'student'),
         getDepartments().catch(() => []),
-        getSubjects(activeDeptId).catch(() => []),
+        getSubjects().catch(() => []),
         user ? getUserBookBookmarks(user.uid).catch(() => []) : Promise.resolve([]),
-        getPublishedExams(activeDeptId).catch(() => []),
+        getPublishedExams().catch(() => []),
       ]);
 
-      // Strict department assignment rule: students only see subjects explicitly assigned to their department
-      let subsData = rawSubsData;
-      if (!isAdmin && userDeptId && userDeptId !== 'all') {
-        subsData = subsData.filter((s) => {
-          if (s.isActive === false) return false;
-          if (s.departmentIds && s.departmentIds.length > 0) {
-            return s.departmentIds.includes(userDeptId) || s.departmentIds.includes('all');
-          }
-          return (s as any).departmentId === userDeptId || (s as any).departmentId === 'all';
-        });
-      }
+      const subsData = rawSubsData;
 
       // Enrich books with dept & subject names and cover images
       const enriched = booksData.map((b) => {
         const dept = deptsData.find((d) => d.id === b.departmentId);
-        const sub = subsData.find((s) => s.id === b.subjectId) || rawSubsData.find((s) => s.id === b.subjectId);
+        const sub = rawSubsData.find((s) => s.id === b.subjectId);
         const isShortNote = b.resourceType === 'short_note';
         const effectiveCoverUrl =
           b.coverImageUrl ||
           (isShortNote ? sub?.notesCoverImageUrl : sub?.bookCoverImageUrl) ||
           sub?.coverImageUrl ||
-          (sub ? getSubjectCover(sub.name).url : '');
+          (sub ? getSubjectCover(sub.name || '').url : '');
 
         return {
           ...b,
@@ -351,8 +334,8 @@ export default function StudentBooks() {
     return (sub as any).departmentId === deptId || (sub as any).departmentId === 'all';
   };
 
-  // Active department filter: students with an assigned department are strictly bound to userDeptId
-  const effectiveDeptId = (!isAdmin && userDeptId && userDeptId !== 'all') ? userDeptId : selectedDept;
+  // Active department filter: students can browse by selected department or All Departments
+  const effectiveDeptId = selectedDept;
 
   // Counts
   const textbooksCount = useMemo(() => {
@@ -394,7 +377,7 @@ export default function StudentBooks() {
             const effectiveCoverUrl =
               r.book.coverImageUrl ||
               sub?.coverImageUrl ||
-              (sub ? getSubjectCover(sub.name).url : '');
+              (sub ? getSubjectCover(sub.name || '').url : '');
             return {
               ...r.book,
               coverImageUrl: effectiveCoverUrl,
@@ -424,11 +407,11 @@ export default function StudentBooks() {
       // Search query
       if (searchQuery.trim().length > 0) {
         const q = searchQuery.toLowerCase().trim();
-        const titleMatch = b.title?.toLowerCase().includes(q);
-        const authorMatch = b.author?.toLowerCase().includes(q);
-        const subMatch = b.subjectName?.toLowerCase().includes(q);
-        const descMatch = b.description?.toLowerCase().includes(q);
-        const chapterMatch = b.chapterTitle?.toLowerCase().includes(q);
+        const titleMatch = (b.title || '').toLowerCase().includes(q);
+        const authorMatch = (b.author || '').toLowerCase().includes(q);
+        const subMatch = (b.subjectName || '').toLowerCase().includes(q);
+        const descMatch = (b.description || '').toLowerCase().includes(q);
+        const chapterMatch = (b.chapterTitle || '').toLowerCase().includes(q);
         return titleMatch || authorMatch || subMatch || descMatch || chapterMatch;
       }
 
@@ -450,7 +433,18 @@ export default function StudentBooks() {
         }
         if (searchQuery.trim().length > 0) {
           const q = searchQuery.toLowerCase().trim();
-          if (!s.name.toLowerCase().includes(q)) return false;
+          const nameMatch = (s.name || '').toLowerCase().includes(q);
+          const descMatch = (s.description || '').toLowerCase().includes(q);
+          const noteMatch = books.some(
+            (b) =>
+              b.resourceType === 'short_note' &&
+              b.subjectId === s.id &&
+              ((b.title || '').toLowerCase().includes(q) ||
+                (b.chapterTitle || '').toLowerCase().includes(q) ||
+                (b.description || '').toLowerCase().includes(q) ||
+                (Array.isArray(b.chapterLabels) && b.chapterLabels.some((cl) => (cl || '').toLowerCase().includes(q))))
+          );
+          if (!nameMatch && !descMatch && !noteMatch) return false;
         }
         return true;
       })
@@ -480,6 +474,17 @@ export default function StudentBooks() {
     () => subjects.find((s) => s.id === selectedNotesSubjectId),
     [subjects, selectedNotesSubjectId]
   );
+
+  // Curriculum books for the selected notes subject (Level 2)
+  const currentSubjectCurriculumBooks = useMemo(() => {
+    if (!selectedNotesSubjectId) return [];
+    return books.filter(
+      (b) =>
+        b.resourceType === 'textbook' &&
+        b.subjectId === selectedNotesSubjectId &&
+        (role === 'admin' || b.status === 'published' || !b.status)
+    );
+  }, [books, selectedNotesSubjectId, role]);
 
   // Chapter notes for the selected subject
   const currentSubjectChapterNotes = useMemo(() => {
@@ -529,12 +534,12 @@ export default function StudentBooks() {
     }
     // Match by chapterTitle similarity under the same subject
     if (note.subjectId && note.chapterTitle) {
-      const titleLower = note.chapterTitle.toLowerCase();
+      const titleLower = (note.chapterTitle || '').toLowerCase();
       const byTitle = availableExams.find(
         (e) =>
           e.subjectId === note.subjectId &&
-          (e.title.toLowerCase().includes(titleLower) ||
-            (e.chapterTitle && e.chapterTitle.toLowerCase().includes(titleLower)))
+          (((e.title || '').toLowerCase().includes(titleLower)) ||
+            (e.chapterTitle && (e.chapterTitle || '').toLowerCase().includes(titleLower)))
       );
       if (byTitle) return byTitle;
     }
@@ -605,7 +610,7 @@ export default function StudentBooks() {
         return idx + 1;
       };
       const unitNum = getNum(note);
-      const isLocked = idx > 0 && role !== 'admin' && !profile?.isPremium;
+      const isLocked = Boolean(note.isPremium && role !== 'admin' && !profile?.isPremium);
 
       return {
         id: note.id,
@@ -909,30 +914,21 @@ export default function StudentBooks() {
               </div>
 
               {/* Department Filter */}
-              {isAdmin || !userDeptId || userDeptId === 'all' ? (
-                <div className="w-full sm:w-auto">
-                  <Select value={selectedDept} onValueChange={setSelectedDept}>
-                    <SelectTrigger className="w-full sm:w-[170px] rounded-xl text-xs h-8 bg-card">
-                      <SelectValue placeholder="All Departments" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Departments</SelectItem>
-                      {departments.map((dept) => (
-                        <SelectItem key={dept.id} value={dept.id}>
-                          {dept.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-700 dark:text-purple-300 text-xs font-semibold">
-                  <Building className="h-3.5 w-3.5 text-purple-500 shrink-0" />
-                  <span className="truncate max-w-[150px]">
-                    {departments.find((d) => d.id === userDeptId)?.name || 'My Department'}
-                  </span>
-                </div>
-              )}
+              <div className="w-full sm:w-auto">
+                <Select value={selectedDept} onValueChange={setSelectedDept}>
+                  <SelectTrigger className="w-full sm:w-[185px] rounded-xl text-xs h-8 bg-card">
+                    <SelectValue placeholder="All Departments" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">🌐 All Departments</SelectItem>
+                    {departments.map((dept) => (
+                      <SelectItem key={dept.id} value={dept.id}>
+                        {dept.name} {dept.id === userDeptId ? '(My Dept)' : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             {/* OFFLINE STORAGE BAR (in offline mode) */}
@@ -1003,22 +999,36 @@ export default function StudentBooks() {
                 {filteredBooksList.length === 0 ? (
                   <div className="text-center py-20 px-6 rounded-3xl border border-dashed bg-card/40">
                     <FolderOpen className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-                    <h3 className="text-lg font-bold font-display">No books found</h3>
+                    <h3 className="text-lg font-bold font-display">No textbooks found</h3>
                     <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto mt-1 mb-4">
-                      No textbooks match your current search and department filters.
+                      {notesCount > 0
+                        ? `No textbooks found, but ${notesCount} chapter study note(s) are available in your library!`
+                        : 'No textbooks match your current search and department filters.'}
                     </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setSearchQuery('');
-                        setSelectedSubject('all');
-                        setSelectedDept((!isAdmin && userDeptId && userDeptId !== 'all') ? userDeptId : 'all');
-                      }}
-                      className="rounded-xl text-xs"
-                    >
-                      Reset Filters
-                    </Button>
+                    {notesCount > 0 ? (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => setPrimaryMode('notes')}
+                        className="rounded-xl text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white shadow-xs"
+                      >
+                        <FileText className="h-3.5 w-3.5 mr-1.5" />
+                        Browse Study Notes ({notesCount})
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSearchQuery('');
+                          setSelectedSubject('all');
+                          setSelectedDept('all');
+                        }}
+                        className="rounded-xl text-xs"
+                      >
+                        Reset Filters
+                      </Button>
+                    )}
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -1047,42 +1057,140 @@ export default function StudentBooks() {
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                       <div>
                         <h3 className="text-xl font-display font-bold text-foreground">
-                          Available Subjects with Study Notes
+                          Chapter Study Notes
                         </h3>
                         <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-                          Select a subject below to browse its separated, chapter-by-chapter notes and chapter practice exams.
+                          Browse notes organized by subject and curriculum chapters, or view all uploaded notes directly.
                         </p>
                       </div>
 
-                      <div className="relative w-full sm:w-72">
-                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          placeholder="Search subjects..."
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          className="pl-10 rounded-xl bg-card text-xs h-9"
-                        />
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {/* View Mode Toggle: By Subject vs All Notes */}
+                        <div className="flex items-center rounded-xl bg-card border p-1 shadow-xs">
+                          <button
+                            type="button"
+                            onClick={() => setNotesViewMode('by_subject')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                              notesViewMode === 'by_subject'
+                                ? 'bg-purple-600 text-white shadow-xs'
+                                : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                          >
+                            <BookOpen className="h-3.5 w-3.5" />
+                            <span>By Subject</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setNotesViewMode('all_notes')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                              notesViewMode === 'all_notes'
+                                ? 'bg-purple-600 text-white shadow-xs'
+                                : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                          >
+                            <FileText className="h-3.5 w-3.5" />
+                            <span>All Notes ({notesCount})</span>
+                          </button>
+                        </div>
+
+                        <div className="relative w-full sm:w-64">
+                          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            placeholder={
+                              notesViewMode === 'by_subject'
+                                ? 'Search subjects & topics...'
+                                : 'Search notes by title or chapter...'
+                            }
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-10 rounded-xl bg-card text-xs h-9"
+                          />
+                        </div>
                       </div>
                     </div>
 
-                    {subjectsWithNotes.length === 0 ? (
+                    {notesViewMode === 'all_notes' ? (
+                      /* DIRECT ALL NOTES GRID (INSTANT VISIBILITY FOR RECENTLY SAVED NOTES) */
+                      filteredBooksList.length === 0 ? (
+                        <div className="text-center py-20 px-6 rounded-3xl border border-dashed bg-card/40">
+                          <FileText className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+                          <h3 className="text-lg font-bold font-display">No study notes found</h3>
+                          <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto mt-1 mb-4">
+                            {textbooksCount > 0
+                              ? `No study notes found, but ${textbooksCount} curriculum book(s) are available in your library.`
+                              : 'No study notes match your current search and department filters.'}
+                          </p>
+                          {textbooksCount > 0 ? (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => setPrimaryMode('books')}
+                              className="rounded-xl text-xs font-semibold"
+                            >
+                              <BookOpen className="h-3.5 w-3.5 mr-1.5" />
+                              Browse Curriculum Books ({textbooksCount})
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSearchQuery('');
+                                setSelectedDept('all');
+                              }}
+                              className="rounded-xl text-xs"
+                            >
+                              Reset Filters
+                            </Button>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                          {filteredBooksList.map((note) => (
+                            <BookCard
+                              key={note.id}
+                              book={note}
+                              isBookmarked={bookmarkedIds.includes(note.id)}
+                              onToggleBookmark={handleToggleBookmark}
+                              isSavedOffline={offlineBookIds.has(note.id)}
+                              onSaveOffline={handleSaveBookOffline}
+                              isDownloadingOffline={downloadingBookId === note.id}
+                            />
+                          ))}
+                        </div>
+                      )
+                    ) : subjectsWithNotes.length === 0 ? (
                       <div className="text-center py-20 px-6 rounded-3xl border border-dashed bg-card/40">
                         <FolderOpen className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-                        <h3 className="text-lg font-bold font-display">No subjects found</h3>
+                        <h3 className="text-lg font-bold font-display">No study notes subjects found</h3>
                         <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto mt-1 mb-4">
-                          No subjects match your current search and department filters.
+                          {textbooksCount > 0
+                            ? `No study notes subjects found, but ${textbooksCount} curriculum textbook(s) are available.`
+                            : 'No subjects match your current search and department filters.'}
                         </p>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSearchQuery('');
-                            setSelectedDept((!isAdmin && userDeptId && userDeptId !== 'all') ? userDeptId : 'all');
-                          }}
-                          className="rounded-xl text-xs"
-                        >
-                          Reset Filters
-                        </Button>
+                        {textbooksCount > 0 ? (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => setPrimaryMode('books')}
+                            className="rounded-xl text-xs font-semibold"
+                          >
+                            <BookOpen className="h-3.5 w-3.5 mr-1.5" />
+                            Browse Curriculum Books ({textbooksCount})
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSearchQuery('');
+                              setSelectedDept('all');
+                            }}
+                            className="rounded-xl text-xs"
+                          >
+                            Reset Filters
+                          </Button>
+                        )}
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -1110,7 +1218,8 @@ export default function StudentBooks() {
                                     alt={subject.name}
                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                                     onError={(e) => {
-                                      (e.target as HTMLElement).src = getSubjectCover(subject.name).url;
+                                      e.currentTarget.onerror = null;
+                                      e.currentTarget.src = getSubjectCover(subject?.name || '').url;
                                     }}
                                   />
                                   {/* Book spine simulation */}
@@ -1188,6 +1297,43 @@ export default function StudentBooks() {
                       );
                     })()}
 
+                    {/* Complete Curriculum Textbook Banner if available for this subject */}
+                    {currentSubjectCurriculumBooks.length > 0 && (
+                      <div className="p-4 rounded-2xl bg-gradient-to-r from-primary/10 via-purple-500/10 to-indigo-500/10 border border-primary/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0 shadow-xs">
+                            <BookOpen className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-primary">
+                                Complete Textbook
+                              </span>
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-mono">
+                                {currentSubjectCurriculumBooks.length} available
+                              </Badge>
+                            </div>
+                            <h4 className="text-sm sm:text-base font-bold text-foreground line-clamp-1">
+                              {currentSubjectCurriculumBooks[0].title}
+                            </h4>
+                            <p className="text-xs text-muted-foreground line-clamp-1">
+                              {currentSubjectCurriculumBooks[0].author ? `By ${currentSubjectCurriculumBooks[0].author} · ` : ''}
+                              Read the full curriculum textbook volume alongside these chapter unit guides.
+                            </p>
+                          </div>
+                        </div>
+
+                        <Button
+                          size="sm"
+                          onClick={() => navigate(`/dashboard/books/${currentSubjectCurriculumBooks[0].id}/read`)}
+                          className="rounded-xl text-xs font-semibold h-8 bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs shrink-0"
+                        >
+                          <Eye className="w-3.5 h-3.5 mr-1" />
+                          Read Textbook
+                        </Button>
+                      </div>
+                    )}
+
                     {/* Search inside chapter view */}
                     {displayUnits.length > 6 && (
                       <div className="relative w-full">
@@ -1231,10 +1377,10 @@ export default function StudentBooks() {
                             if (!searchQuery.trim()) return true;
                             const q = searchQuery.toLowerCase().trim();
                             return (
-                              unit.title.toLowerCase().includes(q) ||
+                              (unit.title || '').toLowerCase().includes(q) ||
                               `unit ${unit.unitNumber}`.includes(q) ||
-                              unit.note?.summary?.toLowerCase().includes(q) ||
-                              unit.note?.title?.toLowerCase().includes(q)
+                              (unit.note?.summary || '').toLowerCase().includes(q) ||
+                              (unit.note?.title || '').toLowerCase().includes(q)
                             );
                           })
                           .map((unit) => {

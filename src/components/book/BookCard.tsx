@@ -43,6 +43,7 @@ interface BookCardProps {
   onEdit?: (book: Book) => void;
   onDelete?: (book: Book) => void;
   onToggleStatus?: (book: Book) => void;
+  onToggleResourceType?: (book: Book) => void;
   onGenerateAI?: (book: Book) => void;
   isSavedOffline?: boolean;
   onSaveOffline?: (book: Book) => void;
@@ -57,6 +58,7 @@ export function BookCard({
   onEdit,
   onDelete,
   onToggleStatus,
+  onToggleResourceType,
   onGenerateAI,
   isSavedOffline = false,
   onSaveOffline,
@@ -174,7 +176,20 @@ export function BookCard({
               <div className="flex items-center gap-1 shrink-0">
                 <Badge
                   variant={isShortNote ? 'secondary' : 'default'}
-                  className={`text-[10px] font-semibold px-2 py-0 border-0 shadow-xs ${
+                  onClick={(e) => {
+                    if (isAdmin && onToggleResourceType) {
+                      e.stopPropagation();
+                      onToggleResourceType(book);
+                    }
+                  }}
+                  title={
+                    isAdmin && onToggleResourceType
+                      ? `Click to convert to ${isShortNote ? 'Curriculum Book' : 'Study Note'}`
+                      : undefined
+                  }
+                  className={`text-[10px] font-semibold px-2 py-0 border-0 shadow-xs transition-all ${
+                    isAdmin && onToggleResourceType ? 'cursor-pointer hover:scale-105 hover:opacity-90' : ''
+                  } ${
                     isShortNote
                       ? 'bg-amber-500 text-white dark:bg-amber-600'
                       : 'bg-primary/90 text-primary-foreground'

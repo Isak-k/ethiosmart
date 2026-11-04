@@ -43,6 +43,8 @@ interface MobileVerticalReaderProps {
   onBack: () => void;
   onSaveOffline?: () => Promise<void>;
   isDownloadingOffline?: boolean;
+  isAdmin?: boolean;
+  onGenerateExam?: () => void;
 }
 
 type ViewMode = 'page' | 'text';
@@ -220,14 +222,14 @@ const LazyPdfPage = memo(function LazyPdfPage({
     <div
       ref={pageRef}
       data-page-number={pageNum}
-      className={`relative flex justify-center items-center select-none ${
+      className={`relative flex justify-center items-center select-none shadow-md my-1.5 rounded-sm overflow-hidden ${
         theme === 'dark' ? 'bg-[#0f1117]' : theme === 'sepia' ? 'bg-[#f4ecd8]' : 'bg-[#e5e7eb]'
       }`}
       style={{
         width: `${Math.round(containerWidth * zoomFactor)}px`,
         maxWidth: 'none',
         minHeight: `${estimatedHeight}px`,
-        marginBottom: zoomFactor > 1.2 ? '14px' : '8px',
+        marginBottom: zoomFactor > 1.2 ? '14px' : '10px',
       }}
     >
       {/* High-Resolution Canvas with crisp font contrast */}
@@ -413,6 +415,8 @@ export function MobileVerticalReader({
   onBack,
   onSaveOffline,
   isDownloadingOffline = false,
+  isAdmin = false,
+  onGenerateExam,
 }: MobileVerticalReaderProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -432,8 +436,11 @@ export function MobileVerticalReader({
   // Settings & Customization
   const [viewMode, setViewMode] = useState<ViewMode>('page');
   
-  // Default zoom is 1.40 (Fit Text - automatically trims white margins so text is large & bold)
-  const [zoomFactor, setZoomFactor] = useState<number>(1.40);
+  // Default zoom is 1.40 for mobile (fit text) or 1.0 for desktop
+  const [zoomFactor, setZoomFactor] = useState<number>(() => {
+    if (typeof window !== 'undefined' && window.innerWidth >= 768) return 1.0;
+    return 1.40;
+  });
   const [livePinchScale, setLivePinchScale] = useState<number | null>(null);
   const [livePinchPercent, setLivePinchPercent] = useState<number | null>(null);
 
@@ -460,15 +467,24 @@ export function MobileVerticalReader({
   const [isDraggingThumb, setIsDraggingThumb] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
-  // Auto-hide timer: when reading and idle for 2.4s, hide header, footer, stick, and indicators
+  // Auto-hide timer: when reading and idle for 3.2s, hide header, footer, stick, and indicators
   const resetAutoHideTimer = useCallback(() => {
     if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
     autoHideTimerRef.current = setTimeout(() => {
       setShowControls(false);
       setShowScrollStick(false);
       setShowPageIndicator(false);
-    }, 2400);
+    }, 3200);
   }, []);
+
+  const handleMouseMove = () => {
+    if (!showControls) {
+      setShowControls(true);
+      setShowScrollStick(true);
+      setShowPageIndicator(true);
+    }
+    resetAutoHideTimer();
+  };
 
   // Initial auto-hide timer on mount
   useEffect(() => {
@@ -586,41 +602,50 @@ export function MobileVerticalReader({
         }
       }
 
-      // Step B: For Drive files or direct PDF URLs, activate Cloud Stream viewer immediately
-      // without ANY 6.5s delay or loading hang on mobile devices!
       const fileId = book?.driveFileId || extractDriveFileId(book?.driveUrl || '');
       const directUrl = book?.driveUrl;
 
-      if (fileId || directUrl) {
+      if (fileId) {
+        // Prioritize HD Canvas mode with full-fidelity rendering
+        if (!isCancelled) {
+          setLoading(true);
+          setViewEngine('canvas');
+        }
+
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+          const res = await fetch(
+            `/api/drive/download?fileId=${encodeURIComponent(fileId)}`,
+            { signal: controller.signal }
+          );
+          clearTimeout(timeoutId);
+
+          const contentType = res.headers.get('content-type') || '';
+          if (res.ok && !contentType.includes('text/html')) {
+            const blob = await res.blob();
+            const isPdf = await checkIsPdf(blob);
+            if (isPdf && !isCancelled) {
+              await loadDocument(blob);
+              return;
+            }
+          }
+        } catch (fetchErr) {
+          console.warn('Canvas binary proxy fetch notice:', fetchErr);
+        }
+
+        // If binary fetch couldn't be loaded on canvas, fall back to cloud stream viewer
         if (!isCancelled) {
           setViewEngine('cloud');
           setLoading(false);
           setError(null);
         }
-
-        // In parallel (non-blocking), attempt to fetch binary for HD Canvas mode in background
-        if (fileId) {
-          try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 3500);
-
-            const res = await fetch(
-              `/api/drive/download?fileId=${encodeURIComponent(fileId)}`,
-              { signal: controller.signal }
-            );
-            clearTimeout(timeoutId);
-
-            const contentType = res.headers.get('content-type') || '';
-            if (res.ok && !contentType.includes('text/html')) {
-              const blob = await res.blob();
-              const isPdf = await checkIsPdf(blob);
-              if (isPdf && !isCancelled) {
-                await loadDocument(blob);
-              }
-            }
-          } catch {
-            // Background fetch fallback notice: Cloud stream viewer is already active and responsive
-          }
+      } else if (directUrl) {
+        if (!isCancelled) {
+          setViewEngine('cloud');
+          setLoading(false);
+          setError(null);
         }
       } else {
         if (!isCancelled) {
@@ -1004,6 +1029,7 @@ export function MobileVerticalReader({
   return (
     <div
       ref={containerRef}
+      onMouseMove={handleMouseMove}
       className={`fixed inset-0 z-50 h-[100dvh] w-screen flex flex-col overflow-hidden select-none ${themeBgClass}`}
     >
       {/* ---------------- Top Floating Header (Auto-hides on reading / double touch) ---------------- */}
@@ -1029,7 +1055,7 @@ export function MobileVerticalReader({
           </Button>
 
           <div className="min-w-0">
-            <h1 className="text-xs font-bold truncate max-w-[130px] sm:max-w-[200px] leading-tight">
+            <h1 className="text-xs sm:text-sm font-bold truncate max-w-[140px] sm:max-w-xs md:max-w-md lg:max-w-xl leading-tight">
               {book.title}
             </h1>
             <div className="flex items-center gap-1.5 text-[10px] opacity-75">
@@ -1135,6 +1161,20 @@ export function MobileVerticalReader({
             </Button>
           ) : null}
 
+          {/* Admin AI Generator shortcut */}
+          {isAdmin && onGenerateExam && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onGenerateExam}
+              className="h-8 px-2 text-[10px] font-bold rounded-lg text-amber-500 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 hidden sm:flex items-center gap-1 shrink-0"
+              title="Generate Exam with AI"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              <span className="hidden md:inline">Generate Exam</span>
+            </Button>
+          )}
+
           {/* Direct External View Link */}
           {externalViewUrl && (
             <Button
@@ -1153,10 +1193,21 @@ export function MobileVerticalReader({
       {/* ---------------- Main Content Body: Continuous Vertical Touch Scroll ---------------- */}
       <main className="flex-1 w-full h-full relative overflow-hidden">
         {loading && viewEngine === 'canvas' && (
-          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-background/85 backdrop-blur-xs">
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-background/90 backdrop-blur-xs">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm font-semibold text-foreground">Preparing reader...</p>
-            <p className="text-xs text-muted-foreground">Rendering pages</p>
+            <p className="text-sm font-semibold text-foreground">Preparing document reader...</p>
+            <p className="text-xs text-muted-foreground">Downloading high-definition pages from Google Drive...</p>
+            {externalViewUrl && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(externalViewUrl, '_blank')}
+                className="mt-2 rounded-xl text-xs gap-1.5"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                Open directly in Google Drive
+              </Button>
+            )}
           </div>
         )}
 
@@ -1197,6 +1248,31 @@ export function MobileVerticalReader({
               touchAction: 'pan-x pan-y',
             }}
           >
+            {/* Third-party cookie warning banner for iframe stream */}
+            {!blobUrl && (
+              <div className="shrink-0 p-2 bg-amber-500/10 border-b border-amber-500/20 text-amber-500 dark:text-amber-400 text-xs flex flex-wrap items-center justify-between gap-2 px-4 z-10 backdrop-blur-md">
+                <span className="text-[11px]">If preview is blank due to browser cookie restrictions, switch to HD Canvas or open directly in Drive.</span>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Button
+                    size="sm"
+                    variant="default"
+                    onClick={() => setViewEngine('canvas')}
+                    className="h-6 text-[10px] px-2 rounded-lg bg-primary"
+                  >
+                    HD Canvas
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => window.open(externalViewUrl, '_blank')}
+                    className="h-6 text-[10px] px-2 rounded-lg"
+                  >
+                    Open Drive
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {cloudIframeLoading && (
               <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-background/90 backdrop-blur-xs">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -1235,44 +1311,51 @@ export function MobileVerticalReader({
         )}
 
         {/* ENGINE 2 - VIEW MODE 1: Continuous Vertical Canvas Touch Scroll with Pinch-to-Zoom */}
-        {viewEngine === 'canvas' && viewMode === 'page' && pdfDoc && (
-          <div
-            ref={scrollContainerRef}
-            onTouchEnd={handleContentTouchEnd}
-            onScroll={handleContainerScroll}
-            className="w-full h-full overflow-y-auto overflow-x-auto m-0 p-0 overscroll-y-contain"
-            style={{
-              WebkitOverflowScrolling: 'touch',
-              touchAction: 'pan-x pan-y',
-            }}
-          >
-            {/* Pages vertically stacked edge-to-edge */}
+        {viewEngine === 'canvas' && viewMode === 'page' && pdfDoc && (() => {
+          const isDesktop = viewportWidth >= 768;
+          const basePageWidth = isDesktop ? Math.min(Math.round(viewportWidth * 0.65), 880) : viewportWidth;
+
+          return (
             <div
-              ref={pagesContainerRef}
-              className="w-full flex flex-col items-center m-0 p-0 transition-transform duration-75 origin-top"
+              ref={scrollContainerRef}
+              onTouchEnd={handleContentTouchEnd}
+              onScroll={handleContainerScroll}
+              className="w-full h-full overflow-y-auto overflow-x-auto m-0 p-0 overscroll-y-contain"
               style={{
-                width: zoomFactor > 1.0 ? `${Math.round(viewportWidth * zoomFactor)}px` : '100%',
-                minWidth: '100%',
-                transform: livePinchScale ? `scale(${livePinchScale})` : undefined,
-                transformOrigin: 'top center',
+                WebkitOverflowScrolling: 'touch',
+                touchAction: 'pan-x pan-y',
               }}
             >
-              {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((pageNum) => (
-                <LazyPdfPage
-                  key={pageNum}
-                  pageNum={pageNum}
-                  pdfDoc={pdfDoc}
-                  zoomFactor={zoomFactor}
-                  containerWidth={viewportWidth}
-                  defaultAspectRatio={defaultAspectRatio}
-                  onVisible={handlePageVisible}
-                  onAspectRatioCalculated={handleAspectRatioCalculated}
-                  theme={theme}
-                />
-              ))}
+              {/* Pages vertically stacked edge-to-edge */}
+              <div
+                ref={pagesContainerRef}
+                className="w-full flex flex-col items-center m-0 p-0 transition-transform duration-75 origin-top pb-16"
+                style={{
+                  width: zoomFactor > 1.0 ? `${Math.round(basePageWidth * zoomFactor)}px` : `${basePageWidth}px`,
+                  minWidth: isDesktop ? `${basePageWidth}px` : '100%',
+                  maxWidth: '100%',
+                  margin: '0 auto',
+                  transform: livePinchScale ? `scale(${livePinchScale})` : undefined,
+                  transformOrigin: 'top center',
+                }}
+              >
+                {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((pageNum) => (
+                  <LazyPdfPage
+                    key={pageNum}
+                    pageNum={pageNum}
+                    pdfDoc={pdfDoc}
+                    zoomFactor={zoomFactor}
+                    containerWidth={basePageWidth}
+                    defaultAspectRatio={defaultAspectRatio}
+                    onVisible={handlePageVisible}
+                    onAspectRatioCalculated={handleAspectRatioCalculated}
+                    theme={theme}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* ENGINE 2 - VIEW MODE 2: Reflowable Large Text Reader (Increase text size & change font style) */}
         {viewEngine === 'canvas' && viewMode === 'text' && pdfDoc && (

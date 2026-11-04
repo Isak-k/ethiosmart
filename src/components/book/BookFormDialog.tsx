@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { Book, BookInput, BookResourceType, BookStatus, GoogleDriveFileInfo } from '@/types/book';
 import { extractDriveFileId, validateDriveLink, buildDrivePreviewUrl } from '@/lib/google-drive';
 import { Department } from '@/integrations/firebase/types';
-import { Subject } from '@/types/subject';
+import { Subject, Chapter } from '@/types/subject';
 import { getDepartments } from '@/lib/departments';
-import { getSubjects } from '@/lib/subjects';
+import { getSubjects, getChapters } from '@/lib/subjects';
 import { getSubjectCover } from '@/lib/subject-covers';
 import { uploadSubjectCoverImage } from '@/lib/image-upload';
 import { Progress } from '@/components/ui/progress';
+import { cn } from '@/lib/utils';
 import {
   Dialog,
   DialogContent,
@@ -46,6 +47,10 @@ import {
   Tag,
   Upload,
   Image as ImageIcon,
+  Bookmark,
+  Check,
+  Plus,
+  Info,
 } from 'lucide-react';
 
 interface BookFormDialogProps {
@@ -55,6 +60,7 @@ interface BookFormDialogProps {
   onSave: (data: BookInput) => Promise<void>;
   defaultDepartmentId?: string;
   defaultSubjectId?: string;
+  defaultResourceType?: BookResourceType;
 }
 
 export function BookFormDialog({
@@ -64,6 +70,7 @@ export function BookFormDialog({
   onSave,
   defaultDepartmentId,
   defaultSubjectId,
+  defaultResourceType,
 }: BookFormDialogProps) {
   const isEditing = Boolean(book?.id);
   const navigate = useNavigate();
@@ -74,7 +81,7 @@ export function BookFormDialog({
 
   // Form Fields
   const [title, setTitle] = useState('');
-  const [resourceType, setResourceType] = useState<BookResourceType>('textbook');
+  const [resourceType, setResourceType] = useState<BookResourceType>(defaultResourceType || 'short_note');
   const [departmentId, setDepartmentId] = useState<string>('');
   const [subjectId, setSubjectId] = useState<string>('');
   const [driveUrl, setDriveUrl] = useState('');
@@ -92,6 +99,14 @@ export function BookFormDialog({
   const [uploadingCover, setUploadingCover] = useState<boolean>(false);
   const [uploadCoverProgress, setUploadCoverProgress] = useState<number>(0);
   const coverFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Chapter selection state for Google Drive Links
+  const [subjectChapters, setSubjectChapters] = useState<Chapter[]>([]);
+  const [loadingChapters, setLoadingChapters] = useState(false);
+  const [selectedChapterId, setSelectedChapterId] = useState<string>('all');
+  const [selectedChapterTitle, setSelectedChapterTitle] = useState<string>('');
+  const [selectedChapterNumber, setSelectedChapterNumber] = useState<number | undefined>(undefined);
+  const [customChapterTitle, setCustomChapterTitle] = useState<string>('');
 
   // Drive Validation State
   const [validatingDrive, setValidatingDrive] = useState(false);
@@ -130,7 +145,7 @@ export function BookFormDialog({
 
       if (book) {
         setTitle(book.title || '');
-        setResourceType(book.resourceType || 'textbook');
+        setResourceType(book.resourceType || defaultResourceType || 'short_note');
         setDepartmentId(book.departmentId || '');
         setSubjectId(book.subjectId || '');
         setCoverImageUrl(book.coverImageUrl || '');
@@ -145,6 +160,10 @@ export function BookFormDialog({
         setChapterLabelsInput(Array.isArray(book.chapterLabels) ? book.chapterLabels.join(', ') : '');
         setStatus(book.status || 'published');
         setAllowDownload(book.allowDownload ?? true);
+        setSelectedChapterId(book.chapterId || (book.chapterTitle ? 'custom' : 'all'));
+        setSelectedChapterTitle(book.chapterTitle || '');
+        setSelectedChapterNumber(book.chapterNumber);
+        setCustomChapterTitle(book.chapterTitle || '');
         if (book.driveFileId) {
           setDriveValidation({
             fileId: book.driveFileId,
@@ -160,7 +179,7 @@ export function BookFormDialog({
       } else {
         // Reset form for creation
         setTitle('');
-        setResourceType('textbook');
+        setResourceType(defaultResourceType || 'short_note');
         setDepartmentId(defaultDepartmentId && defaultDepartmentId !== 'all' ? defaultDepartmentId : '');
         setSubjectId(defaultSubjectId && defaultSubjectId !== 'all' ? defaultSubjectId : '');
         setCoverImageUrl('');
@@ -175,9 +194,33 @@ export function BookFormDialog({
         setChapterLabelsInput('');
         setStatus('published');
         setAllowDownload(true);
+        setSelectedChapterId('all');
+        setSelectedChapterTitle('');
+        setSelectedChapterNumber(undefined);
+        setCustomChapterTitle('');
       }
     }
-  }, [open, book, defaultDepartmentId, defaultSubjectId]);
+  }, [open, book, defaultDepartmentId, defaultSubjectId, defaultResourceType]);
+
+  // Fetch chapters whenever subjectId changes
+  useEffect(() => {
+    if (subjectId) {
+      setLoadingChapters(true);
+      getChapters(subjectId)
+        .then((chs) => {
+          setSubjectChapters(chs);
+        })
+        .catch((err) => {
+          console.warn('Could not load chapters for subject:', err);
+          setSubjectChapters([]);
+        })
+        .finally(() => {
+          setLoadingChapters(false);
+        });
+    } else {
+      setSubjectChapters([]);
+    }
+  }, [subjectId]);
 
   // Find currently selected subject
   const selectedSubject = React.useMemo(() => {
@@ -200,6 +243,10 @@ export function BookFormDialog({
   // When subject changes, automatically update cover image to that subject's cover
   const handleSubjectChange = (newSubId: string) => {
     setSubjectId(newSubId);
+    setSelectedChapterId('all');
+    setSelectedChapterTitle('');
+    setSelectedChapterNumber(undefined);
+    setCustomChapterTitle('');
     const sub = allSubjects.find((s) => s.id === newSubId);
     if (sub) {
       const cover = sub.coverImageUrl || getSubjectCover(sub.name).url;
@@ -283,12 +330,41 @@ export function BookFormDialog({
 
     const finalCover = coverImageUrl || selectedSubjectCover?.url || book?.coverImageUrl || '';
 
+    // Determine final chapterId, chapterTitle, chapterNumber
+    let finalChapterId: string | undefined = undefined;
+    let finalChapterTitle: string | undefined = undefined;
+    let finalChapterNumber: number | undefined = undefined;
+
+    if (selectedChapterId === 'custom') {
+      finalChapterTitle = customChapterTitle.trim() || undefined;
+    } else if (selectedChapterId && selectedChapterId !== 'all') {
+      finalChapterId = selectedChapterId;
+      const matchedCh = subjectChapters.find((c) => c.id === selectedChapterId);
+      if (matchedCh) {
+        finalChapterTitle = matchedCh.title;
+        finalChapterNumber = matchedCh.chapterNumber;
+      }
+    }
+
+    const finalDepartmentIds =
+      departmentId === 'all'
+        ? ['all', ...departments.map((d) => d.id)]
+        : Array.from(
+            new Set([
+              departmentId,
+              ...(selectedSubject?.departmentIds || []),
+            ])
+          );
+
     const payload: BookInput = {
       title: title.trim(),
       resourceType,
       departmentId,
-      departmentIds: [departmentId],
+      departmentIds: finalDepartmentIds,
       subjectId,
+      chapterId: finalChapterId,
+      chapterTitle: finalChapterTitle,
+      chapterNumber: finalChapterNumber,
       driveUrl: driveUrl.trim(),
       driveFileId: finalFileId,
       description: description.trim() || '',
@@ -353,44 +429,113 @@ export function BookFormDialog({
           )}
 
           {/* Resource Type & Status */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="font-semibold">
-                Resource Category <span className="text-destructive">*</span>
+          <div className="space-y-3 p-4 rounded-2xl bg-muted/30 border border-border/60">
+            <div className="space-y-1.5">
+              <Label className="font-semibold text-sm flex items-center justify-between">
+                <span>Resource Category <span className="text-destructive">*</span></span>
+                <span className="text-xs font-normal text-muted-foreground">
+                  Controls which section students find this material under
+                </span>
               </Label>
-              <Select
-                value={resourceType}
-                onValueChange={(val: BookResourceType) => setResourceType(val)}
-                disabled={isSaving}
-              >
-                <SelectTrigger className="rounded-xl">
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="textbook">📖 Book (Full Curriculum Book)</SelectItem>
-                  <SelectItem value="short_note">📝 Note (Summary / Handout)</SelectItem>
-                </SelectContent>
-              </Select>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                {/* Short Note Option */}
+                <div
+                  onClick={() => !isSaving && setResourceType('short_note')}
+                  className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer flex items-start gap-3 select-none ${
+                    resourceType === 'short_note'
+                      ? 'border-purple-600 bg-purple-500/10 shadow-xs ring-1 ring-purple-500/30'
+                      : 'border-border/70 hover:border-purple-500/40 bg-card'
+                  }`}
+                >
+                  <div
+                    className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${
+                      resourceType === 'short_note'
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-purple-500/15 text-purple-600'
+                    }`}
+                  >
+                    <FileText className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs sm:text-sm font-bold text-foreground">
+                        📝 Study Note / Handout
+                      </p>
+                      {resourceType === 'short_note' && (
+                        <CheckCircle2 className="h-4 w-4 text-purple-600 shrink-0" />
+                      )}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+                      Displayed in <strong>Chapter Study Notes</strong> view. Grouped by subject and chapters.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Full Textbook Option */}
+                <div
+                  onClick={() => !isSaving && setResourceType('textbook')}
+                  className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer flex items-start gap-3 select-none ${
+                    resourceType === 'textbook'
+                      ? 'border-primary bg-primary/10 shadow-xs ring-1 ring-primary/30'
+                      : 'border-border/70 hover:border-primary/40 bg-card'
+                  }`}
+                >
+                  <div
+                    className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${
+                      resourceType === 'textbook'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-primary/15 text-primary'
+                    }`}
+                  >
+                    <BookOpen className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs sm:text-sm font-bold text-foreground">
+                        📖 Curriculum Textbook
+                      </p>
+                      {resourceType === 'textbook' && (
+                        <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                      )}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+                      Displayed in <strong>Curriculum Books</strong> library grid. For complete book volumes.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label className="font-semibold">
-                Publication Status <span className="text-destructive">*</span>
-              </Label>
-              <Select
-                value={status}
-                onValueChange={(val: BookStatus) => setStatus(val)}
-                disabled={isSaving}
-              >
-                <SelectTrigger className="rounded-xl">
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="published">🟢 Published (Visible to students)</SelectItem>
-                  <SelectItem value="draft">🟡 Draft (Admin preview only)</SelectItem>
-                  <SelectItem value="archived">⚪ Archived (Hidden from regular browsing)</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="pt-2 border-t border-border/40 grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+              <div className="space-y-1">
+                <Label className="font-semibold text-xs">
+                  Publication Status <span className="text-destructive">*</span>
+                </Label>
+                <Select
+                  value={status}
+                  onValueChange={(val: BookStatus) => setStatus(val)}
+                  disabled={isSaving}
+                >
+                  <SelectTrigger className="rounded-xl h-9 text-xs">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="published">🟢 Published (Visible to all students)</SelectItem>
+                    <SelectItem value="draft">🟡 Draft (Admin preview only)</SelectItem>
+                    <SelectItem value="archived">⚪ Archived (Hidden from students)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="text-[11px] text-muted-foreground flex items-center gap-1.5 pt-4 sm:pt-0">
+                <Info className="h-3.5 w-3.5 text-primary shrink-0" />
+                <span>
+                  {status === 'published'
+                    ? 'Students can browse, open and read this resource immediately.'
+                    : 'Saved in draft mode. Only admins can see it until published.'}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -412,9 +557,12 @@ export function BookFormDialog({
                 disabled={isSaving}
               >
                 <SelectTrigger className="rounded-xl">
-                  <SelectValue placeholder="Select department" />
+                  <SelectValue placeholder="Select department (or All Departments)" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">
+                    🌐 All Departments (Universal — Visible to All Students)
+                  </SelectItem>
                   {departments.map((dept) => (
                     <SelectItem key={dept.id} value={dept.id}>
                       {dept.name}
@@ -688,6 +836,147 @@ export function BookFormDialog({
                 </a>
               </div>
             )}
+
+            {/* Choose Chapter for this Link */}
+            <div className="pt-3 border-t border-primary/20 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold flex items-center gap-1.5 text-foreground">
+                  <Bookmark className="h-3.5 w-3.5 text-primary" />
+                  Target Chapter / Scope for this Link (Optional)
+                </Label>
+                <div className="flex items-center gap-1.5">
+                  {loadingChapters && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                  <Badge variant="outline" className="text-[10px] font-medium border-primary/30 text-primary">
+                    {selectedChapterId === 'all'
+                      ? 'Entire Course / All Chapters'
+                      : selectedChapterId === 'custom'
+                      ? 'Custom Chapter'
+                      : 'Specific Chapter'}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div className="space-y-1">
+                  <Select
+                    value={selectedChapterId}
+                    onValueChange={(val) => {
+                      setSelectedChapterId(val);
+                      if (val === 'all') {
+                        setSelectedChapterTitle('');
+                        setSelectedChapterNumber(undefined);
+                      } else if (val === 'custom') {
+                        // Keep custom title
+                      } else {
+                        const ch = subjectChapters.find((c) => c.id === val);
+                        if (ch) {
+                          setSelectedChapterTitle(ch.title);
+                          setSelectedChapterNumber(ch.chapterNumber);
+                          const labelText = `Chapter ${ch.chapterNumber ?? ''}: ${ch.title}`.trim();
+                          if (!chapterLabelsInput.toLowerCase().includes(ch.title.toLowerCase())) {
+                            setChapterLabelsInput((prev) => (prev ? `${prev}, ${labelText}` : labelText));
+                          }
+                        }
+                      }
+                    }}
+                    disabled={isSaving || !subjectId}
+                  >
+                    <SelectTrigger className="rounded-xl text-xs sm:text-sm bg-card h-9">
+                      <SelectValue placeholder={subjectId ? 'Choose a chapter...' : 'Select a subject first'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">📖 Entire Course / All Chapters</SelectItem>
+                      {subjectChapters.map((ch, idx) => (
+                        <SelectItem key={ch.id} value={ch.id}>
+                          Chapter {ch.chapterNumber ?? idx + 1}: {ch.title}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="custom">✍️ Custom Chapter Title...</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {selectedChapterId === 'custom' && (
+                  <div className="space-y-1">
+                    <Input
+                      placeholder="e.g. Chapter 2: Cell Division & Mitosis"
+                      value={customChapterTitle}
+                      onChange={(e) => {
+                        setCustomChapterTitle(e.target.value);
+                        setSelectedChapterTitle(e.target.value);
+                      }}
+                      disabled={isSaving}
+                      className="rounded-xl text-xs sm:text-sm bg-card h-9"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Quick-add Chapter Chips */}
+              {subjectChapters.length > 0 && (
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span>Click chapters to tag into this link:</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const allLabels = subjectChapters
+                          .map((c) => `Chapter ${c.chapterNumber ?? ''}: ${c.title}`.trim())
+                          .join(', ');
+                        setChapterLabelsInput(allLabels);
+                      }}
+                      className="text-primary hover:underline font-medium text-[11px]"
+                    >
+                      Select All
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {subjectChapters.map((ch, idx) => {
+                      const num = ch.chapterNumber ?? idx + 1;
+                      const label = `Chapter ${num}: ${ch.title}`.trim();
+                      const isSelected =
+                        chapterLabelsInput.toLowerCase().includes(ch.title.toLowerCase()) ||
+                        selectedChapterId === ch.id;
+                      return (
+                        <Badge
+                          key={ch.id}
+                          variant={isSelected ? 'default' : 'outline'}
+                          className={cn(
+                            'text-[10px] cursor-pointer transition-all hover:scale-105 select-none py-0.5 px-2 font-medium',
+                            isSelected
+                              ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
+                              : 'bg-card hover:bg-muted text-muted-foreground border-border/80'
+                          )}
+                          onClick={() => {
+                            if (isSelected) {
+                              const updated = chapterLabelsInput
+                                .split(/[,;\n]/)
+                                .map((s) => s.trim())
+                                .filter((s) => !s.toLowerCase().includes(ch.title.toLowerCase()))
+                                .join(', ');
+                              setChapterLabelsInput(updated);
+                              if (selectedChapterId === ch.id) {
+                                setSelectedChapterId('all');
+                                setSelectedChapterTitle('');
+                                setSelectedChapterNumber(undefined);
+                              }
+                            } else {
+                              setChapterLabelsInput((prev) => (prev ? `${prev}, ${label}` : label));
+                              setSelectedChapterId(ch.id);
+                              setSelectedChapterTitle(ch.title);
+                              setSelectedChapterNumber(ch.chapterNumber);
+                            }
+                          }}
+                        >
+                          {isSelected ? <Check className="h-2.5 w-2.5 mr-1" /> : <Plus className="h-2.5 w-2.5 mr-1" />}
+                          Ch. {num}: {ch.title}
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Title & Author */}

@@ -10,6 +10,7 @@ import { PermissionsProvider } from "@/contexts/PermissionsContext";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { GradingErrorBoundary } from "@/components/admin/GradingErrorBoundary";
+import { LibraryErrorBoundary } from "@/components/common/LibraryErrorBoundary";
 import { GraduationCap } from "lucide-react";
 import "./lib/i18n";
 import Index from "./pages/Index";
@@ -54,6 +55,7 @@ import BookDetails from "./pages/BookDetails";
 import BookReader from "./pages/BookReader";
 import AdminSystemSettings from "./pages/AdminSystemSettings";
 import StudentVideoTutorials from "./pages/StudentVideoTutorials";
+import CommunityChat from "./pages/CommunityChat";
 
 const queryClient = new QueryClient();
 
@@ -165,7 +167,9 @@ function AppRoutes() {
         } />
         <Route path="/dashboard/admin/books" element={
           <ProtectedRoute allowedRoles={["admin"]}>
-            <AdminBooks />
+            <LibraryErrorBoundary fallbackTitle="Admin Books Management Notice">
+              <AdminBooks />
+            </LibraryErrorBoundary>
           </ProtectedRoute>
         } />
         <Route path="/dashboard/admin/shortnotes/create" element={
@@ -234,17 +238,23 @@ function AppRoutes() {
         } />
         <Route path="/dashboard/books" element={
           <ProtectedRoute allowedRoles={["student", "admin"]}>
-            <StudentBooks />
+            <LibraryErrorBoundary fallbackTitle="Academic Library Notice">
+              <StudentBooks />
+            </LibraryErrorBoundary>
           </ProtectedRoute>
         } />
         <Route path="/dashboard/books/:bookId" element={
           <ProtectedRoute allowedRoles={["student", "admin"]}>
-            <BookDetails />
+            <LibraryErrorBoundary fallbackTitle="Book Details Notice">
+              <BookDetails />
+            </LibraryErrorBoundary>
           </ProtectedRoute>
         } />
         <Route path="/dashboard/books/:bookId/read" element={
           <ProtectedRoute allowedRoles={["student", "admin"]}>
-            <BookReader />
+            <LibraryErrorBoundary fallbackTitle="Reader Notice">
+              <BookReader />
+            </LibraryErrorBoundary>
           </ProtectedRoute>
         } />
         <Route path="/dashboard/results" element={
@@ -255,6 +265,11 @@ function AppRoutes() {
         <Route path="/dashboard/messages" element={
           <ProtectedRoute allowedRoles={["student"]}>
             <StudentMessages />
+          </ProtectedRoute>
+        } />
+        <Route path="/dashboard/community" element={
+          <ProtectedRoute allowedRoles={["student", "admin"]}>
+            <CommunityChat />
           </ProtectedRoute>
         } />
         <Route path="/dashboard/ai-assistant" element={

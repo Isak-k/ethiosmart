@@ -60,6 +60,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { getExamsBySubject } from '@/lib/firebase-exams';
+import { buildDriveViewUrl, extractDriveFileId } from '@/lib/google-drive';
 import { FormattedProseWithMath, MathContent } from '@/components/notes/MathContent';
 import { ContentBlockRenderer } from '@/components/notes/ContentBlockRenderer';
 import { InteractiveExerciseCard } from '@/components/notes/InteractiveExerciseCard';
@@ -316,6 +317,9 @@ export function InteractiveShortNoteReader({
   const keyTerms: KeyTerm[] = Array.isArray(book?.keyTerms) ? book.keyTerms : [];
   const keyTakeaways: string[] = Array.isArray(book?.keyTakeaways) ? book.keyTakeaways : [];
   const topExercises: NoteExercise[] = Array.isArray(book?.exercises) ? book.exercises : [];
+
+  const driveFileId = book?.driveFileId || extractDriveFileId(book?.driveUrl || '');
+  const externalDriveUrl = driveFileId ? buildDriveViewUrl(driveFileId) : (book?.driveUrl || '');
 
   const subjectNameLower = (book?.subjectName || book?.title || '').toLowerCase();
   const isMathOrPhysics =
@@ -915,6 +919,20 @@ export function InteractiveShortNoteReader({
               >
                 <Printer className="h-4 w-4" />
               </Button>
+
+              {/* View Original PDF / Document Reader */}
+              {(driveFileId || book?.driveUrl) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/dashboard/books/${book.id}/read?viewer=document`)}
+                  className="h-8 px-2 text-xs font-semibold rounded-xl text-primary border-primary/30 hover:bg-primary/10 gap-1 shrink-0"
+                  title="Open in Document PDF Reader"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">PDF</span>
+                </Button>
+              )}
             </div>
           </div>
 
@@ -1274,15 +1292,50 @@ export function InteractiveShortNoteReader({
               })}
             </div>
           ) : (
-            <div className={`p-8 text-center rounded-3xl border border-dashed text-foreground space-y-3 ${themeCardClass}`}>
-              <Search className="h-8 w-8 mx-auto text-muted-foreground" />
-              <p className="text-sm font-semibold">
-                {searchQuery ? `No topics match "${searchQuery}"` : 'No section content available.'}
-              </p>
-              {searchQuery && (
-                <Button variant="outline" size="sm" onClick={() => setSearchQuery('')} className="rounded-xl text-xs">
-                  Clear Search
-                </Button>
+            <div className={`p-8 text-center rounded-3xl border border-dashed text-foreground space-y-4 ${themeCardClass}`}>
+              {driveFileId || book?.driveUrl ? (
+                <>
+                  <div className="h-12 w-12 mx-auto rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
+                    <FileText className="h-6 w-6" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-base font-bold">Document Note Available</h4>
+                    <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                      This note is linked to a Google Drive document. You can open and read the full original document in the continuous document reader.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                    <Button
+                      onClick={() => navigate(`/dashboard/books/${book.id}/read?viewer=document`)}
+                      className="rounded-xl text-xs font-semibold gap-1.5"
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                      Open Document Reader
+                    </Button>
+                    {externalDriveUrl && (
+                      <Button
+                        variant="outline"
+                        onClick={() => window.open(externalDriveUrl, '_blank')}
+                        className="rounded-xl text-xs gap-1.5"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                        Open in Google Drive
+                      </Button>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Search className="h-8 w-8 mx-auto text-muted-foreground" />
+                  <p className="text-sm font-semibold">
+                    {searchQuery ? `No topics match "${searchQuery}"` : 'No section content available.'}
+                  </p>
+                  {searchQuery && (
+                    <Button variant="outline" size="sm" onClick={() => setSearchQuery('')} className="rounded-xl text-xs">
+                      Clear Search
+                    </Button>
+                  )}
+                </>
               )}
             </div>
           )}
