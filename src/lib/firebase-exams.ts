@@ -24,6 +24,7 @@ import {
   getDeviceExam,
 } from '@/lib/device-storage';
 import { getOfflineQuestions, getDownloadedExams } from '@/lib/offline-storage';
+import { getCachedData, setCachedData, invalidateCacheKey } from '@/lib/app-cache';
 
 export async function createExam(examData: Omit<Exam, 'examId' | 'createdAt' | 'updatedAt'>) {
   const base = { ...examData };
@@ -40,6 +41,7 @@ export async function createExam(examData: Omit<Exam, 'examId' | 'createdAt' | '
     examId: docRef.id
   });
   
+  invalidateCacheKey('published_exams_');
   return docRef.id;
 }
 
@@ -260,6 +262,12 @@ export async function getAllExams(): Promise<Exam[]> {
 }
 
 export async function getPublishedExams(studentDepartmentId?: string): Promise<Exam[]> {
+  const cacheKey = `published_exams_${studentDepartmentId || 'all'}`;
+  const cachedExams = getCachedData<Exam[]>(cacheKey);
+  if (cachedExams) {
+    return cachedExams;
+  }
+
   const q = query(
     collection(db, 'exams'),
     where('isPublished', '==', true)
@@ -294,11 +302,14 @@ export async function getPublishedExams(studentDepartmentId?: string): Promise<E
     });
 
     // Client-side sort
-    return exams.sort((a, b) => {
+    const sorted = exams.sort((a, b) => {
       const timeA = a.createdAt?.seconds || 0;
       const timeB = b.createdAt?.seconds || 0;
       return timeB - timeA;
     });
+
+    setCachedData(cacheKey, sorted, 3 * 60 * 1000);
+    return sorted;
   } catch (error) {
     console.warn('Error fetching published exams, trying cache:', error);
     try {

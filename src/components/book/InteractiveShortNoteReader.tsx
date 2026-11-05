@@ -50,6 +50,7 @@ import {
   List,
   Sliders,
   FileText,
+  MoreVertical,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -810,56 +811,8 @@ export function InteractiveShortNoteReader({
               </div>
             </div>
 
-            {/* Reading Toolbar Action Buttons */}
+            {/* Reading Toolbar Action Buttons - Streamlined & Minimalist */}
             <div className="flex items-center gap-1 shrink-0">
-              {/* Quick Font Size Controls: A- and A+ */}
-              <div className="flex items-center rounded-xl border border-border/80 bg-muted/30 p-0.5">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => stepFontSize('down')}
-                  disabled={fontSize === 'sm'}
-                  className="h-7 w-7 rounded-lg text-xs font-bold text-muted-foreground hover:text-foreground"
-                  title="Decrease font size"
-                >
-                  A-
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => stepFontSize('up')}
-                  disabled={fontSize === '2xl'}
-                  className="h-7 w-7 rounded-lg text-xs font-bold text-muted-foreground hover:text-foreground"
-                  title="Increase font size"
-                >
-                  A+
-                </Button>
-              </div>
-
-              {/* Reading Comfort & Appearance Settings (Aa) */}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsAppearanceOpen(true)}
-                className="h-8 px-2 rounded-xl text-xs font-bold gap-1 text-muted-foreground hover:text-foreground font-sans"
-                title="Reading comfort: Font size, style, color theme, and width"
-              >
-                <Palette className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Theme</span>
-              </Button>
-
-              {/* Quick Width Toggle: Wide / Centered */}
-              <Button
-                variant={isEdgeToEdge ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={toggleEdgeToEdge}
-                className="h-8 px-2 rounded-xl text-xs font-semibold gap-1 text-muted-foreground hover:text-foreground font-sans hidden sm:inline-flex"
-                title={isEdgeToEdge ? 'Switch to Standard Reading Width' : 'Expand to Full Edge-to-Edge Display Width'}
-              >
-                {isEdgeToEdge ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
-                <span className="hidden md:inline">{isEdgeToEdge ? 'Wide' : 'Normal'}</span>
-              </Button>
-
               {/* Table of Contents Button */}
               {sections.length > 0 && (
                 <Button
@@ -869,12 +822,12 @@ export function InteractiveShortNoteReader({
                   className="h-8 px-2 rounded-xl text-xs font-bold gap-1 text-muted-foreground hover:text-foreground font-sans"
                   title="Table of contents"
                 >
-                  <ListOrdered className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Contents</span>
+                  <ListOrdered className="h-4 w-4" />
+                  <span className="hidden md:inline">Contents</span>
                 </Button>
               )}
 
-              {/* Search Toggle */}
+              {/* In-Note Search Toggle */}
               <Button
                 variant={isSearchOpen ? 'default' : 'ghost'}
                 size="icon"
@@ -885,17 +838,16 @@ export function InteractiveShortNoteReader({
                 <Search className="h-4 w-4" />
               </Button>
 
-              {/* Text to Speech */}
+              {/* Reading Comfort & Appearance Settings (Aa) */}
               <Button
-                variant={isSpeaking ? 'default' : 'ghost'}
-                size="icon"
-                onClick={toggleSpeech}
-                className={`h-8 w-8 rounded-xl ${
-                  isSpeaking ? 'bg-amber-500 text-white animate-pulse' : 'text-muted-foreground hover:text-foreground'
-                }`}
-                title={isSpeaking ? 'Stop read aloud' : 'Read aloud'}
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsAppearanceOpen(true)}
+                className="h-8 px-2 rounded-xl text-xs font-bold gap-1 text-muted-foreground hover:text-foreground font-sans"
+                title="Appearance: Font, theme, and width"
               >
-                {isSpeaking ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                <Palette className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Theme</span>
               </Button>
 
               {/* Bookmark Toggle */}
@@ -913,41 +865,87 @@ export function InteractiveShortNoteReader({
                 </Button>
               )}
 
-              {/* Share */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleShare}
-                className="h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground"
-                title="Share notes"
-              >
-                <Share2 className="h-4 w-4" />
-              </Button>
+              {/* More Actions Dropdown Menu */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground"
+                    title="More reading options"
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52 p-1.5 rounded-2xl shadow-lg border">
+                  {/* Read Aloud */}
+                  <DropdownMenuItem
+                    onClick={toggleSpeech}
+                    className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-xl cursor-pointer"
+                  >
+                    {isSpeaking ? (
+                      <>
+                        <VolumeX className="h-4 w-4 text-amber-500 animate-pulse" />
+                        <span className="text-amber-600 dark:text-amber-400 font-bold">Stop Read Aloud</span>
+                      </>
+                    ) : (
+                      <>
+                        <Volume2 className="h-4 w-4 text-muted-foreground" />
+                        <span>Read Aloud</span>
+                      </>
+                    )}
+                  </DropdownMenuItem>
 
-              {/* Print / Save PDF */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handlePrint}
-                className="h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground hidden sm:inline-flex"
-                title="Print or Save PDF"
-              >
-                <Printer className="h-4 w-4" />
-              </Button>
+                  {/* Width Toggle: Wide / Normal */}
+                  <DropdownMenuItem
+                    onClick={toggleEdgeToEdge}
+                    className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-xl cursor-pointer"
+                  >
+                    {isEdgeToEdge ? (
+                      <>
+                        <Minimize2 className="h-4 w-4 text-muted-foreground" />
+                        <span>Standard Width</span>
+                      </>
+                    ) : (
+                      <>
+                        <Maximize2 className="h-4 w-4 text-muted-foreground" />
+                        <span>Edge-to-Edge Wide</span>
+                      </>
+                    )}
+                  </DropdownMenuItem>
 
-              {/* View Original PDF / Document Reader */}
-              {(driveFileId || book?.driveUrl) && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => navigate(`/dashboard/books/${book.id}/read?viewer=document`)}
-                  className="h-8 px-2 text-xs font-semibold rounded-xl text-primary border-primary/30 hover:bg-primary/10 gap-1 shrink-0"
-                  title="Open in Document PDF Reader"
-                >
-                  <FileText className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">PDF</span>
-                </Button>
-              )}
+                  {/* Document Reader (PDF View) */}
+                  {(driveFileId || book?.driveUrl) && (
+                    <DropdownMenuItem
+                      onClick={() => navigate(`/dashboard/books/${book.id}/read?viewer=document`)}
+                      className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-xl cursor-pointer"
+                    >
+                      <FileText className="h-4 w-4 text-primary" />
+                      <span>Document PDF Reader</span>
+                    </DropdownMenuItem>
+                  )}
+
+                  <DropdownMenuSeparator className="my-1" />
+
+                  {/* Share */}
+                  <DropdownMenuItem
+                    onClick={handleShare}
+                    className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-xl cursor-pointer"
+                  >
+                    <Share2 className="h-4 w-4 text-muted-foreground" />
+                    <span>Share Notes</span>
+                  </DropdownMenuItem>
+
+                  {/* Print / Save PDF */}
+                  <DropdownMenuItem
+                    onClick={handlePrint}
+                    className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-xl cursor-pointer"
+                  >
+                    <Printer className="h-4 w-4 text-muted-foreground" />
+                    <span>Print or Save PDF</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
 
@@ -1334,18 +1332,6 @@ export function InteractiveShortNoteReader({
                         <Maximize2 className="h-3.5 w-3.5" />
                         Fullscreen Document
                       </Button>
-                      {externalDriveUrl && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => window.open(externalDriveUrl, '_blank')}
-                          className="rounded-xl text-xs gap-1.5 h-8 border-blue-500/30 text-blue-600 dark:text-blue-400 bg-blue-500/5 hover:bg-blue-500/15"
-                          title="Open directly in Google Drive in a new browser tab"
-                        >
-                          <ExternalLink className="h-3.5 w-3.5" />
-                          Open in Google Drive
-                        </Button>
-                      )}
                       <Button
                         variant="outline"
                         size="sm"
@@ -1892,17 +1878,6 @@ export function InteractiveShortNoteReader({
               <Badge variant="outline" className="text-[10px] sm:text-xs shrink-0">Document View</Badge>
             </div>
             <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-              {externalDriveUrl && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => window.open(externalDriveUrl, '_blank')}
-                  className="h-7 sm:h-8 px-2 rounded-xl text-xs gap-1"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Open in Drive</span>
-                </Button>
-              )}
               <Button
                 variant="secondary"
                 size="sm"

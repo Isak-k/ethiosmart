@@ -228,15 +228,15 @@ export function SubjectCard({
               <Layers className="h-4 w-4 text-primary shrink-0" />
               <span className="truncate">
                 {hasStudentAttempts ? (
-                  `${completedUnits} of ${totalUnits} units completed`
+                  `${completedUnits} of ${totalUnits} chapters completed`
                 ) : unitsWithExams > 0 ? (
                   totalUnits > 0
-                    ? `${unitsWithExams} of ${totalUnits} units`
-                    : `${unitsWithExams} ${unitsWithExams === 1 ? 'unit' : 'units'}`
+                    ? `${unitsWithExams} of ${totalUnits} chapters`
+                    : `${unitsWithExams} ${unitsWithExams === 1 ? 'chapter' : 'chapters'}`
                 ) : totalUnits > 0 ? (
-                  `${totalUnits} units`
+                  `${totalUnits} chapters`
                 ) : (
-                  '0 units'
+                  '0 chapters'
                 )}
               </span>
             </div>

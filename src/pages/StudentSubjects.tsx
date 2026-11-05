@@ -185,7 +185,7 @@ export default function StudentSubjects() {
             Academic Subjects
           </h1>
           <p className="text-sm sm:text-base text-muted-foreground mt-1">
-            Explore structured learning units, interactive assessments, and track your completion progress.
+            Explore structured learning chapters, interactive assessments, and track your completion progress.
           </p>
         </div>
 
@@ -240,7 +240,7 @@ export default function StudentSubjects() {
                 </h3>
                 <p className="text-sm text-muted-foreground mt-1">
                   {selectedSubjectForModal.description ||
-                    "Comprehensive curriculum units and examination preparation."}
+                    "Comprehensive curriculum chapters and examination preparation."}
                 </p>
               </div>
 
@@ -250,7 +250,7 @@ export default function StudentSubjects() {
                   <span className="font-semibold">Curriculum Structure</span>
                 </div>
                 <Badge variant="secondary">
-                  {selectedSubjectForModal.totalUnits ?? 8} units total
+                  {selectedSubjectForModal.totalUnits ?? 8} chapters total
                 </Badge>
               </div>
 

@@ -2,6 +2,15 @@ import { Timestamp } from 'firebase/firestore';
 
 export type ChannelCategory = 'announcements' | 'general' | 'department' | 'subject';
 
+export type CommunityChatMode = 'stored' | 'live';
+
+export interface CommunityChatSettings {
+  mode: CommunityChatMode;
+  updatedAt?: Timestamp | any;
+  updatedBy?: string;
+  updatedByName?: string;
+}
+
 export interface CommunityChannel {
   id: string;
   name: string;
@@ -34,6 +43,9 @@ export interface CommunityMessage {
   userRole: 'admin' | 'examiner' | 'student' | 'teacher';
   userAvatar?: string;
   text: string;
+  imageUrl?: string;
+  imagePublicId?: string;
+  imageCaption?: string;
   isPinned?: boolean;
   pinnedBy?: string;
   pinnedAt?: Timestamp | any;

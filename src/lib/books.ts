@@ -19,6 +19,7 @@ import { Book, BookInput, BookFilterOptions } from '@/types/book';
 import { getSubject } from '@/lib/subjects';
 import { getSubjectCover } from '@/lib/subject-covers';
 import { removeUndefinedFields, restoreFirestoreData } from '@/lib/firestore-utils';
+import { getCachedData, setCachedData, invalidateCacheKey } from '@/lib/app-cache';
 import {
   saveDeviceBooks,
   getDeviceBooks,
@@ -36,6 +37,12 @@ export async function getBooks(
   userRole?: string,
   userDeptId?: string
 ): Promise<Book[]> {
+  const cacheKey = `books_${userRole || 'student'}_${userDeptId || 'all'}_${JSON.stringify(options)}`;
+  const cachedList = getCachedData<Book[]>(cacheKey);
+  if (cachedList) {
+    return cachedList;
+  }
+
   try {
     const booksRef = collection(db, BOOKS_COLLECTION);
     const isAdmin = userRole === 'admin' || userRole === 'superadmin';
@@ -117,8 +124,9 @@ export async function getBooks(
       });
     }
 
-    // Auto-cache all fetched books and notes on device
+    // Auto-cache all fetched books and notes on device and in-memory cache
     saveDeviceBooks(list).catch(() => {});
+    setCachedData(cacheKey, list, 3 * 60 * 1000);
 
     return list;
   } catch (error) {
@@ -253,6 +261,7 @@ export async function createBook(input: BookInput, creatorId: string): Promise<s
   // Deeply strip any undefined values to satisfy Firestore addDoc validation
   const cleanData = removeUndefinedFields(data);
   const docRef = await addDoc(booksRef, cleanData);
+  invalidateCacheKey('books_');
   return docRef.id;
 }
 
@@ -282,6 +291,7 @@ export async function updateBook(id: string, updates: Partial<Book>): Promise<vo
   cleanUpdates.updatedAt = serverTimestamp();
 
   await updateDoc(docRef, cleanUpdates);
+  invalidateCacheKey('books_');
 }
 
 /**
@@ -290,6 +300,7 @@ export async function updateBook(id: string, updates: Partial<Book>): Promise<vo
 export async function deleteBook(id: string): Promise<void> {
   const docRef = doc(db, BOOKS_COLLECTION, id);
   await deleteDoc(docRef);
+  invalidateCacheKey('books_');
 }
 
 /**

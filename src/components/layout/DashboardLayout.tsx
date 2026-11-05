@@ -51,6 +51,8 @@ import {
 } from "lucide-react";
 import { usePWAInstall } from "@/hooks/use-pwa-install";
 import { PwaInstallDialog } from "@/components/ui/pwa-install-dialog";
+import { ManualRefreshButton } from "@/components/ui/manual-refresh-button";
+import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { cn } from "@/lib/utils";
 import { syncAllDeviceData } from "@/lib/device-storage-sync";
 import { GuestSetupDialog } from "@/components/auth/GuestSetupDialog";
@@ -295,7 +297,7 @@ export const CATEGORY_THEMES: Record<string, CategoryTheme> = {
   },
   "/dashboard/messages": {
     category: "messages",
-    label: "Messages",
+    label: "Contact Admin",
     colorName: "cyan",
     accentHex: "#06b6d4",
     sidebarGradient: "bg-gradient-to-b from-[#062933] via-[#041d24] to-[#020e12]",
@@ -479,6 +481,7 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
 
   const {
     isStandalone,
+    isAppInstalled,
     isIOS,
     deferredPrompt,
     promptInstall,
@@ -520,7 +523,7 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
         { href: "/dashboard/video-tutorials", label: "Videos", icon: Video, badge: "Soon" },
         { href: "/dashboard/ai-assistant", label: "AI Tutor", icon: Brain, badge: "Soon" },
         { href: "/dashboard/results", label: t("dashboard.menu.myResults", "Results"), icon: Trophy },
-        { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
+        { href: "/dashboard/messages", label: "Contact Admin", icon: MessageSquare },
       ];
     }
     return [
@@ -531,7 +534,7 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
       { href: "/dashboard/ai-assistant", label: "AI Tutor", icon: Brain, badge: "Soon" },
       { href: "/dashboard/community", label: "Community", icon: Users, badge: "Live" },
       { href: "/dashboard/results", label: t("dashboard.menu.myResults", "Results"), icon: Trophy },
-      { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
+      { href: "/dashboard/messages", label: "Contact Admin", icon: MessageSquare },
     ];
   }, [t, isGuest]);
 
@@ -595,8 +598,12 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
               </button>
             )}
           </div>
-          <div className="flex items-center gap-3">
-            {!isStandalone && (
+          <div className="flex items-center gap-2 sm:gap-2.5">
+            {/* Manual Refresh Button */}
+            <ManualRefreshButton />
+
+            {/* Smart Install Button: Automatically hides once app is installed */}
+            {!isAppInstalled && !isStandalone && (
               <button
                 type="button"
                 onClick={promptInstall}
@@ -607,6 +614,10 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
                 <span>Install App</span>
               </button>
             )}
+
+            {/* Real-time Notification System */}
+            <NotificationCenter userDepartmentId={profile?.departmentId} />
+
             <div className="[&_button]:liquid-glass-squircle [&_button]:rounded-2xl">
               <LanguageToggle />
             </div>
@@ -646,17 +657,25 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-2">
-          {!isStandalone && (
+          {/* Manual Refresh Button */}
+          <ManualRefreshButton />
+
+          {/* Smart Install Button: Automatically hides once app is installed */}
+          {!isAppInstalled && !isStandalone && (
             <button
               type="button"
               onClick={promptInstall}
-              className="h-8 px-2.5 rounded-full text-[11px] font-bold flex items-center gap-1 bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 text-white shadow-xs hover:scale-105 active:scale-95 transition-all shrink-0"
+              className="min-h-[40px] h-9 px-3 rounded-full text-xs font-bold flex items-center gap-1 bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 text-white shadow-xs hover:scale-105 active:scale-95 transition-all shrink-0"
               title="Install EthioSmart as an app"
             >
-              <Download className="h-3 w-3" />
+              <Download className="h-3.5 w-3.5" />
               <span>Install</span>
             </button>
           )}
+
+          {/* Real-time Notification System */}
+          <NotificationCenter userDepartmentId={profile?.departmentId} />
+
           {isGuest && (
             <button
               type="button"
@@ -875,7 +894,7 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
 
       {/* Mobile Bottom Navigation - Liquid Glass Floating Dock (Optimized for 98% mobile user base) */}
       <nav className="liquid-glass-dock lg:hidden fixed bottom-0 left-0 right-0 z-50 pb-[env(safe-area-inset-bottom)]">
-        <div className={cn("px-1.5 sm:px-2 py-1.5", role === "admin" ? "grid grid-cols-4 gap-1" : "grid grid-cols-5 gap-0.5 sm:gap-1")}>
+        <div className="px-1.5 sm:px-2 py-1.5 grid grid-cols-4 gap-1">
           {role === "admin" ? (
             <>
               {links.slice(0, 3).map((link) => {
@@ -968,16 +987,6 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
                 activeText: "text-indigo-600 dark:text-indigo-400 font-bold",
                 inactiveText: "text-slate-600 dark:text-slate-400 font-semibold",
                 dot: "bg-indigo-500 shadow-[0_0_8px_#6366f1]",
-              },
-              {
-                href: "/dashboard/messages",
-                label: "Message",
-                icon: MessageSquare,
-                activeBg: "bg-gradient-to-tr from-cyan-500 to-teal-600 text-white shadow-lg shadow-cyan-500/35 border-cyan-300/40",
-                inactiveBg: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20",
-                activeText: "text-cyan-600 dark:text-cyan-400 font-bold",
-                inactiveText: "text-slate-600 dark:text-slate-400 font-semibold",
-                dot: "bg-cyan-500 shadow-[0_0_8px_#22d3ee]",
               },
             ].map((item) => {
               const isActive = location.pathname === item.href || (item.href !== "/dashboard" && location.pathname.startsWith(item.href));

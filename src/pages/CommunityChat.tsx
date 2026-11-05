@@ -44,6 +44,12 @@ import {
   Filter,
   CornerDownLeft,
   Crown,
+  Image as ImageIcon,
+  Paperclip,
+  Eye,
+  Download,
+  Radio,
+  RefreshCw,
 } from 'lucide-react';
 import {
   Popover,
@@ -67,6 +73,7 @@ import {
   CommunityChannel,
   CommunityMessage,
   ReplyReference,
+  CommunityChatMode,
 } from '@/types/community';
 import {
   buildCommunityChannels,
@@ -75,7 +82,11 @@ import {
   toggleMessageReaction,
   pinCommunityMessage,
   deleteCommunityMessage,
+  getCommunityChatMode,
+  subscribeToCommunityChatMode,
+  setCommunityChatMode,
 } from '@/lib/community';
+import { uploadQuestionImage } from '@/lib/image-upload';
 import { getDepartments } from '@/lib/departments';
 import { getCachedDefaultDepartmentId } from '@/lib/system-settings';
 import { Department } from '@/integrations/firebase/types';
@@ -207,6 +218,17 @@ export default function CommunityChat() {
   // Admin chat storage cleanup dialog state
   const [cleanupDialogOpen, setCleanupDialogOpen] = useState(false);
 
+  // Community Chat Mode ('stored' | 'live')
+  const [chatMode, setChatMode] = useState<CommunityChatMode>('stored');
+  const [isUpdatingMode, setIsUpdatingMode] = useState(false);
+
+  // Image & Screenshot sharing state
+  const [pendingImageFile, setPendingImageFile] = useState<File | null>(null);
+  const [pendingImagePreview, setPendingImagePreview] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [viewingImage, setViewingImage] = useState<{ url: string; caption?: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // Modern UI states
   const [inputEmojiPickerOpen, setInputEmojiPickerOpen] = useState(false);
   const [emojiCategoryTab, setEmojiCategoryTab] = useState<string>('Reactions');
@@ -214,6 +236,114 @@ export default function CommunityChat() {
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [inChannelSearchOpen, setInChannelSearchOpen] = useState(false);
   const [inChannelSearchQuery, setInChannelSearchQuery] = useState('');
+
+  // Subscribe to real-time Community Chat Mode
+  useEffect(() => {
+    const unsubscribeMode = subscribeToCommunityChatMode((mode) => {
+      setChatMode(mode);
+    });
+    return () => {
+      unsubscribeMode();
+    };
+  }, []);
+
+  // Admin switch between Stored Mode and Live Mode
+  const handleToggleChatMode = async () => {
+    if (!isAdminOrExaminer || !user || isUpdatingMode) return;
+    const nextMode: CommunityChatMode = chatMode === 'stored' ? 'live' : 'stored';
+    setIsUpdatingMode(true);
+    try {
+      await setCommunityChatMode({
+        mode: nextMode,
+        adminId: user.uid,
+        adminName: profile?.full_name || user.email?.split('@')[0] || 'Admin',
+      });
+      setChatMode(nextMode);
+      toast({
+        title: nextMode === 'live' ? '⚡ Live Mode Active' : '💾 Stored Mode Active',
+        description:
+          nextMode === 'live'
+            ? 'Real-time student communication is now active across the community.'
+            : 'Messages are stored in the database so students can access previous conversations.',
+      });
+    } catch (err: any) {
+      console.error('Failed to change chat mode:', err);
+      toast({
+        title: 'Mode update failed',
+        description: err.message || 'Could not update community chat mode.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUpdatingMode(false);
+    }
+  };
+
+  // Stage an image file or screenshot for sending
+  const handleStageImage = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: 'Unsupported file type',
+        description: 'Please select an image (JPEG, PNG, or WebP).',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast({
+        title: 'Image too large',
+        description: 'Please attach an image smaller than 10MB.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (pendingImagePreview) {
+      URL.revokeObjectURL(pendingImagePreview);
+    }
+    setPendingImageFile(file);
+    const url = URL.createObjectURL(file);
+    setPendingImagePreview(url);
+  };
+
+  const handleClearStagedImage = () => {
+    if (pendingImagePreview) {
+      URL.revokeObjectURL(pendingImagePreview);
+    }
+    setPendingImageFile(null);
+    setPendingImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Capture pasted screenshots from clipboard directly into the chat input
+  const handleTextareaPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.indexOf('image') !== -1) {
+        const file = item.getAsFile();
+        if (file) {
+          e.preventDefault();
+          handleStageImage(file);
+          toast({
+            title: 'Screenshot Captured 📸',
+            description: 'Screenshot attached. Ready to send with your message.',
+          });
+        }
+        break;
+      }
+    }
+  };
+
+  // Clean up object URL when component unmounts
+  useEffect(() => {
+    return () => {
+      if (pendingImagePreview) {
+        URL.revokeObjectURL(pendingImagePreview);
+      }
+    };
+  }, [pendingImagePreview]);
 
   const handleInsertEmoji = (emoji: string) => {
     setInputText((prev) => prev + emoji);
@@ -419,10 +549,12 @@ export default function CommunityChat() {
     return list;
   }, [channels, activeCategoryFilter, channelSearch]);
 
-  // Send message handler
+  // Send message handler (supporting text, image upload, and screenshots)
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!inputText.trim() || !user || isSending) return;
+    const hasText = Boolean(inputText.trim());
+    const hasImage = Boolean(pendingImageFile);
+    if ((!hasText && !hasImage) || !user || isSending) return;
 
     if (activeChannel?.isOfficialOnly && !isAdminOrExaminer) {
       toast({
@@ -434,7 +566,10 @@ export default function CommunityChat() {
     }
 
     const messageText = inputText.trim();
+    const imageFileToSend = pendingImageFile;
+
     setInputText('');
+    handleClearStagedImage();
 
     let replyRef: ReplyReference | undefined;
     if (replyingTo) {
@@ -449,6 +584,27 @@ export default function CommunityChat() {
 
     try {
       setIsSending(true);
+      let uploadedImageUrl: string | undefined;
+      let uploadedImagePublicId: string | undefined;
+
+      if (imageFileToSend) {
+        setIsUploadingImage(true);
+        try {
+          const uploadRes = await uploadQuestionImage(imageFileToSend);
+          uploadedImageUrl = uploadRes.url;
+          uploadedImagePublicId = uploadRes.publicId;
+        } catch (uploadErr: any) {
+          console.warn('Image upload error, continuing with fallback:', uploadErr);
+          toast({
+            title: 'Image notice',
+            description: 'Could not upload image attachment. Sending text.',
+            variant: 'destructive',
+          });
+        } finally {
+          setIsUploadingImage(false);
+        }
+      }
+
       await sendCommunityMessage({
         channelId: activeChannelId,
         userId: user.uid,
@@ -457,14 +613,22 @@ export default function CommunityChat() {
         userRole,
         userAvatar: profile?.avatar_url,
         text: messageText,
+        imageUrl: uploadedImageUrl,
+        imagePublicId: uploadedImagePublicId,
         replyTo: replyRef,
       });
+
+      if (inChannelSearchQuery) {
+        setInChannelSearchQuery('');
+      }
 
       setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
       }, 80);
     } catch (err: any) {
       console.error('Failed to send message:', err);
+      // Restore input text if send failed
+      setInputText(messageText);
       const isPermError =
         err?.code === 'permission-denied' ||
         String(err?.message || '').toLowerCase().includes('permission') ||
@@ -889,6 +1053,51 @@ export default function CommunityChat() {
             </div>
 
             <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              {/* Community Mode Switcher (Admin) or Status Badge (Student) */}
+              {isAdminOrExaminer ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleToggleChatMode}
+                  disabled={isUpdatingMode}
+                  className={`h-7 px-2 sm:px-2.5 text-[10px] sm:text-[11px] font-bold rounded-xl gap-1 sm:gap-1.5 shadow-xs transition-all ${
+                    chatMode === 'live'
+                      ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20'
+                      : 'border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-300 hover:bg-blue-500/20'
+                  }`}
+                  title={`Admin Control: Click to switch to ${chatMode === 'live' ? 'Stored Mode' : 'Live Mode'}`}
+                >
+                  {chatMode === 'live' ? (
+                    <>
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                      </span>
+                      <span className="hidden sm:inline">⚡ Live Mode</span>
+                      <span className="sm:hidden">⚡ Live</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-blue-500 font-normal">💾</span>
+                      <span className="hidden sm:inline">Stored Mode</span>
+                      <span className="sm:hidden">Stored</span>
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <Badge
+                  variant="outline"
+                  className={`text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full font-semibold gap-1 ${
+                    chatMode === 'live'
+                      ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                      : 'border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-300'
+                  }`}
+                >
+                  {chatMode === 'live' ? '⚡ Live' : '💾 Stored'}
+                </Badge>
+              )}
+
               {/* In-Channel Live Search Trigger */}
               <Button
                 type="button"
@@ -927,6 +1136,33 @@ export default function CommunityChat() {
               )}
             </div>
           </header>
+
+          {/* Mode Announcement Banner (Live Mode vs Stored Mode) */}
+          <div
+            className={`px-3 sm:px-4 py-1.5 border-b text-[11px] font-medium flex items-center justify-between gap-2 shrink-0 transition-colors ${
+              chatMode === 'live'
+                ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-800 dark:text-emerald-300'
+                : 'bg-blue-500/10 border-blue-500/20 text-blue-800 dark:text-blue-300'
+            }`}
+          >
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-xs shrink-0">{chatMode === 'live' ? '⚡' : '💾'}</span>
+              <span className="truncate">
+                {chatMode === 'live'
+                  ? 'Live Mode Active: Real-time communication between students enabled.'
+                  : 'Stored Mode Active: Chat history is saved in the database so you can access previous conversations.'}
+              </span>
+            </div>
+            {isAdminOrExaminer && (
+              <button
+                type="button"
+                onClick={handleToggleChatMode}
+                className="text-[10px] sm:text-[11px] font-bold underline shrink-0 hover:opacity-80 ml-2"
+              >
+                Switch to {chatMode === 'live' ? 'Stored' : 'Live'}
+              </button>
+            )}
+          </div>
 
           {/* In-Channel Live Search Bar */}
           {inChannelSearchOpen && (
@@ -1191,9 +1427,33 @@ export default function CommunityChat() {
                             )}
 
                             {/* Message Text */}
-                            <div className="break-words select-text text-xs sm:text-[13.5px] leading-relaxed">
-                              {renderFormattedChatText(message.text, isCurrentUser)}
-                            </div>
+                            {message.text && (
+                              <div className="break-words select-text text-xs sm:text-[13.5px] leading-relaxed">
+                                {renderFormattedChatText(message.text, isCurrentUser)}
+                              </div>
+                            )}
+
+                            {/* Shared Image / Screenshot Attachment */}
+                            {message.imageUrl && (
+                              <div className="mt-1.5 mb-1 rounded-2xl overflow-hidden border border-black/10 dark:border-white/10 shadow-xs cursor-pointer group/img relative bg-black/5 max-w-sm">
+                                <img
+                                  src={message.imageUrl}
+                                  alt="Shared image"
+                                  className="max-h-72 w-auto max-w-full rounded-2xl object-cover hover:opacity-95 transition-opacity"
+                                  loading="lazy"
+                                  onClick={() =>
+                                    setViewingImage({
+                                      url: message.imageUrl!,
+                                      caption: message.imageCaption || message.text,
+                                    })
+                                  }
+                                />
+                                <div className="absolute bottom-2 right-2 bg-black/70 text-white rounded-lg px-2 py-0.5 text-[10px] font-medium backdrop-blur-xs flex items-center gap-1 opacity-0 group-hover/img:opacity-100 transition-opacity pointer-events-none">
+                                  <Eye className="w-3 h-3" />
+                                  <span>View</span>
+                                </div>
+                              </div>
+                            )}
 
                             {/* Timestamp indicator */}
                             <div
@@ -1423,12 +1683,46 @@ export default function CommunityChat() {
               <form onSubmit={handleSendMessage} className="space-y-2">
                 {/* Floating Frosted Glass Input Card */}
                 <div className="relative rounded-3xl bg-background/90 dark:bg-slate-900/90 border border-border/80 focus-within:border-sky-500/70 focus-within:ring-4 focus-within:ring-sky-500/15 shadow-lg shadow-black/5 dark:shadow-black/20 transition-all overflow-hidden">
+                  {/* Staged Image / Screenshot Preview Banner */}
+                  {pendingImagePreview && (
+                    <div className="p-2.5 sm:p-3 bg-muted/40 dark:bg-slate-950/50 border-b border-border/40 flex items-center justify-between gap-3 animate-fade-in">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="h-12 w-12 rounded-xl overflow-hidden border border-border/80 shrink-0 bg-black/10">
+                          <img
+                            src={pendingImagePreview}
+                            alt="Pending upload"
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-xs font-semibold text-foreground truncate">
+                            {pendingImageFile?.name || 'Screenshot attached'}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground">
+                            {pendingImageFile ? `${(pendingImageFile.size / 1024).toFixed(1)} KB` : 'Ready to send'}
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleClearStagedImage}
+                        className="h-7 w-7 rounded-xl text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10"
+                        title="Remove image"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+
                   {/* Multi-line auto-growing textarea */}
                   <textarea
                     ref={textareaRef}
                     rows={2}
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
+                    onPaste={handleTextareaPaste}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
@@ -1437,14 +1731,39 @@ export default function CommunityChat() {
                         setReplyingTo(null);
                       }
                     }}
-                    placeholder={`Message #${activeChannel?.name || 'channel'}...`}
+                    placeholder={`Message #${activeChannel?.name || 'channel'} (Type text, attach image, or paste screenshot)...`}
                     className="w-full min-h-[48px] max-h-40 px-4 pt-3 pb-2 bg-transparent text-xs sm:text-sm text-foreground focus:outline-none resize-none transition-all placeholder:text-muted-foreground/60 leading-relaxed"
                   />
 
                   {/* Input Card Bottom Action Toolbar */}
                   <div className="px-3 py-2 bg-muted/30 dark:bg-slate-950/40 border-t border-border/40 flex items-center justify-between gap-2">
-                    {/* Left Toolbar: Emoji Picker Popover + Rich text helpers */}
+                    {/* Left Toolbar: Image/Screenshot + Emoji Picker Popover + Rich text helpers */}
                     <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
+                      {/* Hidden Image File Input */}
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleStageImage(file);
+                        }}
+                      />
+
+                      {/* Image / Screenshot Upload Trigger */}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="h-8 px-2 sm:px-2.5 rounded-xl hover:bg-sky-500/10 text-muted-foreground hover:text-sky-600 dark:hover:text-sky-400 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                        title="Upload image or screenshot (or press Ctrl+V to paste)"
+                      >
+                        <ImageIcon className="h-4 w-4 text-sky-500" />
+                        <span className="hidden sm:inline text-[11px]">Image</span>
+                      </Button>
+
                       {/* Emoji Picker Popover */}
                       <Popover open={inputEmojiPickerOpen} onOpenChange={setInputEmojiPickerOpen}>
                         <PopoverTrigger asChild>
@@ -1556,15 +1875,18 @@ export default function CommunityChat() {
 
                       <Button
                         type="submit"
-                        disabled={!inputText.trim() || isSending}
+                        disabled={(!inputText.trim() && !pendingImageFile) || isSending || isUploadingImage}
                         className={`h-8 sm:h-9 px-3.5 sm:px-4 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-md active:scale-95 ${
-                          inputText.trim() && !isSending
+                          (inputText.trim() || pendingImageFile) && !isSending && !isUploadingImage
                             ? 'bg-gradient-to-r from-sky-500 via-indigo-600 to-purple-600 hover:from-sky-600 hover:to-purple-700 text-white shadow-sky-500/25 ring-2 ring-sky-400/30'
                             : 'bg-muted text-muted-foreground cursor-not-allowed opacity-60 shadow-none'
                         }`}
                       >
-                        {isSending ? (
-                          <span className="h-3.5 w-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                        {isSending || isUploadingImage ? (
+                          <>
+                            <span className="h-3.5 w-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                            <span className="hidden sm:inline">Sending...</span>
+                          </>
                         ) : (
                           <>
                             <Send className="h-3.5 w-3.5" />
@@ -1662,6 +1984,55 @@ export default function CommunityChat() {
           initialChannelId={activeChannelId}
         />
       )}
+
+      {/* Community Image / Screenshot Lightbox Modal */}
+      <Dialog open={Boolean(viewingImage)} onOpenChange={(open) => !open && setViewingImage(null)}>
+        <DialogContent className="max-w-4xl p-2 sm:p-4 rounded-3xl bg-background/95 backdrop-blur-xl border border-border/80">
+          <DialogHeader className="sr-only">
+            <DialogTitle>View Shared Image</DialogTitle>
+            <DialogDescription>Full resolution view of image shared in community chat</DialogDescription>
+          </DialogHeader>
+          {viewingImage && (
+            <div className="space-y-3">
+              <div className="relative max-h-[80vh] flex items-center justify-center overflow-hidden rounded-2xl bg-black/40">
+                <img
+                  src={viewingImage.url}
+                  alt={viewingImage.caption || 'Shared screenshot'}
+                  className="max-h-[75vh] w-auto max-w-full object-contain rounded-xl shadow-2xl"
+                />
+              </div>
+
+              <div className="flex items-center justify-between gap-3 px-2 pt-1 flex-wrap">
+                <p className="text-xs text-muted-foreground truncate max-w-md">
+                  {viewingImage.caption || 'Community image attachment'}
+                </p>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(viewingImage.url, '_blank')}
+                    className="h-8 px-3 rounded-xl text-xs gap-1.5"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    <span>Download</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="sm"
+                    onClick={() => setViewingImage(null)}
+                    className="h-8 px-3.5 rounded-xl text-xs"
+                  >
+                    Close
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

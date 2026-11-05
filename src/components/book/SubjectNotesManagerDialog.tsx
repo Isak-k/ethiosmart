@@ -205,7 +205,7 @@ export function SubjectNotesManagerDialog({
 
       toast({
         title: 'Chapter Created',
-        description: `Unit ${newNumber}: "${newTitle.trim()}" has been added.`,
+        description: `Chapter ${newNumber}: "${newTitle.trim()}" has been added.`,
       });
 
       setNewTitle('');
@@ -365,7 +365,7 @@ export function SubjectNotesManagerDialog({
                   Study Notes Book
                 </Badge>
                 <span className="text-xs text-muted-foreground font-medium">
-                  {notesCount} of {totalUnits} units uploaded
+                  {notesCount} of {totalUnits} chapters uploaded
                 </span>
               </div>
 
@@ -423,7 +423,7 @@ export function SubjectNotesManagerDialog({
               className="rounded-xl text-xs font-semibold bg-purple-600 text-white hover:bg-purple-700 gap-1.5 shadow-xs"
             >
               <Plus className="h-3.5 w-3.5" />
-              Add Unit / Chapter
+              Add Chapter
             </Button>
           </div>
         </div>
@@ -439,7 +439,7 @@ export function SubjectNotesManagerDialog({
               <div className="flex items-center justify-between">
                 <span className="text-sm font-bold text-foreground flex items-center gap-1.5">
                   <BookOpen className="h-4 w-4 text-purple-600" />
-                  Add New Chapter / Unit
+                  Add New Chapter
                 </span>
                 <Button
                   type="button"
@@ -454,7 +454,7 @@ export function SubjectNotesManagerDialog({
 
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                 <div className="sm:col-span-1">
-                  <Label className="text-xs font-semibold">Unit Number</Label>
+                  <Label className="text-xs font-semibold">Chapter Number</Label>
                   <Input
                     type="number"
                     min={1}
@@ -552,7 +552,7 @@ export function SubjectNotesManagerDialog({
                         <div className="space-y-3">
                           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                             <div className="sm:col-span-1">
-                              <Label className="text-xs font-semibold">Unit Number</Label>
+                              <Label className="text-xs font-semibold">Chapter Number</Label>
                               <Input
                                 type="number"
                                 min={1}
@@ -601,7 +601,7 @@ export function SubjectNotesManagerDialog({
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <h4 className="text-sm sm:text-base font-bold text-foreground truncate">
-                                  Unit {unitNum}: {ch.title}
+                                  Chapter {unitNum}: {ch.title}
                                 </h4>
 
                                 {note ? (

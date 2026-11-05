@@ -386,10 +386,10 @@ export default function BookReader() {
   const isShortNote = book.resourceType === 'short_note';
   const hasInteractiveSections = Array.isArray(book.sections) && book.sections.length > 0;
 
-  // All short notes open in the interactive AI notes reader by default!
-  // Rendered full-width without dashboard sidebar constraints for maximum screen space and immersive reading.
-  // If the user specifically wants the raw continuous PDF viewer, they can use ?viewer=document
-  if (isShortNote && !forceDocumentMode) {
+  // Short notes with structured AI sections open in the interactive reader when online.
+  // If the note has no AI sections (raw Drive document/PDF) or is being read offline (from local storage),
+  // open the continuous high-definition document reader with offline PDF blob support.
+  if (isShortNote && hasInteractiveSections && !isReadingOffline && !forceDocumentMode) {
     return (
       <div className="min-h-screen w-full bg-background animate-fade-in">
         <InteractiveShortNoteReader

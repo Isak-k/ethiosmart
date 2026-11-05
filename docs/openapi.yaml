@@ -1,0 +1,1445 @@
+openapi: 3.0.3
+info:
+  title: ExamPro Backend & Cloud Functions API
+  version: 1.0.0
+  description: |
+    Comprehensive OpenAPI specification for the ExamPro backend services, covering:
+    1. **Vercel / Local Dev Serverless REST APIs** (`/api/*`): AI Question Generation, Provider Status, and Google Drive integration bridges.
+    2. **Firebase Cloud Functions (HTTPS & Callable endpoints)**: Department & Global Leaderboards, Admin Ranking Maintenance, and Cloud Function AI bridges.
+
+    Prepared for automated API testing using **TestSprite**.
+servers:
+  - url: http://localhost:5173
+    description: Local Vite Dev Server with AI & Drive Bridge Middleware
+  - url: https://online-exam-f443c.web.app
+    description: Production Web & Vercel API Deployment
+  - url: https://us-central1-online-exam-f443c.cloudfunctions.net
+    description: Firebase Cloud Functions HTTP & Callable Endpoint Base
+  - url: https://identitytoolkit.googleapis.com
+    description: Google Firebase Authentication Identity Toolkit Gateway
+
+tags:
+  - name: Authentication
+    description: Firebase Auth login endpoint to generate JWT Bearer tokens (idToken) for protected endpoints
+  - name: AI Question Generation
+    description: Multi-provider AI Question Generation with automatic fallback (Gemini, Groq, OpenRouter, HuggingFace)
+  - name: Google Drive Bridge
+    description: Validation, text extraction, and binary proxy streaming for Google Drive study documents
+  - name: Leaderboards (Cloud Functions)
+    description: Student department rankings, institutional rankings, and cached leaderboard stats
+  - name: Admin Leaderboard Operations
+    description: Administrator-only leaderboard recalculation, cache invalidation, and diagnostic endpoints
+
+paths:
+  # =========================================================================
+  # 0. AUTHENTICATION (FIREBASE IDENTITY TOOLKIT GATEWAY)
+  # =========================================================================
+
+  /v1/accounts:signInWithPassword:
+    post:
+      servers:
+        - url: https://identitytoolkit.googleapis.com
+          description: Google Firebase Authentication Identity Toolkit
+      tags:
+        - Authentication
+      summary: Sign in with email and password to obtain Firebase JWT ID Token
+      description: |
+        Authenticates a user against Firebase Authentication.
+        Returns a valid Firebase ID Token (`idToken`), which is the JWT Bearer token required for all protected endpoints.
+        PUBLIC ENDPOINT: No credentials required to invoke.
+      operationId: signInWithPassword
+      security: []
+      parameters:
+        - name: key
+          in: query
+          required: true
+          description: Firebase Web API Key for the project
+          schema:
+            type: string
+          example: "AIzaSyA5UNpm_8VghlXdPuvo0UhETORUKitJmo4"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "test.admin@example.com"
+                password:
+                  type: string
+                  format: password
+                  example: "Password123!"
+                returnSecureToken:
+                  type: boolean
+                  default: true
+                  example: true
+      responses:
+        '200':
+          description: User authenticated successfully; JWT ID Token returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirebaseAuthResponse'
+        '400':
+          description: Invalid email, invalid password, or account disabled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        type: integer
+                        example: 400
+                      message:
+                        type: string
+                        example: "EMAIL_NOT_FOUND"
+
+  # =========================================================================
+  # 1. VERCEL SERVERLESS / DEV SERVER REST ENDPOINTS (/api/*)
+  # =========================================================================
+
+  /api/ai/generate-batch:
+    post:
+      tags:
+        - AI Question Generation
+      summary: Generate a batch of exam questions using AI
+      description: |
+        Generates normalized questions (MCQ, True/False, Short Answer) from topic, prompt, or source text.
+        Orchestrates requests across configured AI providers (Gemini, Groq, OpenRouter, HuggingFace) with automatic fallback.
+        PUBLIC ENDPOINT: No credentials required.
+      operationId: generateAIBatch
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerateBatchRequest'
+            example:
+              prompt: "Generate questions on Computer Networks and OSI Model"
+              topic: "Data Link Layer & Framing"
+              count: 5
+              questionTypes:
+                - mcq
+                - truefalse
+              difficulty: "Medium"
+              language: "English"
+      responses:
+        '200':
+          description: Batch generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerateBatchResponse'
+              example:
+                success: true
+                fallbackOccurred: false
+                providerUsed: "groq"
+                questions:
+                  - id: "q-1"
+                    questionText: "What is the primary function of the Data Link Layer?"
+                    questionType: "mcq"
+                    options:
+                      - "Framing and error detection"
+                      - "IP addressing"
+                      - "Routing packets"
+                      - "Application formatting"
+                    correctOptionIndex: 0
+                    explanation: "The Data Link layer handles framing, flow control, and physical error detection."
+                    difficulty: "Medium"
+                    marks: 1
+                    providerUsed: "groq"
+                    batchIndex: 0
+                attempts:
+                  - provider: "groq"
+                    status: "success"
+                    latencyMs: 1420
+        '400':
+          description: Invalid request parameters (e.g. invalid count, missing prompt/topic)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorResponse'
+              example:
+                success: false
+                error: "Batch count must be an integer between 1 and 50"
+        '405':
+          description: HTTP method not allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorResponse'
+              example:
+                error: "Method not allowed"
+        '500':
+          description: Internal bridge server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerateBatchResponse'
+              example:
+                success: false
+                questions: []
+                fallbackOccurred: false
+                attempts: []
+                error: "Internal server error in AI bridge"
+        '502':
+          description: All AI providers failed during orchestration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerateBatchResponse'
+
+  /api/ai/provider-status:
+    get:
+      tags:
+        - AI Question Generation
+      summary: Retrieve AI provider operational statuses
+      description: |
+        Returns the health, cooldown state, and configuration status of all supported AI providers (Gemini, Groq, OpenRouter, HuggingFace).
+        PUBLIC ENDPOINT: No credentials required.
+      operationId: getAIProviderStatus
+      security: []
+      parameters:
+        - name: keys
+          in: query
+          required: false
+          description: Optional JSON-encoded string containing client-provided API keys to test
+          schema:
+            type: string
+          example: '{"groq":"YOUR_PROVIDER_KEY_HERE"}'
+      responses:
+        '200':
+          description: Provider statuses retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  statuses:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProviderStatusInfo'
+              example:
+                success: true
+                statuses:
+                  - id: "gemini"
+                    name: "Google Gemini"
+                    configured: true
+                    inCooldown: false
+                    cooldownRemainingSeconds: 0
+                    lastLatencyMs: 820
+                  - id: "groq"
+                    name: "Groq Llama 3"
+                    configured: true
+                    inCooldown: false
+                    cooldownRemainingSeconds: 0
+                    lastLatencyMs: 410
+        '405':
+          description: HTTP method not allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorResponse'
+        '500':
+          description: Server error evaluating provider statuses
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorResponse'
+
+  /api/drive/validate:
+    post:
+      tags:
+        - Google Drive Bridge
+      summary: Validate Google Drive file accessibility and metadata
+      description: |
+        Validates whether a Google Drive document URL or file ID is public, reachable, and extractable.
+        Returns document metadata including file name, mime type, size, and view links.
+        PUBLIC ENDPOINT: No credentials required.
+      operationId: validateDriveFile
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DriveValidationRequest'
+            example:
+              fileId: "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"
+      responses:
+        '200':
+          description: Validation completed (file may be accessible or restricted)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  error:
+                    type: string
+                  info:
+                    $ref: '#/components/schemas/DriveValidationResult'
+              example:
+                success: true
+                info:
+                  accessible: true
+                  fileId: "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"
+                  fileName: "Computer_Architecture_Notes.pdf"
+                  mimeType: "application/pdf"
+                  fileSizeBytes: 2450120
+                  previewUrl: "https://drive.google.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/preview"
+                  canDownload: true
+        '400':
+          description: Missing file ID or URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorResponse'
+              example:
+                success: false
+                error: "File ID or URL is required"
+        '405':
+          description: HTTP method not allowed
+        '500':
+          description: Server error during Google Drive validation
+
+  /api/drive/download:
+    get:
+      tags:
+        - Google Drive Bridge
+      summary: Download or proxy Google Drive document binary
+      description: |
+        Streams the binary PDF/document stream with appropriate CORS and caching headers.
+        Bypasses browser cross-origin blocks and handles Google Drive virus warning redirect interstitials.
+        PUBLIC ENDPOINT: No credentials required.
+      operationId: downloadDriveFile
+      security: []
+      parameters:
+        - name: fileId
+          in: query
+          required: true
+          description: Google Drive File ID
+          schema:
+            type: string
+          example: "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"
+        - name: Range
+          in: header
+          required: false
+          description: Standard HTTP range header for partial document streaming
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Raw binary file stream
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                example: "application/pdf"
+            Content-Length:
+              schema:
+                type: integer
+            Content-Disposition:
+              schema:
+                type: string
+                example: 'inline; filename="Document.pdf"'
+            Cache-Control:
+              schema:
+                type: string
+                example: "public, max-age=86400"
+            Access-Control-Allow-Origin:
+              schema:
+                type: string
+                example: "*"
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Missing fileId query parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorResponse'
+        '405':
+          description: Method not allowed
+        '500':
+          description: Failed to stream document from Google Drive
+
+  /api/drive/extract-content:
+    post:
+      tags:
+        - Google Drive Bridge
+      summary: Extract parsed text from a Google Drive document for AI Exam Generation
+      description: |
+        Downloads the document and extracts plain text from uncompressed or FlateDecode compressed PDF streams.
+        Chunks text for optimal AI prompt injection.
+        PUBLIC ENDPOINT: No credentials required.
+      operationId: extractDriveContent
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DriveExtractContentRequest'
+            example:
+              fileId: "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"
+              pageRange: "1-15"
+              chapter: "Chapter 2: Memory Hierarchy"
+      responses:
+        '200':
+          description: Text extracted and chunked successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DriveExtractContentResponse'
+        '400':
+          description: Missing fileId in request body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorResponse'
+        '500':
+          description: Extraction error or unparseable document
+
+  # =========================================================================
+  # 2. FIREBASE CLOUD FUNCTIONS (CALLABLE & HTTPS ENDPOINTS)
+  # =========================================================================
+
+  /calculateDepartmentLeaderboard:
+    post:
+      tags:
+        - Leaderboards (Cloud Functions)
+      summary: Calculate student rankings for a department (Callable)
+      description: |
+        Calculates and returns student rankings for a specific department.
+        Utilizes 10-minute caching in `leaderboardCache`.
+        Enforces authentication and validates that the requesting student belongs to the department (or is an Admin/Examiner).
+      operationId: calculateDepartmentLeaderboard
+      security:
+        - firebaseAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - data
+              properties:
+                data:
+                  type: object
+                  required:
+                    - departmentId
+                  properties:
+                    departmentId:
+                      type: string
+                    forceRefresh:
+                      type: boolean
+                      default: false
+                    limit:
+                      type: integer
+                      minimum: 1
+                      maximum: 100
+                      default: 50
+                    offset:
+                      type: integer
+                      minimum: 0
+                      default: 0
+            example:
+              data:
+                departmentId: "dept_cs_01"
+                forceRefresh: false
+                limit: 50
+                offset: 0
+      responses:
+        '200':
+          description: Leaderboard calculated and returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    $ref: '#/components/schemas/LeaderboardResponse'
+        '400':
+          description: Invalid argument error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirebaseCallableError'
+        '401':
+          description: Unauthenticated request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirebaseCallableError'
+        '403':
+          description: Permission denied (User not enrolled in department)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirebaseCallableError'
+
+  /calculateGlobalDepartmentLeaderboard:
+    post:
+      tags:
+        - Leaderboards (Cloud Functions)
+      summary: Calculate cross-department institutional rankings (Callable)
+      description: |
+        Aggregates active students, total points, and average performance across all departments.
+      operationId: calculateGlobalDepartmentLeaderboard
+      security:
+        - firebaseAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - data
+              properties:
+                data:
+                  type: object
+            example:
+              data: {}
+      responses:
+        '200':
+          description: Global department rankings calculated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    $ref: '#/components/schemas/DepartmentLeaderboardResponse'
+        '401':
+          description: Unauthenticated request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirebaseCallableError'
+
+  /adminRefreshLeaderboardCache:
+    post:
+      tags:
+        - Admin Leaderboard Operations
+      summary: Manually refresh leaderboard cache (Admin Callable)
+      description: |
+        Forces recalculation and cache write for a single department or all departments.
+        Restricted to users with role `admin` or `superadmin`.
+      operationId: adminRefreshLeaderboardCache
+      security:
+        - firebaseAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminRefreshLeaderboardRequest'
+            example:
+              data:
+                departmentId: "dept_cs_01"
+      responses:
+        '200':
+          description: Cache refreshed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    type: object
+                    properties:
+                      success:
+                        type: boolean
+                      message:
+                        type: string
+                      departmentId:
+                        type: string
+                      totalStudents:
+                        type: integer
+                      refreshedCount:
+                        type: integer
+                      timestamp:
+                        type: object
+        '401':
+          description: Unauthenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirebaseCallableError'
+        '403':
+          description: Permission denied (Requires administrator role)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirebaseCallableError'
+
+  /adminRecalculateRankings:
+    post:
+      tags:
+        - Admin Leaderboard Operations
+      summary: Recalculate rankings across all departments (Admin Callable)
+      description: |
+        Invalidates existing caches and recalculates rankings for all active departments.
+        Restricted to users with role `admin` or `superadmin`.
+      operationId: adminRecalculateRankings
+      security:
+        - firebaseAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - data
+              properties:
+                data:
+                  type: object
+            example:
+              data: {}
+      responses:
+        '200':
+          description: Full rankings recalculation completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    type: object
+                    properties:
+                      success:
+                        type: boolean
+                      message:
+                        type: string
+                      recalculatedCount:
+                        type: integer
+                      totalDepartments:
+                        type: integer
+                      totalStudents:
+                        type: integer
+                      results:
+                        type: array
+                        items:
+                          type: object
+                      timestamp:
+                        type: object
+        '403':
+          description: Permission denied (Admin role required)
+
+  /adminResetLeaderboard:
+    post:
+      tags:
+        - Admin Leaderboard Operations
+      summary: Reset / clear cache for a specific department (Admin Callable)
+      description: |
+        Clears the cached leaderboard data for a department.
+        Restricted to users with role `admin` or `superadmin`.
+      operationId: adminResetLeaderboard
+      security:
+        - firebaseAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminResetLeaderboardRequest'
+            example:
+              data:
+                departmentId: "dept_cs_01"
+      responses:
+        '200':
+          description: Department leaderboard cache cleared
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    type: object
+                    properties:
+                      success:
+                        type: boolean
+                      message:
+                        type: string
+                      departmentId:
+                        type: string
+        '403':
+          description: Permission denied (Admin role required)
+
+  /adminGetLeaderboardStatus:
+    post:
+      tags:
+        - Admin Leaderboard Operations
+      summary: Inspect system leaderboard health and cache TTLs (Admin Callable)
+      description: |
+        Returns system-wide diagnostics on total exam attempts, cached students, valid caches, and expired caches.
+      operationId: adminGetLeaderboardStatus
+      security:
+        - firebaseAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - data
+              properties:
+                data:
+                  type: object
+            example:
+              data: {}
+      responses:
+        '200':
+          description: System leaderboard status returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    $ref: '#/components/schemas/AdminLeaderboardStatusResponse'
+        '403':
+          description: Permission denied
+
+  /generateAIExamBatch:
+    post:
+      tags:
+        - AI Question Generation
+      summary: Cloud Function version of AI Exam question generation (Callable)
+      description: |
+        Firebase Cloud Function equivalent of `/api/ai/generate-batch`.
+        Enforces administrator authentication before dispatching to multi-provider orchestrator.
+      operationId: generateAIExamBatchCallable
+      security:
+        - firebaseAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - data
+              properties:
+                data:
+                  $ref: '#/components/schemas/GenerateBatchRequest'
+      responses:
+        '200':
+          description: Questions generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    $ref: '#/components/schemas/GenerateBatchResponse'
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Administrator permissions required
+
+  /getAIProviderStatus:
+    post:
+      tags:
+        - AI Question Generation
+      summary: Cloud Function version of AI Provider status (Callable)
+      description: |
+        Checks provider status via Cloud Function backend. Enforces administrator authentication.
+      operationId: getAIProviderStatusCallable
+      security:
+        - firebaseAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - data
+              properties:
+                data:
+                  type: object
+            example:
+              data: {}
+      responses:
+        '200':
+          description: Provider statuses returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProviderStatusInfo'
+        '403':
+          description: Administrator permissions required
+
+  /validateGoogleDriveResource:
+    post:
+      tags:
+        - Google Drive Bridge
+      summary: Cloud Function HTTP endpoint to validate Google Drive resource
+      description: |
+        Standard Firebase HTTP Request function (`functions.https.onRequest`).
+        Can be invoked via GET or POST.
+        PUBLIC ENDPOINT: No credentials required.
+      operationId: validateDriveResourceHttp
+      security: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DriveValidationRequest'
+      parameters:
+        - name: fileId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  error:
+                    type: string
+                  info:
+                    $ref: '#/components/schemas/DriveValidationResult'
+        '400':
+          description: File ID missing
+        '500':
+          description: Validation error
+
+components:
+  securitySchemes:
+    firebaseAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Firebase ID Token obtained after user authentication (`user.getIdToken()`).
+
+  schemas:
+    # -----------------------------------------------------------------------
+    # Common & Error Schemas
+    # -----------------------------------------------------------------------
+    StandardErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: "Invalid argument supplied"
+
+    FirebaseCallableError:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            message:
+              type: string
+              example: "User must be authenticated to access leaderboard data"
+            status:
+              type: string
+              enum:
+                - INVALID_ARGUMENT
+                - UNAUTHENTICATED
+                - PERMISSION_DENIED
+                - NOT_FOUND
+                - ALREADY_EXISTS
+                - INTERNAL
+                - UNAVAILABLE
+              example: "UNAUTHENTICATED"
+
+    FirebaseAuthResponse:
+      type: object
+      required:
+        - idToken
+        - email
+        - refreshToken
+        - expiresIn
+        - localId
+      properties:
+        idToken:
+          type: string
+          description: Firebase JWT ID Token used as Bearer token for protected endpoints
+          example: "eyJhbGciOiJSUzI1NiIsImtpZCI6..."
+        email:
+          type: string
+          example: "test.admin@example.com"
+        refreshToken:
+          type: string
+          description: Token used to refresh the idToken after expiry
+          example: "AMf-vBx..."
+        expiresIn:
+          type: string
+          description: Token validity in seconds (typically 3600)
+          example: "3600"
+        localId:
+          type: string
+          description: Firebase UID of the user
+          example: "v8mS3a41z..."
+
+    # -----------------------------------------------------------------------
+    # AI Engine Schemas
+    # -----------------------------------------------------------------------
+    QuestionType:
+      type: string
+      enum:
+        - mcq
+        - truefalse
+        - shortanswer
+      example: "mcq"
+
+    Difficulty:
+      type: string
+      enum:
+        - Easy
+        - Medium
+        - Hard
+        - Mixed
+      example: "Medium"
+
+    Language:
+      type: string
+      enum:
+        - English
+        - Afaan Oromoo
+        - Amharic
+      example: "English"
+
+    QuestionSourceReference:
+      type: object
+      properties:
+        bookId:
+          type: string
+        bookTitle:
+          type: string
+        pageRange:
+          type: string
+        chapter:
+          type: string
+        driveFileId:
+          type: string
+
+    NormalizedQuestion:
+      type: object
+      required:
+        - id
+        - questionText
+        - questionType
+        - options
+        - correctOptionIndex
+        - explanation
+        - difficulty
+        - marks
+        - providerUsed
+        - batchIndex
+      properties:
+        id:
+          type: string
+          example: "q-batch0-1"
+        questionText:
+          type: string
+          example: "Which layer of the OSI model is responsible for routing packets?"
+        questionType:
+          $ref: '#/components/schemas/QuestionType'
+        options:
+          type: array
+          items:
+            type: string
+          example:
+            - "Data Link Layer"
+            - "Network Layer"
+            - "Transport Layer"
+            - "Physical Layer"
+        correctOptionIndex:
+          type: integer
+          example: 1
+        correctAnswer:
+          type: string
+          example: "Network Layer"
+        explanation:
+          type: string
+          example: "The Network Layer (Layer 3) handles routing and IP addressing across subnets."
+        difficulty:
+          type: string
+          enum: [Easy, Medium, Hard]
+          example: "Medium"
+        marks:
+          type: number
+          example: 1
+        providerUsed:
+          type: string
+          enum: [gemini, groq, openrouter, huggingface]
+          example: "groq"
+        batchIndex:
+          type: integer
+          example: 0
+        sourceReference:
+          $ref: '#/components/schemas/QuestionSourceReference'
+
+    ProviderAttemptLog:
+      type: object
+      required:
+        - provider
+        - status
+        - latencyMs
+      properties:
+        provider:
+          type: string
+          enum: [gemini, groq, openrouter, huggingface]
+        status:
+          type: string
+          enum: [success, failed, skipped]
+        error:
+          type: string
+        latencyMs:
+          type: number
+
+    GenerateBatchRequest:
+      type: object
+      required:
+        - count
+      properties:
+        prompt:
+          type: string
+          description: Base instruction prompt for question generation
+          example: "Create challenging questions on Operating System Deadlocks"
+        topic:
+          type: string
+          description: Subject or topic name
+          example: "Banker's Algorithm & Resource Allocation"
+        sourceMaterial:
+          type: string
+          description: Raw extracted study text or document content to derive questions from
+        pageRange:
+          type: string
+          example: "45-60"
+        chapter:
+          type: string
+          example: "Chapter 7: Deadlocks"
+        count:
+          type: integer
+          minimum: 1
+          maximum: 50
+          example: 5
+        questionTypes:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuestionType'
+          default: ["mcq"]
+        questionTypeCounts:
+          type: object
+          properties:
+            mcq:
+              type: integer
+            truefalse:
+              type: integer
+            shortanswer:
+              type: integer
+        difficulty:
+          $ref: '#/components/schemas/Difficulty'
+          default: "Medium"
+        language:
+          $ref: '#/components/schemas/Language'
+          default: "English"
+        providerPriority:
+          type: array
+          items:
+            type: string
+            enum: [gemini, groq, openrouter, huggingface]
+          example: ["groq", "gemini", "openrouter"]
+        providerModels:
+          type: object
+          additionalProperties:
+            type: string
+        batchIndex:
+          type: integer
+          default: 0
+        totalBatches:
+          type: integer
+          default: 1
+        providerKeys:
+          $ref: '#/components/schemas/ProviderKeys'
+
+    GenerateBatchResponse:
+      type: object
+      required:
+        - success
+        - questions
+        - fallbackOccurred
+        - attempts
+      properties:
+        success:
+          type: boolean
+          example: true
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/NormalizedQuestion'
+        providerUsed:
+          type: string
+          enum: [gemini, groq, openrouter, huggingface]
+          example: "groq"
+        fallbackOccurred:
+          type: boolean
+          example: false
+        attempts:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProviderAttemptLog'
+        error:
+          type: string
+
+    ProviderStatusInfo:
+      type: object
+      required:
+        - id
+        - name
+        - configured
+        - inCooldown
+        - cooldownRemainingSeconds
+      properties:
+        id:
+          type: string
+          enum: [gemini, groq, openrouter, huggingface]
+        name:
+          type: string
+          example: "Groq Llama 3"
+        configured:
+          type: boolean
+          example: true
+        inCooldown:
+          type: boolean
+          example: false
+        cooldownRemainingSeconds:
+          type: integer
+          example: 0
+        lastLatencyMs:
+          type: number
+          example: 320
+        lastError:
+          type: string
+
+    ProviderKeys:
+      type: object
+      properties:
+        gemini:
+          type: string
+        groq:
+          type: string
+        openrouter:
+          type: string
+        huggingface:
+          type: string
+
+    # -----------------------------------------------------------------------
+    # Google Drive Schemas
+    # -----------------------------------------------------------------------
+    DriveValidationRequest:
+      type: object
+      properties:
+        fileId:
+          type: string
+          description: Google Drive File ID
+          example: "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"
+        url:
+          type: string
+          description: Full Google Drive shareable link
+          example: "https://drive.google.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/view"
+
+    DriveValidationResult:
+      type: object
+      required:
+        - accessible
+        - fileId
+        - fileName
+        - mimeType
+        - previewUrl
+        - canDownload
+      properties:
+        accessible:
+          type: boolean
+          example: true
+        fileId:
+          type: string
+          example: "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"
+        fileName:
+          type: string
+          example: "Distributed_Systems_Textbook.pdf"
+        mimeType:
+          type: string
+          example: "application/pdf"
+        fileSizeBytes:
+          type: integer
+          example: 4194304
+        webViewLink:
+          type: string
+        previewUrl:
+          type: string
+        downloadUrl:
+          type: string
+        canDownload:
+          type: boolean
+          example: true
+        error:
+          type: string
+
+    DriveExtractContentRequest:
+      type: object
+      required:
+        - fileId
+      properties:
+        fileId:
+          type: string
+          example: "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"
+        pageRange:
+          type: string
+          example: "1-10"
+        chapter:
+          type: string
+          example: "Chapter 3"
+
+    DriveExtractContentResponse:
+      type: object
+      required:
+        - success
+        - text
+        - chunks
+      properties:
+        success:
+          type: boolean
+          example: true
+        text:
+          type: string
+        totalPages:
+          type: integer
+          example: 10
+        chunks:
+          type: array
+          items:
+            type: object
+            properties:
+              pageNumber:
+                type: integer
+              text:
+                type: string
+
+    # -----------------------------------------------------------------------
+    # Leaderboard Schemas
+    # -----------------------------------------------------------------------
+    LeaderboardEntry:
+      type: object
+      required:
+        - studentId
+        - studentName
+        - departmentId
+        - totalPoints
+        - averageScore
+        - examCount
+        - rankPosition
+      properties:
+        studentId:
+          type: string
+          example: "usr_student_101"
+        studentName:
+          type: string
+          example: "Abebe Kebede"
+        departmentId:
+          type: string
+          example: "dept_cs_01"
+        totalPoints:
+          type: number
+          example: 285
+        averageScore:
+          type: number
+          example: 95.0
+        examCount:
+          type: integer
+          example: 3
+        rankPosition:
+          type: integer
+          example: 1
+
+    LeaderboardResponse:
+      type: object
+      required:
+        - entries
+        - totalStudents
+        - lastUpdated
+        - departmentId
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/LeaderboardEntry'
+        totalStudents:
+          type: integer
+          example: 42
+        lastUpdated:
+          type: object
+          description: Firestore timestamp object or ISO string
+        departmentId:
+          type: string
+          example: "dept_cs_01"
+        hasMore:
+          type: boolean
+          example: false
+        nextCursor:
+          type: integer
+
+    DepartmentRanking:
+      type: object
+      required:
+        - departmentId
+        - departmentName
+        - totalDepartmentScore
+        - averageScore
+        - activeStudentCount
+        - rankPosition
+      properties:
+        departmentId:
+          type: string
+          example: "dept_cs_01"
+        departmentName:
+          type: string
+          example: "Computer Science"
+        totalDepartmentScore:
+          type: number
+          example: 12500
+        averageScore:
+          type: number
+          example: 86.4
+        activeStudentCount:
+          type: integer
+          example: 145
+        rankPosition:
+          type: integer
+          example: 1
+
+    DepartmentLeaderboardResponse:
+      type: object
+      required:
+        - rankings
+        - totalDepartments
+        - lastUpdated
+      properties:
+        rankings:
+          type: array
+          items:
+            $ref: '#/components/schemas/DepartmentRanking'
+        totalDepartments:
+          type: integer
+          example: 8
+        lastUpdated:
+          type: object
+
+    AdminRefreshLeaderboardRequest:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: object
+          properties:
+            departmentId:
+              type: string
+              description: Department ID to refresh. Omit to refresh all departments.
+              example: "dept_cs_01"
+
+    AdminResetLeaderboardRequest:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: object
+          required:
+            - departmentId
+          properties:
+            departmentId:
+              type: string
+              example: "dept_cs_01"
+
+    AdminLeaderboardStatusResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        status:
+          type: object
+          properties:
+            totalDepartments:
+              type: integer
+              example: 8
+            totalStudents:
+              type: integer
+              example: 450
+            totalExamAttempts:
+              type: integer
+              example: 1820
+            cache:
+              type: object
+              properties:
+                total:
+                  type: integer
+                  example: 8
+                valid:
+                  type: integer
+                  example: 7
+                expired:
+                  type: integer
+                  example: 1
+                totalCachedStudents:
+                  type: integer
+                  example: 450
+            cacheDetails:
+              type: array
+              items:
+                type: object
+                properties:
+                  departmentId:
+                    type: string
+                  totalStudents:
+                    type: integer
+                  isExpired:
+                    type: boolean
+        timestamp:
+          type: object

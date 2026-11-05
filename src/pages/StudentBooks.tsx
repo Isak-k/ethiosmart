@@ -174,9 +174,18 @@ export default function StudentBooks() {
     };
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+
+    // Listen for global manual refresh button clicks
+    const handleManualRefresh = () => {
+      fetchLibraryData();
+      loadOfflineData();
+    };
+    window.addEventListener('exampro-manual-refresh', handleManualRefresh);
+
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('exampro-manual-refresh', handleManualRefresh);
     };
   }, []);
 
@@ -1236,7 +1245,7 @@ export default function StudentBooks() {
                                   <div className="absolute inset-y-0 left-0 w-2.5 bg-gradient-to-r from-black/60 via-black/30 to-transparent pointer-events-none" />
                                   <div className="absolute top-2.5 right-2.5">
                                     <Badge className="bg-purple-600/90 hover:bg-purple-600 text-white font-bold text-[11px] rounded-lg px-2.5 py-0.5 backdrop-blur-xs shadow-xs">
-                                      {subject.notesCount} {subject.notesCount === 1 ? 'Unit Ready' : 'Units Ready'}
+                                      {subject.notesCount} {subject.notesCount === 1 ? 'Chapter Ready' : 'Chapters Ready'}
                                     </Badge>
                                   </div>
                                 </div>
@@ -1301,7 +1310,7 @@ export default function StudentBooks() {
                             {currentNotesSubject?.name || 'Subject'}
                           </h1>
                           <p className="text-sm sm:text-base text-slate-500 dark:text-muted-foreground font-medium">
-                            {gradeText} · {uploadedCount} of {totalUnits} units uploaded
+                            {gradeText} · {uploadedCount} of {totalUnits} chapters uploaded
                           </p>
                         </div>
                       );
@@ -1349,7 +1358,7 @@ export default function StudentBooks() {
                       <div className="relative w-full">
                         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
-                          placeholder="Search units or topics..."
+                          placeholder="Search chapters or topics..."
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
                           className="pl-10 rounded-2xl bg-card text-xs h-9"
@@ -1361,12 +1370,12 @@ export default function StudentBooks() {
                     {loadingCurriculumChapters ? (
                       <div className="text-center py-20">
                         <Loader2 className="h-8 w-8 text-purple-600 animate-spin mx-auto mb-2" />
-                        <p className="text-xs text-muted-foreground">Loading curriculum units...</p>
+                        <p className="text-xs text-muted-foreground">Loading curriculum chapters...</p>
                       </div>
                     ) : displayUnits.length === 0 ? (
                       <div className="text-center py-20 px-6 rounded-3xl border border-dashed bg-card/40">
                         <FileText className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-                        <h3 className="text-lg font-bold font-display">No units available yet</h3>
+                        <h3 className="text-lg font-bold font-display">No chapters available yet</h3>
                         <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto mt-1 mb-4">
                           Study notes for {currentNotesSubject?.name || 'this subject'} are currently being organized.
                         </p>
@@ -1388,6 +1397,7 @@ export default function StudentBooks() {
                             const q = searchQuery.toLowerCase().trim();
                             return (
                               (unit.title || '').toLowerCase().includes(q) ||
+                              `chapter ${unit.unitNumber}`.includes(q) ||
                               `unit ${unit.unitNumber}`.includes(q) ||
                               (unit.note?.summary || '').toLowerCase().includes(q) ||
                               (unit.note?.title || '').toLowerCase().includes(q)
@@ -1403,7 +1413,7 @@ export default function StudentBooks() {
                                   } else {
                                     toast({
                                       title: 'Study guide in preparation',
-                                      description: `Study notes for Unit ${unit.unitNumber}: "${unit.title}" will be uploaded soon.`,
+                                      description: `Study notes for Chapter ${unit.unitNumber}: "${unit.title}" will be uploaded soon.`,
                                     });
                                   }
                                 }}
@@ -1435,15 +1445,8 @@ export default function StudentBooks() {
                                   <div className="min-w-0 flex-1 space-y-1">
                                     <div className="flex items-center gap-2 flex-wrap">
                                       <h4 className="text-base sm:text-lg font-bold text-[#1e293b] dark:text-foreground group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors leading-snug">
-                                        Unit {unit.unitNumber}: {unit.title}
+                                        Chapter {unit.unitNumber}: {unit.title}
                                       </h4>
-
-                                      {unit.isLocked && (
-                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/40 shrink-0">
-                                          <Lock className="w-3 h-3 text-amber-600 dark:text-amber-400" />
-                                          Premium
-                                        </span>
-                                      )}
                                     </div>
 
                                     <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium flex-wrap">
@@ -1598,7 +1601,7 @@ export default function StudentBooks() {
                   <DialogHeader className="space-y-2 text-left">
                     <div className="flex items-center gap-2 flex-wrap">
                       <Badge className="bg-purple-600 text-white font-bold text-[10px] rounded-lg">
-                        Unit {quickSummaryNote.chapterNumber || 'Guide'}
+                        Chapter {quickSummaryNote.chapterNumber || 'Guide'}
                       </Badge>
                       {quickSummaryNote.departmentName && (
                         <Badge variant="outline" className="text-[10px]">
@@ -1627,7 +1630,7 @@ export default function StudentBooks() {
                       Chapter Key Summary
                     </h4>
                     <div className="p-4 rounded-2xl bg-muted/40 border border-border/80 text-sm leading-relaxed text-foreground whitespace-pre-line">
-                      {quickSummaryNote.summary || quickSummaryNote.description || 'No written summary provided for this unit yet.'}
+                      {quickSummaryNote.summary || quickSummaryNote.description || 'No written summary provided for this chapter yet.'}
                     </div>
                   </div>
 

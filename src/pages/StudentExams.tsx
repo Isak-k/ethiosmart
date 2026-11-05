@@ -107,12 +107,18 @@ const StudentExams = () => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
 
+    const handleManualRefresh = () => {
+      loadAllData();
+    };
+
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
+    window.addEventListener("exampro-manual-refresh", handleManualRefresh);
 
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("exampro-manual-refresh", handleManualRefresh);
     };
   }, []);
 
@@ -351,7 +357,7 @@ const StudentExams = () => {
           units.push({
             id: `placeholder_unit_${i}`,
             unitNumber: i,
-            title: `Unit ${i}`,
+            title: `Chapter ${i}`,
             exams: [],
             hasExam: false,
             hasAttempted: false,
@@ -405,7 +411,7 @@ const StudentExams = () => {
         units.push({
           id: `placeholder_unit_${i}`,
           unitNumber: i,
-          title: `Unit ${i}`,
+          title: `Chapter ${i}`,
           exams: [],
           hasExam: false,
           hasAttempted: false,
@@ -530,7 +536,7 @@ const StudentExams = () => {
                 {activeSubject.name}
               </h1>
               <p className="text-sm sm:text-base text-slate-500 dark:text-muted-foreground font-medium">
-                {gradeText} · {readyUnitsCount} of {totalUnitsCount} units uploaded
+                {gradeText} · {readyUnitsCount} of {totalUnitsCount} chapters uploaded
               </p>
             </div>
 
@@ -540,7 +546,7 @@ const StudentExams = () => {
                 <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="text"
-                  placeholder={`Search units or exams in ${activeSubject.name}...`}
+                  placeholder={`Search chapters or exams in ${activeSubject.name}...`}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10 pr-9 rounded-2xl bg-card border-border/80 h-11 text-sm shadow-2xs"
@@ -560,7 +566,7 @@ const StudentExams = () => {
             {chaptersLoading ? (
               <div className="flex flex-col items-center justify-center py-20">
                 <Loader2 className="h-8 w-8 animate-spin text-[#7c3aed] mb-2" />
-                <p className="text-sm text-muted-foreground">Loading curriculum units...</p>
+                <p className="text-sm text-muted-foreground">Loading curriculum chapters...</p>
               </div>
             ) : filteredUnits.length > 0 ? (
               /* Vertical stack of horizontal cards matching screenshot */
@@ -582,7 +588,7 @@ const StudentExams = () => {
                         } else {
                           toast({
                             title: "Exam gonna upload soon",
-                            description: `The assessment for Unit ${unit.unitNumber}: "${unit.title}" will be uploaded soon.`,
+                            description: `The assessment for Chapter ${unit.unitNumber}: "${unit.title}" will be uploaded soon.`,
                           });
                         }
                       }}
@@ -604,7 +610,7 @@ const StudentExams = () => {
                         <div className="min-w-0 flex-1 space-y-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <h4 className="text-base sm:text-lg font-bold text-[#1e293b] dark:text-foreground group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors leading-snug">
-                              Unit {unit.unitNumber}: {unit.title}
+                              Chapter {unit.unitNumber}: {unit.title}
                             </h4>
 
                             {unit.hasAttempted && (
@@ -668,9 +674,9 @@ const StudentExams = () => {
                 <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 text-primary">
                   <Search className="h-7 w-7" />
                 </div>
-                <h3 className="text-lg font-bold text-foreground">No matching units</h3>
+                <h3 className="text-lg font-bold text-foreground">No matching chapters</h3>
                 <p className="text-muted-foreground mt-1 text-sm">
-                  No units in {activeSubject.name} matched &ldquo;{searchQuery}&rdquo;.
+                  No chapters in {activeSubject.name} matched &ldquo;{searchQuery}&rdquo;.
                 </p>
                 <Button
                   variant="outline"
@@ -688,7 +694,7 @@ const StudentExams = () => {
               <DialogContent className="max-w-md rounded-3xl p-6">
                 <DialogHeader>
                   <DialogTitle className="text-xl font-bold font-display">
-                    Unit {selectedMultiExamUnit?.unitNumber}: {selectedMultiExamUnit?.title}
+                    Chapter {selectedMultiExamUnit?.unitNumber}: {selectedMultiExamUnit?.title}
                   </DialogTitle>
                   <DialogDescription>
                     Choose an assessment below to take:

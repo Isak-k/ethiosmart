@@ -266,7 +266,7 @@ export function BookCard({
             </span>
             <span className="text-[11px] font-medium shrink-0 text-muted-foreground">
               {Array.isArray(book.chapterLabels) && book.chapterLabels.length > 0
-                ? `${book.chapterLabels.length} units`
+                ? `${book.chapterLabels.length} chapters`
                 : [book.edition, book.publicationYear, book.language].filter(Boolean)[0] || 'Ready'}
             </span>
           </div>

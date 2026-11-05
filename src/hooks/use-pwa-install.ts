@@ -13,7 +13,12 @@ if (typeof window !== 'undefined') {
 
   window.addEventListener('appinstalled', () => {
     cachedDeferredPrompt = null;
-    (window as any).__pwaInstallPrompt = null;
+    if (typeof window !== 'undefined') {
+      (window as any).__pwaInstallPrompt = null;
+      try {
+        localStorage.setItem('pwa_app_installed', 'true');
+      } catch {}
+    }
     window.dispatchEvent(new CustomEvent('pwa-installed-success'));
   });
 }
@@ -25,6 +30,11 @@ export function usePWAInstall() {
   const [isDismissed, setIsDismissed] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     return sessionStorage.getItem('pwa_install_dismissed') === 'true';
+  });
+
+  const [isAppInstalled, setIsAppInstalled] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('pwa_app_installed') === 'true';
   });
 
   const dismissInstall = useCallback(() => {
@@ -42,7 +52,8 @@ export function usePWAInstall() {
     return Boolean(
       window.matchMedia('(display-mode: standalone)').matches ||
       (window.navigator as any).standalone === true ||
-      document.referrer.startsWith('android-app://')
+      document.referrer.startsWith('android-app://') ||
+      localStorage.getItem('pwa_app_installed') === 'true'
     );
   });
 
@@ -87,6 +98,10 @@ export function usePWAInstall() {
 
     const handleInstalled = () => {
       setIsStandalone(true);
+      setIsAppInstalled(true);
+      try {
+        localStorage.setItem('pwa_app_installed', 'true');
+      } catch {}
       cachedDeferredPrompt = null;
       if (typeof window !== 'undefined') (window as any).__pwaInstallPrompt = null;
       setDeferredPrompt(null);
@@ -152,7 +167,8 @@ export function usePWAInstall() {
 
   return {
     isStandalone,
-    canInstall: !isStandalone && !isDismissed,
+    isAppInstalled: isStandalone || isAppInstalled,
+    canInstall: !isStandalone && !isAppInstalled && !isDismissed,
     isIOS,
     deferredPrompt,
     promptInstall,

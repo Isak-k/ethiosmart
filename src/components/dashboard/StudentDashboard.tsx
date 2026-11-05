@@ -7,6 +7,7 @@ import { getCachedDefaultDepartmentId } from "@/lib/system-settings";
 import { SimpleLeaderboard } from "@/components/SimpleLeaderboard";
 import { StatCard } from "./StatCard";
 import { ExamCard } from "@/components/exam/ExamCard";
+import { DashboardNotificationsSection } from "@/components/dashboard/DashboardNotificationsSection";
 import { ClipboardList, Trophy, Clock, CheckCircle, Sparkles, GraduationCap, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
@@ -160,6 +161,9 @@ export function StudentDashboard() {
           />
         </div>
       </div>
+
+      {/* Real-time Notifications & Announcements Section */}
+      <DashboardNotificationsSection userDepartmentId={profile?.departmentId} />
 
       {/* Leaderboard Section */}
       {(getCachedDefaultDepartmentId() || profile?.departmentId) && (

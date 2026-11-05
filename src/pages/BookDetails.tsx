@@ -484,7 +484,7 @@ export default function BookDetails() {
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base font-bold flex items-center gap-2">
                     <Tag className="w-4 h-4 text-primary" />
-                    Covered Chapters & Curriculum Units
+                    Covered Chapters & Topics
                   </CardTitle>
                 </CardHeader>
                 <CardContent>

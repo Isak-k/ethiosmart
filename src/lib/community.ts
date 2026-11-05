@@ -9,6 +9,8 @@ import {
   updateDoc,
   deleteDoc,
   doc,
+  getDoc,
+  setDoc,
   serverTimestamp,
   Timestamp,
   getDocs,
@@ -16,7 +18,7 @@ import {
   getCountFromServer,
 } from 'firebase/firestore';
 import { db } from '@/integrations/firebase/client';
-import { CommunityChannel, CommunityMessage, ReplyReference } from '@/types/community';
+import { CommunityChannel, CommunityMessage, ReplyReference, CommunityChatMode, CommunityChatSettings } from '@/types/community';
 import { Department } from '@/integrations/firebase/types';
 import { getDepartments } from '@/lib/departments';
 
@@ -151,6 +153,9 @@ export function subscribeToChannelMessages(
             userRole: data.userRole || 'student',
             userAvatar: data.userAvatar,
             text: data.text || '',
+            imageUrl: data.imageUrl || undefined,
+            imagePublicId: data.imagePublicId || undefined,
+            imageCaption: data.imageCaption || undefined,
             isPinned: Boolean(data.isPinned),
             pinnedBy: data.pinnedBy,
             pinnedAt: data.pinnedAt,
@@ -185,9 +190,12 @@ export async function sendCommunityMessage(params: {
   userRole: 'admin' | 'examiner' | 'student' | 'teacher';
   userAvatar?: string;
   text: string;
+  imageUrl?: string;
+  imagePublicId?: string;
+  imageCaption?: string;
   replyTo?: ReplyReference;
 }): Promise<string> {
-  const { channelId, userId, userName, userEmail, userRole, userAvatar, text, replyTo } = params;
+  const { channelId, userId, userName, userEmail, userRole, userAvatar, text, imageUrl, imagePublicId, imageCaption, replyTo } = params;
   const messagesRef = collection(db, 'communityChannels', channelId, 'messages');
 
   const docRef = await addDoc(messagesRef, {
@@ -198,6 +206,9 @@ export async function sendCommunityMessage(params: {
     userRole: userRole || 'student',
     userAvatar: userAvatar || '',
     text: text.trim(),
+    imageUrl: imageUrl || null,
+    imagePublicId: imagePublicId || null,
+    imageCaption: imageCaption || null,
     replyTo: replyTo || null,
     reactions: {},
     isPinned: false,
@@ -206,6 +217,89 @@ export async function sendCommunityMessage(params: {
   });
 
   return docRef.id;
+}
+
+const COMMUNITY_SETTINGS_DOC = 'communityChat';
+const LOCAL_CHAT_MODE_KEY = 'exampro_chat_mode_v1';
+
+/**
+ * Get current community chat mode ('stored' | 'live')
+ */
+export async function getCommunityChatMode(): Promise<CommunityChatMode> {
+  try {
+    const docRef = doc(db, 'settings', COMMUNITY_SETTINGS_DOC);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      const mode = (snap.data().mode as CommunityChatMode) || 'stored';
+      try {
+        localStorage.setItem(LOCAL_CHAT_MODE_KEY, mode);
+      } catch {}
+      return mode;
+    }
+  } catch (err) {
+    console.warn('Error fetching community chat mode from Firestore, using local cache:', err);
+  }
+
+  try {
+    const cached = localStorage.getItem(LOCAL_CHAT_MODE_KEY) as CommunityChatMode;
+    if (cached === 'live' || cached === 'stored') return cached;
+  } catch {}
+
+  return 'stored'; // default to stored mode
+}
+
+/**
+ * Subscribe to real-time community chat mode changes
+ */
+export function subscribeToCommunityChatMode(
+  onUpdate: (mode: CommunityChatMode) => void
+): () => void {
+  const docRef = doc(db, 'settings', COMMUNITY_SETTINGS_DOC);
+  return onSnapshot(
+    docRef,
+    (snap) => {
+      if (snap.exists()) {
+        const mode = (snap.data().mode as CommunityChatMode) || 'stored';
+        try {
+          localStorage.setItem(LOCAL_CHAT_MODE_KEY, mode);
+        } catch {}
+        onUpdate(mode);
+      } else {
+        onUpdate('stored');
+      }
+    },
+    (err) => {
+      console.warn('Error in community chat mode snapshot listener:', err);
+      onUpdate('stored');
+    }
+  );
+}
+
+/**
+ * Admin action to toggle or set community chat mode ('stored' | 'live')
+ */
+export async function setCommunityChatMode(params: {
+  mode: CommunityChatMode;
+  adminId: string;
+  adminName: string;
+}): Promise<void> {
+  const { mode, adminId, adminName } = params;
+  const docRef = doc(db, 'settings', COMMUNITY_SETTINGS_DOC);
+
+  await setDoc(
+    docRef,
+    {
+      mode,
+      updatedAt: serverTimestamp(),
+      updatedBy: adminId,
+      updatedByName: adminName,
+    },
+    { merge: true }
+  );
+
+  try {
+    localStorage.setItem(LOCAL_CHAT_MODE_KEY, mode);
+  } catch {}
 }
 
 /**
