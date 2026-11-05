@@ -23,6 +23,7 @@ import {
   X,
   Info,
   Check,
+  CheckCheck,
   Flame,
   Heart,
   Lightbulb,
@@ -35,7 +36,26 @@ import {
   ChevronDown,
   Hash,
   Layers,
+  Bold,
+  Code,
+  Quote,
+  MoreVertical,
+  BookOpen,
+  Filter,
+  CornerDownLeft,
+  Crown,
 } from 'lucide-react';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import {
   Dialog,
   DialogContent,
@@ -61,7 +81,83 @@ import { getCachedDefaultDepartmentId } from '@/lib/system-settings';
 import { Department } from '@/integrations/firebase/types';
 import { AdminChatCleanupDialog } from '@/components/community/AdminChatCleanupDialog';
 
-const QUICK_EMOJIS = ['👍', '❤️', '🔥', '🧠', '💡', '🎉'];
+export const EMOJI_CATEGORIES = [
+  {
+    name: 'Reactions',
+    emojis: ['👍', '❤️', '🔥', '🎉', '🧠', '💡', '👏', '🙌', '💯', '✨', '🎯', '🚀', '👀', '💪'],
+  },
+  {
+    name: 'Study & Campus',
+    emojis: ['📚', '📖', '📝', '✏️', '🎓', '🔬', '💻', '📐', '📊', '📌', '📎', '⌛', '🏆', '🥇'],
+  },
+  {
+    name: 'Smilies & Faces',
+    emojis: ['😀', '😂', '😎', '🤔', '🥳', '🤩', '😇', '🤝', '🙏', '⚡', '☕', '🌟', '🫡', '👌'],
+  },
+];
+
+export const QUICK_EMOJIS = ['👍', '❤️', '🔥', '💡', '🧠', '🎉'];
+
+export const ICEBREAKER_PROMPTS = [
+  { label: 'Say Hello 👋', text: 'Hello everyone! 👋 Excited to study and collaborate here.' },
+  { label: 'Ask a Question ❓', text: 'Does anyone have the past exam questions or notes for this week?' },
+  { label: 'Share Study Tip 💡', text: '💡 Quick study tip: Review chapter key formulas before doing practice tests!' },
+];
+
+/**
+ * Formats URLs, bold, inline code and linebreaks in chat text
+ */
+function renderFormattedChatText(text: string, isCurrentUser: boolean) {
+  if (!text) return null;
+  const lines = text.split('\n');
+
+  return lines.map((line, lineIdx) => {
+    const tokens = line.split(/(https?:\/\/[^\s]+|\*\*[^*]+\*\*|`[^`]+`)/g);
+
+    return (
+      <span key={lineIdx} className="block leading-relaxed">
+        {tokens.map((token, tokenIdx) => {
+          if (/^https?:\/\//.test(token)) {
+            return (
+              <a
+                key={tokenIdx}
+                href={token}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className={`underline font-semibold break-all inline-flex items-center gap-0.5 ${
+                  isCurrentUser ? 'text-amber-200 hover:text-white' : 'text-sky-600 dark:text-sky-400 hover:underline'
+                }`}
+              >
+                {token}
+              </a>
+            );
+          }
+          if (token.startsWith('**') && token.endsWith('**')) {
+            return (
+              <strong key={tokenIdx} className="font-extrabold">
+                {token.slice(2, -2)}
+              </strong>
+            );
+          }
+          if (token.startsWith('`') && token.endsWith('`')) {
+            return (
+              <code
+                key={tokenIdx}
+                className={`px-1.5 py-0.5 rounded-md font-mono text-[11px] ${
+                  isCurrentUser ? 'bg-white/20 text-white' : 'bg-muted text-foreground'
+                }`}
+              >
+                {token.slice(1, -1)}
+              </code>
+            );
+          }
+          return token;
+        })}
+      </span>
+    );
+  });
+}
 
 export default function CommunityChat() {
   const navigate = useNavigate();
@@ -110,6 +206,49 @@ export default function CommunityChat() {
 
   // Admin chat storage cleanup dialog state
   const [cleanupDialogOpen, setCleanupDialogOpen] = useState(false);
+
+  // Modern UI states
+  const [inputEmojiPickerOpen, setInputEmojiPickerOpen] = useState(false);
+  const [emojiCategoryTab, setEmojiCategoryTab] = useState<string>('Reactions');
+  const [reactingMessageId, setReactingMessageId] = useState<string | null>(null);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [inChannelSearchOpen, setInChannelSearchOpen] = useState(false);
+  const [inChannelSearchQuery, setInChannelSearchQuery] = useState('');
+
+  const handleInsertEmoji = (emoji: string) => {
+    setInputText((prev) => prev + emoji);
+    textareaRef.current?.focus();
+  };
+
+  const handleInsertFormatting = (prefix: string, suffix: string = prefix, placeholder: string = 'text') => {
+    const el = textareaRef.current;
+    if (!el) {
+      setInputText((prev) => prev + prefix + placeholder + suffix);
+      return;
+    }
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const selected = inputText.substring(start, end) || placeholder;
+    const replacement = prefix + selected + suffix;
+    const nextVal = inputText.substring(0, start) + replacement + inputText.substring(end);
+    setInputText(nextVal);
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(start + prefix.length, start + prefix.length + selected.length);
+    }, 10);
+  };
+
+  const handleCopyMessageText = (message: CommunityMessage) => {
+    navigator.clipboard.writeText(message.text);
+    setCopiedMessageId(message.id);
+    toast({
+      title: 'Message Copied 📋',
+      description: 'Text copied to your clipboard.',
+    });
+    setTimeout(() => {
+      setCopiedMessageId(null);
+    }, 2000);
+  };
 
   const FIRESTORE_COMMUNITY_RULE_SNIPPET = `    // --- Community Channels & Messages Collection ---
     match /communityChannels/{channelId} {
@@ -205,6 +344,13 @@ export default function CommunityChat() {
       },
       (error) => {
         console.error('Channel subscription error:', error);
+        const isPerm =
+          (error as any)?.code === 'permission-denied' ||
+          String(error?.message || '').toLowerCase().includes('permission') ||
+          String(error?.message || '').toLowerCase().includes('missing or insufficient');
+        if (isPerm) {
+          setPermissionErrorDetected(true);
+        }
         setLoadingMessages(false);
       }
     );
@@ -326,9 +472,27 @@ export default function CommunityChat() {
 
       if (isPermError) {
         setPermissionErrorDetected(true);
+        setRulesModalOpen(true);
+        // Optimistically add message so user does not lose their typed message
+        const optimisticMsg: CommunityMessage = {
+          id: `local_${Date.now()}`,
+          channelId: activeChannelId,
+          userId: user.uid,
+          userName: profile?.full_name || user.email?.split('@')[0] || 'Student',
+          userEmail: user.email || '',
+          userRole,
+          userAvatar: profile?.avatar_url,
+          text: messageText,
+          replyTo: replyRef,
+          reactions: {},
+          isPinned: false,
+          deleted: false,
+          createdAt: { seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 } as any,
+        };
+        setMessages((prev) => [...prev, optimisticMsg]);
         toast({
-          title: 'Firestore Permission Rule Required',
-          description: 'Firebase security rules need to be published for communityChannels. Click the alert banner to copy the rule.',
+          title: 'Firestore Permission Rule Required (1-Minute Setup)',
+          description: 'Your message was saved locally. Please paste the Firestore rule in Firebase Console so all students receive it.',
           variant: 'destructive',
         });
       } else {
@@ -337,8 +501,8 @@ export default function CommunityChat() {
           description: err.message || 'Check your internet connection and try again.',
           variant: 'destructive',
         });
+        setInputText(messageText);
       }
-      setInputText(messageText);
     } finally {
       setIsSending(false);
     }
@@ -419,6 +583,17 @@ export default function CommunityChat() {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  // Messages filtered by in-channel search if active
+  const displayedMessages = useMemo(() => {
+    if (!inChannelSearchQuery.trim()) return messages;
+    const q = inChannelSearchQuery.toLowerCase();
+    return messages.filter(
+      (m) =>
+        m.text.toLowerCase().includes(q) ||
+        m.userName.toLowerCase().includes(q)
+    );
+  }, [messages, inChannelSearchQuery]);
+
   // Date grouping for clean Discord/Telegram style date separators
   const groupedMessageSections = useMemo(() => {
     const groups: { dateLabel: string; items: CommunityMessage[] }[] = [];
@@ -426,7 +601,7 @@ export default function CommunityChat() {
     const yesterday = new Date();
     yesterday.setDate(now.getDate() - 1);
 
-    messages.forEach((msg) => {
+    displayedMessages.forEach((msg) => {
       const date = msg.createdAt?.toDate ? msg.createdAt.toDate() : new Date(msg.createdAt || Date.now());
       let dateLabel = date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
       if (date.toDateString() === now.toDateString()) {
@@ -444,7 +619,7 @@ export default function CommunityChat() {
     });
 
     return groups;
-  }, [messages]);
+  }, [displayedMessages]);
 
   return (
     <DashboardLayout contentClassName="p-0 sm:p-2 lg:p-4 max-w-none w-full !pb-0 lg:!pb-3">
@@ -698,16 +873,43 @@ export default function CommunityChat() {
                       Official
                     </Badge>
                   )}
+                  {activeChannel?.category === 'department' && (
+                    <Badge
+                      variant="outline"
+                      className="hidden sm:inline-flex text-[9px] px-1.5 py-0 h-4 text-sky-600 dark:text-sky-400 border-sky-400/30 font-semibold"
+                    >
+                      Department
+                    </Badge>
+                  )}
                 </div>
-                <p className="text-[10px] sm:text-[11px] text-muted-foreground truncate max-w-[140px] xs:max-w-[200px] sm:max-w-md">
+                <p className="text-[10px] sm:text-[11px] text-muted-foreground truncate max-w-[140px] xs:max-w-[200px] sm:max-w-md lg:max-w-lg">
                   {activeChannel?.description}
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              {/* In-Channel Live Search Trigger */}
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  setInChannelSearchOpen(!inChannelSearchOpen);
+                  if (inChannelSearchOpen) setInChannelSearchQuery('');
+                }}
+                className={`h-8 w-8 rounded-xl transition-colors ${
+                  inChannelSearchOpen || inChannelSearchQuery
+                    ? 'bg-sky-500/20 text-sky-600 dark:text-sky-300'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                }`}
+                title="Search messages in this channel"
+              >
+                <Search className="h-4 w-4" />
+              </Button>
+
               <Badge variant="secondary" className="text-[10px] sm:text-[11px] font-semibold bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-400/25 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-xl">
-                {messages.length} {messages.length === 1 ? 'msg' : 'msgs'}
+                {displayedMessages.length} {displayedMessages.length === 1 ? 'msg' : 'msgs'}
               </Badge>
 
               {isAdminOrExaminer && (
@@ -725,6 +927,46 @@ export default function CommunityChat() {
               )}
             </div>
           </header>
+
+          {/* In-Channel Live Search Bar */}
+          {inChannelSearchOpen && (
+            <div className="p-2 sm:p-2.5 bg-sky-500/5 dark:bg-sky-950/20 border-b border-sky-500/20 flex items-center gap-2 animate-fade-in shrink-0">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-sky-500" />
+                <Input
+                  value={inChannelSearchQuery}
+                  onChange={(e) => setInChannelSearchQuery(e.target.value)}
+                  placeholder={`Search in #${activeChannel?.name || 'channel'}...`}
+                  className="pl-8.5 h-8 rounded-xl text-xs bg-background/90 border-sky-400/30"
+                  autoFocus
+                />
+                {inChannelSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setInChannelSearchQuery('')}
+                    className="absolute right-2.5 top-2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                {displayedMessages.length} match{displayedMessages.length === 1 ? '' : 'es'}
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setInChannelSearchOpen(false);
+                  setInChannelSearchQuery('');
+                }}
+                className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
+              >
+                Close
+              </Button>
+            </div>
+          )}
 
           {/* Firestore Permission Alert Banner (if needed) */}
           {permissionErrorDetected && (
@@ -807,7 +1049,7 @@ export default function CommunityChat() {
                 <div className="h-8 w-8 rounded-full border-2 border-sky-500 border-t-transparent animate-spin" />
                 <p className="text-xs font-medium">Connecting to live feed...</p>
               </div>
-            ) : messages.length === 0 ? (
+            ) : displayedMessages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center p-6 space-y-3.5 max-w-md mx-auto">
                 <div className="h-20 w-20 rounded-3xl bg-gradient-to-tr from-sky-500/20 via-indigo-500/20 to-purple-500/20 text-sky-600 dark:text-sky-300 flex items-center justify-center text-4xl shadow-inner border border-white/20">
                   {activeChannel?.icon || (activeChannel?.category === 'department' ? '🏛️' : '💬')}
@@ -816,10 +1058,30 @@ export default function CommunityChat() {
                   <h4 className="text-base font-bold text-foreground">
                     Welcome to #{activeChannel?.name}!
                   </h4>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    This is the beginning of the #{activeChannel?.name} discussion space. Say hello, collaborate with peers, or ask a question!
+                  <p className="text-xs text-muted-foreground leading-relaxed max-w-sm mx-auto">
+                    {inChannelSearchQuery
+                      ? 'No messages matched your search query in this channel.'
+                      : `This is the beginning of the #${activeChannel?.name} discussion space. Say hello, collaborate with peers, or ask a question!`}
                   </p>
                 </div>
+
+                {!inChannelSearchQuery && (
+                  <div className="pt-2 flex flex-wrap items-center justify-center gap-2">
+                    {ICEBREAKER_PROMPTS.map((prompt) => (
+                      <button
+                        key={prompt.label}
+                        type="button"
+                        onClick={() => {
+                          setInputText(prompt.text);
+                          textareaRef.current?.focus();
+                        }}
+                        className="px-3 py-1.5 rounded-2xl bg-sky-500/10 hover:bg-sky-500/20 text-sky-700 dark:text-sky-300 border border-sky-400/30 text-xs font-semibold transition-all hover:scale-105 active:scale-95 shadow-xs"
+                      >
+                        {prompt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             ) : (
               groupedMessageSections.map((group) => (
@@ -929,25 +1191,25 @@ export default function CommunityChat() {
                             )}
 
                             {/* Message Text */}
-                            <p className="break-words whitespace-pre-wrap selection:bg-white/30">
-                              {message.text}
-                            </p>
+                            <div className="break-words select-text text-xs sm:text-[13.5px] leading-relaxed">
+                              {renderFormattedChatText(message.text, isCurrentUser)}
+                            </div>
 
                             {/* Timestamp indicator */}
                             <div
-                              className={`flex items-center justify-end gap-1 mt-1.5 text-[10px] ${
-                                isCurrentUser ? 'text-white/75' : 'text-muted-foreground'
+                              className={`flex items-center justify-end gap-1 mt-1 text-[10px] ${
+                                isCurrentUser ? 'text-white/80' : 'text-muted-foreground'
                               }`}
                             >
                               <span>{formatTimestamp(message.createdAt)}</span>
-                              {isCurrentUser && <Check className="h-3 w-3" />}
+                              {isCurrentUser && <CheckCheck className="h-3 w-3 text-white/90" />}
                             </div>
                           </div>
 
-                          {/* Reaction Badges Pill Row */}
-                          {message.reactions && Object.keys(message.reactions).length > 0 && (
-                            <div className="flex items-center gap-1.5 flex-wrap mt-1.5 px-1">
-                              {Object.entries(message.reactions).map(([emoji, userIds]) => {
+                          {/* Reaction Badges Pill Row with Add Reaction button */}
+                          <div className="flex items-center gap-1.5 flex-wrap mt-1 px-1">
+                            {message.reactions &&
+                              Object.entries(message.reactions).map(([emoji, userIds]) => {
                                 if (!userIds || userIds.length === 0) return null;
                                 const hasReacted = user ? userIds.includes(user.uid) : false;
 
@@ -967,28 +1229,94 @@ export default function CommunityChat() {
                                   </button>
                                 );
                               })}
-                            </div>
-                          )}
+
+                            {/* Add Reaction Button (+) accessible on both mobile and desktop */}
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="h-6 px-1.5 rounded-full bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground border border-border/60 flex items-center gap-0.5 text-[11px] transition-all active:scale-90"
+                                  title="Add reaction"
+                                >
+                                  <Smile className="h-3 w-3 text-sky-500" />
+                                  <span className="text-[10px] font-bold">+</span>
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent
+                                className="w-64 p-2 rounded-2xl shadow-xl z-50 bg-background/95 backdrop-blur-md border border-border/80"
+                                align={isCurrentUser ? 'end' : 'start'}
+                              >
+                                <div className="text-[11px] font-bold text-muted-foreground px-1 pb-1 mb-1 border-b border-border/50">
+                                  React to message
+                                </div>
+                                <div className="grid grid-cols-6 gap-1">
+                                  {QUICK_EMOJIS.concat(['👏', '🙌', '💯', '✨', '🎯', '🚀']).map((emoji) => (
+                                    <button
+                                      key={emoji}
+                                      type="button"
+                                      onClick={() => handleToggleReaction(message, emoji)}
+                                      className="h-8 w-8 rounded-lg hover:bg-sky-500/15 flex items-center justify-center text-sm transition-transform hover:scale-125 active:scale-95"
+                                    >
+                                      {emoji}
+                                    </button>
+                                  ))}
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                          </div>
                         </div>
 
-                        {/* Floating Quick Action Toolbar (visible on hover) */}
+                        {/* Floating Quick Action Toolbar (visible on hover for desktop) */}
                         <div
-                          className={`opacity-0 group-hover:opacity-100 transition-opacity absolute top-0 flex items-center gap-0.5 bg-background/95 backdrop-blur-md border border-border/80 rounded-2xl p-1 shadow-lg z-10 ${
-                            isCurrentUser ? 'right-4 -top-3' : 'left-12 -top-3'
+                          className={`hidden md:flex opacity-0 group-hover:opacity-100 transition-all duration-150 absolute top-0 items-center gap-0.5 bg-background/95 backdrop-blur-md border border-border/80 rounded-2xl p-1 shadow-lg z-10 ${
+                            isCurrentUser ? 'right-4 -top-3.5' : 'left-12 -top-3.5'
                           }`}
                         >
-                          {QUICK_EMOJIS.slice(0, 3).map((emoji) => (
+                          {QUICK_EMOJIS.slice(0, 4).map((emoji) => (
                             <button
                               key={emoji}
                               type="button"
                               onClick={() => handleToggleReaction(message, emoji)}
-                              className="h-6 w-6 rounded-lg hover:bg-muted flex items-center justify-center text-xs transition-transform hover:scale-110"
+                              className="h-6 w-6 rounded-lg hover:bg-muted flex items-center justify-center text-xs transition-transform hover:scale-115 active:scale-90"
                               title={`React with ${emoji}`}
                             >
                               {emoji}
                             </button>
                           ))}
 
+                          {/* Full Emoji Popover on Hover Bar */}
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <button
+                                type="button"
+                                className="h-6 w-6 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                                title="More reactions"
+                              >
+                                <Smile className="h-3.5 w-3.5" />
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent
+                              className="w-64 p-2 rounded-2xl shadow-xl z-50 bg-background/95 backdrop-blur-md border border-border/80"
+                              align="center"
+                            >
+                              <div className="grid grid-cols-6 gap-1">
+                                {EMOJI_CATEGORIES[0].emojis.concat(EMOJI_CATEGORIES[1].emojis.slice(0, 4)).map((emoji) => (
+                                  <button
+                                    key={emoji}
+                                    type="button"
+                                    onClick={() => handleToggleReaction(message, emoji)}
+                                    className="h-7 w-7 rounded-lg hover:bg-sky-500/15 flex items-center justify-center text-sm transition-transform hover:scale-125"
+                                  >
+                                    {emoji}
+                                  </button>
+                                ))}
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+
+                          <div className="h-3.5 w-[1px] bg-border/80 mx-0.5" />
+
+                          {/* Reply Button */}
                           <button
                             type="button"
                             onClick={() => {
@@ -996,17 +1324,32 @@ export default function CommunityChat() {
                               textareaRef.current?.focus();
                             }}
                             className="h-6 w-6 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
-                            title="Reply"
+                            title="Reply to message"
                           >
                             <Reply className="h-3.5 w-3.5" />
                           </button>
 
+                          {/* Copy text */}
+                          <button
+                            type="button"
+                            onClick={() => handleCopyMessageText(message)}
+                            className="h-6 w-6 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                            title="Copy text"
+                          >
+                            {copiedMessageId === message.id ? (
+                              <Check className="h-3.5 w-3.5 text-emerald-500" />
+                            ) : (
+                              <Copy className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+
+                          {/* Pin Button */}
                           {isAdminOrExaminer && (
                             <button
                               type="button"
                               onClick={() => handlePinMessage(message)}
                               className={`h-6 w-6 rounded-lg hover:bg-muted flex items-center justify-center transition-colors ${
-                                message.isPinned ? 'text-amber-500' : 'text-muted-foreground hover:text-foreground'
+                                message.isPinned ? 'text-amber-500 bg-amber-500/10' : 'text-muted-foreground hover:text-foreground'
                               }`}
                               title={message.isPinned ? 'Unpin message' : 'Pin message'}
                             >
@@ -1014,12 +1357,13 @@ export default function CommunityChat() {
                             </button>
                           )}
 
+                          {/* Delete Button */}
                           {canDelete && (
                             <button
                               type="button"
                               onClick={() => handleDeleteMessage(message)}
                               className="h-6 w-6 rounded-lg hover:bg-rose-500/10 text-muted-foreground hover:text-rose-500 flex items-center justify-center transition-colors"
-                              title="Delete"
+                              title="Delete message"
                             >
                               <Trash2 className="h-3 w-3" />
                             </button>
@@ -1045,7 +1389,7 @@ export default function CommunityChat() {
             </button>
           )}
 
-          {/* Replying-To Context Banner */}
+          {/* Replying-To Context Banner (when replying) */}
           {replyingTo && (
             <div className="px-4 py-2 bg-gradient-to-r from-sky-500/15 via-indigo-500/10 to-transparent border-t border-sky-400/30 flex items-center justify-between gap-3 animate-fade-in shrink-0">
               <div className="flex items-center gap-2 min-w-0 text-xs">
@@ -1058,7 +1402,8 @@ export default function CommunityChat() {
               <button
                 type="button"
                 onClick={() => setReplyingTo(null)}
-                className="text-muted-foreground hover:text-foreground p-1 rounded-lg"
+                className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-background/60 transition-colors"
+                title="Cancel reply"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -1066,62 +1411,169 @@ export default function CommunityChat() {
           )}
 
           {/* Bottom Chat Input Bar */}
-          <footer className="p-2.5 sm:p-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-border/60 bg-background/95 lg:bg-muted/20 backdrop-blur-md shrink-0 space-y-2">
+          <footer className="p-2 sm:p-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-border/60 bg-background/95 lg:bg-muted/20 backdrop-blur-md shrink-0">
             {activeChannel?.isOfficialOnly && !isAdminOrExaminer ? (
-              <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-center">
+              <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-center shadow-xs">
                 <p className="text-xs font-semibold text-amber-700 dark:text-amber-300 flex items-center justify-center gap-1.5">
-                  <Info className="h-4 w-4" />
+                  <Info className="h-4 w-4 shrink-0" />
                   Official Announcements is broadcast-only for students. You can react to messages using emojis!
                 </p>
               </div>
             ) : (
               <form onSubmit={handleSendMessage} className="space-y-2">
-                {/* Quick Emoji Bar */}
-                <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-0.5">
-                  <span className="text-[11px] font-bold text-muted-foreground mr-1">React:</span>
-                  {QUICK_EMOJIS.map((emoji) => (
-                    <button
-                      key={emoji}
-                      type="button"
-                      onClick={() => setInputText((prev) => prev + emoji)}
-                      className="px-2 py-0.5 rounded-lg hover:bg-muted text-sm transition-transform hover:scale-115 active:scale-95"
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Input Textarea & Send Button */}
-                <div className="flex items-end gap-2.5">
+                {/* Floating Frosted Glass Input Card */}
+                <div className="relative rounded-3xl bg-background/90 dark:bg-slate-900/90 border border-border/80 focus-within:border-sky-500/70 focus-within:ring-4 focus-within:ring-sky-500/15 shadow-lg shadow-black/5 dark:shadow-black/20 transition-all overflow-hidden">
+                  {/* Multi-line auto-growing textarea */}
                   <textarea
                     ref={textareaRef}
-                    rows={1}
+                    rows={2}
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
                         handleSendMessage();
+                      } else if (e.key === 'Escape' && replyingTo) {
+                        setReplyingTo(null);
                       }
                     }}
-                    placeholder={`Message #${activeChannel?.name || 'channel'}... (Enter to send, Shift+Enter for new line)`}
-                    className="flex-1 min-h-[44px] max-h-36 p-3 rounded-2xl bg-background/90 border border-border/80 focus:outline-none focus:ring-2 focus:ring-sky-500/30 text-xs sm:text-sm text-foreground resize-none transition-all placeholder:text-muted-foreground/60 shadow-inner"
+                    placeholder={`Message #${activeChannel?.name || 'channel'}...`}
+                    className="w-full min-h-[48px] max-h-40 px-4 pt-3 pb-2 bg-transparent text-xs sm:text-sm text-foreground focus:outline-none resize-none transition-all placeholder:text-muted-foreground/60 leading-relaxed"
                   />
 
-                  <Button
-                    type="submit"
-                    disabled={!inputText.trim() || isSending}
-                    className="h-11 px-4 sm:px-5 rounded-2xl bg-gradient-to-r from-sky-500 via-indigo-600 to-purple-600 hover:from-sky-600 hover:to-purple-700 text-white font-bold shadow-lg shadow-sky-500/25 flex items-center gap-2 shrink-0 active:scale-95 transition-all"
-                  >
-                    {isSending ? (
-                      <span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                    ) : (
-                      <>
-                        <Send className="h-4 w-4" />
-                        <span className="hidden sm:inline text-xs">Send</span>
-                      </>
-                    )}
-                  </Button>
+                  {/* Input Card Bottom Action Toolbar */}
+                  <div className="px-3 py-2 bg-muted/30 dark:bg-slate-950/40 border-t border-border/40 flex items-center justify-between gap-2">
+                    {/* Left Toolbar: Emoji Picker Popover + Rich text helpers */}
+                    <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
+                      {/* Emoji Picker Popover */}
+                      <Popover open={inputEmojiPickerOpen} onOpenChange={setInputEmojiPickerOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 px-2.5 rounded-xl hover:bg-sky-500/10 text-muted-foreground hover:text-sky-600 dark:hover:text-sky-400 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                            title="Insert Emoji"
+                          >
+                            <Smile className="h-4 w-4 text-sky-500" />
+                            <span className="hidden sm:inline text-[11px]">Emoji</span>
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                          className="w-72 sm:w-80 p-2.5 rounded-3xl shadow-2xl z-50 bg-background/95 backdrop-blur-xl border border-border/80"
+                          align="start"
+                          side="top"
+                        >
+                          {/* Category Tabs */}
+                          <div className="flex items-center gap-1 pb-2 mb-2 border-b border-border/50 overflow-x-auto no-scrollbar">
+                            {EMOJI_CATEGORIES.map((cat) => (
+                              <button
+                                key={cat.name}
+                                type="button"
+                                onClick={() => setEmojiCategoryTab(cat.name)}
+                                className={`px-2.5 py-1 rounded-xl text-[11px] font-bold whitespace-nowrap transition-all ${
+                                  emojiCategoryTab === cat.name
+                                    ? 'bg-sky-500 text-white shadow-xs'
+                                    : 'text-muted-foreground hover:bg-muted'
+                                }`}
+                              >
+                                {cat.name}
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Emoji Grid */}
+                          <div className="grid grid-cols-7 gap-1 max-h-48 overflow-y-auto p-1">
+                            {(
+                              EMOJI_CATEGORIES.find((c) => c.name === emojiCategoryTab)?.emojis ||
+                              EMOJI_CATEGORIES[0].emojis
+                            ).map((emoji) => (
+                              <button
+                                key={emoji}
+                                type="button"
+                                onClick={() => handleInsertEmoji(emoji)}
+                                className="h-8 w-8 rounded-xl hover:bg-sky-500/15 flex items-center justify-center text-lg transition-transform hover:scale-125 active:scale-95"
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+
+                          <div className="pt-2 mt-2 border-t border-border/50 text-[10px] text-muted-foreground text-center">
+                            Click any emoji to insert into your message
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+
+                      {/* Formatting Helper Buttons */}
+                      <div className="hidden sm:flex items-center gap-0.5 pl-1 border-l border-border/60">
+                        <button
+                          type="button"
+                          onClick={() => handleInsertFormatting('**', '**', 'bold text')}
+                          className="h-7 w-7 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors"
+                          title="Bold (**text**)"
+                        >
+                          <Bold className="h-3.5 w-3.5" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleInsertFormatting('`', '`', 'code')}
+                          className="h-7 w-7 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors"
+                          title="Code (`code`)"
+                        >
+                          <Code className="h-3.5 w-3.5" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleInsertFormatting('> ', '', 'quote')}
+                          className="h-7 w-7 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors"
+                          title="Quote (> quote)"
+                        >
+                          <Quote className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Right Toolbar: Character count + Keyboard hint + Gradient Send button */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {inputText.trim().length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setInputText('')}
+                          className="text-[10px] text-muted-foreground hover:text-rose-500 px-1.5 py-0.5 rounded-md hover:bg-muted transition-colors hidden sm:inline"
+                          title="Clear text"
+                        >
+                          Clear
+                        </button>
+                      )}
+
+                      <span className="hidden lg:flex items-center gap-1 text-[10px] text-muted-foreground/70 font-mono">
+                        <CornerDownLeft className="h-2.5 w-2.5" />
+                        Enter to send
+                      </span>
+
+                      <Button
+                        type="submit"
+                        disabled={!inputText.trim() || isSending}
+                        className={`h-8 sm:h-9 px-3.5 sm:px-4 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-md active:scale-95 ${
+                          inputText.trim() && !isSending
+                            ? 'bg-gradient-to-r from-sky-500 via-indigo-600 to-purple-600 hover:from-sky-600 hover:to-purple-700 text-white shadow-sky-500/25 ring-2 ring-sky-400/30'
+                            : 'bg-muted text-muted-foreground cursor-not-allowed opacity-60 shadow-none'
+                        }`}
+                      >
+                        {isSending ? (
+                          <span className="h-3.5 w-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                        ) : (
+                          <>
+                            <Send className="h-3.5 w-3.5" />
+                            <span className="hidden sm:inline">Send</span>
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </form>
             )}
@@ -1145,13 +1597,34 @@ export default function CommunityChat() {
           <div className="space-y-4 pt-2">
             <div className="space-y-2 text-xs">
               <p className="font-semibold text-foreground">Steps to enable (Takes ~30 seconds):</p>
-              <ol className="list-decimal list-inside space-y-1.5 text-muted-foreground pl-1">
-                <li>Open the <a href="https://console.firebase.google.com" target="_blank" rel="noreferrer" className="text-sky-500 hover:text-sky-600 underline font-semibold inline-flex items-center gap-1">Firebase Console <ExternalLink className="h-3 w-3" /></a></li>
-                <li>Select your project <strong>online-exam-f443c</strong></li>
-                <li>Navigate to <strong>Firestore Database</strong> → <strong>Rules</strong> tab</li>
-                <li>Paste the snippet below right before the last closing brace <code>{"}"}</code></li>
-                <li>Click <strong>Publish</strong></li>
+              <ol className="list-decimal list-inside space-y-2 text-muted-foreground pl-1">
+                <li>
+                  Open the{' '}
+                  <a
+                    href="https://console.firebase.google.com/project/online-exam-f443c/firestore/rules"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sky-500 hover:text-sky-600 underline font-semibold inline-flex items-center gap-1"
+                  >
+                    online-exam-f443c Firestore Rules <ExternalLink className="h-3 w-3" />
+                  </a>
+                </li>
+                <li>Copy the snippet below and paste it right before the last closing brace <code>{"}"}</code></li>
+                <li>Click <strong>Publish</strong> in the Firebase Console</li>
+                <li>Or if you have Firebase CLI installed: run <code>deploy-rules.bat</code> in the project folder</li>
               </ol>
+
+              <div className="pt-1">
+                <a
+                  href="https://console.firebase.google.com/project/online-exam-f443c/firestore/rules"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shadow-sm transition-all hover:scale-[1.02] active:scale-95"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  <span>Open Firebase Console Rules Directly</span>
+                </a>
+              </div>
             </div>
 
             <div className="relative">

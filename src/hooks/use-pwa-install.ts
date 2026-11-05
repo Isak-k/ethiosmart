@@ -22,6 +22,19 @@ export function usePWAInstall() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(() => cachedDeferredPrompt || (typeof window !== 'undefined' ? (window as any).__pwaInstallPrompt : null));
   const [isIOS, setIsIOS] = useState(false);
   const [installModalOpen, setInstallModalOpen] = useState(false);
+  const [isDismissed, setIsDismissed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return sessionStorage.getItem('pwa_install_dismissed') === 'true';
+  });
+
+  const dismissInstall = useCallback(() => {
+    setIsDismissed(true);
+    setInstallModalOpen(false);
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('pwa_install_dismissed', 'true');
+      window.dispatchEvent(new CustomEvent('pwa-install-dismissed'));
+    }
+  }, []);
 
   // Standalone check: only true when actually running inside the installed PWA window
   const [isStandalone, setIsStandalone] = useState<boolean>(() => {
@@ -80,19 +93,37 @@ export function usePWAInstall() {
       setInstallModalOpen(false);
     };
 
+    const handleDismissed = () => {
+      setIsDismissed(true);
+      setInstallModalOpen(false);
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        dismissInstall();
+      }
+    };
+
     window.addEventListener('beforeinstallprompt', directHandler);
     window.addEventListener('pwa-prompt-available', handlePromptAvailable);
     window.addEventListener('pwa-installed-success', handleInstalled);
+    window.addEventListener('pwa-install-dismissed', handleDismissed);
+    window.addEventListener('keydown', handleKeyDown);
 
     return () => {
       mediaQuery.removeEventListener?.('change', handleDisplayChange);
       window.removeEventListener('beforeinstallprompt', directHandler);
       window.removeEventListener('pwa-prompt-available', handlePromptAvailable);
       window.removeEventListener('pwa-installed-success', handleInstalled);
+      window.removeEventListener('pwa-install-dismissed', handleDismissed);
+      window.removeEventListener('keydown', handleKeyDown);
     };
-  }, []);
+  }, [dismissInstall]);
 
   const promptInstall = useCallback(async (): Promise<boolean> => {
+    // Open the guidance modal explaining how to enable offline study access
+    setInstallModalOpen(true);
+
     const prompt =
       deferredPrompt ||
       cachedDeferredPrompt ||
@@ -113,23 +144,21 @@ export function usePWAInstall() {
         return false;
       } catch (err) {
         console.warn('Install prompt execution error:', err);
-        setInstallModalOpen(true);
         return false;
       }
-    } else {
-      // If native deferred prompt is not directly supported/available (e.g. iOS Safari, Firefox, or Chrome desktop), open instructions modal
-      setInstallModalOpen(true);
-      return false;
     }
+    return false;
   }, [deferredPrompt]);
 
   return {
     isStandalone,
-    canInstall: !isStandalone,
+    canInstall: !isStandalone && !isDismissed,
     isIOS,
     deferredPrompt,
     promptInstall,
     installModalOpen,
     setInstallModalOpen,
+    isDismissed,
+    dismissInstall,
   };
 }

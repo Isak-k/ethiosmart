@@ -9,7 +9,19 @@ export function InstallPrompt() {
   const [isIOS, setIsIOS] = useState(false);
   const { t } = useTranslation();
 
+  const dismiss = () => {
+    setIsVisible(false);
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('pwa_install_dismissed', 'true');
+      window.dispatchEvent(new CustomEvent('pwa-install-dismissed'));
+    }
+  };
+
   useEffect(() => {
+    if (typeof window !== 'undefined' && sessionStorage.getItem('pwa_install_dismissed') === 'true') {
+      return;
+    }
+
     // Check if it's iOS
     const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
     // Check if it's already running in standalone PWA mode
@@ -26,7 +38,11 @@ export function InstallPrompt() {
     if (isIOSDevice && !isStandalone) {
       setIsIOS(true);
       // Show prompt after a delay on iOS
-      const timer = setTimeout(() => setIsVisible(true), 3000);
+      const timer = setTimeout(() => {
+        if (sessionStorage.getItem('pwa_install_dismissed') !== 'true') {
+          setIsVisible(true);
+        }
+      }, 3000);
       return () => clearTimeout(timer);
     }
 
@@ -38,7 +54,9 @@ export function InstallPrompt() {
       setDeferredPrompt(e);
       window.dispatchEvent(new CustomEvent('pwa-prompt-available', { detail: e }));
       // Update UI notify the user they can install the PWA
-      setIsVisible(true);
+      if (sessionStorage.getItem('pwa_install_dismissed') !== 'true') {
+        setIsVisible(true);
+      }
     };
 
     const installedHandler = () => {
@@ -46,14 +64,31 @@ export function InstallPrompt() {
       (window as any).__pwaInstallPrompt = null;
     };
 
+    const dismissedHandler = () => {
+      setIsVisible(false);
+    };
+
     window.addEventListener("beforeinstallprompt", handler);
     window.addEventListener("appinstalled", installedHandler);
+    window.addEventListener("pwa-install-dismissed", dismissedHandler);
 
     return () => {
       window.removeEventListener("beforeinstallprompt", handler);
       window.removeEventListener("appinstalled", installedHandler);
+      window.removeEventListener("pwa-install-dismissed", dismissedHandler);
     };
   }, []);
+
+  // Keyboard Escape listener to dismiss install prompt
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isVisible) {
+        dismiss();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isVisible]);
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) return;
@@ -92,7 +127,9 @@ export function InstallPrompt() {
               size="icon" 
               variant="ghost" 
               className="h-8 w-8 hover:bg-white/20 text-primary-foreground -mt-1 -mr-1"
-              onClick={() => setIsVisible(false)}
+              onClick={dismiss}
+              aria-label="Close install prompt"
+              title="Close"
             >
               <X className="h-4 w-4" />
             </Button>
@@ -137,7 +174,9 @@ export function InstallPrompt() {
             size="icon" 
             variant="ghost" 
             className="h-8 w-8 hover:bg-white/20 text-primary-foreground"
-            onClick={() => setIsVisible(false)}
+            onClick={dismiss}
+            aria-label="Close install prompt"
+            title="Close"
           >
             <X className="h-4 w-4" />
           </Button>

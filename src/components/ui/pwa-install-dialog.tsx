@@ -26,8 +26,16 @@ export function PwaInstallDialog({
   deferredPrompt,
   onInstallClick,
 }: PwaInstallDialogProps) {
+  const handleOpenChange = (newOpen: boolean) => {
+    if (!newOpen && typeof window !== 'undefined') {
+      sessionStorage.setItem('pwa_install_dismissed', 'true');
+      window.dispatchEvent(new CustomEvent('pwa-install-dismissed'));
+    }
+    onOpenChange(newOpen);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-md rounded-3xl p-6 sm:p-7 z-50">
         <DialogHeader className="space-y-2 text-center sm:text-left">
           <div className="h-12 w-12 rounded-2xl bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center mx-auto sm:mx-0">
@@ -43,7 +51,7 @@ export function PwaInstallDialog({
           <DialogDescription className="text-xs sm:text-sm text-muted-foreground">
             {isStandalone
               ? 'You are already running EthioSmart as an installed app.'
-              : 'Install EthioSmart for fast 1-click access from your home screen, full-screen reading, and 100% offline study capability.'}
+              : 'Install EthioSmart to enable 100% offline study access for textbooks, notes, and exams without needing internet.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -115,8 +123,9 @@ export function PwaInstallDialog({
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => onOpenChange(false)}
-            className="rounded-xl text-xs text-muted-foreground"
+            onClick={() => handleOpenChange(false)}
+            aria-label="Close installation guidance"
+            className="rounded-xl text-xs text-muted-foreground hover:text-foreground"
           >
             Close
           </Button>

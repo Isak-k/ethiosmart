@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Check } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -140,6 +141,10 @@ export function LanguageToggle() {
     i18n.changeLanguage(lng);
   };
 
+  const isSelected = (lng: string) => {
+    return currentLang === lng || currentLang.toLowerCase().startsWith(lng.toLowerCase());
+  };
+
   const getFlag = (lang: string) => {
     if (lang === "om" || lang === "am") return <ETFlag />;
     return <USFlag />; // Default to US flag for English
@@ -148,20 +153,55 @@ export function LanguageToggle() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-9 w-9 px-0 hover:bg-muted">
+        <Button variant="ghost" size="icon" className="h-9 w-9 px-0 hover:bg-muted" aria-label="Select language">
           <span className="flex items-center justify-center">{getFlag(currentLang)}</span>
           <span className="sr-only">Toggle language</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => changeLanguage("en")} className="gap-2 cursor-pointer">
-          <USFlag /> English
+      <DropdownMenuContent align="end" className="w-48 p-1">
+        <DropdownMenuItem
+          onClick={() => changeLanguage("en")}
+          className={`flex items-center justify-between gap-2.5 px-3 py-2 cursor-pointer rounded-lg transition-colors ${
+            isSelected("en") ? "bg-accent/80 font-bold text-foreground" : "text-muted-foreground hover:text-foreground"
+          }`}
+          aria-selected={isSelected("en")}
+        >
+          <div className="flex items-center gap-2.5">
+            <USFlag /> <span>English</span>
+          </div>
+          {isSelected("en") && (
+            <Check className="h-4 w-4 text-sky-600 dark:text-sky-400 stroke-[2.5] shrink-0" />
+          )}
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => changeLanguage("om")} className="gap-2 cursor-pointer">
-          <ETFlag /> Afaan Oromoo
+
+        <DropdownMenuItem
+          onClick={() => changeLanguage("om")}
+          className={`flex items-center justify-between gap-2.5 px-3 py-2 cursor-pointer rounded-lg transition-colors ${
+            isSelected("om") ? "bg-accent/80 font-bold text-foreground" : "text-muted-foreground hover:text-foreground"
+          }`}
+          aria-selected={isSelected("om")}
+        >
+          <div className="flex items-center gap-2.5">
+            <ETFlag /> <span>Afaan Oromoo</span>
+          </div>
+          {isSelected("om") && (
+            <Check className="h-4 w-4 text-sky-600 dark:text-sky-400 stroke-[2.5] shrink-0" />
+          )}
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => changeLanguage("am")} className="gap-2 cursor-pointer">
-          <ETFlag /> አማርኛ
+
+        <DropdownMenuItem
+          onClick={() => changeLanguage("am")}
+          className={`flex items-center justify-between gap-2.5 px-3 py-2 cursor-pointer rounded-lg transition-colors ${
+            isSelected("am") ? "bg-accent/80 font-bold text-foreground" : "text-muted-foreground hover:text-foreground"
+          }`}
+          aria-selected={isSelected("am")}
+        >
+          <div className="flex items-center gap-2.5">
+            <ETFlag /> <span>አማርኛ</span>
+          </div>
+          {isSelected("am") && (
+            <Check className="h-4 w-4 text-sky-600 dark:text-sky-400 stroke-[2.5] shrink-0" />
+          )}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

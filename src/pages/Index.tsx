@@ -20,6 +20,7 @@ import {
   BookOpen,
   Brain,
   ClipboardList,
+  X,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { LanguageToggle } from "@/components/ui/language-toggle";
@@ -54,6 +55,8 @@ const Index = () => {
     promptInstall,
     installModalOpen,
     setInstallModalOpen,
+    isDismissed,
+    dismissInstall,
   } = usePWAInstall();
 
   useEffect(() => {
@@ -72,7 +75,7 @@ const Index = () => {
       <LiquidBackdrop showDroplets={true} showSplash={true} showRipples={true} interactive={true} variant="hero" />
 
       {/* TOP INSTALL BANNER - Prominently placed at the very top of the first page */}
-      {!isStandalone && (
+      {!isStandalone && !isDismissed && (
         <div className="relative z-30 w-full bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-700 text-white px-3 sm:px-6 py-2 shadow-md flex items-center justify-between text-xs sm:text-sm font-medium shrink-0 animate-fade-in border-b border-white/20">
           <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
             <span className="flex h-2.5 w-2.5 relative shrink-0">
@@ -94,6 +97,15 @@ const Index = () => {
             >
               <Download className="h-3.5 w-3.5" />
               <span>Install as App</span>
+            </button>
+            <button
+              type="button"
+              onClick={dismissInstall}
+              aria-label="Dismiss install prompt"
+              className="h-7 w-7 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+              title="Close"
+            >
+              <X className="h-4 w-4" />
             </button>
           </div>
         </div>
