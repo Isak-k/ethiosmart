@@ -11,11 +11,11 @@ const Dashboard = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Guest students see the exam page by default when accessing the dashboard
-    if (!loading && isGuest) {
+    // Students and guest users open on exam page by default
+    if (!loading && (isGuest || role === "student")) {
       navigate("/dashboard/exams", { replace: true });
     }
-  }, [loading, isGuest, navigate]);
+  }, [loading, isGuest, role, navigate]);
 
   if (loading) {
     return (

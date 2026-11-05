@@ -82,7 +82,33 @@ export function getFriendlyAuthErrorMessage(
     case 'auth/popup-blocked':
       return {
         title: "Popup blocked",
-        description: "Your browser blocked the Google sign-in popup. Please allow popups for this site.",
+        description: "Your browser blocked the Google sign-in popup. Please allow popups for this site, or try again.",
+        isOffline: false,
+      };
+    case 'auth/unauthorized-domain': {
+      const currentHost = typeof window !== 'undefined' ? window.location.hostname : 'your current domain';
+      return {
+        title: "Domain Not Authorized in Firebase",
+        description: `"${currentHost}" is not authorized for Google Sign-In in Firebase. In Firebase Console, go to Authentication > Settings > Authorized domains, and add "${currentHost}".`,
+        isOffline: false,
+      };
+    }
+    case 'auth/operation-not-allowed':
+      return {
+        title: "Google Sign-In Disabled",
+        description: "Google Sign-In is not enabled for this project. Enable it in Firebase Console > Authentication > Sign-in method > Google.",
+        isOffline: false,
+      };
+    case 'auth/cancelled-popup-request':
+      return {
+        title: "Sign-in in progress",
+        description: "A sign-in window was already open. Please complete or close it and try again.",
+        isOffline: false,
+      };
+    case 'auth/account-exists-with-different-credential':
+      return {
+        title: "Email already registered",
+        description: "An account already exists with this email using password login. Please sign in with your email and password.",
         isOffline: false,
       };
     default: {

@@ -17,7 +17,7 @@ import { Department } from "@/integrations/firebase/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
-import { signInWithGoogle, completeGoogleSignUpProfile } from "@/lib/firebase-auth";
+import { signInWithGoogle, checkGoogleRedirectResult, completeGoogleSignUpProfile } from "@/lib/firebase-auth";
 import { getFriendlyAuthErrorMessage } from "@/lib/firebase-utils";
 
 export function AuthForm() {
@@ -86,6 +86,47 @@ export function AuthForm() {
       });
     }
   }, [searchParams, toast]);
+
+  // Check for Google redirect sign-in result on page mount
+  useEffect(() => {
+    let isMounted = true;
+    async function resolveRedirect() {
+      try {
+        const result = await checkGoogleRedirectResult();
+        if (!result || !isMounted) return;
+
+        if (result.needsProfileSetup) {
+          setGoogleUserData({
+            userId: result.user.uid,
+            email: result.user.email || "",
+            displayName: result.user.displayName || "",
+          });
+          setShowGoogleProfileSetup(true);
+        } else {
+          await refreshProfile();
+          const userRole = await getUserRole(result.user.uid);
+          toast({
+            title: "Welcome back!",
+            description: "You have been signed in with Google.",
+          });
+          navigate(userRole === "admin" ? "/dashboard" : "/dashboard/exams");
+        }
+      } catch (error: any) {
+        if (!isMounted) return;
+        console.error("Google redirect sign-in resolution error:", error);
+        const friendly = getFriendlyAuthErrorMessage(error, "google");
+        toast({
+          title: friendly.title,
+          description: friendly.description,
+          variant: "destructive",
+        });
+      }
+    }
+    resolveRedirect();
+    return () => {
+      isMounted = false;
+    };
+  }, [navigate, refreshProfile, toast]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -211,6 +252,11 @@ export function AuthForm() {
     setLoading(true);
     try {
       const result = await signInWithGoogle();
+
+      if (result.redirectInitiated) {
+        // Browser is redirecting to Google OAuth login page
+        return;
+      }
       
       if (result.needsProfileSetup) {
         // New user - show profile setup
@@ -233,6 +279,7 @@ export function AuthForm() {
       }
     } catch (error: any) {
       setLoading(false);
+      console.error('Google sign-in error:', error);
       const friendly = getFriendlyAuthErrorMessage(error, 'google');
       toast({
         title: friendly.title,

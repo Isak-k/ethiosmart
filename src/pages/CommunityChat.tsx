@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/card';
@@ -33,6 +34,7 @@ import {
   ShieldAlert,
   ChevronDown,
   Hash,
+  Layers,
 } from 'lucide-react';
 import {
   Dialog,
@@ -57,12 +59,22 @@ import {
 import { getDepartments } from '@/lib/departments';
 import { getCachedDefaultDepartmentId } from '@/lib/system-settings';
 import { Department } from '@/integrations/firebase/types';
+import { AdminChatCleanupDialog } from '@/components/community/AdminChatCleanupDialog';
 
 const QUICK_EMOJIS = ['👍', '❤️', '🔥', '🧠', '💡', '🎉'];
 
 export default function CommunityChat() {
+  const navigate = useNavigate();
   const { user, profile } = useAuth();
   const { toast } = useToast();
+
+  const handleGoBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/dashboard');
+    }
+  };
 
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loadingInitial, setLoadingInitial] = useState(true);
@@ -96,20 +108,29 @@ export default function CommunityChat() {
   const [rulesModalOpen, setRulesModalOpen] = useState(false);
   const [copiedRule, setCopiedRule] = useState(false);
 
+  // Admin chat storage cleanup dialog state
+  const [cleanupDialogOpen, setCleanupDialogOpen] = useState(false);
+
   const FIRESTORE_COMMUNITY_RULE_SNIPPET = `    // --- Community Channels & Messages Collection ---
     match /communityChannels/{channelId} {
       allow read: if true;
-      allow write: if isAuthenticated() || isAdminOrSuper();
+      allow write: if true;
+
+      match /messages/{messageId} {
+        allow read: if true;
+        allow create, update: if true;
+        allow delete: if true;
+      }
 
       match /{allChildren=**} {
         allow read: if true;
-        allow write: if isAuthenticated();
+        allow write: if true;
       }
     }
 
     match /communityMessages/{document=**} {
       allow read: if true;
-      allow write: if isAuthenticated();
+      allow write: if true;
     }`;
 
   const handleCopyRule = () => {
@@ -426,31 +447,44 @@ export default function CommunityChat() {
   }, [messages]);
 
   return (
-    <DashboardLayout contentClassName="p-2 sm:p-3 lg:p-4 max-w-none w-full !pb-20 lg:!pb-3">
-      {/* Edge-to-Edge Full Height Chat Container */}
-      <div className="w-full h-[calc(100dvh-5.2rem)] flex rounded-3xl border border-white/60 dark:border-white/10 shadow-2xl bg-card/75 dark:bg-slate-950/70 backdrop-blur-2xl overflow-hidden relative">
+    <DashboardLayout contentClassName="p-0 sm:p-2 lg:p-4 max-w-none w-full !pb-0 lg:!pb-3">
+      {/* Edge-to-Edge Full Height Chat Container: On mobile it is fixed inset-0 z-[60] full page, on desktop it is inside DashboardLayout */}
+      <div className="fixed inset-0 z-[60] lg:relative lg:inset-auto lg:z-auto w-full h-[100dvh] lg:h-[calc(100dvh-5.2rem)] flex rounded-none lg:rounded-3xl border-0 lg:border border-white/60 dark:border-white/10 shadow-none lg:shadow-2xl bg-background lg:bg-card/75 dark:bg-slate-950 lg:dark:bg-slate-950/70 backdrop-blur-none lg:backdrop-blur-2xl overflow-hidden">
         {/* ========================================================= */}
         {/* LEFT PANE: CHANNELS DIRECTORY                            */}
         {/* ========================================================= */}
         <aside
-          className={`w-full lg:w-80 xl:w-96 shrink-0 flex flex-col border-r border-border/60 bg-muted/25 dark:bg-slate-950/40 backdrop-blur-xl transition-all duration-300 ${
+          className={`w-full lg:w-80 xl:w-96 shrink-0 flex flex-col border-r border-border/60 bg-background lg:bg-muted/25 dark:bg-slate-950 lg:dark:bg-slate-950/40 backdrop-blur-xl transition-all duration-300 ${
             mobileShowChat ? 'hidden lg:flex' : 'flex'
           }`}
         >
           {/* Header Branding */}
-          <div className="p-4 border-b border-border/60 flex items-center justify-between gap-3 bg-muted/10">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="h-10 w-10 rounded-2xl bg-gradient-to-tr from-sky-500 via-indigo-600 to-purple-600 text-white flex items-center justify-center shadow-lg shadow-sky-500/25 shrink-0">
-                <Users className="h-5 w-5" />
+          <div className="p-3 sm:p-4 border-b border-border/60 flex items-center justify-between gap-2.5 bg-muted/20">
+            <div className="flex items-center gap-2.5 min-w-0">
+              {/* Back to other page button */}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleGoBack}
+                className="h-9 px-2 sm:px-2.5 rounded-xl border border-border/70 hover:bg-muted text-foreground flex items-center gap-1.5 font-bold text-xs shrink-0 active:scale-95 transition-all shadow-xs"
+                title="Back to previous page"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                <span>Back</span>
+              </Button>
+
+              <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-sky-500 via-indigo-600 to-purple-600 text-white flex items-center justify-center shadow-md shadow-sky-500/25 shrink-0">
+                <Users className="h-4 w-4" />
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <h2 className="text-base font-display font-bold text-foreground truncate">
+                  <h2 className="text-sm sm:text-base font-display font-bold text-foreground truncate">
                     Community
                   </h2>
                   <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                 </div>
-                <p className="text-[11px] text-muted-foreground truncate">
+                <p className="text-[10px] sm:text-[11px] text-muted-foreground truncate">
                   {isAdminOrExaminer ? 'All Department Study Halls' : 'Department & Announcements'}
                 </p>
               </div>
@@ -619,48 +653,76 @@ export default function CommunityChat() {
           }`}
         >
           {/* Active Channel Header */}
-          <header className="p-3.5 sm:p-4 border-b border-border/60 bg-muted/15 flex items-center justify-between gap-3 shrink-0">
-            <div className="flex items-center gap-3 min-w-0">
-              {/* Back button on mobile */}
+          <header className="p-2.5 sm:p-3.5 lg:p-4 border-b border-border/60 bg-muted/15 flex items-center justify-between gap-2 shrink-0">
+            <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
+              {/* Back to previous page button on mobile */}
               <Button
                 type="button"
                 variant="ghost"
-                size="icon"
-                onClick={() => setMobileShowChat(false)}
-                className="lg:hidden h-8 w-8 rounded-xl -ml-1 text-muted-foreground hover:text-foreground"
-                title="Back to channels"
+                size="sm"
+                onClick={handleGoBack}
+                className="lg:hidden h-8 px-2 rounded-xl text-foreground hover:bg-muted border border-border/60 flex items-center gap-1 font-bold text-xs shrink-0 active:scale-95 transition-all shadow-xs"
+                title="Back to previous page"
               >
-                <ArrowLeft className="h-5 w-5" />
+                <ArrowLeft className="h-4 w-4" />
+                <span>Back</span>
               </Button>
 
-              <div className="h-10 w-10 rounded-2xl bg-gradient-to-tr from-sky-500 via-indigo-600 to-purple-600 text-white flex items-center justify-center text-lg shrink-0 shadow-md shadow-sky-500/20">
+              {/* Channels Switcher button on mobile */}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setMobileShowChat(false)}
+                className="lg:hidden h-8 px-2 rounded-xl border-sky-400/30 text-sky-600 dark:text-sky-400 hover:bg-sky-500/10 flex items-center gap-1 text-xs shrink-0 font-semibold active:scale-95 transition-all"
+                title="Switch channel"
+              >
+                <Layers className="h-3.5 w-3.5 text-sky-500" />
+                <span className="text-[11px]">Channels</span>
+              </Button>
+
+              <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-2xl bg-gradient-to-tr from-sky-500 via-indigo-600 to-purple-600 text-white flex items-center justify-center text-base sm:text-lg shrink-0 shadow-md shadow-sky-500/20">
                 {activeChannel?.icon || (activeChannel?.category === 'department' ? '🏛️' : '#')}
               </div>
 
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm sm:text-base font-display font-bold text-foreground truncate">
+                <div className="flex items-center gap-1.5">
+                  <h3 className="text-xs sm:text-sm lg:text-base font-display font-bold text-foreground truncate">
                     {activeChannel?.name}
                   </h3>
                   {activeChannel?.isOfficialOnly && (
                     <Badge
                       variant="secondary"
-                      className="text-[10px] px-1.5 py-0 h-4 bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-400/30 font-semibold"
+                      className="text-[9px] px-1.5 py-0 h-4 bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-400/30 font-semibold"
                     >
                       Official
                     </Badge>
                   )}
                 </div>
-                <p className="text-[11px] text-muted-foreground truncate max-w-xl">
+                <p className="text-[10px] sm:text-[11px] text-muted-foreground truncate max-w-[140px] xs:max-w-[200px] sm:max-w-md">
                   {activeChannel?.description}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
-              <Badge variant="secondary" className="text-[11px] font-semibold bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-400/25 px-2.5 py-1 rounded-xl">
-                {messages.length} {messages.length === 1 ? 'message' : 'messages'}
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              <Badge variant="secondary" className="text-[10px] sm:text-[11px] font-semibold bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-400/25 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-xl">
+                {messages.length} {messages.length === 1 ? 'msg' : 'msgs'}
               </Badge>
+
+              {isAdminOrExaminer && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCleanupDialogOpen(true)}
+                  className="h-7 px-2 sm:px-2.5 text-[10px] sm:text-[11px] font-semibold rounded-xl border-rose-300/40 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 hover:border-rose-400 gap-1 sm:gap-1.5 shadow-sm"
+                  title="Clear or prune old chat storage"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Storage</span>
+                </Button>
+              )}
             </div>
           </header>
 
@@ -1004,7 +1066,7 @@ export default function CommunityChat() {
           )}
 
           {/* Bottom Chat Input Bar */}
-          <footer className="p-3 sm:p-4 border-t border-border/60 bg-muted/20 backdrop-blur-md shrink-0 space-y-2">
+          <footer className="p-2.5 sm:p-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-border/60 bg-background/95 lg:bg-muted/20 backdrop-blur-md shrink-0 space-y-2">
             {activeChannel?.isOfficialOnly && !isAdminOrExaminer ? (
               <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-center">
                 <p className="text-xs font-semibold text-amber-700 dark:text-amber-300 flex items-center justify-center gap-1.5">
@@ -1117,6 +1179,16 @@ export default function CommunityChat() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Admin Chat Storage & Retention Cleanup Dialog */}
+      {isAdminOrExaminer && (
+        <AdminChatCleanupDialog
+          open={cleanupDialogOpen}
+          onOpenChange={setCleanupDialogOpen}
+          channels={channels}
+          initialChannelId={activeChannelId}
+        />
+      )}
     </DashboardLayout>
   );
 }

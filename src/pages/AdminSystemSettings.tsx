@@ -11,10 +11,17 @@ import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Slider } from '@/components/ui/slider';
-import { Loader2, AlertCircle, Check, Building } from 'lucide-react';
+import { Loader2, AlertCircle, Check, Building, Trash2, Database, RefreshCw, MessageSquare } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { getSystemSettings, updateSystemSettings } from '@/lib/system-settings';
 import { getDepartments } from '@/lib/departments';
 import { Department } from '@/integrations/firebase/types';
+import {
+  buildCommunityChannels,
+  getChatStorageStats,
+  ChatStorageStats,
+} from '@/lib/community';
+import { AdminChatCleanupDialog } from '@/components/community/AdminChatCleanupDialog';
 import {
   Select,
   SelectContent,
@@ -44,6 +51,25 @@ export function AdminSystemSettings() {
   const [isDirty, setIsDirty] = useState(false);
   const [departments, setDepartments] = useState<Department[]>([]);
 
+  // Community Chat Retention & Storage Clean states
+  const [cleanupDialogOpen, setCleanupDialogOpen] = useState(false);
+  const [selectedCleanupChannel, setSelectedCleanupChannel] = useState<string>('all');
+  const [chatStats, setChatStats] = useState<ChatStorageStats | null>(null);
+  const [loadingChatStats, setLoadingChatStats] = useState(false);
+
+  const fetchChatStats = async (deptsList: Department[]) => {
+    try {
+      setLoadingChatStats(true);
+      const chs = buildCommunityChannels(deptsList, { userRole: 'admin' });
+      const stats = await getChatStorageStats(chs);
+      setChatStats(stats);
+    } catch (err) {
+      console.warn('Failed to fetch chat storage stats:', err);
+    } finally {
+      setLoadingChatStats(false);
+    }
+  };
+
   const [settings, setSettings] = useState<Settings>({
     requireStudentLogin: true,
     defaultDepartmentId: 'qzw7P8fCSFpnRGqdAgxW',
@@ -70,6 +96,7 @@ export function AdminSystemSettings() {
           setSettings(loaded as Settings);
         }
         setDepartments(depts);
+        fetchChatStats(depts);
       } catch (err) {
         console.error('Error loading settings:', err);
         setError('Failed to load system settings');
@@ -357,6 +384,142 @@ export function AdminSystemSettings() {
         </CardContent>
       </Card>
 
+      {/* Community Chat Storage & Data Retention */}
+      <Card className="border-border/80 shadow-sm overflow-hidden">
+        <CardHeader className="bg-gradient-to-r from-sky-500/5 via-indigo-500/5 to-transparent pb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-2xl bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
+                <Database className="h-5 w-5" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">Community Chat Storage & Retention</CardTitle>
+                <CardDescription className="text-xs">
+                  Clean up and prune accumulated student messages to reclaim Firestore database storage as the student count increases.
+                </CardDescription>
+              </div>
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => fetchChatStats(departments)}
+              disabled={loadingChatStats}
+              className="h-8 text-xs gap-1.5 self-start sm:self-auto rounded-xl"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${loadingChatStats ? 'animate-spin' : ''}`} />
+              Refresh Count
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4 pt-4">
+          {/* Storage Summary Bar */}
+          <div className="p-4 rounded-2xl bg-muted/30 border border-border/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Total Stored Chat Messages
+              </span>
+              <div className="flex items-center gap-2.5">
+                <span className="text-2xl font-bold font-display text-foreground">
+                  {loadingChatStats ? (
+                    <span className="inline-flex items-center gap-1.5 text-base font-normal text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Calculating...
+                    </span>
+                  ) : (
+                    chatStats?.totalMessages ?? 0
+                  )}
+                </span>
+                <Badge variant="secondary" className="text-xs font-medium bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-400/20">
+                  {chatStats?.channels.length ?? 0} active channels
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Accumulated student conversations across Announcements, General Campus Lounge, and Department study halls.
+              </p>
+            </div>
+
+            <Button
+              type="button"
+              onClick={() => {
+                setSelectedCleanupChannel('all');
+                setCleanupDialogOpen(true);
+              }}
+              className="rounded-xl h-9 bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs shadow-md shadow-rose-600/20 gap-2 shrink-0"
+            >
+              <Trash2 className="h-4 w-4" />
+              Manage & Clear Chat Data
+            </Button>
+          </div>
+
+          {/* Quick Retention Prune Options */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+            <div className="p-3.5 rounded-2xl border border-border/70 bg-background/60 flex flex-col justify-between gap-3">
+              <div>
+                <span className="font-semibold text-xs text-foreground block">Prune 30+ Days Old</span>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Keep active recent conversations while removing older historical messages.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSelectedCleanupChannel('all');
+                  setCleanupDialogOpen(true);
+                }}
+                className="h-8 text-xs rounded-xl border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+              >
+                Clear Older Than 30 Days
+              </Button>
+            </div>
+
+            <div className="p-3.5 rounded-2xl border border-border/70 bg-background/60 flex flex-col justify-between gap-3">
+              <div>
+                <span className="font-semibold text-xs text-foreground block">Prune 90+ Days Old</span>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Clear messages from past academic quarters or older semesters.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSelectedCleanupChannel('all');
+                  setCleanupDialogOpen(true);
+                }}
+                className="h-8 text-xs rounded-xl border-slate-300 dark:border-slate-700 text-foreground hover:bg-muted"
+              >
+                Clear Older Than 90 Days
+              </Button>
+            </div>
+
+            <div className="p-3.5 rounded-2xl border border-rose-500/30 bg-rose-500/5 flex flex-col justify-between gap-3">
+              <div>
+                <span className="font-semibold text-xs text-rose-600 dark:text-rose-400 block">Complete Channel Wipe</span>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Completely reset all messages for a new semester or fresh start.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSelectedCleanupChannel('all');
+                  setCleanupDialogOpen(true);
+                }}
+                className="h-8 text-xs rounded-xl border-rose-500/40 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10"
+              >
+                Complete Wipe Options
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Actions */}
       <div className="flex gap-2 justify-end">
         <Button
@@ -374,6 +537,17 @@ export function AdminSystemSettings() {
           {saving ? 'Saving...' : 'Save Settings'}
         </Button>
       </div>
+
+      {/* Chat Cleanup Modal */}
+      <AdminChatCleanupDialog
+        open={cleanupDialogOpen}
+        onOpenChange={setCleanupDialogOpen}
+        channels={buildCommunityChannels(departments, { userRole: 'admin' })}
+        initialChannelId={selectedCleanupChannel}
+        onSuccess={() => {
+          fetchChatStats(departments);
+        }}
+      />
     </div>
   );
 }

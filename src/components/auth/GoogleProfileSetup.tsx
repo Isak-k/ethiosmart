@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getDepartments } from "@/lib/departments";
+import { getCachedDefaultDepartmentId } from "@/lib/system-settings";
 import { Department } from "@/integrations/firebase/types";
 import { useTranslation } from "react-i18next";
 import { Building, Loader2, User } from "lucide-react";
@@ -29,6 +30,12 @@ export function GoogleProfileSetup({ email, displayName, onComplete, loading }: 
       try {
         const data = await getDepartments();
         setDepartments(data);
+        const defaultDeptId = getCachedDefaultDepartmentId();
+        if (defaultDeptId && data.some((d) => d.id === defaultDeptId)) {
+          setSelectedDept(defaultDeptId);
+        } else if (data.length > 0 && !selectedDept) {
+          setSelectedDept(data[0].id);
+        }
       } catch (error) {
         console.error("Failed to fetch departments", error);
       } finally {

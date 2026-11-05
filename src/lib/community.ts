@@ -1,6 +1,7 @@
 import {
   collection,
   query,
+  where,
   orderBy,
   limit,
   onSnapshot,
@@ -11,10 +12,13 @@ import {
   serverTimestamp,
   Timestamp,
   getDocs,
+  writeBatch,
+  getCountFromServer,
 } from 'firebase/firestore';
 import { db } from '@/integrations/firebase/client';
 import { CommunityChannel, CommunityMessage, ReplyReference } from '@/types/community';
 import { Department } from '@/integrations/firebase/types';
+import { getDepartments } from '@/lib/departments';
 
 export const BUILTIN_SYSTEM_CHANNELS: CommunityChannel[] = [
   {
@@ -275,4 +279,202 @@ export async function deleteCommunityMessage(params: {
     text: '[This message was deleted]',
     updatedAt: serverTimestamp(),
   });
+}
+
+export interface ClearMessagesOptions {
+  channelId: string;
+  olderThanDays?: number; // 0 or undefined = all messages
+  preservePinned?: boolean; // default true
+  softDelete?: boolean; // default false (permanent deletion reclaims Firestore storage)
+}
+
+export interface ClearMessagesResult {
+  channelId: string;
+  deletedCount: number;
+}
+
+export interface ClearAllChannelsOptions {
+  channelIds?: string[];
+  olderThanDays?: number;
+  preservePinned?: boolean;
+  softDelete?: boolean;
+}
+
+export interface ClearAllChannelsResult {
+  totalDeleted: number;
+  channelResults: Record<string, number>;
+}
+
+export interface ChannelStorageStat {
+  channelId: string;
+  name: string;
+  messageCount: number;
+}
+
+export interface ChatStorageStats {
+  totalMessages: number;
+  channels: ChannelStorageStat[];
+}
+
+/**
+ * Permanently cleans / purges messages in a specific channel based on age.
+ * Uses batched writes (up to 400 docs per batch) to efficiently delete from Firestore.
+ */
+export async function clearChannelMessages(
+  options: ClearMessagesOptions
+): Promise<ClearMessagesResult> {
+  const { channelId, olderThanDays = 0, preservePinned = true, softDelete = false } = options;
+  const messagesRef = collection(db, 'communityChannels', channelId, 'messages');
+
+  const cutoffDate =
+    olderThanDays > 0 ? new Date(Date.now() - olderThanDays * 24 * 60 * 60 * 1000) : null;
+
+  let snapshot;
+  if (cutoffDate) {
+    try {
+      const q = query(messagesRef, where('createdAt', '<=', Timestamp.fromDate(cutoffDate)));
+      snapshot = await getDocs(q);
+    } catch (queryErr) {
+      console.warn(`Query with timestamp filter failed for ${channelId}, using full scan:`, queryErr);
+      snapshot = await getDocs(messagesRef);
+    }
+  } else {
+    snapshot = await getDocs(messagesRef);
+  }
+
+  const docsToDelete = snapshot.docs.filter((docSnap) => {
+    const data = docSnap.data();
+    if (preservePinned && Boolean(data.isPinned)) {
+      return false;
+    }
+    if (cutoffDate) {
+      let createdDate: Date | null = null;
+      if (data.createdAt?.toDate) {
+        createdDate = data.createdAt.toDate();
+      } else if (data.createdAt?.seconds) {
+        createdDate = new Date(data.createdAt.seconds * 1000);
+      } else if (data.createdAt) {
+        createdDate = new Date(data.createdAt);
+      }
+      if (createdDate && createdDate.getTime() > cutoffDate.getTime()) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  let deletedCount = 0;
+  for (let i = 0; i < docsToDelete.length; i += 400) {
+    const batch = writeBatch(db);
+    const chunk = docsToDelete.slice(i, i + 400);
+
+    for (const docSnap of chunk) {
+      if (softDelete) {
+        batch.update(docSnap.ref, {
+          deleted: true,
+          text: '[Message cleared by admin retention cleanup]',
+          updatedAt: serverTimestamp(),
+        });
+      } else {
+        batch.delete(docSnap.ref);
+      }
+    }
+
+    await batch.commit();
+    deletedCount += chunk.length;
+  }
+
+  return { channelId, deletedCount };
+}
+
+/**
+ * Cleans messages across all community channels (Announcements, General, and all Department channels).
+ */
+export async function clearAllChannelsMessages(
+  options: ClearAllChannelsOptions = {}
+): Promise<ClearAllChannelsResult> {
+  const { channelIds, olderThanDays = 0, preservePinned = true, softDelete = false } = options;
+
+  let targetChannels: string[] = [];
+  if (channelIds && channelIds.length > 0) {
+    targetChannels = channelIds;
+  } else {
+    targetChannels = ['announcements', 'general'];
+    try {
+      const depts = await getDepartments();
+      depts.forEach((d) => {
+        if (d.id) targetChannels.push(`dept_${d.id}`);
+      });
+    } catch (err) {
+      console.error('Error fetching departments for chat cleanup:', err);
+    }
+  }
+
+  let totalDeleted = 0;
+  const channelResults: Record<string, number> = {};
+
+  for (const chId of targetChannels) {
+    try {
+      const res = await clearChannelMessages({
+        channelId: chId,
+        olderThanDays,
+        preservePinned,
+        softDelete,
+      });
+      channelResults[chId] = res.deletedCount;
+      totalDeleted += res.deletedCount;
+    } catch (err) {
+      console.error(`Failed to clear messages in channel ${chId}:`, err);
+      channelResults[chId] = 0;
+    }
+  }
+
+  return { totalDeleted, channelResults };
+}
+
+/**
+ * Inspects chat storage by checking message counts for all channels.
+ */
+export async function getChatStorageStats(channels?: CommunityChannel[]): Promise<ChatStorageStats> {
+  let targetChannels = channels;
+  if (!targetChannels || targetChannels.length === 0) {
+    try {
+      const depts = await getDepartments();
+      targetChannels = buildCommunityChannels(depts, { userRole: 'admin' });
+    } catch {
+      targetChannels = BUILTIN_SYSTEM_CHANNELS;
+    }
+  }
+
+  const stats: ChannelStorageStat[] = [];
+  let total = 0;
+
+  for (const channel of targetChannels) {
+    try {
+      const messagesRef = collection(db, 'communityChannels', channel.id, 'messages');
+      let count = 0;
+      try {
+        const countSnap = await getCountFromServer(messagesRef);
+        count = countSnap.data().count;
+      } catch {
+        const snap = await getDocs(messagesRef);
+        count = snap.size;
+      }
+
+      stats.push({
+        channelId: channel.id,
+        name: channel.name,
+        messageCount: count,
+      });
+      total += count;
+    } catch {
+      stats.push({
+        channelId: channel.id,
+        name: channel.name,
+        messageCount: 0,
+      });
+    }
+  }
+
+  return { totalMessages: total, channels: stats };
 }

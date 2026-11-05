@@ -214,17 +214,23 @@ service cloud.firestore {
     // --- Community Channels & Messages Collection ---
     match /communityChannels/{channelId} {
       allow read: if true;
-      allow write: if isAuthenticated() || isAdminOrSuper();
+      allow write: if true;
+
+      match /messages/{messageId} {
+        allow read: if true;
+        allow create, update: if true;
+        allow delete: if true;
+      }
 
       match /{allChildren=**} {
         allow read: if true;
-        allow write: if isAuthenticated();
+        allow write: if true;
       }
     }
 
     match /communityMessages/{document=**} {
       allow read: if true;
-      allow write: if isAuthenticated();
+      allow write: if true;
     }
   }
 }
