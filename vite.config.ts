@@ -31,6 +31,8 @@ export default defineConfig(({ mode }) => ({
           'firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage'],
           'react-vendor': ['react', 'react-dom', 'react-router-dom'],
           'ui-vendor': ['lucide-react', 'date-fns'],
+          'pdf-vendor': ['pdfjs-dist', 'jspdf', 'jspdf-autotable'],
+          'charts-vendor': ['recharts'],
         }
       }
     },

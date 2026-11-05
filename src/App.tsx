@@ -1,3 +1,4 @@
+import { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -13,49 +14,66 @@ import { GradingErrorBoundary } from "@/components/admin/GradingErrorBoundary";
 import { LibraryErrorBoundary } from "@/components/common/LibraryErrorBoundary";
 import { GraduationCap } from "lucide-react";
 import "./lib/i18n";
-import Index from "./pages/Index";
-import Auth from "./pages/Auth";
-import About from "./pages/About";
-import Dashboard from "./pages/Dashboard";
-import AdminExams from "./pages/AdminExams";
-import CreateExam from "./pages/CreateExam";
-import EditExam from "./pages/EditExam";
-import ExamResults from "./pages/ExamResults";
-import AdminStudents from "./pages/AdminStudents";
-import AdminFeedback from "./pages/AdminFeedback";
-import AdminAnalytics from "./pages/AdminAnalytics";
-import AdminLeaderboardSimple from "./pages/AdminLeaderboardSimple";
-import AdminAllResults from "./pages/AdminAllResults";
-import AdminGradeExam from "./pages/AdminGradeExam";
-import StudentExams from "./pages/StudentExams";
-import StudentResults from "./pages/StudentResults";
-import StudentMessages from "./pages/StudentMessages";
-import ReviewExam from "./pages/ReviewExam";
-import TakeExam from "./pages/TakeExam";
-import Settings from "./pages/Settings";
-import NotFound from "./pages/NotFound";
-import FirebaseTest from "./pages/FirebaseTest";
-import FirebaseDiagnostic from "./pages/FirebaseDiagnostic";
-import AdminSetup from "./pages/AdminSetup";
-import ManageExaminers from "./pages/ManageExaminers";
-import ManageDepartments from "./pages/ManageDepartments";
-import MigrateExams from "./pages/MigrateExams";
-import ExamDiagnostic from "./pages/ExamDiagnostic";
-import SuperAdmin from "./pages/SuperAdmin";
-import PermissionTest from "./pages/PermissionTest";
-import AIStudyAssistant from "./pages/AIStudyAssistant";
-import PracticeExamResultsPage from "./pages/PracticeExamResultsPage";
-import StudentSubjects from "./pages/StudentSubjects";
-import AdminSubjects from "./pages/AdminSubjects";
-import AdminAIGenerator from "./pages/AdminAIGenerator";
-import AdminBooks from "./pages/AdminBooks";
-import AdminShortnotesStudio from "./pages/AdminShortnotesStudio";
-import StudentBooks from "./pages/StudentBooks";
-import BookDetails from "./pages/BookDetails";
-import BookReader from "./pages/BookReader";
-import AdminSystemSettings from "./pages/AdminSystemSettings";
-import StudentVideoTutorials from "./pages/StudentVideoTutorials";
-import CommunityChat from "./pages/CommunityChat";
+
+// Dynamic route code-splitting for high-speed mobile performance
+const Index = lazy(() => import("./pages/Index"));
+const Auth = lazy(() => import("./pages/Auth"));
+const About = lazy(() => import("./pages/About"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const AdminExams = lazy(() => import("./pages/AdminExams"));
+const CreateExam = lazy(() => import("./pages/CreateExam"));
+const EditExam = lazy(() => import("./pages/EditExam"));
+const ExamResults = lazy(() => import("./pages/ExamResults"));
+const AdminStudents = lazy(() => import("./pages/AdminStudents"));
+const AdminFeedback = lazy(() => import("./pages/AdminFeedback"));
+const AdminAnalytics = lazy(() => import("./pages/AdminAnalytics"));
+const AdminLeaderboardSimple = lazy(() => import("./pages/AdminLeaderboardSimple"));
+const AdminAllResults = lazy(() => import("./pages/AdminAllResults"));
+const AdminGradeExam = lazy(() => import("./pages/AdminGradeExam"));
+const StudentExams = lazy(() => import("./pages/StudentExams"));
+const StudentResults = lazy(() => import("./pages/StudentResults"));
+const StudentMessages = lazy(() => import("./pages/StudentMessages"));
+const ReviewExam = lazy(() => import("./pages/ReviewExam"));
+const TakeExam = lazy(() => import("./pages/TakeExam"));
+const Settings = lazy(() => import("./pages/Settings"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const FirebaseTest = lazy(() => import("./pages/FirebaseTest"));
+const FirebaseDiagnostic = lazy(() => import("./pages/FirebaseDiagnostic"));
+const AdminSetup = lazy(() => import("./pages/AdminSetup"));
+const ManageExaminers = lazy(() => import("./pages/ManageExaminers"));
+const ManageDepartments = lazy(() => import("./pages/ManageDepartments"));
+const MigrateExams = lazy(() => import("./pages/MigrateExams"));
+const ExamDiagnostic = lazy(() => import("./pages/ExamDiagnostic"));
+const SuperAdmin = lazy(() => import("./pages/SuperAdmin"));
+const PermissionTest = lazy(() => import("./pages/PermissionTest"));
+const AIStudyAssistant = lazy(() => import("./pages/AIStudyAssistant"));
+const PracticeExamResultsPage = lazy(() => import("./pages/PracticeExamResultsPage"));
+const StudentSubjects = lazy(() => import("./pages/StudentSubjects"));
+const AdminSubjects = lazy(() => import("./pages/AdminSubjects"));
+const AdminAIGenerator = lazy(() => import("./pages/AdminAIGenerator"));
+const AdminBooks = lazy(() => import("./pages/AdminBooks"));
+const AdminShortnotesStudio = lazy(() => import("./pages/AdminShortnotesStudio"));
+const StudentBooks = lazy(() => import("./pages/StudentBooks"));
+const BookDetails = lazy(() => import("./pages/BookDetails"));
+const BookReader = lazy(() => import("./pages/BookReader"));
+const AdminSystemSettings = lazy(() => import("./pages/AdminSystemSettings"));
+const StudentVideoTutorials = lazy(() => import("./pages/StudentVideoTutorials"));
+const CommunityChat = lazy(() => import("./pages/CommunityChat"));
+
+const PageLoader = () => (
+  <div className="min-h-[50vh] flex flex-col items-center justify-center p-6 text-center animate-fade-in">
+    <div className="relative w-12 h-12 mb-2">
+      <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-sky-500 via-indigo-600 to-purple-600 flex items-center justify-center text-white shadow-lg shadow-sky-500/25 animate-pulse">
+        <GraduationCap className="h-6 w-6" />
+      </div>
+    </div>
+    <div className="flex items-center gap-1.5 pt-2">
+      <div className="h-2 w-2 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+      <div className="h-2 w-2 rounded-full bg-amber-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+      <div className="h-2 w-2 rounded-full bg-rose-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+    </div>
+  </div>
+);
 
 const queryClient = new QueryClient();
 
@@ -98,8 +116,9 @@ function AppRoutes() {
 
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Index />} />
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/" element={<Index />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/about" element={<About />} />
         <Route path="/subjects" element={<StudentSubjects />} />
@@ -322,7 +341,8 @@ function AppRoutes() {
         
         <Route path="*" element={<NotFound />} />
       </Routes>
-    </BrowserRouter>
+    </Suspense>
+  </BrowserRouter>
   );
 }
 

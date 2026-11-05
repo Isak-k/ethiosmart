@@ -19,6 +19,8 @@ import {
   getOfflineAnswers, 
   saveOfflineAttempt, 
   saveOfflineAnswer, 
+  saveExamOffline,
+  saveQuestionsOffline,
   initOfflineDB 
 } from "@/lib/offline-storage";
 import { submitPracticeExam, savePracticeAnswer, getPracticeAnswers, deletePracticeAnswer, createPracticeAttempt } from "@/lib/offline-practice-exam";
@@ -288,6 +290,13 @@ const TakeExam = () => {
           if ((!firebaseQuestions || firebaseQuestions.length === 0) && offlineExam) {
             const offlineQ = await getOfflineQuestions(id).catch(() => []);
             if (offlineQ.length > 0) firebaseQuestions = offlineQ;
+          }
+
+          // Seamless Offline Auto-Caching:
+          // Guarantee that any exam loaded while online is stored locally for full offline taking
+          if (firebaseQuestions && firebaseQuestions.length > 0) {
+            saveExamOffline(firebaseExam).catch((err) => console.warn('Offline exam auto-cache warning:', err));
+            saveQuestionsOffline(firebaseExam.examId || id, firebaseQuestions).catch((err) => console.warn('Offline questions auto-cache warning:', err));
           }
 
           return {

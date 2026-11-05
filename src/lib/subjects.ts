@@ -81,12 +81,8 @@ export function getStoredLocalSubjects(): Subject[] {
 }
 
 export function saveStoredLocalSubjects(subjects: Subject[]): void {
-  try {
-    if (typeof localStorage === 'undefined') return;
-    localStorage.setItem(LOCAL_SUBJECTS_STORAGE_KEY, JSON.stringify(subjects));
-  } catch (e) {
-    console.warn('Failed to save subjects to localStorage:', e);
-  }
+  // Delegate directly to saveDeviceSubjects for unified persistent IndexedDB + compact storage
+  saveDeviceSubjects(subjects).catch(() => {});
 }
 
 /**

@@ -23,7 +23,7 @@ import {
   getDeviceExams,
   getDeviceExam,
 } from '@/lib/device-storage';
-import { getOfflineQuestions } from '@/lib/offline-storage';
+import { getOfflineQuestions, getDownloadedExams } from '@/lib/offline-storage';
 
 export async function createExam(examData: Omit<Exam, 'examId' | 'createdAt' | 'updatedAt'>) {
   const base = { ...examData };
@@ -340,11 +340,21 @@ export async function getPublishedExams(studentDepartmentId?: string): Promise<E
       console.error('Cache fetch failed:', cacheError);
     }
 
-    // Offline device storage fallback
+    // Offline device storage & downloaded exams fallback
     try {
-      const deviceExams = await getDeviceExams(studentDepartmentId);
-      if (deviceExams && deviceExams.length > 0) {
-        return deviceExams;
+      const [deviceExams, downloadedExams] = await Promise.all([
+        getDeviceExams(studentDepartmentId).catch(() => []),
+        getDownloadedExams(studentDepartmentId).catch(() => []),
+      ]);
+
+      const mergedMap = new Map<string, Exam>();
+      deviceExams.forEach((e) => mergedMap.set(e.examId, e));
+      downloadedExams.forEach((e) => {
+        if (!mergedMap.has(e.examId)) mergedMap.set(e.examId, e as unknown as Exam);
+      });
+
+      if (mergedMap.size > 0) {
+        return Array.from(mergedMap.values());
       }
     } catch (deviceErr) {
       console.warn('Error reading device exams:', deviceErr);

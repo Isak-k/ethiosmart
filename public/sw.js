@@ -45,7 +45,7 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames
           .filter((name) => {
-            return name.startsWith('exampro-') && 
+            return (name.startsWith('exampro-') || name.startsWith('ethiosmart-')) && 
                    name !== CACHE_NAME && 
                    name !== RUNTIME_CACHE &&
                    name !== IMAGE_CACHE;
