@@ -73,6 +73,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -561,6 +562,52 @@ export default function CommunityChat() {
     return cleaned || 'Department';
   }, [currentDeptChannel]);
 
+  // Mobile-optimized short label for Department tab (clean & balanced like TikTok "Following")
+  const deptMobileLabel = useMemo(() => {
+    if (!currentDeptChannel) return 'Department';
+    const cleaned = (currentDeptChannel.name || '').replace(/\s*Department\s*/i, '').trim();
+    if (cleaned.length <= 11) return cleaned;
+    return 'Department';
+  }, [currentDeptChannel]);
+
+  // Mobile swipe gestures between Department and Announcements (like TikTok)
+  const touchStartXRef = useRef<number | null>(null);
+  const touchStartYRef = useRef<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartXRef.current = e.touches[0].clientX;
+    touchStartYRef.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartXRef.current === null || touchStartYRef.current === null) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartXRef.current;
+    const deltaY = e.changedTouches[0].clientY - touchStartYRef.current;
+
+    // Minimum swipe distance of 50px, and horizontal movement dominant (1.4x vertical)
+    if (Math.abs(deltaX) > 50 && Math.abs(deltaX) > Math.abs(deltaY) * 1.4) {
+      if (deltaX < -50 && isDeptActive) {
+        // Swiped Left -> go to Announcements (TikTok: following -> for you)
+        if (announcementsChannel) {
+          try {
+            navigator.vibrate?.(10);
+          } catch {}
+          setActiveChannelId(announcementsChannel.id);
+        }
+      } else if (deltaX > 50 && isAnnouncementsActive) {
+        // Swiped Right -> go to Department (TikTok: for you -> following)
+        if (currentDeptChannel) {
+          try {
+            navigator.vibrate?.(10);
+          } catch {}
+          setActiveChannelId(currentDeptChannel.id);
+        }
+      }
+    }
+    touchStartXRef.current = null;
+    touchStartYRef.current = null;
+  };
+
   // Pinned message in current channel (if any)
   const pinnedMessage = useMemo(() => {
     return messages.slice().reverse().find((m) => m.isPinned);
@@ -1026,32 +1073,19 @@ export default function CommunityChat() {
           }`}
         >
           {/* Top Header with TikTok-style "Department | Announcements" Feeds Switcher */}
-          <header className="p-2 sm:p-3 lg:px-5 lg:py-3.5 border-b border-border/60 bg-muted/20 backdrop-blur-md flex items-center justify-between gap-2 shrink-0">
+          <header className="px-2.5 sm:px-4 py-2 sm:py-3 border-b border-border/60 bg-background/95 dark:bg-slate-950/90 backdrop-blur-md flex items-center justify-between gap-1 sm:gap-3 shrink-0 relative">
             {/* Left Controls: Mobile Back & Channel Directory */}
             <div className="flex items-center gap-1 sm:gap-2 shrink-0">
               {/* Back to previous page button on mobile */}
               <Button
                 type="button"
                 variant="ghost"
-                size="sm"
+                size="icon"
                 onClick={handleGoBack}
-                className="lg:hidden h-8 w-8 p-0 rounded-xl text-foreground hover:bg-muted border border-border/60 flex items-center justify-center font-bold text-xs shrink-0 active:scale-95 transition-all shadow-xs"
+                className="lg:hidden h-8 w-8 rounded-full text-foreground/80 hover:text-foreground hover:bg-muted/70 active:scale-95 transition-all"
                 title="Back to previous page"
               >
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-
-              {/* Channels Directory button (for admins or to browse all channels) */}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setMobileShowChat(false)}
-                className="lg:hidden h-8 px-2 rounded-xl border-border/70 text-muted-foreground hover:text-foreground hover:bg-muted flex items-center gap-1 text-xs shrink-0 font-medium active:scale-95 transition-all"
-                title="Browse all channels"
-              >
-                <Layers className="h-3.5 w-3.5 text-sky-500" />
-                <span className="text-[11px] hidden xs:inline">Channels</span>
+                <ArrowLeft className="h-4.5 w-4.5" />
               </Button>
 
               {/* Desktop channel icon indicator */}
@@ -1063,8 +1097,8 @@ export default function CommunityChat() {
             </div>
 
             {/* CENTER: THE TIKTOK-STYLE "DEPARTMENT | ANNOUNCEMENTS" FEED SWITCHER */}
-            <div className="flex-1 flex items-center justify-center min-w-0 px-1 sm:px-4">
-              <div className="flex items-center justify-center gap-3 xs:gap-5 sm:gap-8 select-none">
+            <div className="flex-1 flex items-center justify-center min-w-0 px-1">
+              <div className="flex items-center justify-center gap-4 xs:gap-6 sm:gap-8 select-none">
                 {/* 1. DEPARTMENT FEED TAB */}
                 <div className="relative flex items-center">
                   <button
@@ -1075,28 +1109,28 @@ export default function CommunityChat() {
                         setMobileShowChat(true);
                       }
                     }}
-                    className={`group relative flex flex-col items-center py-1 px-1.5 sm:px-2.5 cursor-pointer transition-all active:scale-95 ${
-                      isDeptActive ? 'opacity-100' : 'opacity-60 hover:opacity-100'
+                    className={`group relative flex flex-col items-center py-1 px-1 cursor-pointer transition-all active:scale-95 ${
+                      isDeptActive ? 'opacity-100' : 'opacity-55 hover:opacity-90'
                     }`}
                   >
-                    <div className="flex items-center gap-1 sm:gap-1.5">
-                      <span className="text-xs sm:text-sm">🏛️</span>
+                    <div className="flex items-center gap-1">
                       <span
-                        className={`text-xs sm:text-sm md:text-base tracking-tight font-display transition-all duration-200 truncate max-w-[100px] xs:max-w-[130px] sm:max-w-[200px] ${
+                        className={`tracking-tight font-display transition-all duration-200 ${
                           isDeptActive
-                            ? 'font-black text-foreground scale-105'
-                            : 'font-semibold text-muted-foreground hover:text-foreground'
+                            ? 'font-black text-foreground text-[15px] xs:text-base sm:text-lg scale-102'
+                            : 'font-semibold text-muted-foreground hover:text-foreground text-[14px] xs:text-[15px] sm:text-base'
                         }`}
                       >
-                        {deptShortName}
+                        <span className="hidden sm:inline">{deptShortName}</span>
+                        <span className="sm:hidden">{deptMobileLabel}</span>
                       </span>
                     </div>
                     {/* TikTok active underline indicator */}
                     <div
-                      className={`h-0.5 sm:h-1 rounded-full transition-all duration-300 ${
+                      className={`h-[3px] rounded-full transition-all duration-300 mt-1 ${
                         isDeptActive
-                          ? 'w-7 sm:w-12 bg-gradient-to-r from-sky-500 via-indigo-600 to-purple-600 shadow-sm shadow-sky-500/50 mt-1 opacity-100'
-                          : 'w-0 mt-1 opacity-0'
+                          ? 'w-7 sm:w-11 bg-foreground shadow-xs opacity-100 scale-100'
+                          : 'w-0 opacity-0 scale-50'
                       }`}
                     />
                   </button>
@@ -1107,8 +1141,8 @@ export default function CommunityChat() {
                       <DropdownMenuTrigger asChild>
                         <button
                           type="button"
-                          className="p-1 -ml-1 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted/50 transition-colors"
-                          title="Select department"
+                          className="p-1 -ml-0.5 text-muted-foreground/70 hover:text-foreground rounded-lg transition-colors"
+                          title="Switch department"
                         >
                           <ChevronDown className="h-3 w-3" />
                         </button>
@@ -1138,7 +1172,7 @@ export default function CommunityChat() {
                 </div>
 
                 {/* TikTok Vertical Separator */}
-                <span className="text-muted-foreground/30 font-light text-xs sm:text-sm select-none">|</span>
+                <span className="text-muted-foreground/30 font-light text-sm select-none">|</span>
 
                 {/* 2. ANNOUNCEMENTS FEED TAB */}
                 <button
@@ -1149,17 +1183,16 @@ export default function CommunityChat() {
                       setMobileShowChat(true);
                     }
                   }}
-                  className={`group relative flex flex-col items-center py-1 px-1.5 sm:px-2.5 cursor-pointer transition-all active:scale-95 ${
-                    isAnnouncementsActive ? 'opacity-100' : 'opacity-60 hover:opacity-100'
+                  className={`group relative flex flex-col items-center py-1 px-1 cursor-pointer transition-all active:scale-95 ${
+                    isAnnouncementsActive ? 'opacity-100' : 'opacity-55 hover:opacity-90'
                   }`}
                 >
-                  <div className="flex items-center gap-1 sm:gap-1.5">
-                    <span className="text-xs sm:text-sm">📢</span>
+                  <div className="flex items-center gap-1">
                     <span
-                      className={`text-xs sm:text-sm md:text-base tracking-tight font-display transition-all duration-200 ${
+                      className={`tracking-tight font-display transition-all duration-200 ${
                         isAnnouncementsActive
-                          ? 'font-black text-foreground scale-105'
-                          : 'font-semibold text-muted-foreground hover:text-foreground'
+                          ? 'font-black text-foreground text-[15px] xs:text-base sm:text-lg scale-102'
+                          : 'font-semibold text-muted-foreground hover:text-foreground text-[14px] xs:text-[15px] sm:text-base'
                       }`}
                     >
                       Announcements
@@ -1167,63 +1200,18 @@ export default function CommunityChat() {
                   </div>
                   {/* TikTok active underline indicator */}
                   <div
-                    className={`h-0.5 sm:h-1 rounded-full transition-all duration-300 ${
+                    className={`h-[3px] rounded-full transition-all duration-300 mt-1 ${
                       isAnnouncementsActive
-                        ? 'w-7 sm:w-12 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 shadow-sm shadow-amber-500/50 mt-1 opacity-100'
-                        : 'w-0 mt-1 opacity-0'
+                        ? 'w-8 sm:w-12 bg-foreground shadow-xs opacity-100 scale-100'
+                        : 'w-0 opacity-0 scale-50'
                     }`}
                   />
                 </button>
               </div>
             </div>
 
-            {/* Right Controls: Mode Badge / Toggle & Search */}
+            {/* Right Controls */}
             <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-              {/* Community Mode Switcher (Admin) or Status Badge (Student) */}
-              {isAdminOrExaminer ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleToggleChatMode}
-                  disabled={isUpdatingMode}
-                  className={`h-7 px-2 sm:px-2.5 text-[10px] sm:text-[11px] font-bold rounded-xl gap-1 sm:gap-1.5 shadow-xs transition-all ${
-                    chatMode === 'live'
-                      ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20'
-                      : 'border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-300 hover:bg-blue-500/20'
-                  }`}
-                  title={`Admin Control: Click to switch to ${chatMode === 'live' ? 'Stored Mode' : 'Live Mode'}`}
-                >
-                  {chatMode === 'live' ? (
-                    <>
-                      <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                      </span>
-                      <span className="hidden sm:inline">⚡ Live Mode</span>
-                      <span className="sm:hidden">⚡ Live</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-blue-500 font-normal">💾</span>
-                      <span className="hidden sm:inline">Stored Mode</span>
-                      <span className="sm:hidden">Stored</span>
-                    </>
-                  )}
-                </Button>
-              ) : (
-                <Badge
-                  variant="outline"
-                  className={`text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full font-semibold gap-1 ${
-                    chatMode === 'live'
-                      ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-                      : 'border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-300'
-                  }`}
-                >
-                  {chatMode === 'live' ? '⚡ Live' : '💾 Stored'}
-                </Badge>
-              )}
-
               {/* In-Channel Live Search Trigger */}
               <Button
                 type="button"
@@ -1233,33 +1221,134 @@ export default function CommunityChat() {
                   setInChannelSearchOpen(!inChannelSearchOpen);
                   if (inChannelSearchOpen) setInChannelSearchQuery('');
                 }}
-                className={`h-8 w-8 rounded-xl transition-colors ${
+                className={`h-8 w-8 rounded-full transition-colors ${
                   inChannelSearchOpen || inChannelSearchQuery
                     ? 'bg-sky-500/20 text-sky-600 dark:text-sky-300'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                    : 'text-foreground/80 hover:text-foreground hover:bg-muted/70'
                 }`}
                 title="Search messages in this channel"
               >
                 <Search className="h-4 w-4" />
               </Button>
 
-              {isAdminOrExaminer && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCleanupDialogOpen(true)}
-                  className="h-7 px-2 sm:px-2.5 text-[10px] sm:text-[11px] font-semibold rounded-xl border-rose-300/40 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 hover:border-rose-400 gap-1 shadow-sm"
-                  title="Clear or prune old chat storage"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Storage</span>
-                </Button>
-              )}
+              {/* Mobile Options & Channels Drawer Dropdown */}
+              <div className="lg:hidden">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-full text-foreground/80 hover:text-foreground hover:bg-muted/70 active:scale-95"
+                      title="More options"
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56 rounded-2xl p-1.5 shadow-xl bg-background/95 backdrop-blur-xl border border-border/80">
+                    <DropdownMenuItem
+                      onClick={() => setMobileShowChat(false)}
+                      className="text-xs rounded-xl cursor-pointer font-medium flex items-center gap-2 py-2"
+                    >
+                      <Layers className="h-4 w-4 text-sky-500" />
+                      <span>Browse All Channels</span>
+                    </DropdownMenuItem>
+
+                    {isAdminOrExaminer && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={handleToggleChatMode}
+                          disabled={isUpdatingMode}
+                          className="text-xs rounded-xl cursor-pointer font-medium flex items-center gap-2 py-2"
+                        >
+                          <span>{chatMode === 'live' ? '💾 Switch to Stored Mode' : '⚡ Switch to Live Mode'}</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => setCleanupDialogOpen(true)}
+                          className="text-xs rounded-xl cursor-pointer font-medium flex items-center gap-2 py-2 text-rose-600 dark:text-rose-400"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          <span>Clear Old Chat Storage</span>
+                        </DropdownMenuItem>
+                      </>
+                    )}
+
+                    <DropdownMenuSeparator />
+                    <div className="px-2 py-1.5 text-[11px] text-muted-foreground">
+                      <div className="font-semibold text-foreground truncate">{activeChannel?.name}</div>
+                      <div className="truncate opacity-80">{activeChannel?.description}</div>
+                      <div className="mt-1 text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+                        Mode: {chatMode === 'live' ? '⚡ Real-time Live' : '💾 History Stored'}
+                      </div>
+                    </div>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
+              {/* Desktop Direct Controls (hidden on mobile) */}
+              <div className="hidden lg:flex items-center gap-1.5">
+                {/* Community Mode Switcher (Admin) or Status Badge (Student) */}
+                {isAdminOrExaminer ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleToggleChatMode}
+                    disabled={isUpdatingMode}
+                    className={`h-7 px-2.5 text-[11px] font-bold rounded-xl gap-1.5 shadow-xs transition-all ${
+                      chatMode === 'live'
+                        ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20'
+                        : 'border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-300 hover:bg-blue-500/20'
+                    }`}
+                    title={`Admin Control: Click to switch to ${chatMode === 'live' ? 'Stored Mode' : 'Live Mode'}`}
+                  >
+                    {chatMode === 'live' ? (
+                      <>
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                        <span>⚡ Live Mode</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-blue-500 font-normal">💾</span>
+                        <span>Stored Mode</span>
+                      </>
+                    )}
+                  </Button>
+                ) : (
+                  <Badge
+                    variant="outline"
+                    className={`text-[10px] px-2 py-0.5 rounded-full font-semibold gap-1 ${
+                      chatMode === 'live'
+                        ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                        : 'border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-300'
+                    }`}
+                  >
+                    {chatMode === 'live' ? '⚡ Live' : '💾 Stored'}
+                  </Badge>
+                )}
+
+                {isAdminOrExaminer && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCleanupDialogOpen(true)}
+                    className="h-7 px-2.5 text-[11px] font-semibold rounded-xl border-rose-300/40 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 hover:border-rose-400 gap-1 shadow-sm"
+                    title="Clear or prune old chat storage"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Storage</span>
+                  </Button>
+                )}
+              </div>
             </div>
           </header>
 
-          {/* Active Feed Info Subtitle Bar */}
+          {/* Active Feed Info Subtitle Bar with TikTok Swipe hint */}
           <div className="px-3 sm:px-4 py-1 bg-muted/20 border-b border-border/40 flex items-center justify-between text-[11px] text-muted-foreground shrink-0">
             <div className="flex items-center gap-1.5 truncate">
               <span className="font-semibold text-foreground truncate">
@@ -1269,11 +1358,16 @@ export default function CommunityChat() {
                 {activeChannel?.description}
               </span>
             </div>
-            {activeChannel?.isOfficialOnly && !isAdminOrExaminer && (
-              <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 border-amber-400/40 text-amber-700 dark:text-amber-300 bg-amber-500/10 shrink-0 font-medium">
-                Official Broadcast
-              </Badge>
-            )}
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="hidden xs:inline-block text-[10px] text-muted-foreground/60 select-none">
+                👈 Swipe ↔ 👉
+              </span>
+              {activeChannel?.isOfficialOnly && !isAdminOrExaminer && (
+                <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 border-amber-400/40 text-amber-700 dark:text-amber-300 bg-amber-500/10 shrink-0 font-medium">
+                  Official Broadcast
+                </Badge>
+              )}
+            </div>
           </div>
 
           {/* Mode Announcement Banner (Live Mode vs Stored Mode) */}
@@ -1413,11 +1507,13 @@ export default function CommunityChat() {
             </div>
           )}
 
-          {/* Main Messages Stream Area */}
+          {/* Main Messages Stream Area (supports mobile TikTok horizontal swipe between feeds) */}
           <div
             ref={chatScrollContainerRef}
             onScroll={handleScroll}
-            className="flex-1 overflow-y-auto p-3 sm:p-5 lg:p-6 space-y-6"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+            className="flex-1 overflow-y-auto p-3 sm:p-5 lg:p-6 space-y-6 select-text touch-pan-y"
           >
             {loadingMessages ? (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground space-y-2.5">
