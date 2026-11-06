@@ -193,9 +193,9 @@ export default function CommunityChat() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loadingInitial, setLoadingInitial] = useState(true);
 
-  // Channels & active selection
+  // Channels & active selection (starts empty so students auto-land on their Department Chat)
   const [channels, setChannels] = useState<CommunityChannel[]>([]);
-  const [activeChannelId, setActiveChannelId] = useState<string>('announcements');
+  const [activeChannelId, setActiveChannelId] = useState<string>('');
   const [channelSearch, setChannelSearch] = useState<string>('');
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<string>('all');
 
@@ -451,11 +451,11 @@ export default function CommunityChat() {
 
         setChannels(allChannels);
 
-        // Auto select first channel (department channel or announcements)
+        // Auto select first channel: students land directly in their Department Chat with open textarea!
         if (allChannels.length > 0) {
           const deptChannel = allChannels.find((c) => c.category === 'department');
           const defaultChannel = deptChannel ? deptChannel.id : allChannels[0].id;
-          setActiveChannelId((prev) => (allChannels.some((c) => c.id === prev) ? prev : defaultChannel));
+          setActiveChannelId((prev) => (prev && allChannels.some((c) => c.id === prev) ? prev : defaultChannel));
         }
       } catch (err) {
         console.error('Failed to load community channel data:', err);
@@ -869,7 +869,7 @@ export default function CommunityChat() {
   return (
     <DashboardLayout contentClassName="p-0 sm:p-2 lg:p-4 max-w-none w-full !pb-0 lg:!pb-3">
       {/* Edge-to-Edge Full Height Chat Container: On mobile it is fixed inset-0 z-[60] full page, on desktop it is inside DashboardLayout */}
-      <div className="fixed inset-0 z-[60] lg:relative lg:inset-auto lg:z-auto w-full h-[100dvh] lg:h-[calc(100dvh-5.2rem)] flex rounded-none lg:rounded-3xl border-0 lg:border border-white/60 dark:border-white/10 shadow-none lg:shadow-2xl bg-background lg:bg-card/75 dark:bg-slate-950 lg:dark:bg-slate-950/70 backdrop-blur-none lg:backdrop-blur-2xl overflow-hidden">
+      <div className="fixed inset-0 z-[60] lg:relative lg:inset-auto lg:z-auto w-full h-full lg:h-[calc(100dvh-5.2rem)] flex flex-col lg:flex-row rounded-none lg:rounded-3xl border-0 lg:border border-white/60 dark:border-white/10 shadow-none lg:shadow-2xl bg-background lg:bg-card/75 dark:bg-slate-950 lg:dark:bg-slate-950/70 backdrop-blur-none lg:backdrop-blur-2xl overflow-hidden">
         {/* ========================================================= */}
         {/* LEFT PANE: CHANNELS DIRECTORY                            */}
         {/* ========================================================= */}
@@ -1096,10 +1096,10 @@ export default function CommunityChat() {
               </div>
             </div>
 
-            {/* CENTER: THE TIKTOK-STYLE "DEPARTMENT | ANNOUNCEMENTS" FEED SWITCHER */}
+            {/* CENTER: SMALL BUTTONS TO CHANGE FROM DEP CHAT TO ANNOUNCEMENT AND VICE VERSA */}
             <div className="flex-1 flex items-center justify-center min-w-0 px-1">
-              <div className="flex items-center justify-center gap-4 xs:gap-6 sm:gap-8 select-none">
-                {/* 1. DEPARTMENT FEED TAB */}
+              <div className="inline-flex items-center p-1 rounded-2xl bg-muted/60 dark:bg-slate-900/80 border border-border/60 shadow-xs max-w-full">
+                {/* 1. DEPARTMENT CHAT SMALL BUTTON */}
                 <div className="relative flex items-center">
                   <button
                     type="button"
@@ -1109,30 +1109,18 @@ export default function CommunityChat() {
                         setMobileShowChat(true);
                       }
                     }}
-                    className={`group relative flex flex-col items-center py-1 px-1 cursor-pointer transition-all active:scale-95 ${
-                      isDeptActive ? 'opacity-100' : 'opacity-55 hover:opacity-90'
+                    className={`h-7.5 sm:h-8 px-2.5 sm:px-3 rounded-xl text-xs sm:text-xs font-bold transition-all flex items-center gap-1.5 active:scale-95 ${
+                      isDeptActive
+                        ? 'bg-gradient-to-r from-sky-500 to-indigo-600 text-white shadow-sm shadow-sky-500/30'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/80'
                     }`}
+                    title="Switch to Department Chat"
                   >
-                    <div className="flex items-center gap-1">
-                      <span
-                        className={`tracking-tight font-display transition-all duration-200 ${
-                          isDeptActive
-                            ? 'font-black text-foreground text-[15px] xs:text-base sm:text-lg scale-102'
-                            : 'font-semibold text-muted-foreground hover:text-foreground text-[14px] xs:text-[15px] sm:text-base'
-                        }`}
-                      >
-                        <span className="hidden sm:inline">{deptShortName}</span>
-                        <span className="sm:hidden">{deptMobileLabel}</span>
-                      </span>
-                    </div>
-                    {/* TikTok active underline indicator */}
-                    <div
-                      className={`h-[3px] rounded-full transition-all duration-300 mt-1 ${
-                        isDeptActive
-                          ? 'w-7 sm:w-11 bg-foreground shadow-xs opacity-100 scale-100'
-                          : 'w-0 opacity-0 scale-50'
-                      }`}
-                    />
+                    <span className="text-xs sm:text-sm">🏛️</span>
+                    <span className="truncate max-w-[85px] xs:max-w-[110px] sm:max-w-[150px]">
+                      <span className="hidden sm:inline">{deptShortName}</span>
+                      <span className="sm:hidden">{deptMobileLabel}</span>
+                    </span>
                   </button>
 
                   {/* Multi-department dropdown for Admin */}
@@ -1141,7 +1129,7 @@ export default function CommunityChat() {
                       <DropdownMenuTrigger asChild>
                         <button
                           type="button"
-                          className="p-1 -ml-0.5 text-muted-foreground/70 hover:text-foreground rounded-lg transition-colors"
+                          className="h-7 w-5 flex items-center justify-center text-muted-foreground hover:text-foreground rounded-lg transition-colors -ml-1 mr-0.5"
                           title="Switch department"
                         >
                           <ChevronDown className="h-3 w-3" />
@@ -1171,10 +1159,7 @@ export default function CommunityChat() {
                   )}
                 </div>
 
-                {/* TikTok Vertical Separator */}
-                <span className="text-muted-foreground/30 font-light text-sm select-none">|</span>
-
-                {/* 2. ANNOUNCEMENTS FEED TAB */}
+                {/* 2. ANNOUNCEMENTS SMALL BUTTON */}
                 <button
                   type="button"
                   onClick={() => {
@@ -1183,29 +1168,15 @@ export default function CommunityChat() {
                       setMobileShowChat(true);
                     }
                   }}
-                  className={`group relative flex flex-col items-center py-1 px-1 cursor-pointer transition-all active:scale-95 ${
-                    isAnnouncementsActive ? 'opacity-100' : 'opacity-55 hover:opacity-90'
+                  className={`h-7.5 sm:h-8 px-2.5 sm:px-3 rounded-xl text-xs sm:text-xs font-bold transition-all flex items-center gap-1.5 active:scale-95 ${
+                    isAnnouncementsActive
+                      ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-sm shadow-amber-500/30'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/80'
                   }`}
+                  title="Switch to Announcements"
                 >
-                  <div className="flex items-center gap-1">
-                    <span
-                      className={`tracking-tight font-display transition-all duration-200 ${
-                        isAnnouncementsActive
-                          ? 'font-black text-foreground text-[15px] xs:text-base sm:text-lg scale-102'
-                          : 'font-semibold text-muted-foreground hover:text-foreground text-[14px] xs:text-[15px] sm:text-base'
-                      }`}
-                    >
-                      Announcements
-                    </span>
-                  </div>
-                  {/* TikTok active underline indicator */}
-                  <div
-                    className={`h-[3px] rounded-full transition-all duration-300 mt-1 ${
-                      isAnnouncementsActive
-                        ? 'w-8 sm:w-12 bg-foreground shadow-xs opacity-100 scale-100'
-                        : 'w-0 opacity-0 scale-50'
-                    }`}
-                  />
+                  <span className="text-xs sm:text-sm">📢</span>
+                  <span className="truncate max-w-[95px] xs:max-w-none">Announcements</span>
                 </button>
               </div>
             </div>
@@ -1906,13 +1877,34 @@ export default function CommunityChat() {
           )}
 
           {/* Bottom Chat Input Bar */}
-          <footer className="p-2 sm:p-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-border/60 bg-background/95 lg:bg-muted/20 backdrop-blur-md shrink-0">
+          <footer className="p-2 sm:p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-border/60 bg-background/95 dark:bg-slate-950/95 backdrop-blur-md shrink-0 sticky bottom-0 z-20">
             {activeChannel?.isOfficialOnly && !isAdminOrExaminer ? (
-              <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-center shadow-xs">
-                <p className="text-xs font-semibold text-amber-700 dark:text-amber-300 flex items-center justify-center gap-1.5">
-                  <Info className="h-4 w-4 shrink-0" />
-                  Official Announcements is broadcast-only for students. You can react to messages using emojis!
-                </p>
+              <div className="p-2.5 sm:p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-2 shadow-xs">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-base shrink-0">📢</span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-amber-800 dark:text-amber-300 truncate">
+                      Official Announcements is broadcast-only
+                    </p>
+                    <p className="text-[11px] text-muted-foreground truncate">
+                      Switch to Department Chat to send messages & questions
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => {
+                    if (currentDeptChannel) {
+                      setActiveChannelId(currentDeptChannel.id);
+                      setMobileShowChat(true);
+                    }
+                  }}
+                  className="rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 text-white text-xs font-bold shrink-0 h-8 px-3 shadow-xs flex items-center gap-1.5 active:scale-95 transition-all"
+                >
+                  <MessageCircle className="h-3.5 w-3.5" />
+                  <span>Go to Dept Chat</span>
+                </Button>
               </div>
             ) : (
               <form onSubmit={handleSendMessage} className="space-y-2">
@@ -1966,7 +1958,7 @@ export default function CommunityChat() {
                         setReplyingTo(null);
                       }
                     }}
-                    placeholder={`Message #${activeChannel?.name || 'channel'} (Type text, attach image, or paste screenshot)...`}
+                    placeholder={`Message #${activeChannel?.name || 'channel'}...`}
                     className="w-full min-h-[48px] max-h-40 px-4 pt-3 pb-2 bg-transparent text-xs sm:text-sm text-foreground focus:outline-none resize-none transition-all placeholder:text-muted-foreground/60 leading-relaxed"
                   />
 

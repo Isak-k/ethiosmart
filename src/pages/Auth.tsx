@@ -14,11 +14,11 @@ const Auth = () => {
 
   return (
     <div className="h-[100dvh] max-h-[100dvh] flex flex-col lg:flex-row bg-background relative overflow-hidden">
-      {/* Left Side - Student Study Showcase (High Quality 3D Render) */}
-      <div className="hidden lg:flex lg:w-1/2 h-full relative overflow-hidden bg-[#c8e4fe] dark:bg-[#070c18] border-r border-slate-200/70 dark:border-slate-800/70 select-none">
+      {/* Left Side - Student Study Showcase */}
+      <div className="hidden lg:flex lg:w-1/2 h-full relative overflow-hidden bg-[#b4d8fd] dark:bg-[#070c18] border-r border-slate-200/70 dark:border-slate-800/70 select-none">
         <img
-          src="/images/auth-student-showcase-composite.jpg"
-          srcSet="/images/auth-student-showcase-composite.jpg 1200w, /images/auth-student-showcase-2x.jpg 896w"
+          src="/images/auth-student-showcase.jpg"
+          srcSet="/images/auth-student-showcase.jpg 1024w, /images/auth-student-showcase-2x.jpg 2048w"
           sizes="(min-width: 1024px) 50vw, 100vw"
           alt="EthioSmart - Smart Learning for Every Student"
           className="w-full h-full object-cover object-center select-none"
