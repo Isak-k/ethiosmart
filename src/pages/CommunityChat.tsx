@@ -70,6 +70,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   CommunityChannel,
   CommunityMessage,
   ReplyReference,
@@ -202,7 +208,8 @@ export default function CommunityChat() {
   const [replyingTo, setReplyingTo] = useState<CommunityMessage | null>(null);
 
   // Mobile navigation state (true = viewing chat stream, false = viewing channels list)
-  const [mobileShowChat, setMobileShowChat] = useState(false);
+  // Defaults to true so students jump directly into their feed with TikTok-style top tabs
+  const [mobileShowChat, setMobileShowChat] = useState(true);
 
   // Scrolling
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -526,6 +533,33 @@ export default function CommunityChat() {
   const activeChannel = useMemo(() => {
     return channels.find((c) => c.id === activeChannelId) || channels[0];
   }, [channels, activeChannelId]);
+
+  // Announcements channel (Official Notices)
+  const announcementsChannel = useMemo(() => {
+    return channels.find((c) => c.category === 'announcements' || c.id === 'announcements') || channels[0];
+  }, [channels]);
+
+  // All Department channels
+  const departmentChannels = useMemo(() => {
+    return channels.filter((c) => c.category === 'department');
+  }, [channels]);
+
+  // Current active or default department channel
+  const currentDeptChannel = useMemo(() => {
+    if (activeChannel?.category === 'department') return activeChannel;
+    return departmentChannels[0] || null;
+  }, [activeChannel, departmentChannels]);
+
+  // Active status checks for TikTok switcher tabs
+  const isAnnouncementsActive = activeChannel?.id === 'announcements' || activeChannel?.category === 'announcements';
+  const isDeptActive = activeChannel?.category === 'department';
+
+  // Short display label for department tab
+  const deptShortName = useMemo(() => {
+    if (!currentDeptChannel) return 'Department';
+    const cleaned = (currentDeptChannel.name || '').replace(/\s*Department\s*/i, '').trim();
+    return cleaned || 'Department';
+  }, [currentDeptChannel]);
 
   // Pinned message in current channel (if any)
   const pinnedMessage = useMemo(() => {
@@ -991,68 +1025,160 @@ export default function CommunityChat() {
             !mobileShowChat ? 'hidden lg:flex' : 'flex'
           }`}
         >
-          {/* Active Channel Header */}
-          <header className="p-2.5 sm:p-3.5 lg:p-4 border-b border-border/60 bg-muted/15 flex items-center justify-between gap-2 shrink-0">
-            <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
+          {/* Top Header with TikTok-style "Department | Announcements" Feeds Switcher */}
+          <header className="p-2 sm:p-3 lg:px-5 lg:py-3.5 border-b border-border/60 bg-muted/20 backdrop-blur-md flex items-center justify-between gap-2 shrink-0">
+            {/* Left Controls: Mobile Back & Channel Directory */}
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
               {/* Back to previous page button on mobile */}
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
                 onClick={handleGoBack}
-                className="lg:hidden h-8 px-2 rounded-xl text-foreground hover:bg-muted border border-border/60 flex items-center gap-1 font-bold text-xs shrink-0 active:scale-95 transition-all shadow-xs"
+                className="lg:hidden h-8 w-8 p-0 rounded-xl text-foreground hover:bg-muted border border-border/60 flex items-center justify-center font-bold text-xs shrink-0 active:scale-95 transition-all shadow-xs"
                 title="Back to previous page"
               >
                 <ArrowLeft className="h-4 w-4" />
-                <span>Back</span>
               </Button>
 
-              {/* Channels Switcher button on mobile */}
+              {/* Channels Directory button (for admins or to browse all channels) */}
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => setMobileShowChat(false)}
-                className="lg:hidden h-8 px-2 rounded-xl border-sky-400/30 text-sky-600 dark:text-sky-400 hover:bg-sky-500/10 flex items-center gap-1 text-xs shrink-0 font-semibold active:scale-95 transition-all"
-                title="Switch channel"
+                className="lg:hidden h-8 px-2 rounded-xl border-border/70 text-muted-foreground hover:text-foreground hover:bg-muted flex items-center gap-1 text-xs shrink-0 font-medium active:scale-95 transition-all"
+                title="Browse all channels"
               >
                 <Layers className="h-3.5 w-3.5 text-sky-500" />
-                <span className="text-[11px]">Channels</span>
+                <span className="text-[11px] hidden xs:inline">Channels</span>
               </Button>
 
-              <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-2xl bg-gradient-to-tr from-sky-500 via-indigo-600 to-purple-600 text-white flex items-center justify-center text-base sm:text-lg shrink-0 shadow-md shadow-sky-500/20">
-                {activeChannel?.icon || (activeChannel?.category === 'department' ? '🏛️' : '#')}
-              </div>
-
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <h3 className="text-xs sm:text-sm lg:text-base font-display font-bold text-foreground truncate">
-                    {activeChannel?.name}
-                  </h3>
-                  {activeChannel?.isOfficialOnly && (
-                    <Badge
-                      variant="secondary"
-                      className="text-[9px] px-1.5 py-0 h-4 bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-400/30 font-semibold"
-                    >
-                      Official
-                    </Badge>
-                  )}
-                  {activeChannel?.category === 'department' && (
-                    <Badge
-                      variant="outline"
-                      className="hidden sm:inline-flex text-[9px] px-1.5 py-0 h-4 text-sky-600 dark:text-sky-400 border-sky-400/30 font-semibold"
-                    >
-                      Department
-                    </Badge>
-                  )}
+              {/* Desktop channel icon indicator */}
+              <div className="hidden lg:flex items-center gap-2">
+                <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-sky-500 via-indigo-600 to-purple-600 text-white flex items-center justify-center text-sm shadow-xs">
+                  {activeChannel?.icon || (activeChannel?.category === 'department' ? '🏛️' : '#')}
                 </div>
-                <p className="text-[10px] sm:text-[11px] text-muted-foreground truncate max-w-[140px] xs:max-w-[200px] sm:max-w-md lg:max-w-lg">
-                  {activeChannel?.description}
-                </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* CENTER: THE TIKTOK-STYLE "DEPARTMENT | ANNOUNCEMENTS" FEED SWITCHER */}
+            <div className="flex-1 flex items-center justify-center min-w-0 px-1 sm:px-4">
+              <div className="flex items-center justify-center gap-3 xs:gap-5 sm:gap-8 select-none">
+                {/* 1. DEPARTMENT FEED TAB */}
+                <div className="relative flex items-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (currentDeptChannel) {
+                        setActiveChannelId(currentDeptChannel.id);
+                        setMobileShowChat(true);
+                      }
+                    }}
+                    className={`group relative flex flex-col items-center py-1 px-1.5 sm:px-2.5 cursor-pointer transition-all active:scale-95 ${
+                      isDeptActive ? 'opacity-100' : 'opacity-60 hover:opacity-100'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1 sm:gap-1.5">
+                      <span className="text-xs sm:text-sm">🏛️</span>
+                      <span
+                        className={`text-xs sm:text-sm md:text-base tracking-tight font-display transition-all duration-200 truncate max-w-[100px] xs:max-w-[130px] sm:max-w-[200px] ${
+                          isDeptActive
+                            ? 'font-black text-foreground scale-105'
+                            : 'font-semibold text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        {deptShortName}
+                      </span>
+                    </div>
+                    {/* TikTok active underline indicator */}
+                    <div
+                      className={`h-0.5 sm:h-1 rounded-full transition-all duration-300 ${
+                        isDeptActive
+                          ? 'w-7 sm:w-12 bg-gradient-to-r from-sky-500 via-indigo-600 to-purple-600 shadow-sm shadow-sky-500/50 mt-1 opacity-100'
+                          : 'w-0 mt-1 opacity-0'
+                      }`}
+                    />
+                  </button>
+
+                  {/* Multi-department dropdown for Admin */}
+                  {isAdminOrExaminer && departmentChannels.length > 1 && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          className="p-1 -ml-1 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted/50 transition-colors"
+                          title="Select department"
+                        >
+                          <ChevronDown className="h-3 w-3" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="center" className="w-56 rounded-2xl p-1.5 shadow-xl bg-background/95 backdrop-blur-xl border border-border/80">
+                        <div className="text-[10px] font-bold text-muted-foreground px-2 py-1 uppercase tracking-wider">
+                          Departments
+                        </div>
+                        {departmentChannels.map((dept) => (
+                          <DropdownMenuItem
+                            key={dept.id}
+                            onClick={() => {
+                              setActiveChannelId(dept.id);
+                              setMobileShowChat(true);
+                            }}
+                            className={`text-xs rounded-xl cursor-pointer font-medium flex items-center justify-between ${
+                              dept.id === activeChannelId ? 'bg-sky-500/15 text-sky-600 dark:text-sky-400 font-bold' : ''
+                            }`}
+                          >
+                            <span className="truncate">{dept.name}</span>
+                            {dept.id === activeChannelId && <Check className="h-3.5 w-3.5 text-sky-500 shrink-0" />}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
+
+                {/* TikTok Vertical Separator */}
+                <span className="text-muted-foreground/30 font-light text-xs sm:text-sm select-none">|</span>
+
+                {/* 2. ANNOUNCEMENTS FEED TAB */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (announcementsChannel) {
+                      setActiveChannelId(announcementsChannel.id);
+                      setMobileShowChat(true);
+                    }
+                  }}
+                  className={`group relative flex flex-col items-center py-1 px-1.5 sm:px-2.5 cursor-pointer transition-all active:scale-95 ${
+                    isAnnouncementsActive ? 'opacity-100' : 'opacity-60 hover:opacity-100'
+                  }`}
+                >
+                  <div className="flex items-center gap-1 sm:gap-1.5">
+                    <span className="text-xs sm:text-sm">📢</span>
+                    <span
+                      className={`text-xs sm:text-sm md:text-base tracking-tight font-display transition-all duration-200 ${
+                        isAnnouncementsActive
+                          ? 'font-black text-foreground scale-105'
+                          : 'font-semibold text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      Announcements
+                    </span>
+                  </div>
+                  {/* TikTok active underline indicator */}
+                  <div
+                    className={`h-0.5 sm:h-1 rounded-full transition-all duration-300 ${
+                      isAnnouncementsActive
+                        ? 'w-7 sm:w-12 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 shadow-sm shadow-amber-500/50 mt-1 opacity-100'
+                        : 'w-0 mt-1 opacity-0'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+
+            {/* Right Controls: Mode Badge / Toggle & Search */}
+            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
               {/* Community Mode Switcher (Admin) or Status Badge (Student) */}
               {isAdminOrExaminer ? (
                 <Button
@@ -1117,17 +1243,13 @@ export default function CommunityChat() {
                 <Search className="h-4 w-4" />
               </Button>
 
-              <Badge variant="secondary" className="text-[10px] sm:text-[11px] font-semibold bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-400/25 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-xl">
-                {displayedMessages.length} {displayedMessages.length === 1 ? 'msg' : 'msgs'}
-              </Badge>
-
               {isAdminOrExaminer && (
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={() => setCleanupDialogOpen(true)}
-                  className="h-7 px-2 sm:px-2.5 text-[10px] sm:text-[11px] font-semibold rounded-xl border-rose-300/40 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 hover:border-rose-400 gap-1 sm:gap-1.5 shadow-sm"
+                  className="h-7 px-2 sm:px-2.5 text-[10px] sm:text-[11px] font-semibold rounded-xl border-rose-300/40 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 hover:border-rose-400 gap-1 shadow-sm"
                   title="Clear or prune old chat storage"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -1136,6 +1258,23 @@ export default function CommunityChat() {
               )}
             </div>
           </header>
+
+          {/* Active Feed Info Subtitle Bar */}
+          <div className="px-3 sm:px-4 py-1 bg-muted/20 border-b border-border/40 flex items-center justify-between text-[11px] text-muted-foreground shrink-0">
+            <div className="flex items-center gap-1.5 truncate">
+              <span className="font-semibold text-foreground truncate">
+                {activeChannel?.name}:
+              </span>
+              <span className="truncate opacity-80">
+                {activeChannel?.description}
+              </span>
+            </div>
+            {activeChannel?.isOfficialOnly && !isAdminOrExaminer && (
+              <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 border-amber-400/40 text-amber-700 dark:text-amber-300 bg-amber-500/10 shrink-0 font-medium">
+                Official Broadcast
+              </Badge>
+            )}
+          </div>
 
           {/* Mode Announcement Banner (Live Mode vs Stored Mode) */}
           <div
