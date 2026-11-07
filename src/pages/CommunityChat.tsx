@@ -695,6 +695,9 @@ export default function CommunityChat() {
         }
       }
 
+      // Announcements channel is always in Stored Mode because it is exclusively managed by admin
+      const messageChatMode = isAnnouncementsActive ? 'stored' : chatMode;
+
       const sentDocId = await sendCommunityMessage({
         channelId: activeChannelId,
         userId: user.uid,
@@ -706,7 +709,7 @@ export default function CommunityChat() {
         imageUrl: uploadedImageUrl,
         imagePublicId: uploadedImagePublicId,
         replyTo: replyRef,
-        chatMode,
+        chatMode: messageChatMode,
       });
 
       if (sentDocId) {
@@ -846,10 +849,11 @@ export default function CommunityChat() {
   const displayedMessages = useMemo(() => {
     let list = messages;
 
-    // When chatMode is 'live', past chat history does not stay when user closes chat.
-    // Returning users see a blank history of chat; only messages arriving in this active session appear.
-    // However, users who are in the chat at that time still see the messages until they exit.
-    if (chatMode === 'live') {
+    // Announcements is ALWAYS in Stored Mode because it is exclusively managed by admin and must remain permanent.
+    // Live mode session filtering ONLY applies to interactive channels (like Department Chat).
+    const isChannelLive = chatMode === 'live' && !isAnnouncementsActive;
+
+    if (isChannelLive) {
       list = list.filter((m) => {
         // Any message sent by the user during this session is always visible
         if (sentInThisSessionRef.current.has(m.id)) {
@@ -874,7 +878,7 @@ export default function CommunityChat() {
         m.text.toLowerCase().includes(q) ||
         m.userName.toLowerCase().includes(q)
     );
-  }, [messages, inChannelSearchQuery, chatMode]);
+  }, [messages, inChannelSearchQuery, chatMode, isAnnouncementsActive]);
 
   // Date grouping for clean Discord/Telegram style date separators
   const groupedMessageSections = useMemo(() => {
@@ -1399,20 +1403,26 @@ export default function CommunityChat() {
           {/* Mode Announcement Banner (Live Mode vs Stored Mode) */}
           <div
             className={`px-3 sm:px-4 py-1.5 border-b text-[11px] font-medium flex items-center justify-between gap-2 shrink-0 transition-colors ${
-              chatMode === 'live'
+              isAnnouncementsActive
+                ? 'bg-amber-500/10 border-amber-500/25 text-amber-800 dark:text-amber-300'
+                : chatMode === 'live'
                 ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-800 dark:text-emerald-300'
                 : 'bg-blue-500/10 border-blue-500/20 text-blue-800 dark:text-blue-300'
             }`}
           >
             <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-xs shrink-0">{chatMode === 'live' ? '⚡' : '💾'}</span>
+              <span className="text-xs shrink-0">
+                {isAnnouncementsActive ? '💾' : chatMode === 'live' ? '⚡' : '💾'}
+              </span>
               <span className="truncate">
-                {chatMode === 'live'
+                {isAnnouncementsActive
+                  ? 'Stored Mode Active: Official announcements are managed by admins and permanently preserved for all students.'
+                  : chatMode === 'live'
                   ? 'Live Mode Active: Real-time communication between students enabled.'
                   : 'Stored Mode Active: Chat history is saved in the database so you can access previous conversations.'}
               </span>
             </div>
-            {isAdminOrExaminer && (
+            {isAdminOrExaminer && !isAnnouncementsActive && (
               <button
                 type="button"
                 onClick={handleToggleChatMode}
@@ -1420,6 +1430,11 @@ export default function CommunityChat() {
               >
                 Switch to {chatMode === 'live' ? 'Stored' : 'Live'}
               </button>
+            )}
+            {isAnnouncementsActive && (
+              <Badge variant="outline" className="text-[10px] px-2 py-0.5 rounded-full border-amber-400/40 text-amber-700 dark:text-amber-300 bg-amber-500/10 shrink-0 font-bold">
+                Permanent History
+              </Badge>
             )}
           </div>
 
@@ -1602,26 +1617,40 @@ export default function CommunityChat() {
             ) : displayedMessages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center p-6 space-y-3.5 max-w-md mx-auto">
                 <div className="h-20 w-20 rounded-3xl bg-gradient-to-tr from-sky-500/20 via-indigo-500/20 to-purple-500/20 text-sky-600 dark:text-sky-300 flex items-center justify-center text-4xl shadow-inner border border-white/20">
-                  {chatMode === 'live' ? '⚡' : activeChannel?.icon || (activeChannel?.category === 'department' ? '🏛️' : '💬')}
+                  {isAnnouncementsActive
+                    ? '📢'
+                    : chatMode === 'live'
+                    ? '⚡'
+                    : activeChannel?.icon || (activeChannel?.category === 'department' ? '🏛️' : '💬')}
                 </div>
                 <div className="space-y-1">
                   <h4 className="text-base font-bold text-foreground">
-                    {chatMode === 'live' ? '⚡ Live Mode Active' : `Welcome to #${activeChannel?.name}!`}
+                    {isAnnouncementsActive
+                      ? 'Official Announcements'
+                      : chatMode === 'live'
+                      ? '⚡ Live Mode Active'
+                      : `Welcome to #${activeChannel?.name}!`}
                   </h4>
                   <p className="text-xs text-muted-foreground leading-relaxed max-w-sm mx-auto">
                     {inChannelSearchQuery
                       ? 'No messages matched your search query in this channel.'
+                      : isAnnouncementsActive
+                      ? 'No official announcements published yet. Official notices and university updates published by administrators will be permanently preserved here.'
                       : chatMode === 'live'
                       ? 'Chat history is ephemeral. Real-time messages sent during this session appear here and automatically clear when you exit.'
                       : `This is the beginning of the #${activeChannel?.name} discussion space. Say hello, collaborate with peers, or ask a question!`}
                   </p>
                 </div>
 
-                {chatMode === 'live' && (
+                {isAnnouncementsActive ? (
+                  <Badge variant="outline" className="text-[11px] px-3 py-1 rounded-full text-amber-600 dark:text-amber-400 border-amber-500/30 bg-amber-500/10 font-bold">
+                    💾 Stored Mode • Admin Managed Broadcasts
+                  </Badge>
+                ) : chatMode === 'live' ? (
                   <Badge variant="outline" className="text-[11px] px-3 py-1 rounded-full text-emerald-600 dark:text-emerald-400 border-emerald-500/30 bg-emerald-500/10 font-bold">
                     ⚡ Real-time Session • Blank History on Return
                   </Badge>
-                )}
+                ) : null}
 
                 {!inChannelSearchQuery && (
                   <div className="pt-2 flex flex-wrap items-center justify-center gap-2">
