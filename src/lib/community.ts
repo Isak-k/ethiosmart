@@ -194,9 +194,12 @@ export async function sendCommunityMessage(params: {
   imagePublicId?: string;
   imageCaption?: string;
   replyTo?: ReplyReference;
+  chatMode?: CommunityChatMode;
 }): Promise<string> {
-  const { channelId, userId, userName, userEmail, userRole, userAvatar, text, imageUrl, imagePublicId, imageCaption, replyTo } = params;
+  const { channelId, userId, userName, userEmail, userRole, userAvatar, text, imageUrl, imagePublicId, imageCaption, replyTo, chatMode = 'stored' } = params;
   const messagesRef = collection(db, 'communityChannels', channelId, 'messages');
+
+  const isLive = chatMode === 'live';
 
   const docRef = await addDoc(messagesRef, {
     channelId,
@@ -213,10 +216,32 @@ export async function sendCommunityMessage(params: {
     reactions: {},
     isPinned: false,
     deleted: false,
+    chatMode,
+    isLive,
     createdAt: serverTimestamp(),
   });
 
   return docRef.id;
+}
+
+/**
+ * Purges live ephemeral messages from a channel so they do not stay in the database when the chat closes.
+ */
+export async function purgeLiveChannelMessages(channelId: string): Promise<number> {
+  if (!channelId) return 0;
+  try {
+    const messagesRef = collection(db, 'communityChannels', channelId, 'messages');
+    const q = query(messagesRef, where('isLive', '==', true), limit(150));
+    const snap = await getDocs(q);
+    if (snap.empty) return 0;
+    const batch = writeBatch(db);
+    snap.docs.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+    return snap.docs.length;
+  } catch (err) {
+    console.warn('Could not purge live messages from Firestore:', err);
+    return 0;
+  }
 }
 
 const COMMUNITY_SETTINGS_DOC = 'communityChat';

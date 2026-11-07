@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -50,6 +49,9 @@ import {
   Download,
   Radio,
   RefreshCw,
+  ArrowRight,
+  ArrowLeftRight,
+  Zap,
 } from 'lucide-react';
 import {
   Popover,
@@ -182,7 +184,14 @@ export default function CommunityChat() {
   const { user, profile } = useAuth();
   const { toast } = useToast();
 
+  // Session start timestamp: When chatMode is 'live', messages before this session are hidden so returning users see a blank history.
+  // Other users who were already in the chat when a message was sent will see it, and it will disappear for them only when they exit.
+  const sessionStartTimeRef = useRef<number>(Date.now());
+  const sentInThisSessionRef = useRef<Set<string>>(new Set());
+
   const handleGoBack = () => {
+    // When a user leaves, we do NOT delete live messages from Firestore so other active users can still see them.
+    // When this user returns later, their sessionStartTimeRef resets, giving them a blank chat history.
     if (window.history.length > 1) {
       navigate(-1);
     } else {
@@ -686,7 +695,7 @@ export default function CommunityChat() {
         }
       }
 
-      await sendCommunityMessage({
+      const sentDocId = await sendCommunityMessage({
         channelId: activeChannelId,
         userId: user.uid,
         userName: profile?.full_name || user.email?.split('@')[0] || 'Student',
@@ -697,7 +706,12 @@ export default function CommunityChat() {
         imageUrl: uploadedImageUrl,
         imagePublicId: uploadedImagePublicId,
         replyTo: replyRef,
+        chatMode,
       });
+
+      if (sentDocId) {
+        sentInThisSessionRef.current.add(sentDocId);
+      }
 
       if (inChannelSearchQuery) {
         setInChannelSearchQuery('');
@@ -828,16 +842,39 @@ export default function CommunityChat() {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  // Messages filtered by in-channel search if active
+  // Messages filtered by in-channel search and Live Mode session boundary
   const displayedMessages = useMemo(() => {
-    if (!inChannelSearchQuery.trim()) return messages;
+    let list = messages;
+
+    // When chatMode is 'live', past chat history does not stay when user closes chat.
+    // Returning users see a blank history of chat; only messages arriving in this active session appear.
+    // However, users who are in the chat at that time still see the messages until they exit.
+    if (chatMode === 'live') {
+      list = list.filter((m) => {
+        // Any message sent by the user during this session is always visible
+        if (sentInThisSessionRef.current.has(m.id)) {
+          return true;
+        }
+
+        const msgTime = m.createdAt?.toDate
+          ? m.createdAt.toDate().getTime()
+          : (typeof m.createdAt?.seconds === 'number'
+              ? m.createdAt.seconds * 1000
+              : (m.createdAt ? Number(m.createdAt) : Date.now()));
+
+        // Visible only if the message was created after the user entered this active session
+        return msgTime >= sessionStartTimeRef.current - 3000;
+      });
+    }
+
+    if (!inChannelSearchQuery.trim()) return list;
     const q = inChannelSearchQuery.toLowerCase();
-    return messages.filter(
+    return list.filter(
       (m) =>
         m.text.toLowerCase().includes(q) ||
         m.userName.toLowerCase().includes(q)
     );
-  }, [messages, inChannelSearchQuery]);
+  }, [messages, inChannelSearchQuery, chatMode]);
 
   // Date grouping for clean Discord/Telegram style date separators
   const groupedMessageSections = useMemo(() => {
@@ -867,9 +904,9 @@ export default function CommunityChat() {
   }, [displayedMessages]);
 
   return (
-    <DashboardLayout contentClassName="p-0 sm:p-2 lg:p-4 max-w-none w-full !pb-0 lg:!pb-3">
-      {/* Edge-to-Edge Full Height Chat Container: On mobile it is fixed inset-0 z-[60] full page, on desktop it is inside DashboardLayout */}
-      <div className="fixed inset-0 z-[60] lg:relative lg:inset-auto lg:z-auto w-full h-full lg:h-[calc(100dvh-5.2rem)] flex flex-col lg:flex-row rounded-none lg:rounded-3xl border-0 lg:border border-white/60 dark:border-white/10 shadow-none lg:shadow-2xl bg-background lg:bg-card/75 dark:bg-slate-950 lg:dark:bg-slate-950/70 backdrop-blur-none lg:backdrop-blur-2xl overflow-hidden">
+    <>
+      {/* Completely standalone, dedicated page (No DashboardLayout, No global navbar/notification/3-line menu, No mobile bottom dock) */}
+      <div className="w-screen h-[100dvh] flex flex-col lg:flex-row bg-background dark:bg-slate-950 overflow-hidden select-text">
         {/* ========================================================= */}
         {/* LEFT PANE: CHANNELS DIRECTORY                            */}
         {/* ========================================================= */}
@@ -1074,18 +1111,19 @@ export default function CommunityChat() {
         >
           {/* Top Header with TikTok-style "Department | Announcements" Feeds Switcher */}
           <header className="px-2.5 sm:px-4 py-2 sm:py-3 border-b border-border/60 bg-background/95 dark:bg-slate-950/90 backdrop-blur-md flex items-center justify-between gap-1 sm:gap-3 shrink-0 relative">
-            {/* Left Controls: Mobile Back & Channel Directory */}
-            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-              {/* Back to previous page button on mobile */}
+            {/* Left Controls: Top Back Button & Channel Icon */}
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              {/* Back to previous page button (prominently visible on both desktop and mobile) */}
               <Button
                 type="button"
                 variant="ghost"
-                size="icon"
+                size="sm"
                 onClick={handleGoBack}
-                className="lg:hidden h-8 w-8 rounded-full text-foreground/80 hover:text-foreground hover:bg-muted/70 active:scale-95 transition-all"
-                title="Back to previous page"
+                className="h-8.5 px-2.5 sm:px-3 rounded-xl border border-border/70 hover:bg-muted text-foreground flex items-center gap-1.5 font-bold text-xs shrink-0 active:scale-95 transition-all shadow-xs"
+                title="Back to dashboard / previous page"
               >
-                <ArrowLeft className="h-4.5 w-4.5" />
+                <ArrowLeft className="h-4 w-4" />
+                <span>Back</span>
               </Button>
 
               {/* Desktop channel icon indicator */}
@@ -1158,6 +1196,23 @@ export default function CommunityChat() {
                     </DropdownMenu>
                   )}
                 </div>
+
+                {/* Turn / Swap Quick Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isAnnouncementsActive && currentDeptChannel) {
+                      setActiveChannelId(currentDeptChannel.id);
+                    } else if (announcementsChannel) {
+                      setActiveChannelId(announcementsChannel.id);
+                    }
+                    setMobileShowChat(true);
+                  }}
+                  className="h-6 w-6 mx-0.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/70 flex items-center justify-center transition-transform active:rotate-180"
+                  title="Turn between Department Chat and Announcements"
+                >
+                  <ArrowLeftRight className="h-3 w-3" />
+                </button>
 
                 {/* 2. ANNOUNCEMENTS SMALL BUTTON */}
                 <button
@@ -1368,6 +1423,59 @@ export default function CommunityChat() {
             )}
           </div>
 
+          {/* Mobile Quick Turn Button: Helps students turn between Announcements and Department chat */}
+          <div className="lg:hidden px-3 py-1.5 bg-background/80 border-b border-border/50 shrink-0">
+            {isAnnouncementsActive ? (
+              <div className="flex items-center justify-between gap-2 p-1.5 px-2.5 rounded-xl bg-amber-500/10 border border-amber-400/30">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="text-sm">📢</span>
+                  <span className="text-[11px] font-semibold text-amber-800 dark:text-amber-300 truncate">
+                    Official Announcements
+                  </span>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => {
+                    if (currentDeptChannel) {
+                      setActiveChannelId(currentDeptChannel.id);
+                      setMobileShowChat(true);
+                    }
+                  }}
+                  className="h-7 px-2.5 rounded-lg text-xs font-bold bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 text-white shrink-0 shadow-xs flex items-center gap-1 active:scale-95 transition-all"
+                  title="Turn to Department Chat"
+                >
+                  <span>Turn to Dept</span>
+                  <ArrowRight className="h-3 w-3" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between gap-2 p-1.5 px-2.5 rounded-xl bg-sky-500/10 border border-sky-400/30">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="text-sm">🏛️</span>
+                  <span className="text-[11px] font-semibold text-sky-800 dark:text-sky-300 truncate">
+                    {deptShortName} Chat
+                  </span>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => {
+                    if (announcementsChannel) {
+                      setActiveChannelId(announcementsChannel.id);
+                      setMobileShowChat(true);
+                    }
+                  }}
+                  className="h-7 px-2.5 rounded-lg text-xs font-bold bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white shrink-0 shadow-xs flex items-center gap-1 active:scale-95 transition-all"
+                  title="Turn to Announcements"
+                >
+                  <span>Turn to Announcements</span>
+                  <ArrowRight className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
+          </div>
+
           {/* In-Channel Live Search Bar */}
           {inChannelSearchOpen && (
             <div className="p-2 sm:p-2.5 bg-sky-500/5 dark:bg-sky-950/20 border-b border-sky-500/20 flex items-center gap-2 animate-fade-in shrink-0">
@@ -1494,18 +1602,26 @@ export default function CommunityChat() {
             ) : displayedMessages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center p-6 space-y-3.5 max-w-md mx-auto">
                 <div className="h-20 w-20 rounded-3xl bg-gradient-to-tr from-sky-500/20 via-indigo-500/20 to-purple-500/20 text-sky-600 dark:text-sky-300 flex items-center justify-center text-4xl shadow-inner border border-white/20">
-                  {activeChannel?.icon || (activeChannel?.category === 'department' ? '🏛️' : '💬')}
+                  {chatMode === 'live' ? '⚡' : activeChannel?.icon || (activeChannel?.category === 'department' ? '🏛️' : '💬')}
                 </div>
                 <div className="space-y-1">
                   <h4 className="text-base font-bold text-foreground">
-                    Welcome to #{activeChannel?.name}!
+                    {chatMode === 'live' ? '⚡ Live Mode Active' : `Welcome to #${activeChannel?.name}!`}
                   </h4>
                   <p className="text-xs text-muted-foreground leading-relaxed max-w-sm mx-auto">
                     {inChannelSearchQuery
                       ? 'No messages matched your search query in this channel.'
+                      : chatMode === 'live'
+                      ? 'Chat history is ephemeral. Real-time messages sent during this session appear here and automatically clear when you exit.'
                       : `This is the beginning of the #${activeChannel?.name} discussion space. Say hello, collaborate with peers, or ask a question!`}
                   </p>
                 </div>
+
+                {chatMode === 'live' && (
+                  <Badge variant="outline" className="text-[11px] px-3 py-1 rounded-full text-emerald-600 dark:text-emerald-400 border-emerald-500/30 bg-emerald-500/10 font-bold">
+                    ⚡ Real-time Session • Blank History on Return
+                  </Badge>
+                )}
 
                 {!inChannelSearchQuery && (
                   <div className="pt-2 flex flex-wrap items-center justify-center gap-2">
@@ -2260,6 +2376,6 @@ export default function CommunityChat() {
           )}
         </DialogContent>
       </Dialog>
-    </DashboardLayout>
+    </>
   );
 }

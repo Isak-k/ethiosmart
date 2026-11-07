@@ -54,4 +54,6 @@ export interface CommunityMessage {
   createdAt: Timestamp | any;
   updatedAt?: Timestamp | any;
   deleted?: boolean;
+  chatMode?: CommunityChatMode;
+  isLive?: boolean;
 }
