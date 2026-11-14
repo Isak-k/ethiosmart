@@ -96,15 +96,15 @@ describe('StudentBooks component', () => {
     expect(screen.getByRole('heading', { name: /Books & Textbooks/i })).toBeInTheDocument();
   });
 
-  it('navigates to confirmed view when Continue is clicked', async () => {
+  it('enters the Notes view directly when the Notes tile is clicked', async () => {
     render(
       <MemoryRouter initialEntries={['/dashboard/books']}>
         <StudentBooks />
       </MemoryRouter>
     );
 
-    const nextBtn = await screen.findByRole('button', { name: /Continue/i });
-    fireEvent.click(nextBtn);
+    const notesTile = await screen.findByRole('button', { name: /Chapter Study Notes/i });
+    fireEvent.click(notesTile);
 
     await waitFor(() => {
       expect(screen.getByText(/Change: Notes \/ Books/i)).toBeInTheDocument();

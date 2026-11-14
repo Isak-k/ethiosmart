@@ -137,13 +137,7 @@ export default function StudentBooks() {
     };
   }, [selectedNotesSubjectId]);
 
-  // Step 1 Choice State: 'notes' comes first
-  const [selectedChoice, setSelectedChoice] = useState<'books' | 'notes'>(() => {
-    const typeParam = searchParams.get('type');
-    return typeParam === 'books' ? 'books' : 'notes';
-  });
-
-  // Has the user confirmed their choice by clicking "Next"?
+  // Has the user confirmed their choice by tapping a resource tile?
   const [isChoiceConfirmed, setIsChoiceConfirmed] = useState<boolean>(() => {
     const tab = searchParams.get('tab');
     const subjectId = searchParams.get('subjectId');
@@ -650,9 +644,9 @@ export default function StudentBooks() {
     availableExams,
   ]);
 
-  // Handler when user clicks "Next" on the choice screen
-  const handleProceedNext = () => {
-    setPrimaryMode(selectedChoice);
+  // Handler when the user taps a resource tile on the choice screen (enters directly)
+  const handleEnter = (choice: 'books' | 'notes') => {
+    setPrimaryMode(choice);
     setIsChoiceConfirmed(true);
     setSelectedNotesSubjectId(null);
   };
@@ -698,143 +692,80 @@ export default function StudentBooks() {
               </p>
             </div>
 
-            {/* The Two Choice Tiles (Notes order comes first!) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* CHOICE 1: CHAPTER STUDY NOTES (FIRST) */}
+            {/* Horizontal Choice Tiles — tapping one enters it directly (no Next step) */}
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+              {/* CHOICE 1: CHAPTER STUDY NOTES */}
               <button
                 type="button"
-                onClick={() => setSelectedChoice('notes')}
-                aria-pressed={selectedChoice === 'notes'}
-                className={cn(
-                  'group relative flex flex-col rounded-2xl border bg-card p-5 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
-                  selectedChoice === 'notes'
-                    ? 'border-primary ring-1 ring-primary/30 shadow-sm'
-                    : 'border-border/60 hover:border-primary/40 hover:shadow-sm'
-                )}
+                onClick={() => handleEnter('notes')}
+                className="group relative flex flex-col overflow-hidden rounded-2xl bg-gradient-to-br from-purple-600 to-fuchsia-600 p-4 text-left text-white shadow-lg shadow-purple-600/20 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2 sm:p-5"
               >
-                <div className="flex items-start justify-between">
-                  <div
-                    className={cn(
-                      'flex h-11 w-11 items-center justify-center rounded-xl transition-colors',
-                      selectedChoice === 'notes'
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary'
-                    )}
-                  >
-                    <FileText className="h-5 w-5" />
-                  </div>
-                  <span
-                    className={cn(
-                      'flex h-6 w-6 items-center justify-center rounded-full border transition-all',
-                      selectedChoice === 'notes'
-                        ? 'border-primary bg-primary text-primary-foreground'
-                        : 'border-border text-transparent'
-                    )}
-                  >
-                    <Check className="h-3.5 w-3.5 stroke-[3]" />
-                  </span>
+                <span className="pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-white/10" aria-hidden="true" />
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 sm:h-11 sm:w-11">
+                  <FileText className="h-5 w-5" />
                 </div>
-
-                <h2 className="mt-4 font-display text-base font-semibold text-foreground">
+                <h2 className="mt-3 font-display text-sm font-bold sm:text-base">
                   Chapter Study Notes
                 </h2>
-                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                  Chapter-by-chapter guides with definitions, worked examples and recall exercises.
+                <p className="mt-0.5 hidden text-xs leading-snug text-white/80 sm:block">
+                  Chapter-by-chapter guides, definitions and worked examples.
                 </p>
-
-                <div className="mt-4 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                  <Layers className="h-3.5 w-3.5 text-primary" />
+                <div className="mt-3 flex items-center gap-1 text-[11px] font-semibold text-white/90">
+                  <Layers className="h-3.5 w-3.5" />
                   {notesCount} available
+                  <ArrowRight className="ml-auto h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                 </div>
               </button>
 
-              {/* CHOICE 2: BOOKS & TEXTBOOKS (SECOND) */}
+              {/* CHOICE 2: BOOKS & TEXTBOOKS */}
               <button
                 type="button"
-                onClick={() => setSelectedChoice('books')}
-                aria-pressed={selectedChoice === 'books'}
-                className={cn(
-                  'group relative flex flex-col rounded-2xl border bg-card p-5 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
-                  selectedChoice === 'books'
-                    ? 'border-primary ring-1 ring-primary/30 shadow-sm'
-                    : 'border-border/60 hover:border-primary/40 hover:shadow-sm'
-                )}
+                onClick={() => handleEnter('books')}
+                className="group relative flex flex-col overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 p-4 text-left text-white shadow-lg shadow-blue-600/20 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 sm:p-5"
               >
-                <div className="flex items-start justify-between">
-                  <div
-                    className={cn(
-                      'flex h-11 w-11 items-center justify-center rounded-xl transition-colors',
-                      selectedChoice === 'books'
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary'
-                    )}
-                  >
-                    <BookOpen className="h-5 w-5" />
-                  </div>
-                  <span
-                    className={cn(
-                      'flex h-6 w-6 items-center justify-center rounded-full border transition-all',
-                      selectedChoice === 'books'
-                        ? 'border-primary bg-primary text-primary-foreground'
-                        : 'border-border text-transparent'
-                    )}
-                  >
-                    <Check className="h-3.5 w-3.5 stroke-[3]" />
-                  </span>
+                <span className="pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-white/10" aria-hidden="true" />
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 sm:h-11 sm:w-11">
+                  <BookOpen className="h-5 w-5" />
                 </div>
-
-                <h2 className="mt-4 font-display text-base font-semibold text-foreground">
+                <h2 className="mt-3 font-display text-sm font-bold sm:text-base">
                   Books &amp; Textbooks
                 </h2>
-                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                  Complete digital textbooks, official syllabus documents and academic reference books.
+                <p className="mt-0.5 hidden text-xs leading-snug text-white/80 sm:block">
+                  Complete textbooks, syllabus documents and references.
                 </p>
-
-                <div className="mt-4 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                  <Layers className="h-3.5 w-3.5 text-primary" />
+                <div className="mt-3 flex items-center gap-1 text-[11px] font-semibold text-white/90">
+                  <Layers className="h-3.5 w-3.5" />
                   {textbooksCount} available
+                  <ArrowRight className="ml-auto h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                 </div>
               </button>
             </div>
 
-            {/* NEXT BUTTON */}
-            <div className="flex flex-col items-center justify-center gap-4 pt-1">
-              <Button
+            {/* Direct Jump Links */}
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-1 text-xs text-muted-foreground">
+              <span>Or jump to</span>
+              <button
                 type="button"
-                size="lg"
-                onClick={handleProceedNext}
-                className="w-full sm:w-auto sm:min-w-[220px] h-11 rounded-xl font-semibold text-sm sm:text-base shadow-sm flex items-center justify-center gap-2 group"
+                onClick={() => {
+                  setPrimaryMode('offline');
+                  setIsChoiceConfirmed(true);
+                }}
+                className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/15 transition-colors"
               >
-                <span>Continue</span>
-                <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
-              </Button>
-
-              {/* Direct Jump Links */}
-              <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground flex-wrap">
-                <span>Or jump to</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPrimaryMode('offline');
-                    setIsChoiceConfirmed(true);
-                  }}
-                  className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/15 transition-colors"
-                >
-                  <HardDrive className="h-3.5 w-3.5" />
-                  Offline Saved ({offlineRecords.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPrimaryMode('bookmarks');
-                    setIsChoiceConfirmed(true);
-                  }}
-                  className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 font-semibold text-primary hover:bg-primary/15 transition-colors"
-                >
-                  <Bookmark className="h-3.5 w-3.5" />
-                  Bookmarks ({bookmarkedIds.length})
-                </button>
-              </div>
+                <HardDrive className="h-3.5 w-3.5" />
+                Offline Saved ({offlineRecords.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPrimaryMode('bookmarks');
+                  setIsChoiceConfirmed(true);
+                }}
+                className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 font-semibold text-primary hover:bg-primary/15 transition-colors"
+              >
+                <Bookmark className="h-3.5 w-3.5" />
+                Bookmarks ({bookmarkedIds.length})
+              </button>
             </div>
           </div>
         ) : (
