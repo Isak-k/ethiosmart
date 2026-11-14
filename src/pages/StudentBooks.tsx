@@ -154,16 +154,9 @@ export default function StudentBooks() {
     };
   }, [selectedNotesSubjectId]);
 
-  // Has the user confirmed their choice by tapping a resource tile?
-  const [isChoiceConfirmed, setIsChoiceConfirmed] = useState<boolean>(() => {
-    const tab = searchParams.get('tab');
-    const subjectId = searchParams.get('subjectId');
-    const step = searchParams.get('step');
-    if (tab === 'offline' || tab === 'bookmarks' || subjectId || step === 'view') {
-      return true;
-    }
-    return false;
-  });
+  // The Study hub opens straight into the notes (shortnotes) view by default.
+  // Students can still switch to Books/Bookmarks/Offline from the top toolbar.
+  const [isChoiceConfirmed, setIsChoiceConfirmed] = useState<boolean>(true);
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -802,47 +795,41 @@ export default function StudentBooks() {
           /* STEP 2: CONFIRMED VIEW (USER SEES EITHER BOOKS OR NOTES)                  */
           /* ========================================================================= */
           <div className="lg:space-y-6">
-            {/* Top Toolbar: Switch Option, Mode Pills & Department Filter (hidden on mobile in the Notes view) */}
-            <div className={cn("flex items-center justify-between gap-3 flex-wrap p-4 rounded-3xl border bg-card/60 backdrop-blur-xs mb-6 lg:mb-0", primaryMode === 'notes' && "hidden lg:flex")}>
+            {/* Top Toolbar: Prominent Notes/Books switch + filters (always visible on every screen size) */}
+            <div className="flex items-center justify-between gap-3 flex-wrap p-3 sm:p-4 rounded-3xl border bg-card/60 backdrop-blur-xs mb-6 lg:mb-0">
               <div className="flex items-center gap-2.5 flex-wrap">
-                {/* Back to Choice button */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setIsChoiceConfirmed(false);
-                    setSelectedNotesSubjectId(null);
-                  }}
-                  className="rounded-xl text-xs h-8 gap-1.5 font-bold hover:bg-muted"
-                  title="Switch between Notes and Books"
-                >
-                  <RotateCcw className="h-3.5 w-3.5 text-primary" />
-                  <span>Change: Notes / Books</span>
-                </Button>
-
-                {/* Mode Selector Pills (Notes comes first!) */}
-                <Button
-                  variant={primaryMode === 'notes' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setPrimaryMode('notes')}
-                  className="rounded-xl text-xs h-8 font-semibold"
-                >
-                  <FileText className="h-3.5 w-3.5 mr-1 text-amber-500" />
-                  Notes ({notesCount})
-                </Button>
-
-                <Button
-                  variant={primaryMode === 'books' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => {
-                    setPrimaryMode('books');
-                    setSelectedNotesSubjectId(null);
-                  }}
-                  className="rounded-xl text-xs h-8 font-semibold"
-                >
-                  <BookOpen className="h-3.5 w-3.5 mr-1 text-primary" />
-                  Books ({textbooksCount})
-                </Button>
+                {/* Primary Notes / Books switch — kept clearly visible on mobile & desktop */}
+                <div className="flex items-center rounded-2xl border border-border/60 bg-muted/40 p-1 shadow-xs">
+                  <button
+                    type="button"
+                    onClick={() => setPrimaryMode('notes')}
+                    className={cn(
+                      'flex items-center gap-1.5 px-3.5 sm:px-4 py-2 rounded-xl text-sm font-bold transition-all',
+                      primaryMode === 'notes'
+                        ? 'bg-purple-600 text-white shadow-xs'
+                        : 'text-muted-foreground hover:text-foreground'
+                    )}
+                  >
+                    <FileText className="h-4 w-4" />
+                    Notes ({notesCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPrimaryMode('books');
+                      setSelectedNotesSubjectId(null);
+                    }}
+                    className={cn(
+                      'flex items-center gap-1.5 px-3.5 sm:px-4 py-2 rounded-xl text-sm font-bold transition-all',
+                      primaryMode === 'books'
+                        ? 'bg-primary text-primary-foreground shadow-xs'
+                        : 'text-muted-foreground hover:text-foreground'
+                    )}
+                  >
+                    <BookOpen className="h-4 w-4" />
+                    Books ({textbooksCount})
+                  </button>
+                </div>
 
                 <Button
                   variant={primaryMode === 'bookmarks' ? 'default' : 'ghost'}
@@ -865,21 +852,38 @@ export default function StudentBooks() {
                 </Button>
               </div>
 
-              {/* Department Filter */}
-              <div className="w-full sm:w-auto">
-                <Select value={selectedDept} onValueChange={setSelectedDept}>
-                  <SelectTrigger className="w-full sm:w-[185px] rounded-xl text-xs h-8 bg-card">
-                    <SelectValue placeholder="All Departments" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">🌐 All Departments</SelectItem>
-                    {departments.map((dept) => (
-                      <SelectItem key={dept.id} value={dept.id}>
-                        {dept.name} {dept.id === userDeptId ? '(My Dept)' : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="flex items-center gap-2.5 flex-wrap w-full sm:w-auto">
+                {/* Back to Choice button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setIsChoiceConfirmed(false);
+                    setSelectedNotesSubjectId(null);
+                  }}
+                  className="rounded-xl text-xs h-8 gap-1.5 font-bold hover:bg-muted"
+                  title="Switch between Notes and Books"
+                >
+                  <RotateCcw className="h-3.5 w-3.5 text-primary" />
+                  <span>Change: Notes / Books</span>
+                </Button>
+
+                {/* Department Filter */}
+                <div className="flex-1 sm:flex-none min-w-[140px] sm:w-auto">
+                  <Select value={selectedDept} onValueChange={setSelectedDept}>
+                    <SelectTrigger className="w-full sm:w-[185px] rounded-xl text-xs h-8 bg-card">
+                      <SelectValue placeholder="All Departments" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">🌐 All Departments</SelectItem>
+                      {departments.map((dept) => (
+                        <SelectItem key={dept.id} value={dept.id}>
+                          {dept.name} {dept.id === userDeptId ? '(My Dept)' : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
 

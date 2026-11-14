@@ -83,31 +83,36 @@ describe('StudentBooks component', () => {
     vi.clearAllMocks();
   });
 
-  it('renders choice screen without crashing after data loads', async () => {
+  it('opens directly in the notes (shortnotes) view by default', async () => {
     render(
       <MemoryRouter initialEntries={['/dashboard/books']}>
         <StudentBooks />
       </MemoryRouter>
     );
 
-    const heading = await screen.findByRole('heading', { name: /What would you like to study\?/i });
-    expect(heading).toBeInTheDocument();
+    // The "choose notes or books" screen is skipped entirely.
+    expect(
+      screen.queryByRole('heading', { name: /What would you like to study\?/i })
+    ).not.toBeInTheDocument();
+
+    // The Notes / Books switch stays clearly visible at the top.
+    expect(await screen.findByRole('button', { name: /^Notes \(\d+\)$/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Books \(\d+\)$/ })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Chapter Study Notes/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /Books & Textbooks/i })).toBeInTheDocument();
   });
 
-  it('enters the Notes view directly when the Notes tile is clicked', async () => {
+  it('switches to the Books view when the Books button is clicked', async () => {
     render(
       <MemoryRouter initialEntries={['/dashboard/books']}>
         <StudentBooks />
       </MemoryRouter>
     );
 
-    const notesTile = await screen.findByRole('button', { name: /Chapter Study Notes/i });
-    fireEvent.click(notesTile);
+    const booksButton = await screen.findByRole('button', { name: /^Books \(\d+\)$/ });
+    fireEvent.click(booksButton);
 
     await waitFor(() => {
-      expect(screen.getByText(/Change: Notes \/ Books/i)).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(/Search books by title/i)).toBeInTheDocument();
     });
   });
 
