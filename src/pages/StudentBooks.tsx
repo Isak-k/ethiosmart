@@ -107,9 +107,26 @@ export default function StudentBooks() {
 
   const [primaryMode, setPrimaryMode] = useState<'books' | 'notes' | 'bookmarks' | 'offline'>(initialMode);
   const [notesViewMode, setNotesViewMode] = useState<'by_subject' | 'all_notes'>('by_subject');
-  const [selectedNotesSubjectId, setSelectedNotesSubjectId] = useState<string | null>(
-    searchParams.get('subjectId') || null
-  );
+  // Selected notes subject is driven by the URL (?subjectId=) so the back
+  // control can reliably return to the page the student came from.
+  const selectedNotesSubjectId = searchParams.get('subjectId');
+
+  const setSelectedNotesSubjectId = (id: string | null) => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (id) {
+          next.set('subjectId', id);
+        } else {
+          next.delete('subjectId');
+        }
+        return next;
+      },
+      // Opening a subject pushes a history entry (so Back returns here);
+      // clearing it replaces the current entry to avoid history clutter.
+      { replace: id === null }
+    );
+  };
 
   // Curriculum chapters for the selected notes subject
   const [subjectCurriculumChapters, setSubjectCurriculumChapters] = useState<Chapter[]>([]);
@@ -649,6 +666,18 @@ export default function StudentBooks() {
     setPrimaryMode(choice);
     setIsChoiceConfirmed(true);
     setSelectedNotesSubjectId(null);
+  };
+
+  // Back from a subject's chapter list — returns to the page the student came from.
+  const handleBackFromChapters = () => {
+    setSearchQuery('');
+    const historyIdx =
+      (window.history.state && (window.history.state as { idx?: number }).idx) || 0;
+    if (historyIdx > 0) {
+      navigate(-1);
+    } else {
+      setSelectedNotesSubjectId(null);
+    }
   };
 
   return (
@@ -1202,11 +1231,8 @@ export default function StudentBooks() {
                           <div className="flex items-center gap-2.5 lg:hidden">
                             <button
                               type="button"
-                              aria-label="Back to all subjects"
-                              onClick={() => {
-                                setSelectedNotesSubjectId(null);
-                                setSearchQuery('');
-                              }}
+                              aria-label="Back to the previous page"
+                              onClick={handleBackFromChapters}
                               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border/60 bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             >
                               <ArrowLeft className="h-4 w-4" />
@@ -1226,10 +1252,7 @@ export default function StudentBooks() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => {
-                                setSelectedNotesSubjectId(null);
-                                setSearchQuery('');
-                              }}
+                              onClick={handleBackFromChapters}
                               className="-ml-2 h-8 gap-1.5 rounded-xl text-xs font-semibold text-muted-foreground hover:text-foreground"
                             >
                               <ArrowLeft className="h-3.5 w-3.5" />
