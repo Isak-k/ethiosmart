@@ -389,6 +389,12 @@ export default function BookReader() {
   const fileId = book.driveFileId || extractDriveFileId(book.driveUrl || '');
   const hasDriveDocument = Boolean(fileId);
 
+  // Notes return to their subject's chapter list; books return to their details page.
+  const readerBackTarget =
+    isShortNote && book.subjectId
+      ? `/dashboard/books?subjectId=${encodeURIComponent(book.subjectId)}`
+      : `/dashboard/books/${book.id}`;
+
   // Notes backed by a Google Drive document open in the immersive, gesture-only PDF reader
   // (edge-to-edge page, finger scroll + pinch-to-zoom, no toolbars).
   // Notes with only AI-generated sections (no Drive file) keep the interactive reader.
@@ -399,7 +405,7 @@ export default function BookReader() {
           book={book}
           isBookmarked={isBookmarked}
           onToggleBookmark={handleToggleBookmark}
-          onBack={() => navigate(`/dashboard/books/${book.id}`)}
+          onBack={() => navigate(readerBackTarget)}
         />
       </div>
     );
@@ -420,7 +426,7 @@ export default function BookReader() {
         pdfData={pdfBlob}
         isSavedOffline={isSavedOffline}
         immersive={isShortNote}
-        onBack={() => navigate(`/dashboard/books/${book.id}`)}
+        onBack={() => navigate(readerBackTarget)}
         onSaveOffline={book.allowDownload ? handleSaveForOffline : undefined}
         isDownloadingOffline={isDownloadingOffline}
         isAdmin={role === 'admin'}
@@ -450,7 +456,7 @@ export default function BookReader() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate(`/dashboard/books/${book.id}`)}
+              onClick={() => navigate(readerBackTarget)}
               className="rounded-lg shrink-0 h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
             >
               <ArrowLeft className="h-3.5 w-3.5 mr-1" />
