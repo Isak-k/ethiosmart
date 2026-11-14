@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 import { auth } from "@/integrations/firebase/client";
-import { updateUserProfile } from "@/lib/auth";
+import { updateUserProfile, signOut } from "@/lib/auth";
+import { clearGuestProfile } from "@/lib/guest-session";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { newPasswordSchema } from "@/lib/validations";
-import { Loader2, User, Mail, Lock, Save, Shield, ArrowLeft, HardDrive, Trash2 } from "lucide-react";
+import { Loader2, User, Mail, Lock, Save, Shield, ArrowLeft, HardDrive, Trash2, LogOut } from "lucide-react";
 import { initOfflineDB, getOfflineStorageSize } from "@/lib/offline-storage";
 import { isOfflineError } from "@/lib/firebase-utils";
 
@@ -26,6 +27,7 @@ const Settings = () => {
   const [name, setName] = useState(profile?.full_name || "");
   const [storageUsed, setStorageUsed] = useState("0 MB");
   const [clearingCache, setClearingCache] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   
   // Password change
   const [currentPassword, setCurrentPassword] = useState("");
@@ -86,6 +88,31 @@ const Settings = () => {
       });
     } finally {
       setClearingCache(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    if (!window.confirm('Are you sure you want to sign out?')) {
+      return;
+    }
+
+    setSigningOut(true);
+    try {
+      clearGuestProfile();
+    } catch {
+      // Ignore guest cleanup errors
+    }
+
+    try {
+      await signOut();
+      navigate("/");
+    } catch (error: any) {
+      toast({
+        title: "Sign out failed",
+        description: error.message || "Could not sign out. Please try again.",
+        variant: "destructive",
+      });
+      setSigningOut(false);
     }
   };
 
@@ -290,17 +317,17 @@ const Settings = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+            <div className="flex items-center justify-between gap-4 p-4 bg-muted/50 rounded-xl border border-border/60">
               <div>
-                <p className="font-medium text-sm">Storage Used</p>
-                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{storageUsed}</p>
+                <p className="font-medium text-sm text-muted-foreground">Storage Used</p>
+                <p className="text-2xl font-bold text-primary mt-0.5">{storageUsed}</p>
               </div>
               <Button
                 onClick={handleClearCache}
                 disabled={clearingCache || storageUsed === '0 MB'}
                 variant="destructive"
                 size="sm"
-                className="gap-2"
+                className="gap-2 shrink-0"
               >
                 {clearingCache ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -391,7 +418,7 @@ const Settings = () => {
               Password must be at least 6 characters
             </p>
 
-            <Button type="submit" variant="outline" disabled={loading || !currentPassword || !newPassword || !confirmPassword}>
+            <Button type="submit" className="btn-primary" disabled={loading || !currentPassword || !newPassword || !confirmPassword}>
               {loading ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
@@ -400,6 +427,48 @@ const Settings = () => {
               Update Password
             </Button>
           </form>
+        </CardContent>
+      </Card>
+
+      {/* Sign Out Section */}
+      <Card className="card-elevated border-destructive/30">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-destructive">
+            <LogOut className="h-5 w-5" />
+            Sign Out
+          </CardTitle>
+          <CardDescription>
+            Sign out of your account on this device
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-xl bg-destructive/5 border border-destructive/20">
+            <div className="flex items-center gap-3">
+              <Avatar className="h-10 w-10">
+                <AvatarImage src={profile?.avatar_url || "/placeholder.svg"} alt={profile?.full_name} />
+                <AvatarFallback className="bg-primary text-primary-foreground text-sm">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate">{profile?.full_name || "Guest User"}</p>
+                <p className="text-xs text-muted-foreground truncate">{profile?.email || "Not signed in"}</p>
+              </div>
+            </div>
+            <Button
+              onClick={handleSignOut}
+              disabled={signingOut}
+              variant="destructive"
+              className="gap-2 shrink-0"
+            >
+              {signingOut ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <LogOut className="h-4 w-4" />
+              )}
+              Sign Out
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>
