@@ -13,6 +13,7 @@ import { ForgotPasswordForm } from "./ForgotPasswordForm";
 import { GoogleProfileSetup } from "./GoogleProfileSetup";
 import { GraduationCap, Loader2, Mail, Lock, User, Eye, EyeOff, Building, WifiOff, ArrowRight, Sparkles, Check, BookOpen } from "lucide-react";
 import { getDepartments } from "@/lib/departments";
+import { getCachedDefaultDepartmentId, getCachedHideDepartmentOnSignup, subscribeToSystemSettings } from "@/lib/system-settings";
 import { Department } from "@/integrations/firebase/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTranslation } from "react-i18next";
@@ -50,6 +51,7 @@ export function AuthForm() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loadingDepts, setLoadingDepts] = useState(true);
   const [selectedDept, setSelectedDept] = useState<string>("");
+  const [hideDeptOnSignup, setHideDeptOnSignup] = useState<boolean>(getCachedHideDepartmentOnSignup());
   const [isOnline, setIsOnline] = useState(() => (typeof navigator !== "undefined" ? navigator.onLine : true));
 
   useEffect(() => {
@@ -68,6 +70,12 @@ export function AuthForm() {
       try {
         const data = await getDepartments();
         setDepartments(data);
+        // Preselect the configured default department so students can sign up
+        // directly (like guest students) without manually choosing one.
+        const defaultId = getCachedDefaultDepartmentId();
+        if (defaultId && data.some((d) => d.id === defaultId && !d.hidden)) {
+          setSelectedDept(defaultId);
+        }
       } catch (error) {
         console.error("Failed to fetch departments", error);
       } finally {
@@ -75,6 +83,14 @@ export function AuthForm() {
       }
     };
     fetchDepts();
+  }, []);
+
+  // Keep the hide-department-on-signup setting in sync with Firestore
+  useEffect(() => {
+    const unsub = subscribeToSystemSettings((settings) => {
+      setHideDeptOnSignup(!!settings.hideDepartmentOnSignup);
+    });
+    return () => unsub();
   }, []);
 
   // Check for password reset redirect
@@ -209,7 +225,17 @@ export function AuthForm() {
       return;
     }
 
-    if (!selectedDept) {
+    // Fall back to the configured default department (like guest students) when
+    // the student leaves the department unselected.
+    let effectiveDept = selectedDept;
+    if (!effectiveDept) {
+      const defaultId = getCachedDefaultDepartmentId();
+      if (defaultId && departments.some((d) => d.id === defaultId)) {
+        effectiveDept = defaultId;
+      }
+    }
+
+    if (!effectiveDept) {
       setSignupErrors(prev => ({ ...prev, department: t("common.selectDepartment") }));
       return;
     }
@@ -217,7 +243,7 @@ export function AuthForm() {
     setLoading(true);
 
     try {
-      await signUp(signupEmail, signupPassword, signupName, signupRole, selectedDept);
+      await signUp(signupEmail, signupPassword, signupName, signupRole, effectiveDept);
       
       // Refresh profile to ensure the new role is loaded
       await refreshProfile();
@@ -374,6 +400,9 @@ export function AuthForm() {
       </div>
     );
   }
+
+  // Only show departments that the admin has not hidden from signup
+  const visibleDepartments = departments.filter((d) => !d.hidden);
 
   return (
     <div className="w-full relative">
@@ -689,38 +718,40 @@ export function AuthForm() {
               </div>
 
               {/* Department */}
-              <div>
-                <div className="relative group">
-                  <Building className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-blue-600 transition-colors z-10" />
-                  <Select value={selectedDept} onValueChange={(v) => {
-                    setSelectedDept(v);
-                    setSignupErrors((prev) => ({ ...prev, department: undefined }));
-                  }}>
-                    <SelectTrigger className={cn(
-                      "pl-11 h-12 rounded-2xl liquid-glass-input text-sm text-slate-900 dark:text-slate-50",
-                      signupErrors.department && "border-red-500"
-                    )}>
-                      <SelectValue placeholder={t("common.selectDepartment")} />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 shadow-xl">
-                      {loadingDepts ? (
-                        <div className="p-2 text-xs text-slate-500 text-center">{t("common.loading")}</div>
-                      ) : departments.length === 0 ? (
-                        <div className="p-2 text-xs text-slate-500 text-center">{t("common.noDepartments")}</div>
-                      ) : (
-                        departments.map((dept) => (
-                          <SelectItem key={dept.id} value={dept.id} className="rounded-xl text-xs sm:text-sm">
-                            {dept.name}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
+              {!hideDeptOnSignup && (
+                <div>
+                  <div className="relative group">
+                    <Building className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-blue-600 transition-colors z-10" />
+                    <Select value={selectedDept} onValueChange={(v) => {
+                      setSelectedDept(v);
+                      setSignupErrors((prev) => ({ ...prev, department: undefined }));
+                    }}>
+                      <SelectTrigger className={cn(
+                        "pl-11 h-12 rounded-2xl liquid-glass-input text-sm text-slate-900 dark:text-slate-50",
+                        signupErrors.department && "border-red-500"
+                      )}>
+                        <SelectValue placeholder={t("common.selectDepartment")} />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 shadow-xl">
+                        {loadingDepts ? (
+                          <div className="p-2 text-xs text-slate-500 text-center">{t("common.loading")}</div>
+                        ) : visibleDepartments.length === 0 ? (
+                          <div className="p-2 text-xs text-slate-500 text-center">{t("common.noDepartments")}</div>
+                        ) : (
+                          visibleDepartments.map((dept) => (
+                            <SelectItem key={dept.id} value={dept.id} className="rounded-xl text-xs sm:text-sm">
+                              {dept.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {signupErrors.department && (
+                    <p className="text-[11px] text-red-500 pl-3 pt-0.5">{signupErrors.department}</p>
+                  )}
                 </div>
-                {signupErrors.department && (
-                  <p className="text-[11px] text-red-500 pl-3 pt-0.5">{signupErrors.department}</p>
-                )}
-              </div>
+              )}
 
               {/* Password */}
               <div>

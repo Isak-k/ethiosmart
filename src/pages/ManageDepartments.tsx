@@ -11,14 +11,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus, Trash2, Building, Pencil, Star, Sparkles, CheckCircle2 } from "lucide-react";
-import { getDepartments, createDepartment, deleteDepartment, updateDepartment } from "@/lib/departments";
+import { Loader2, Plus, Trash2, Building, Pencil, Star, Sparkles, CheckCircle2, Eye, EyeOff } from "lucide-react";
+import { getDepartments, createDepartment, deleteDepartment, updateDepartment, updateDepartmentVisibility } from "@/lib/departments";
 import { Department } from "@/integrations/firebase/types";
 import { useSectionPermissions } from "@/hooks/useSectionPermissions";
 import { 
   setDefaultDepartment, 
   getCachedDefaultDepartmentId, 
-  subscribeToSystemSettings 
+  subscribeToSystemSettings,
+  updateSystemSettings,
+  getCachedHideDepartmentOnSignup
 } from "@/lib/system-settings";
 
 export default function ManageDepartments() {
@@ -36,6 +38,10 @@ export default function ManageDepartments() {
   const [defaultDeptId, setDefaultDeptId] = useState<string | null>(getCachedDefaultDepartmentId());
   const [savingDefault, setSavingDefault] = useState(false);
 
+  // Hide department selector on signup state
+  const [hideDepartmentOnSignup, setHideDepartmentOnSignup] = useState<boolean>(getCachedHideDepartmentOnSignup());
+  const [savingHideDept, setSavingHideDept] = useState(false);
+
   // Edit state
   const [editOpen, setEditOpen] = useState(false);
   const [editingDept, setEditingDept] = useState<Department | null>(null);
@@ -52,6 +58,7 @@ export default function ManageDepartments() {
     // Subscribe to system settings to keep default department state live
     const unsub = subscribeToSystemSettings((settings) => {
       setDefaultDeptId(settings.defaultDepartmentId ?? null);
+      setHideDepartmentOnSignup(!!settings.hideDepartmentOnSignup);
     });
     return () => unsub();
   }, [role, navigate]);
@@ -90,6 +97,29 @@ export default function ManageDepartments() {
       });
     } finally {
       setSavingDefault(false);
+    }
+  };
+
+  const handleToggleHideDepartmentOnSignup = async () => {
+    const next = !hideDepartmentOnSignup;
+    setSavingHideDept(true);
+    try {
+      await updateSystemSettings({ hideDepartmentOnSignup: next }, profile?.user_id || 'admin');
+      setHideDepartmentOnSignup(next);
+      toast({
+        title: next ? "Department Selector Hidden" : "Department Selector Visible",
+        description: next
+          ? "Students will sign up using the default department set above."
+          : "Students can now choose their department during sign up.",
+      });
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message || "Failed to update setting",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingHideDept(false);
     }
   };
 
@@ -168,6 +198,26 @@ export default function ManageDepartments() {
       toast({
         title: "Error",
         description: "Failed to delete department",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleToggleVisibility = async (dept: Department) => {
+    const nextHidden = !dept.hidden;
+    try {
+      await updateDepartmentVisibility(dept.id, nextHidden);
+      fetchDepartments();
+      toast({
+        title: nextHidden ? "Department Hidden" : "Department Visible",
+        description: nextHidden
+          ? `"${dept.name}" will no longer appear in the student signup list.`
+          : `"${dept.name}" is now available in the student signup list.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update department visibility",
         variant: "destructive",
       });
     }
@@ -334,6 +384,40 @@ export default function ManageDepartments() {
                 </Button>
               )}
             </div>
+
+            <div className="mt-4 pt-4 border-t border-dashed border-purple-200/60 dark:border-purple-900/40">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-xl bg-blue-600/10 text-blue-600 dark:text-blue-400 shrink-0">
+                    {hideDepartmentOnSignup ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">
+                      Department Selector on Sign Up
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {hideDepartmentOnSignup
+                        ? "Hidden — students sign up using the default department above."
+                        : "Visible — students choose their department during sign up."}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant={hideDepartmentOnSignup ? "secondary" : "outline"}
+                  size="sm"
+                  onClick={handleToggleHideDepartmentOnSignup}
+                  disabled={savingHideDept}
+                  className="rounded-xl text-xs h-10 px-4 shrink-0"
+                >
+                  {savingHideDept && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
+                  {hideDepartmentOnSignup ? "Show on Sign Up" : "Hide on Sign Up"}
+                </Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -368,6 +452,12 @@ export default function ManageDepartments() {
                               Default (Active)
                             </Badge>
                           )}
+                          {dept.hidden && (
+                            <Badge variant="outline" className="text-muted-foreground text-[11px] font-semibold py-0.5 px-2.5 rounded-full flex items-center gap-1">
+                              <EyeOff className="h-3 w-3" />
+                              Hidden from signup
+                            </Badge>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
@@ -393,6 +483,21 @@ export default function ManageDepartments() {
                             >
                               <Star className={`h-3.5 w-3.5 ${isCurrentDefault ? 'fill-amber-500 text-amber-500' : 'text-muted-foreground'}`} />
                               <span>{isCurrentDefault ? "Default" : "Make Default"}</span>
+                            </Button>
+                          )}
+                          {canEdit('departments') && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded-xl"
+                              onClick={() => handleToggleVisibility(dept)}
+                              title={dept.hidden ? "Unhide from student signup" : "Hide from student signup"}
+                            >
+                              {dept.hidden ? (
+                                <EyeOff className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                              ) : (
+                                <Eye className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                              )}
                             </Button>
                           )}
                           {canEdit('departments') && (

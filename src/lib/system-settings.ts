@@ -14,6 +14,9 @@ export interface SystemSettings {
     // Default Department: when set, all students and guests directly open this department
     defaultDepartmentId?: string | null;
     defaultDepartmentName?: string | null;
+    // When true, the department selector is hidden from the student signup page
+    // and students are automatically assigned the default department
+    hideDepartmentOnSignup?: boolean;
     practiceExamsEnabled: boolean;
     defaultPassingScore: number;
     sessionDurationDays: number;
@@ -32,6 +35,7 @@ const LOCAL_SETTINGS_CACHE_KEY = 'exampro_system_settings_cache';
 const LOCAL_REQUIRE_LOGIN_KEY = 'exampro_system_require_login';
 const LOCAL_DEFAULT_DEPT_ID_KEY = 'exampro_system_default_dept_id';
 const LOCAL_DEFAULT_DEPT_NAME_KEY = 'exampro_system_default_dept_name';
+const LOCAL_HIDE_DEPT_ON_SIGNUP_KEY = 'exampro_system_hide_dept_on_signup';
 
 export const SYSTEM_SETTINGS_CHANGED_EVENT = 'exampro_system_settings_changed';
 
@@ -80,6 +84,20 @@ export function getCachedRequireStudentLogin(): boolean {
 }
 
 /**
+ * Get cached hideDepartmentOnSignup flag synchronously for instant cold-start
+ */
+export function getCachedHideDepartmentOnSignup(): boolean {
+  try {
+    if (typeof localStorage === 'undefined') return false;
+    const val = localStorage.getItem(LOCAL_HIDE_DEPT_ON_SIGNUP_KEY);
+    if (val === null) return false; // Default to false (show selector)
+    return val === 'true';
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Save settings to localStorage cache
  */
 function cacheSettingsLocally(settings: SystemSettings['settings']) {
@@ -91,6 +109,9 @@ function cacheSettingsLocally(settings: SystemSettings['settings']) {
     }
     if (settings.defaultDepartmentName !== undefined) {
       localStorage.setItem(LOCAL_DEFAULT_DEPT_NAME_KEY, settings.defaultDepartmentName || '');
+    }
+    if (settings.hideDepartmentOnSignup !== undefined) {
+      localStorage.setItem(LOCAL_HIDE_DEPT_ON_SIGNUP_KEY, String(!!settings.hideDepartmentOnSignup));
     }
     localStorage.setItem(
       LOCAL_SETTINGS_CACHE_KEY,
@@ -240,6 +261,10 @@ export async function updateSystemSettings(
       settings.defaultDepartmentName !== undefined
         ? settings.defaultDepartmentName
         : current.defaultDepartmentName ?? 'Freshman',
+    hideDepartmentOnSignup:
+      settings.hideDepartmentOnSignup !== undefined
+        ? settings.hideDepartmentOnSignup
+        : current.hideDepartmentOnSignup ?? false,
     practiceExamsEnabled: settings.practiceExamsEnabled ?? current.practiceExamsEnabled ?? true,
     defaultPassingScore: settings.defaultPassingScore ?? current.defaultPassingScore ?? 50,
     sessionDurationDays: settings.sessionDurationDays ?? current.sessionDurationDays ?? 30,
@@ -312,6 +337,7 @@ export function getDefaultSettings(): SystemSettings['settings'] {
     requireStudentLogin: true, // Default: students must login unless admin explicitly disables it
     defaultDepartmentId: 'qzw7P8fCSFpnRGqdAgxW', // Freshman department by default
     defaultDepartmentName: 'Freshman',
+    hideDepartmentOnSignup: false, // Default: show department selector on signup
     practiceExamsEnabled: true,
     defaultPassingScore: 50,
     sessionDurationDays: 30,

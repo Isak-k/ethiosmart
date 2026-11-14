@@ -19,6 +19,7 @@ export interface UserProfile {
 export interface Department {
   id: string;
   name: string;
+  hidden?: boolean; // When true, department is hidden from the student signup selection
   createdAt: Timestamp;
 }
 

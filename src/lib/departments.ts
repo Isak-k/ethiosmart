@@ -80,3 +80,13 @@ export const updateDepartment = async (id: string, name: string) => {
     throw error;
   }
 };
+
+export const updateDepartmentVisibility = async (id: string, hidden: boolean) => {
+  try {
+    const docRef = doc(db, "departments", id);
+    await updateDoc(docRef, { hidden });
+  } catch (error) {
+    console.error("Error updating department visibility:", error);
+    throw error;
+  }
+};

@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getDepartments } from "@/lib/departments";
-import { getCachedDefaultDepartmentId } from "@/lib/system-settings";
+import { getCachedDefaultDepartmentId, getCachedHideDepartmentOnSignup } from "@/lib/system-settings";
 import { Department } from "@/integrations/firebase/types";
 import { useTranslation } from "react-i18next";
 import { Building, Loader2, User } from "lucide-react";
@@ -24,11 +24,13 @@ export function GoogleProfileSetup({ email, displayName, onComplete, loading }: 
   const [selectedDept, setSelectedDept] = useState<string>("");
   const [fullName, setFullName] = useState<string>(displayName || "");
   const [errors, setErrors] = useState<{ name?: string; department?: string }>({});
+  const [hideDeptOnSignup] = useState<boolean>(getCachedHideDepartmentOnSignup());
 
   useEffect(() => {
     const fetchDepts = async () => {
       try {
-        const data = await getDepartments();
+        // Only offer departments the admin has not hidden from signup
+        const data = (await getDepartments()).filter((d) => !d.hidden);
         setDepartments(data);
         const defaultDeptId = getCachedDefaultDepartmentId();
         if (defaultDeptId && data.some((d) => d.id === defaultDeptId)) {
@@ -60,13 +62,21 @@ export function GoogleProfileSetup({ email, displayName, onComplete, loading }: 
       return;
     }
 
-    // Validate department
-    if (!selectedDept) {
+    // Validate department (fall back to the configured default department)
+    let effectiveDept = selectedDept;
+    if (!effectiveDept) {
+      const defaultId = getCachedDefaultDepartmentId();
+      if (defaultId && departments.some((d) => d.id === defaultId)) {
+        effectiveDept = defaultId;
+      }
+    }
+
+    if (!effectiveDept) {
       setErrors(prev => ({ ...prev, department: t("common.selectDepartment") }));
       return;
     }
 
-    onComplete(fullName.trim(), selectedDept);
+    onComplete(fullName.trim(), effectiveDept);
   };
 
   return (
@@ -122,37 +132,44 @@ export function GoogleProfileSetup({ email, displayName, onComplete, loading }: 
           <Label htmlFor="dept-select" className="text-xs sm:text-sm font-semibold pl-1">
             {t("common.department")} *
           </Label>
-          <div className="relative group">
-            <Building className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 group-focus-within:text-sky-500 transition-colors z-10" />
-            <Select value={selectedDept} onValueChange={(v) => {
-              setSelectedDept(v);
-              setErrors(prev => ({ ...prev, department: undefined }));
-            }}>
-              <SelectTrigger className={cn(
-                "pl-12 h-12 rounded-full liquid-glass-input text-sm",
-                errors.department && "border-red-500"
-              )}>
-                <SelectValue placeholder={t("common.selectDepartment")} />
-              </SelectTrigger>
-              <SelectContent className="rounded-2xl border border-white/20 backdrop-blur-xl bg-card/95">
-                {loadingDepts ? (
-                  <div className="p-2 text-sm text-muted-foreground text-center">{t("common.loading")}</div>
-                ) : departments.length === 0 ? (
-                  <div className="p-2 text-sm text-muted-foreground text-center">{t("common.noDepartments")}</div>
-                ) : (
-                  departments.map((dept) => (
-                    <SelectItem key={dept.id} value={dept.id} className="rounded-xl">
-                      {dept.name}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-          {errors.department && (
-            <p className="text-xs text-red-500 pl-3 flex items-center gap-1">
-              <span>⚠</span> {errors.department}
-            </p>
+          {!hideDeptOnSignup ? (
+            <div className="relative group">
+              <Building className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 group-focus-within:text-sky-500 transition-colors z-10" />
+              <Select value={selectedDept} onValueChange={(v) => {
+                setSelectedDept(v);
+                setErrors(prev => ({ ...prev, department: undefined }));
+              }}>
+                <SelectTrigger className={cn(
+                  "pl-12 h-12 rounded-full liquid-glass-input text-sm",
+                  errors.department && "border-red-500"
+                )}>
+                  <SelectValue placeholder={t("common.selectDepartment")} />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl border border-white/20 backdrop-blur-xl bg-card/95">
+                  {loadingDepts ? (
+                    <div className="p-2 text-sm text-muted-foreground text-center">{t("common.loading")}</div>
+                  ) : departments.length === 0 ? (
+                    <div className="p-2 text-sm text-muted-foreground text-center">{t("common.noDepartments")}</div>
+                  ) : (
+                    departments.map((dept) => (
+                      <SelectItem key={dept.id} value={dept.id} className="rounded-xl">
+                        {dept.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              {errors.department && (
+                <p className="text-xs text-red-500 pl-3 flex items-center gap-1">
+                  <span>⚠</span> {errors.department}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="px-5 py-3 rounded-full liquid-glass-input flex items-center gap-2 text-sm text-muted-foreground">
+              <Building className="h-4 w-4" />
+              <span>Default department will be assigned automatically.</span>
+            </div>
           )}
         </div>
 
