@@ -1116,19 +1116,30 @@ export default function CommunityChat() {
           {/* Top Header with TikTok-style "Department | Announcements" Feeds Switcher */}
           <header className="px-2.5 sm:px-4 py-2 sm:py-3 border-b border-border/60 bg-background/95 dark:bg-slate-950/90 backdrop-blur-md flex items-center justify-between gap-1 sm:gap-3 shrink-0 relative">
             {/* Left Controls: Top Back Button & Channel Icon */}
-            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-              {/* Back to previous page button (prominently visible on both desktop and mobile) */}
+            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 lg:flex-none">
+              {/* Back to previous page button (compact icon on mobile) */}
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
                 onClick={handleGoBack}
-                className="h-8.5 px-2.5 sm:px-3 rounded-xl border border-border/70 hover:bg-muted text-foreground flex items-center gap-1.5 font-bold text-xs shrink-0 active:scale-95 transition-all shadow-xs"
+                className="h-8.5 w-8.5 sm:w-auto px-0 sm:px-3 rounded-full sm:rounded-xl border border-border/70 hover:bg-muted text-foreground flex items-center justify-center gap-1.5 font-bold text-xs shrink-0 active:scale-95 transition-all shadow-xs"
                 title="Back to dashboard / previous page"
+                aria-label="Back"
               >
                 <ArrowLeft className="h-4 w-4" />
-                <span>Back</span>
+                <span className="hidden sm:inline">Back</span>
               </Button>
+
+              {/* Mobile channel title */}
+              <div className="flex lg:hidden items-center gap-1.5 min-w-0">
+                <div className="h-7 w-7 shrink-0 rounded-lg bg-gradient-to-tr from-sky-500 via-indigo-600 to-purple-600 text-white flex items-center justify-center text-xs shadow-xs">
+                  {activeChannel?.icon || (activeChannel?.category === 'department' ? '🏛️' : '#')}
+                </div>
+                <span className="truncate text-sm font-bold text-foreground">
+                  {activeChannel?.name}
+                </span>
+              </div>
 
               {/* Desktop channel icon indicator */}
               <div className="hidden lg:flex items-center gap-2">
@@ -1138,8 +1149,8 @@ export default function CommunityChat() {
               </div>
             </div>
 
-            {/* CENTER: SMALL BUTTONS TO CHANGE FROM DEP CHAT TO ANNOUNCEMENT AND VICE VERSA */}
-            <div className="flex-1 flex items-center justify-center min-w-0 px-1">
+            {/* CENTER: SMALL BUTTONS TO CHANGE FROM DEP CHAT TO ANNOUNCEMENT AND VICE VERSA (desktop) */}
+            <div className="hidden lg:flex flex-1 items-center justify-center min-w-0 px-1">
               <div className="inline-flex items-center p-1 rounded-2xl bg-muted/60 dark:bg-slate-900/80 border border-border/60 shadow-xs max-w-full">
                 {/* 1. DEPARTMENT CHAT SMALL BUTTON */}
                 <div className="relative flex items-center">
@@ -1378,8 +1389,8 @@ export default function CommunityChat() {
             </div>
           </header>
 
-          {/* Active Feed Info Subtitle Bar with TikTok Swipe hint */}
-          <div className="px-3 sm:px-4 py-1 bg-muted/20 border-b border-border/40 flex items-center justify-between text-[11px] text-muted-foreground shrink-0">
+          {/* Active Feed Info Subtitle Bar with TikTok Swipe hint (desktop only) */}
+          <div className="hidden lg:flex px-3 sm:px-4 py-1 bg-muted/20 border-b border-border/40 items-center justify-between text-[11px] text-muted-foreground shrink-0">
             <div className="flex items-center gap-1.5 truncate">
               <span className="font-semibold text-foreground truncate">
                 {activeChannel?.name}:
@@ -1400,9 +1411,9 @@ export default function CommunityChat() {
             </div>
           </div>
 
-          {/* Mode Announcement Banner (Live Mode vs Stored Mode) */}
+          {/* Mode Announcement Banner (Live Mode vs Stored Mode) — desktop only */}
           <div
-            className={`px-3 sm:px-4 py-1.5 border-b text-[11px] font-medium flex items-center justify-between gap-2 shrink-0 transition-colors ${
+            className={`hidden lg:flex px-3 sm:px-4 py-1.5 border-b text-[11px] font-medium items-center justify-between gap-2 shrink-0 transition-colors ${
               isAnnouncementsActive
                 ? 'bg-amber-500/10 border-amber-500/25 text-amber-800 dark:text-amber-300'
                 : chatMode === 'live'
