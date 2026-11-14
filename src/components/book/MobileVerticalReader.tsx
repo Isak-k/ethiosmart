@@ -427,6 +427,7 @@ export function MobileVerticalReader({
 }: MobileVerticalReaderProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const cloudContainerRef = useRef<HTMLDivElement>(null);
   const pagesContainerRef = useRef<HTMLDivElement>(null);
   const verticalTrackRef = useRef<HTMLDivElement>(null);
 
@@ -777,7 +778,9 @@ export function MobileVerticalReader({
   const lastTapRef = useRef<number>(0);
 
   useEffect(() => {
-    const scrollEl = scrollContainerRef.current;
+    // Support finger pinch-to-zoom in both engines: the HD canvas reader and the
+    // cloud/iframe stream viewer (books without a cached PDF blob).
+    const scrollEl = viewEngine === 'cloud' ? cloudContainerRef.current : scrollContainerRef.current;
     if (!scrollEl) return;
 
     const onTouchStart = (e: TouchEvent) => {
@@ -864,7 +867,7 @@ export function MobileVerticalReader({
       scrollEl.removeEventListener('touchend', onTouchEnd);
       scrollEl.removeEventListener('touchcancel', onTouchEnd);
     };
-  }, [zoomFactor, livePinchPercent, resetAutoHideTimer]);
+  }, [zoomFactor, livePinchPercent, resetAutoHideTimer, viewEngine]);
 
   // Handle single tap (toggle controls) and double touch/tap (HIDE IMMEDIATELY)
   const handleContentTouchEnd = (e: React.TouchEvent) => {
@@ -1270,12 +1273,11 @@ export function MobileVerticalReader({
           </div>
         )}
 
-        {/* Live Pinch Zoom HUD Badge (Canvas mode) */}
-        {livePinchPercent !== null && viewEngine === 'canvas' && (
+        {/* Live pinch zoom indicator (no icons — the percentage auto-hides) */}
+        {livePinchPercent !== null && (
           <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 pointer-events-none animate-scale-in">
-            <div className="px-4 py-2 rounded-full bg-primary text-primary-foreground font-bold text-sm shadow-2xl flex items-center gap-2">
-              <ZoomIn className="h-4 w-4" />
-              <span>Zoom: {livePinchPercent}%</span>
+            <div className="px-4 py-2 rounded-full bg-primary/90 text-primary-foreground font-bold text-sm shadow-2xl backdrop-blur-md">
+              {livePinchPercent}%
             </div>
           </div>
         )}
@@ -1283,6 +1285,7 @@ export function MobileVerticalReader({
         {/* ENGINE 1: CLOUD / DIRECT STREAM VIEWER (Continuous vertical scroll, edge-to-edge, zero failure) */}
         {viewEngine === 'cloud' && (effectiveDriveFileId || activeUrl) && (
           <div
+            ref={cloudContainerRef}
             className="w-full h-full relative overflow-auto bg-[#0a0c10] flex flex-col overscroll-contain select-none"
             style={{
               WebkitOverflowScrolling: 'touch',
@@ -1322,11 +1325,16 @@ export function MobileVerticalReader({
               </div>
             )}
 
-            {/* Scalable Container for Zoom in Cloud / Iframe Mode */}
+            {/* Scalable Container for Zoom in Cloud / Iframe Mode (finger pinch-to-zoom) */}
             <div
-              className="w-full h-full transition-transform duration-150 origin-top flex-1"
+              className={`w-full h-full origin-top flex-1 ${livePinchScale == null ? 'transition-transform duration-150' : ''}`}
               style={{
-                transform: zoomFactor !== 1.0 ? `scale(${zoomFactor})` : undefined,
+                transform:
+                  livePinchScale != null
+                    ? `scale(${zoomFactor * livePinchScale})`
+                    : zoomFactor !== 1.0
+                    ? `scale(${zoomFactor})`
+                    : undefined,
                 transformOrigin: 'top center',
                 width: zoomFactor > 1.0 ? `${Math.round(100 * zoomFactor)}%` : '100%',
                 height: zoomFactor > 1.0 ? `${Math.round(100 * zoomFactor)}%` : '100%',
