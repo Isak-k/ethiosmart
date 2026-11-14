@@ -51,6 +51,16 @@ import {
 } from "lucide-react";
 import { usePWAInstall } from "@/hooks/use-pwa-install";
 import { PwaInstallDialog } from "@/components/ui/pwa-install-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ManualRefreshButton } from "@/components/ui/manual-refresh-button";
 import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import { cn } from "@/lib/utils";
@@ -489,6 +499,8 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
     setInstallModalOpen,
   } = usePWAInstall();
 
+  const [signOutDialogOpen, setSignOutDialogOpen] = useState(false);
+
   const handleSignOut = async () => {
     try {
       clearGuestProfile();
@@ -496,6 +508,9 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
     await signOut();
     navigate("/");
   };
+
+  // Every sign-out control asks for confirmation first, then returns to the first page.
+  const confirmSignOut = () => setSignOutDialogOpen(true);
 
   // Background auto-sync of critical subjects, chapters, exams, books and notes to device storage
   React.useEffect(() => {
@@ -627,7 +642,7 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
             {isGuest && (
               <button
                 type="button"
-                onClick={handleSignOut}
+                onClick={confirmSignOut}
                 className="liquid-glass-button-secondary rounded-full h-9 px-3.5 text-xs font-bold flex items-center gap-1.5 text-red-600 dark:text-red-400 border border-red-400/30 bg-red-500/10 hover:bg-red-500/20 active:scale-95 transition-all shadow-xs"
                 title="Exit guest mode and return to first page"
               >
@@ -724,7 +739,7 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
                   <DropdownMenuSeparator />
                 </>
               )}
-              <DropdownMenuItem onClick={handleSignOut} className="text-destructive font-semibold">
+              <DropdownMenuItem onClick={confirmSignOut} className="text-destructive font-semibold">
                 <LogOut className="mr-2 h-4 w-4" />
                 {t("common.signOut", "Sign Out")}
               </DropdownMenuItem>
@@ -826,7 +841,7 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
             {role !== "admin" && (
               <button
                 type="button"
-                onClick={handleSignOut}
+                onClick={confirmSignOut}
                 className="group relative w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl transition-all duration-300 font-medium text-rose-300/90 hover:text-white hover:bg-rose-500/15 border border-transparent hover:border-rose-400/30"
               >
                 <div className="p-2 rounded-xl transition-all duration-300 shrink-0 bg-rose-500/15 text-rose-300 group-hover:bg-rose-500/25 group-hover:text-rose-200">
@@ -868,7 +883,7 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
                       First Page
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleSignOut} className="text-destructive font-semibold">
+                    <DropdownMenuItem onClick={confirmSignOut} className="text-destructive font-semibold">
                       <LogOut className="mr-2 h-4 w-4" />
                       {t("common.signOut", "Sign Out")}
                     </DropdownMenuItem>
@@ -880,7 +895,7 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
                       {t("common.settings")}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleSignOut}>
+                    <DropdownMenuItem onClick={confirmSignOut}>
                       <LogOut className="mr-2 h-4 w-4" />
                       {t("common.signOut")}
                     </DropdownMenuItem>
@@ -1068,7 +1083,7 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
                 <button
                   onClick={() => {
                     setProfileSheetOpen(false);
-                    handleSignOut();
+                    confirmSignOut();
                   }}
                   className="w-full flex items-center gap-4 px-4 py-4 rounded-2xl hover:bg-red-50 dark:hover:bg-red-950/30 text-red-600 dark:text-red-400 border border-red-200/50 dark:border-red-900/40 transition-colors"
                 >
@@ -1120,6 +1135,30 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
         deferredPrompt={deferredPrompt}
         onInstallClick={promptInstall}
       />
+
+      {/* Sign-out confirmation — asks before logging out, then returns to the first page */}
+      <AlertDialog open={signOutDialogOpen} onOpenChange={setSignOutDialogOpen}>
+        <AlertDialogContent className="rounded-2xl max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Log out?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t(
+                "layout.signOutConfirm",
+                "Are you sure you want to log out? You will be returned to the first page."
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleSignOut}
+              className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {t("common.signOut", "Log out")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
