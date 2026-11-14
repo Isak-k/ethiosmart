@@ -412,8 +412,8 @@ export function AuthForm() {
           <div className="flex justify-center mb-2">
             <div className="relative group">
               {/* Luminous blue/cyan halo */}
-              <div className="absolute -inset-3 bg-gradient-to-r from-blue-500/30 via-sky-400/25 to-cyan-400/30 rounded-[36px] blur-xl opacity-85 group-hover:opacity-100 transition-opacity duration-500" />
-              <div className="relative liquid-glass-squircle w-26 h-26 sm:w-28 sm:h-28 rounded-[28px] sm:rounded-[32px] p-2.5 sm:p-3 flex items-center justify-center shadow-2xl shadow-blue-500/20 group-hover:scale-105 transition-all duration-300">
+              <div className="absolute -inset-2 bg-gradient-to-r from-blue-500/30 via-sky-400/25 to-cyan-400/30 rounded-[28px] blur-xl opacity-85 group-hover:opacity-100 transition-opacity duration-500" />
+              <div className="relative liquid-glass-squircle w-16 h-16 sm:w-20 sm:h-20 rounded-[20px] sm:rounded-[24px] p-2 sm:p-2.5 flex items-center justify-center shadow-2xl shadow-blue-500/20 group-hover:scale-105 transition-all duration-300">
                 <img
                   src="/EthioSmart.png"
                   alt="EthioSmart"
