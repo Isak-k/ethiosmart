@@ -1187,45 +1187,79 @@ export default function StudentBooks() {
                     )}
                   </div>
                 ) : (
-                  /* LEVEL 2: AVAILABLE CHAPTERS FOR SELECTED SUBJECT (MATCHING SCREENSHOT UI) */
-                  <div className="space-y-6 max-w-3xl mx-auto">
-                    {/* Back Button */}
-                    <div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedNotesSubjectId(null);
-                          setSearchQuery('');
-                        }}
-                        className="rounded-xl text-muted-foreground hover:text-foreground text-xs font-semibold gap-1.5 h-8 -ml-2"
-                      >
-                        <ArrowLeft className="h-3.5 w-3.5" />
-                        Back to All Subjects
-                      </Button>
-                    </div>
-
-                    {/* Screenshot-aligned Header */}
+                  /* LEVEL 2: AVAILABLE CHAPTERS FOR SELECTED SUBJECT */
+                  <div className="space-y-4 lg:space-y-6 lg:max-w-3xl lg:mx-auto">
+                    {/* Sticky header — mobile: compact back icon + subject + search; desktop: full header */}
                     {(() => {
                       const uploadedCount = displayUnits.filter((u) => Boolean(u.note)).length;
                       const totalUnits = Math.max(displayUnits.length, currentNotesSubject?.totalUnits || 0, 1);
                       const gradeText = currentNotesSubject?.description?.match(/Grade\s*\d+/i)?.[0] || 'Grade 9';
+                      const subjectName = currentNotesSubject?.name || 'Subject';
 
                       return (
-                        <div className="space-y-1.5 pb-2">
-                          <h1 className="text-3xl sm:text-4xl font-extrabold text-[#111827] dark:text-foreground tracking-tight font-display">
-                            {currentNotesSubject?.name || 'Subject'}
-                          </h1>
-                          <p className="text-sm sm:text-base text-slate-500 dark:text-muted-foreground font-medium">
-                            {gradeText} · {uploadedCount} of {totalUnits} chapters uploaded
-                          </p>
+                        <div className="sticky top-16 z-20 lg:static -mx-6 lg:mx-0 px-3 lg:px-0 py-2.5 lg:py-0 bg-background/90 lg:bg-transparent backdrop-blur-md lg:backdrop-blur-none border-b border-border/60 lg:border-0 space-y-2.5 lg:space-y-3">
+                          {/* Mobile app bar: compact back icon + subject */}
+                          <div className="flex items-center gap-2.5 lg:hidden">
+                            <button
+                              type="button"
+                              aria-label="Back to all subjects"
+                              onClick={() => {
+                                setSelectedNotesSubjectId(null);
+                                setSearchQuery('');
+                              }}
+                              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border/60 bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            >
+                              <ArrowLeft className="h-4 w-4" />
+                            </button>
+                            <div className="min-w-0 flex-1">
+                              <h1 className="truncate font-display text-base font-bold leading-tight text-foreground">
+                                {subjectName}
+                              </h1>
+                              <p className="truncate text-[11px] text-muted-foreground">
+                                {gradeText} · {uploadedCount} of {totalUnits} chapters
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Desktop header */}
+                          <div className="hidden lg:block">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedNotesSubjectId(null);
+                                setSearchQuery('');
+                              }}
+                              className="-ml-2 h-8 gap-1.5 rounded-xl text-xs font-semibold text-muted-foreground hover:text-foreground"
+                            >
+                              <ArrowLeft className="h-3.5 w-3.5" />
+                              Back to All Subjects
+                            </Button>
+                            <h1 className="mt-1.5 font-display text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
+                              {subjectName}
+                            </h1>
+                            <p className="mt-1 text-sm font-medium text-muted-foreground sm:text-base">
+                              {gradeText} · {uploadedCount} of {totalUnits} chapters uploaded
+                            </p>
+                          </div>
+
+                          {/* Search — always visible */}
+                          <div className="relative w-full">
+                            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              placeholder="Search chapters or topics..."
+                              value={searchQuery}
+                              onChange={(e) => setSearchQuery(e.target.value)}
+                              className="h-10 rounded-xl bg-card pl-10 text-sm lg:h-9 lg:text-xs"
+                            />
+                          </div>
                         </div>
                       );
                     })()}
 
                     {/* Complete Curriculum Textbook Banner if available for this subject */}
                     {currentSubjectCurriculumBooks.length > 0 && (
-                      <div className="p-4 rounded-2xl bg-gradient-to-r from-primary/10 via-purple-500/10 to-indigo-500/10 border border-primary/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                      <div className="-mx-6 lg:mx-0 p-4 rounded-2xl bg-gradient-to-r from-primary/10 via-purple-500/10 to-indigo-500/10 border border-primary/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
                         <div className="flex items-center gap-3">
                           <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0 shadow-xs">
                             <BookOpen className="h-5 w-5" />
@@ -1260,19 +1294,6 @@ export default function StudentBooks() {
                       </div>
                     )}
 
-                    {/* Search inside chapter view */}
-                    {displayUnits.length > 6 && (
-                      <div className="relative w-full">
-                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          placeholder="Search chapters or topics..."
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          className="pl-10 rounded-2xl bg-card text-xs h-9"
-                        />
-                      </div>
-                    )}
-
                     {/* Loading State */}
                     {loadingCurriculumChapters ? (
                       <div className="text-center py-20">
@@ -1296,8 +1317,8 @@ export default function StudentBooks() {
                         </Button>
                       </div>
                     ) : (
-                      /* Vertical stack of horizontal cards matching screenshot */
-                      <div className="space-y-3.5">
+                      /* Vertical stack of chapter cards */
+                      <div className="-mx-6 lg:mx-0 space-y-3">
                         {displayUnits
                           .filter((unit) => {
                             if (!searchQuery.trim()) return true;
@@ -1324,7 +1345,7 @@ export default function StudentBooks() {
                                     });
                                   }
                                 }}
-                                className={`group relative overflow-hidden rounded-[24px] sm:rounded-3xl border border-slate-200/90 dark:border-border/70 bg-white dark:bg-card p-4 sm:p-5 flex items-center justify-between gap-3 sm:gap-4 transition-all duration-200 cursor-pointer shadow-xs hover:shadow-md hover:border-purple-400 ${
+                                className={`group relative flex flex-col gap-3 overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs transition-all duration-200 cursor-pointer hover:border-purple-400 hover:shadow-md dark:border-border/70 dark:bg-card sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:rounded-3xl sm:p-5 ${
                                   !unit.note ? 'opacity-70 bg-muted/20' : ''
                                 }`}
                               >
@@ -1335,7 +1356,7 @@ export default function StudentBooks() {
                                 <div className="flex items-center gap-3.5 sm:gap-4 pl-2 min-w-0 flex-1">
                                   {/* Purple Squircle Icon Badge */}
                                   <div
-                                    className={`w-12 h-12 sm:w-13 sm:h-13 rounded-2xl flex items-center justify-center shrink-0 shadow-sm transition-transform group-hover:scale-105 ${
+                                    className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-sm transition-transform group-hover:scale-105 ${
                                       unit.isLocked
                                         ? 'bg-[#8b5cf6] text-amber-300'
                                         : 'bg-[#7c3aed] text-white'
@@ -1382,7 +1403,7 @@ export default function StudentBooks() {
                                 </div>
 
                                 {/* Right Side: Drive Link, Summary Button, Exam Link & Right Chevron */}
-                                <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 pr-1 flex-wrap justify-end">
+                                <div className="flex flex-wrap items-center gap-1.5 pr-1 sm:shrink-0 sm:gap-2 sm:justify-end">
                                   {/* Direct Google Drive Link (Alternative: Zero-wait native viewing) */}
                                   {(() => {
                                     const driveId = unit.note?.driveFileId || (unit.note?.driveUrl ? extractDriveFileId(unit.note.driveUrl) : null);
@@ -1434,7 +1455,7 @@ export default function StudentBooks() {
                                     </button>
                                   )}
 
-                                  <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-purple-600 group-hover:translate-x-1 transition-all" />
+                                  <ChevronRight className="hidden sm:block w-5 h-5 text-slate-400 group-hover:text-purple-600 group-hover:translate-x-1 transition-all" />
                                 </div>
                               </div>
                             );
