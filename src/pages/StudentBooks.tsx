@@ -826,7 +826,9 @@ export default function StudentBooks() {
           /* STEP 2: CONFIRMED VIEW (USER SEES EITHER BOOKS OR NOTES)                  */
           /* ========================================================================= */
           <div className="lg:space-y-6">
-            {/* Top Toolbar: edge-to-edge Notes / Books switch only (mobile-first) */}
+            {/* Top Toolbar: edge-to-edge Notes / Books switch only (mobile-first).
+                Hidden inside a subject's chapter list, where the back arrow takes over. */}
+            {!(primaryMode === 'notes' && selectedNotesSubjectId) && (
             <div className="-mx-6 lg:mx-0 mb-4 lg:mb-0">
               <div className="flex items-stretch w-full lg:w-auto lg:max-w-md rounded-none lg:rounded-2xl border-y lg:border border-border/60 bg-muted/40 p-1 shadow-xs">
                 <button
@@ -860,6 +862,7 @@ export default function StudentBooks() {
                 </button>
               </div>
             </div>
+            )}
 
             {/* OFFLINE STORAGE BAR (in offline mode) */}
             {primaryMode === 'offline' && (
@@ -1177,7 +1180,23 @@ export default function StudentBooks() {
 
                       return (
                         <div className="sticky top-16 z-20 lg:static -mx-6 lg:mx-0 px-3 lg:px-0 py-2.5 lg:py-0 bg-background/90 lg:bg-transparent backdrop-blur-md lg:backdrop-blur-none border-b border-border/60 lg:border-0 space-y-2.5 lg:space-y-3">
-                          {/* Mobile: only the search bar is shown (title/progress/back live in the desktop header) */}
+                          {/* Mobile: compact back arrow + subject name */}
+                          <div className="flex lg:hidden items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={handleBackFromChapters}
+                              aria-label="Back to subjects"
+                              title="Back to subjects"
+                              className="h-8 w-8 px-0 shrink-0 rounded-full border border-border/60 hover:bg-muted active:scale-95 transition-all"
+                            >
+                              <ArrowLeft className="h-4 w-4" />
+                            </Button>
+                            <span className="truncate text-sm font-bold text-foreground">
+                              {subjectName}
+                            </span>
+                          </div>
+
                           {/* Desktop header */}
                           <div className="hidden lg:block">
                             <Button
