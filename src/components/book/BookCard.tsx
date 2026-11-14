@@ -27,7 +27,6 @@ import {
   HardDrive,
   CheckCircle2,
   Loader2,
-  Info,
   Calendar,
   User,
   Globe,
@@ -87,11 +86,6 @@ export function BookCard({
       return;
     }
     navigate(`/dashboard/books/${book.id}/read`);
-  };
-
-  const handleOpenDetail = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setDetailsOpen(true);
   };
 
   const handleDownload = (e: React.MouseEvent) => {
@@ -328,34 +322,6 @@ export function BookCard({
                   <Edit className="w-3.5 h-3.5 mr-1" />
                   <span>{isShortNote ? 'Edit Note' : 'Edit'}</span>
                 </Button>
-              )}
-
-              {/* Detail Button (Hides and opens the detailed info) */}
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={handleOpenDetail}
-                title="View full description, topics and details"
-                className="h-8 px-2 sm:px-2.5 text-xs font-medium rounded-xl border-border/80 hover:bg-accent hover:text-foreground shrink-0"
-              >
-                <Info className="w-3.5 h-3.5 mr-1 text-primary shrink-0" />
-                <span>Detail</span>
-              </Button>
-
-              {/* Direct Open in Google Drive Link (Zero wait alternative) */}
-              {driveViewUrl && (
-                <a
-                  href={driveViewUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  title="Open directly in Google Drive (Fast New Tab - Zero Wait)"
-                  className="h-8 px-2 sm:px-2.5 text-xs font-semibold rounded-xl border border-blue-500/30 text-blue-600 dark:text-blue-400 bg-blue-500/5 hover:bg-blue-500/15 flex items-center justify-center shrink-0 transition-colors"
-                >
-                  <ExternalLink className="w-3.5 h-3.5 sm:mr-1 text-blue-600 dark:text-blue-400" />
-                  <span className="hidden sm:inline">Drive</span>
-                </a>
               )}
             </div>
 
