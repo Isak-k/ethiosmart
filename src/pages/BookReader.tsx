@@ -395,6 +395,12 @@ export default function BookReader() {
       ? `/dashboard/books?subjectId=${encodeURIComponent(book.subjectId)}`
       : `/dashboard/books/${book.id}`;
 
+  // Notes always use the immersive, gesture-only PDF reader. Books use the same
+  // form on mobile (edge-to-edge page, finger scroll + pinch-to-zoom, no toolbars);
+  // on desktop they keep the toolbar since pinch zoom is touch-only.
+  // High-definition quality is unchanged.
+  const useImmersiveReader = isShortNote || isMobile;
+
   // Notes backed by a Google Drive document open in the immersive, gesture-only PDF reader
   // (edge-to-edge page, finger scroll + pinch-to-zoom, no toolbars).
   // Notes with only AI-generated sections (no Drive file) keep the interactive reader.
@@ -425,7 +431,7 @@ export default function BookReader() {
         book={book}
         pdfData={pdfBlob}
         isSavedOffline={isSavedOffline}
-        immersive={isShortNote}
+        immersive={useImmersiveReader}
         onBack={() => navigate(readerBackTarget)}
         onSaveOffline={book.allowDownload ? handleSaveForOffline : undefined}
         isDownloadingOffline={isDownloadingOffline}
