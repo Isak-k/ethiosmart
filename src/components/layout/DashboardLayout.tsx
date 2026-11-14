@@ -657,9 +657,6 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* Manual Refresh Button */}
-          <ManualRefreshButton />
-
           {/* Smart Install Button: Automatically hides once app is installed */}
           {!isAppInstalled && !isStandalone && (
             <button
@@ -910,7 +907,7 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
 
       {/* Mobile Bottom Navigation - Liquid Glass Floating Dock (Optimized for 98% mobile user base) */}
       <nav className="liquid-glass-dock lg:hidden fixed bottom-0 left-0 right-0 z-50 pb-[env(safe-area-inset-bottom)]">
-        <div className="px-1.5 sm:px-2 py-1.5 grid grid-cols-4 gap-1">
+        <div className={cn("px-1.5 sm:px-2 py-1.5 grid gap-1", role === "admin" ? "grid-cols-4" : "grid-cols-3")}>
           {role === "admin" ? (
             <>
               {links.slice(0, 3).map((link) => {
@@ -965,77 +962,50 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
           ) : (
             [
               {
-                href: "/dashboard",
-                label: "Dashboard",
-                icon: LayoutDashboard,
-                activeBg: "bg-gradient-to-tr from-sky-500 to-blue-600 text-white shadow-lg shadow-sky-500/35 border-sky-300/40",
-                inactiveBg: "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20",
-                activeText: "text-sky-600 dark:text-sky-400 font-bold",
-                inactiveText: "text-slate-600 dark:text-slate-400 font-semibold",
-                dot: "bg-sky-500 shadow-[0_0_8px_#38bdf8]",
-              },
-              {
                 href: "/dashboard/books",
                 label: "Study",
                 icon: BookOpen,
-                activeBg: "bg-gradient-to-tr from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/35 border-emerald-300/40",
-                inactiveBg: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
-                activeText: "text-emerald-600 dark:text-emerald-400 font-bold",
-                inactiveText: "text-slate-600 dark:text-slate-400 font-semibold",
-                dot: "bg-emerald-500 shadow-[0_0_8px_#34d399]",
+                accent: "bg-emerald-600",
               },
               {
                 href: "/dashboard/exams",
                 label: "Exam",
                 icon: ClipboardList,
-                activeBg: "bg-gradient-to-tr from-purple-500 to-indigo-600 text-white shadow-lg shadow-purple-500/35 border-purple-300/40",
-                inactiveBg: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
-                activeText: "text-purple-600 dark:text-purple-400 font-bold",
-                inactiveText: "text-slate-600 dark:text-slate-400 font-semibold",
-                dot: "bg-purple-500 shadow-[0_0_8px_#a855f7]",
+                accent: "bg-purple-600",
               },
               {
                 href: "/dashboard/community",
                 label: "Community",
                 icon: Users,
-                activeBg: "bg-gradient-to-tr from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/35 border-indigo-300/40",
-                inactiveBg: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20",
-                activeText: "text-indigo-600 dark:text-indigo-400 font-bold",
-                inactiveText: "text-slate-600 dark:text-slate-400 font-semibold",
-                dot: "bg-indigo-500 shadow-[0_0_8px_#6366f1]",
+                accent: "bg-indigo-600",
               },
             ].map((item) => {
-              const isActive = location.pathname === item.href || (item.href !== "/dashboard" && location.pathname.startsWith(item.href));
+              const isActive = location.pathname === item.href || location.pathname.startsWith(item.href);
               return (
                 <Link
                   key={item.href}
                   to={item.href}
                   className={cn(
-                    "group relative flex flex-col items-center justify-center py-1 px-0.5 rounded-2xl transition-all duration-300 min-h-[54px] active:scale-95",
-                    isActive ? "bg-white/50 dark:bg-slate-800/50 shadow-xs backdrop-blur-md" : "hover:bg-black/5 dark:hover:bg-white/5"
+                    "group relative flex flex-col items-center justify-center gap-1 py-1.5 rounded-2xl transition-all duration-200 min-h-[54px] active:scale-95",
+                    isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  <div
-                    className={cn(
-                      "w-11 h-7.5 rounded-xl flex items-center justify-center transition-all duration-300 border",
-                      isActive
-                        ? cn(item.activeBg, "scale-105")
-                        : item.inactiveBg
-                    )}
-                  >
-                    <item.icon className="h-5 w-5 transition-transform" />
-                  </div>
                   <span
                     className={cn(
-                      "text-[10px] sm:text-[11px] mt-0.5 tracking-tight transition-colors truncate max-w-full",
-                      isActive ? item.activeText : item.inactiveText
+                      "flex h-8 w-8 items-center justify-center rounded-xl transition-all duration-200",
+                      isActive ? cn(item.accent, "text-white shadow-sm scale-105") : "bg-muted/60"
+                    )}
+                  >
+                    <item.icon className="h-[18px] w-[18px]" />
+                  </span>
+                  <span
+                    className={cn(
+                      "text-[10px] sm:text-[11px] tracking-tight truncate max-w-full",
+                      isActive ? "font-semibold" : "font-medium"
                     )}
                   >
                     {item.label}
                   </span>
-                  {isActive && (
-                    <div className={cn("w-1.5 h-1.5 rounded-full mt-0.5", item.dot)} />
-                  )}
                 </Link>
               );
             })
