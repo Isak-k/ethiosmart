@@ -43,6 +43,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
+import { cn } from "@/lib/utils";
 import { Subject, Chapter, StudentSubjectProgress } from "@/types/subject";
 
 interface ExamData {
@@ -498,11 +499,11 @@ const StudentExams = () => {
   }, [subjects, searchQuery]);
 
   return (
-    <DashboardLayout>
-      <div className="space-y-8 animate-fade-in pb-16 max-w-7xl mx-auto">
+    <DashboardLayout contentClassName={activeSubject ? "p-2.5 sm:p-4 lg:p-8" : undefined}>
+      <div className={cn("animate-fade-in mx-auto", activeSubject ? "max-w-3xl pb-6" : "space-y-8 pb-16 max-w-7xl")}>
         {/* Offline Banner notice */}
         {!isOnline && (
-          <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-sm font-medium">
+          <div className={cn("flex items-center gap-3 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-sm font-medium", activeSubject && "mb-3")}>
             <WifiOff className="h-5 w-5 text-amber-600 shrink-0" />
             <div className="flex-1">
               <span>You are currently offline. Showing exams and subject chapters stored on your device.</span>
@@ -516,28 +517,26 @@ const StudentExams = () => {
         {/* VIEW A: SPECIFIC SUBJECT SELECTED (Horizontal Chapters Cards View)   */}
         {/* ==================================================================== */}
         {activeSubject ? (
-          <div className="max-w-3xl mx-auto space-y-6">
-            {/* Top Navigation Bar with Back Button */}
-            <div className="flex items-center justify-between gap-4 pb-1">
+          <div className="space-y-4">
+            {/* Slim full-screen app bar — only a back icon, chapters start right below */}
+            <div className="sticky top-16 z-20 -mx-2.5 sm:-mx-4 lg:-mx-8 -mt-2.5 sm:-mt-4 lg:-mt-8 px-2.5 sm:px-4 lg:px-8 py-2.5 sm:py-3 bg-background/90 backdrop-blur-md border-b border-border/60 flex items-center gap-3 animate-fade-in">
               <Button
-                variant="outline"
-                size="sm"
+                variant="ghost"
+                size="icon"
                 onClick={handleBackToAllSubjects}
-                className="rounded-xl gap-2 font-medium bg-card hover:bg-muted text-foreground border-border/80 shadow-2xs"
+                aria-label="Back to all subjects"
+                className="h-9 w-9 rounded-full shrink-0 hover:bg-muted"
               >
-                <ArrowLeft className="h-4 w-4 text-[#7c3aed]" />
-                <span>Back to all subjects</span>
+                <ArrowLeft className="h-5 w-5" />
               </Button>
-            </div>
-
-            {/* Screenshot-aligned Header */}
-            <div className="space-y-1.5 pb-2">
-              <h1 className="text-3xl sm:text-4xl font-extrabold text-[#111827] dark:text-foreground tracking-tight font-display">
-                {activeSubject.name}
-              </h1>
-              <p className="text-sm sm:text-base text-slate-500 dark:text-muted-foreground font-medium">
-                {gradeText} · {readyUnitsCount} of {totalUnitsCount} chapters uploaded
-              </p>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-base sm:text-lg font-bold text-foreground truncate leading-tight font-display">
+                  {activeSubject.name}
+                </h1>
+                <p className="text-[11px] sm:text-xs text-muted-foreground truncate">
+                  {gradeText} · {readyUnitsCount} of {totalUnitsCount} chapters
+                </p>
+              </div>
             </div>
 
             {/* Search Bar for chapters inside this subject */}
