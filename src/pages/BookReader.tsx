@@ -386,10 +386,13 @@ export default function BookReader() {
   const isShortNote = book.resourceType === 'short_note';
   const hasInteractiveSections = Array.isArray(book.sections) && book.sections.length > 0;
 
-  // Short notes with structured AI sections open in the interactive reader when online.
-  // If the note has no AI sections (raw Drive document/PDF) or is being read offline (from local storage),
-  // open the continuous high-definition document reader with offline PDF blob support.
-  if (isShortNote && hasInteractiveSections && !isReadingOffline && !forceDocumentMode) {
+  const fileId = book.driveFileId || extractDriveFileId(book.driveUrl || '');
+  const hasDriveDocument = Boolean(fileId);
+
+  // Notes backed by a Google Drive document open in the immersive, gesture-only PDF reader
+  // (edge-to-edge page, finger scroll + pinch-to-zoom, no toolbars).
+  // Notes with only AI-generated sections (no Drive file) keep the interactive reader.
+  if (isShortNote && hasInteractiveSections && !hasDriveDocument && !isReadingOffline && !forceDocumentMode) {
     return (
       <div className="min-h-screen w-full bg-background animate-fade-in">
         <InteractiveShortNoteReader
@@ -401,8 +404,6 @@ export default function BookReader() {
       </div>
     );
   }
-
-  const fileId = book.driveFileId || extractDriveFileId(book.driveUrl || '');
 
   const previewUrl = fileId ? buildDrivePreviewUrl(fileId) : (book.driveUrl || '');
   const viewUrl = fileId ? buildDriveViewUrl(fileId) : (book.driveUrl || '');
@@ -418,6 +419,7 @@ export default function BookReader() {
         book={book}
         pdfData={pdfBlob}
         isSavedOffline={isSavedOffline}
+        immersive={isShortNote}
         onBack={() => navigate(`/dashboard/books/${book.id}`)}
         onSaveOffline={book.allowDownload ? handleSaveForOffline : undefined}
         isDownloadingOffline={isDownloadingOffline}

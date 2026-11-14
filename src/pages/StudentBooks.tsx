@@ -68,6 +68,7 @@ import {
   ChevronRight,
   Eye,
   ExternalLink,
+  Download,
 } from 'lucide-react';
 
 export default function StudentBooks() {
@@ -92,6 +93,7 @@ export default function StudentBooks() {
   const [offlineRecords, setOfflineRecords] = useState<OfflineBookRecord[]>([]);
   const [storageStats, setStorageStats] = useState({ totalBytes: 0, formattedSize: '0 B', count: 0 });
   const [downloadingBookId, setDownloadingBookId] = useState<string | null>(null);
+  const [preparingNoteId, setPreparingNoteId] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   // Primary mode: 'notes' | 'books' | 'bookmarks' | 'offline' (Notes comes first)
@@ -347,6 +349,36 @@ export default function StudentBooks() {
   const offlineBookIds = useMemo(() => {
     return new Set(offlineRecords.map((r) => r.bookId));
   }, [offlineRecords]);
+
+  // Tap-to-read for chapters: download the note for offline reading first, then open it
+  // instantly from the local copy (no loading screen). Notes without a Google Drive file
+  // (AI text-only) open directly.
+  const handleReadChapter = async (note: Book) => {
+    if (preparingNoteId) return;
+
+    const driveId = note.driveFileId || extractDriveFileId(note.driveUrl || '');
+
+    // No Drive document → nothing to download, open directly.
+    if (!driveId || offlineBookIds.has(note.id)) {
+      navigate(`/dashboard/books/${note.id}/read`);
+      return;
+    }
+
+    setPreparingNoteId(note.id);
+    try {
+      await downloadAndSaveBookOffline(note);
+      await loadOfflineData();
+    } catch (err: any) {
+      toast({
+        title: 'Opening in online mode',
+        description: err.message || 'Could not download for offline reading.',
+        variant: 'destructive',
+      });
+    } finally {
+      setPreparingNoteId(null);
+      navigate(`/dashboard/books/${note.id}/read`);
+    }
+  };
 
   // Helper to test if a subject belongs to a department
   const isSubjectInDepartment = (sub: Subject, deptId: string) => {
@@ -1278,7 +1310,7 @@ export default function StudentBooks() {
                                 key={unit.id}
                                 onClick={() => {
                                   if (unit.note) {
-                                    navigate(`/dashboard/books/${unit.note.id}/read`);
+                                    handleReadChapter(unit.note);
                                   } else {
                                     toast({
                                       title: 'Study guide in preparation',
@@ -1362,6 +1394,43 @@ export default function StudentBooks() {
                                         <ExternalLink className="h-3.5 w-3.5" />
                                         <span className="hidden sm:inline">Drive</span>
                                       </a>
+                                    );
+                                  })()}
+
+                                  {/* Offline status: tap the chapter to download it, then read instantly */}
+                                  {unit.note && (() => {
+                                    const isCached = offlineBookIds.has(unit.note!.id);
+                                    const isPreparing = preparingNoteId === unit.note!.id;
+                                    return (
+                                      <span
+                                        className={`h-8 px-2 sm:px-2.5 rounded-xl text-xs font-bold flex items-center gap-1 transition-all border shadow-xs ${
+                                          isCached
+                                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25'
+                                            : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 border-border/80'
+                                        }`}
+                                        title={
+                                          isCached
+                                            ? 'Saved for offline reading'
+                                            : 'Tap the chapter to download it, then read offline'
+                                        }
+                                      >
+                                        {isPreparing ? (
+                                          <>
+                                            <Loader2 className="h-3.5 w-3.5 animate-spin text-purple-600 dark:text-purple-400" />
+                                            <span className="hidden sm:inline">Opening…</span>
+                                          </>
+                                        ) : isCached ? (
+                                          <>
+                                            <CheckCircle2 className="h-3.5 w-3.5" />
+                                            <span className="hidden sm:inline">Offline</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Download className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                                            <span className="hidden sm:inline">Download</span>
+                                          </>
+                                        )}
+                                      </span>
                                     );
                                   })()}
 

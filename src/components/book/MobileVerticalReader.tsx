@@ -45,6 +45,12 @@ interface MobileVerticalReaderProps {
   isDownloadingOffline?: boolean;
   isAdmin?: boolean;
   onGenerateExam?: () => void;
+  /**
+   * Immersive, gesture-only reading mode: hides the top/bottom toolbars and the
+   * right-edge scroll stick so the document is purely edge-to-edge with finger
+   * scrolling and pinch-to-zoom. A single tiny floating back arrow remains.
+   */
+  immersive?: boolean;
 }
 
 type ViewMode = 'page' | 'text';
@@ -417,6 +423,7 @@ export function MobileVerticalReader({
   isDownloadingOffline = false,
   isAdmin = false,
   onGenerateExam,
+  immersive = false,
 }: MobileVerticalReaderProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -1032,7 +1039,8 @@ export function MobileVerticalReader({
       onMouseMove={handleMouseMove}
       className={`fixed inset-0 z-50 h-[100dvh] w-screen flex flex-col overflow-hidden select-none ${themeBgClass}`}
     >
-      {/* ---------------- Top Floating Header (Auto-hides on reading / double touch) ---------------- */}
+      {/* ---------------- Top Floating Header (Auto-hides on reading / double touch; hidden in immersive notes mode) ---------------- */}
+      {!immersive && (
       <header
         className={`shrink-0 z-30 transition-all duration-300 ease-in-out px-3 py-2 flex items-center justify-between border-b backdrop-blur-md ${
           theme === 'dark'
@@ -1208,6 +1216,20 @@ export function MobileVerticalReader({
           )}
         </div>
       </header>
+      )}
+
+      {/* Immersive notes mode: a single tiny, always-visible back arrow — no other controls */}
+      {immersive && (
+        <button
+          type="button"
+          onClick={onBack}
+          aria-label="Back"
+          className="fixed left-3 z-40 flex h-9 w-9 items-center justify-center rounded-full bg-black/45 text-white shadow-lg backdrop-blur-md border border-white/15 active:scale-90 transition-all"
+          style={{ top: 'calc(env(safe-area-inset-top, 0px) + 10px)' }}
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </button>
+      )}
 
       {/* ---------------- Main Content Body: Continuous Vertical Touch Scroll ---------------- */}
       <main className="flex-1 w-full h-full relative overflow-hidden">
@@ -1399,7 +1421,7 @@ export function MobileVerticalReader({
 
         {/* ---------------- VERTICAL SCROLL STICK ON THE RIGHT SCREEN EDGE ---------------- */}
         {/* Completely hides when reading / idle / double touch */}
-        {viewEngine === 'canvas' && totalPages > 1 && (
+        {!immersive && viewEngine === 'canvas' && totalPages > 1 && (
           <aside
             className={`fixed right-1 sm:right-2 top-20 bottom-24 z-40 flex flex-col items-center transition-all duration-300 ${
               (showScrollStick || isDraggingThumb)
@@ -1476,7 +1498,7 @@ export function MobileVerticalReader({
         )}
 
         {/* Floating Page Number Pill (at bottom center while scrolling normally, auto-hides when idle) */}
-        {viewEngine === 'canvas' && (
+        {!immersive && viewEngine === 'canvas' && (
           <div
             className={`absolute bottom-16 left-1/2 -translate-x-1/2 pointer-events-none transition-all duration-300 z-30 ${
               showPageIndicator && livePinchPercent === null && !isDraggingThumb ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
@@ -1491,7 +1513,7 @@ export function MobileVerticalReader({
       </main>
 
       {/* ---------------- Bottom Floating Toolbar / Zoom Bar (Only in Canvas mode) ---------------- */}
-      {viewEngine === 'canvas' && viewMode === 'page' && (
+      {!immersive && viewEngine === 'canvas' && viewMode === 'page' && (
         <footer
           className={`shrink-0 z-30 transition-all duration-300 ease-in-out px-4 py-2 border-t backdrop-blur-md ${
             theme === 'dark'
