@@ -841,9 +841,9 @@ export default function StudentBooks() {
           /* ========================================================================= */
           /* STEP 2: CONFIRMED VIEW (USER SEES EITHER BOOKS OR NOTES)                  */
           /* ========================================================================= */
-          <div className="space-y-6">
-            {/* Top Toolbar: Switch Option, Mode Pills & Department Filter */}
-            <div className="flex items-center justify-between gap-3 flex-wrap p-4 rounded-3xl border bg-card/60 backdrop-blur-xs">
+          <div className="lg:space-y-6">
+            {/* Top Toolbar: Switch Option, Mode Pills & Department Filter (hidden on mobile in the Notes view) */}
+            <div className={cn("flex items-center justify-between gap-3 flex-wrap p-4 rounded-3xl border bg-card/60 backdrop-blur-xs mb-6 lg:mb-0", primaryMode === 'notes' && "hidden lg:flex")}>
               <div className="flex items-center gap-2.5 flex-wrap">
                 {/* Back to Choice button */}
                 <Button
@@ -1046,8 +1046,10 @@ export default function StudentBooks() {
                 {!selectedNotesSubjectId ? (
                   /* LEVEL 1: AVAILABLE SUBJECTS WITH NOTES */
                   <div className="space-y-6">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                      <div>
+                    {/* Sticky top bar — mobile shows only the search + view toggle; desktop keeps the header */}
+                    <div className="sticky top-16 z-20 lg:static -mx-6 lg:mx-0 px-3 lg:px-0 py-2.5 lg:py-0 bg-background/90 lg:bg-transparent backdrop-blur-md lg:backdrop-blur-none border-b border-border/60 lg:border-0 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2.5 lg:gap-3">
+                      {/* Heading — desktop only */}
+                      <div className="hidden lg:block">
                         <h3 className="text-xl font-display font-bold text-foreground">
                           Chapter Study Notes
                         </h3>
@@ -1056,13 +1058,28 @@ export default function StudentBooks() {
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex flex-col lg:flex-row lg:items-center gap-2.5 w-full lg:w-auto">
+                        {/* Search — primary element on mobile */}
+                        <div className="relative order-1 lg:order-2 w-full lg:w-64">
+                          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            placeholder={
+                              notesViewMode === 'by_subject'
+                                ? 'Search subjects & topics...'
+                                : 'Search notes by title or chapter...'
+                            }
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-10 rounded-xl bg-card text-sm h-10 lg:text-xs lg:h-9"
+                          />
+                        </div>
+
                         {/* View Mode Toggle: By Subject vs All Notes */}
-                        <div className="flex items-center rounded-xl bg-card border p-1 shadow-xs">
+                        <div className="order-2 lg:order-1 flex items-center rounded-xl bg-card border p-1 shadow-xs self-start lg:self-auto shrink-0">
                           <button
                             type="button"
                             onClick={() => setNotesViewMode('by_subject')}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                            className={`px-3.5 lg:px-3 py-2 lg:py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
                               notesViewMode === 'by_subject'
                                 ? 'bg-purple-600 text-white shadow-xs'
                                 : 'text-muted-foreground hover:text-foreground'
@@ -1074,7 +1091,7 @@ export default function StudentBooks() {
                           <button
                             type="button"
                             onClick={() => setNotesViewMode('all_notes')}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                            className={`px-3.5 lg:px-3 py-2 lg:py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
                               notesViewMode === 'all_notes'
                                 ? 'bg-purple-600 text-white shadow-xs'
                                 : 'text-muted-foreground hover:text-foreground'
@@ -1083,20 +1100,6 @@ export default function StudentBooks() {
                             <FileText className="h-3.5 w-3.5" />
                             <span>All Notes ({notesCount})</span>
                           </button>
-                        </div>
-
-                        <div className="relative w-full sm:w-64">
-                          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            placeholder={
-                              notesViewMode === 'by_subject'
-                                ? 'Search subjects & topics...'
-                                : 'Search notes by title or chapter...'
-                            }
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-10 rounded-xl bg-card text-xs h-9"
-                          />
                         </div>
                       </div>
                     </div>
@@ -1137,7 +1140,7 @@ export default function StudentBooks() {
                           )}
                         </div>
                       ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 -mx-6 lg:mx-0">
                           {filteredBooksList.map((note) => (
                             <BookCard
                               key={note.id}
@@ -1185,7 +1188,7 @@ export default function StudentBooks() {
                         )}
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 -mx-6 lg:mx-0">
                         {subjectsWithNotes.map((subject) => {
                           const theme = getSubjectVisualTheme(subject.name);
                           const dept = departments.find(
