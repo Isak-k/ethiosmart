@@ -499,7 +499,7 @@ const StudentExams = () => {
   }, [subjects, searchQuery]);
 
   return (
-    <DashboardLayout contentClassName={activeSubject ? "p-2.5 sm:p-4 lg:p-8" : undefined}>
+    <DashboardLayout contentClassName={activeSubject ? "p-2.5 sm:p-4 lg:p-8" : "px-2 pt-3 pb-6 lg:p-8"}>
       <div className={cn("animate-fade-in mx-auto", activeSubject ? "max-w-3xl pb-6" : "space-y-8 pb-16 max-w-7xl")}>
         {/* Offline Banner notice */}
         {!isOnline && (
@@ -729,9 +729,9 @@ const StudentExams = () => {
           /* VIEW B: ALL SUBJECTS VIEW (Curriculum Subject Cards Grid)             */
           /* Clicking any subject opens its dedicated chapter contents view       */
           /* ==================================================================== */
-          <div className="space-y-8">
-            {/* Page Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="lg:space-y-8">
+            {/* Page Header — desktop only (mobile shows just the search bar) */}
+            <div className="hidden lg:flex lg:items-center lg:justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2.5">
                   <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground tracking-tight">
@@ -762,35 +762,37 @@ const StudentExams = () => {
               </div>
             </div>
 
-            {/* Search Subjects Bar */}
-            <div className="relative max-w-md">
-              <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="text"
-                placeholder="Search subjects by name..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-9 rounded-2xl bg-card border-border/80 h-11 text-sm shadow-xs"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
+            {/* Search Bar — Android-style sticky app-bar search on mobile, inline on desktop */}
+            <div className="sticky top-16 z-20 lg:static -mx-2 lg:mx-0 px-2 lg:px-0 py-2.5 lg:py-0 bg-background/90 lg:bg-transparent backdrop-blur-md lg:backdrop-blur-none border-b border-border/60 lg:border-0 mb-3 lg:mb-0">
+              <div className="relative w-full lg:max-w-md">
+                <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
+                <Input
+                  type="text"
+                  placeholder="Search subjects by name..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 pr-9 rounded-full lg:rounded-2xl bg-card border-border/80 h-11 text-sm shadow-xs"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
             </div>
 
-            {/* Grid of Subject Cards */}
+            {/* Grid of Subject Cards — single column edge-to-edge on mobile */}
             {loading ? (
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
                 {[1, 2, 3, 4, 5, 6].map((i) => (
                   <div key={i} className="h-64 sm:h-80 rounded-2xl sm:rounded-3xl bg-muted animate-pulse" />
                 ))}
               </div>
             ) : filteredSubjectsForOverview.length > 0 ? (
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
                 {filteredSubjectsForOverview.map((sub) => {
                   const prog = progressMap[sub.id];
 
