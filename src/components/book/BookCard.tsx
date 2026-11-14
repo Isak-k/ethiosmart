@@ -47,6 +47,9 @@ interface BookCardProps {
   onGenerateAI?: (book: Book) => void;
   isSavedOffline?: boolean;
   onSaveOffline?: (book: Book) => void;
+  onRead?: (book: Book) => void;
+  onDownloadToDevice?: (book: Book) => void;
+  isPreparingRead?: boolean;
   isDownloadingOffline?: boolean;
 }
 
@@ -62,6 +65,9 @@ export function BookCard({
   onGenerateAI,
   isSavedOffline = false,
   onSaveOffline,
+  onRead,
+  onDownloadToDevice,
+  isPreparingRead = false,
   isDownloadingOffline = false,
 }: BookCardProps) {
   const navigate = useNavigate();
@@ -72,9 +78,14 @@ export function BookCard({
   const driveFileId = book.driveFileId || (book.driveUrl ? extractDriveFileId(book.driveUrl) : null);
   const driveViewUrl = driveFileId ? buildDriveViewUrl(driveFileId) : book.driveUrl;
 
-  // Directly open reader on click
+  // Directly open reader on click. When a parent provides `onRead`, the parent first
+  // downloads the file for offline reading and only then opens the reader.
   const handleRead = (e?: React.MouseEvent) => {
     e?.stopPropagation();
+    if (onRead) {
+      onRead(book);
+      return;
+    }
     navigate(`/dashboard/books/${book.id}/read`);
   };
 
@@ -280,10 +291,17 @@ export function BookCard({
                 size="sm"
                 variant="default"
                 onClick={handleRead}
+                disabled={isPreparingRead}
                 className="h-8 rounded-xl text-xs font-semibold px-2.5 sm:px-3 shadow-xs bg-primary hover:bg-primary/90 flex-1 min-w-0 justify-center"
               >
-                <Eye className="w-3.5 h-3.5 mr-1 shrink-0" />
-                <span className="truncate">Read {isShortNote ? 'Note' : 'Book'}</span>
+                {isPreparingRead ? (
+                  <Loader2 className="w-3.5 h-3.5 mr-1 shrink-0 animate-spin" />
+                ) : (
+                  <Eye className="w-3.5 h-3.5 mr-1 shrink-0" />
+                )}
+                <span className="truncate">
+                  {isPreparingRead ? 'Downloading…' : `Read ${isShortNote ? 'Note' : 'Book'}`}
+                </span>
               </Button>
 
               {/* Admin Direct Edit Action */}
@@ -358,14 +376,16 @@ export function BookCard({
                   variant="ghost"
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (onSaveOffline) {
+                    if (onDownloadToDevice) {
+                      onDownloadToDevice(book);
+                    } else if (onSaveOffline) {
                       onSaveOffline(book);
                     } else {
                       handleDownload(e);
                     }
                   }}
                   disabled={isDownloadingOffline}
-                  title="Save for offline reading"
+                  title="Download this file to your device"
                   className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground rounded-lg shrink-0"
                 >
                   {isDownloadingOffline ? (

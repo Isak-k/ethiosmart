@@ -389,11 +389,11 @@ export default function BookReader() {
   const fileId = book.driveFileId || extractDriveFileId(book.driveUrl || '');
   const hasDriveDocument = Boolean(fileId);
 
-  // Notes return to their subject's chapter list; books return to their details page.
+  // Notes return to their subject's chapter list; books return to the study page.
   const readerBackTarget =
     isShortNote && book.subjectId
       ? `/dashboard/books?subjectId=${encodeURIComponent(book.subjectId)}`
-      : `/dashboard/books/${book.id}`;
+      : `/dashboard/books`;
 
   // Notes always use the immersive, gesture-only PDF reader. Books use the same
   // form on mobile (edge-to-edge page, finger scroll + pinch-to-zoom, no toolbars);
@@ -466,7 +466,7 @@ export default function BookReader() {
               className="rounded-lg shrink-0 h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
             >
               <ArrowLeft className="h-3.5 w-3.5 mr-1" />
-              Details
+              {isShortNote ? 'Notes' : 'Study'}
             </Button>
 
             <Badge

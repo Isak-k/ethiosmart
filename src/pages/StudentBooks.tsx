@@ -8,6 +8,7 @@ import {
   getAllOfflineBooks,
   getOfflineBooksStorageStats,
   downloadAndSaveBookOffline,
+  exportOfflineBookToDisk,
   clearAllOfflineBooks,
   OfflineBookRecord,
 } from '@/lib/offline-books';
@@ -94,6 +95,7 @@ export default function StudentBooks() {
   const [storageStats, setStorageStats] = useState({ totalBytes: 0, formattedSize: '0 B', count: 0 });
   const [downloadingBookId, setDownloadingBookId] = useState<string | null>(null);
   const [preparingNoteId, setPreparingNoteId] = useState<string | null>(null);
+  const [preparingBookId, setPreparingBookId] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   // Primary mode: 'notes' | 'books' | 'bookmarks' | 'offline' (Notes comes first)
@@ -324,6 +326,31 @@ export default function StudentBooks() {
     }
   };
 
+  // Download button on a book: save it to the user's device (and keep it offline in-app too).
+  const handleDownloadToDevice = async (book: Book) => {
+    if (downloadingBookId) return;
+    setDownloadingBookId(book.id);
+    try {
+      if (!offlineBookIds.has(book.id)) {
+        await downloadAndSaveBookOffline(book);
+        await loadOfflineData();
+      }
+      await exportOfflineBookToDisk(book.id);
+      toast({
+        title: 'Downloaded on your device',
+        description: `"${book.title}" is being saved to your device. You can also read it offline inside the app.`,
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Download failed',
+        description: err.message || 'Could not download this resource to your device.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDownloadingBookId(null);
+    }
+  };
+
   // Clear all offline storage
   const handleClearOfflineStorage = async () => {
     if (!window.confirm('Are you sure you want to remove all offline items from this device?')) {
@@ -377,6 +404,35 @@ export default function StudentBooks() {
     } finally {
       setPreparingNoteId(null);
       navigate(`/dashboard/books/${note.id}/read`);
+    }
+  };
+
+  // Tap-to-open for books: download the file for offline reading first, then open it
+  // instantly from the local copy. Books without a Google Drive file open directly.
+  const handleReadBook = async (book: Book) => {
+    if (preparingBookId) return;
+
+    const driveId = book.driveFileId || extractDriveFileId(book.driveUrl || '');
+
+    // No Drive document → nothing to download, open directly.
+    if (!driveId || offlineBookIds.has(book.id)) {
+      navigate(`/dashboard/books/${book.id}/read`);
+      return;
+    }
+
+    setPreparingBookId(book.id);
+    try {
+      await downloadAndSaveBookOffline(book);
+      await loadOfflineData();
+    } catch (err: any) {
+      toast({
+        title: 'Opening in online mode',
+        description: err.message || 'Could not download for offline reading.',
+        variant: 'destructive',
+      });
+    } finally {
+      setPreparingBookId(null);
+      navigate(`/dashboard/books/${book.id}/read`);
     }
   };
 
@@ -973,6 +1029,9 @@ export default function StudentBooks() {
                         onToggleBookmark={handleToggleBookmark}
                         isSavedOffline={offlineBookIds.has(book.id)}
                         onSaveOffline={handleSaveBookOffline}
+                        onRead={handleReadBook}
+                        onDownloadToDevice={handleDownloadToDevice}
+                        isPreparingRead={preparingBookId === book.id}
                         isDownloadingOffline={downloadingBookId === book.id}
                       />
                     ))}
@@ -1062,6 +1121,9 @@ export default function StudentBooks() {
                               onToggleBookmark={handleToggleBookmark}
                               isSavedOffline={offlineBookIds.has(note.id)}
                               onSaveOffline={handleSaveBookOffline}
+                              onRead={handleReadChapter}
+                              onDownloadToDevice={handleDownloadToDevice}
+                              isPreparingRead={preparingNoteId === note.id}
                               isDownloadingOffline={downloadingBookId === note.id}
                             />
                           ))}
@@ -1517,6 +1579,9 @@ export default function StudentBooks() {
                         onToggleBookmark={handleToggleBookmark}
                         isSavedOffline={offlineBookIds.has(book.id)}
                         onSaveOffline={handleSaveBookOffline}
+                        onRead={handleReadBook}
+                        onDownloadToDevice={handleDownloadToDevice}
+                        isPreparingRead={preparingBookId === book.id}
                         isDownloadingOffline={downloadingBookId === book.id}
                       />
                     ))}

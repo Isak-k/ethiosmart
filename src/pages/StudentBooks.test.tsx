@@ -63,6 +63,7 @@ vi.mock('@/lib/offline-books', () => ({
   getAllOfflineBooks: vi.fn().mockResolvedValue([]),
   getOfflineBooksStorageStats: vi.fn().mockResolvedValue({ totalBytes: 0, formattedSize: '0 B', count: 0 }),
   downloadAndSaveBookOffline: vi.fn().mockResolvedValue({}),
+  exportOfflineBookToDisk: vi.fn().mockResolvedValue(undefined),
   clearAllOfflineBooks: vi.fn().mockResolvedValue(true),
 }));
 
