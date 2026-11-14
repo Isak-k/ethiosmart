@@ -96,14 +96,14 @@ describe('StudentBooks component', () => {
     expect(screen.getByRole('heading', { name: /Books & Textbooks/i })).toBeInTheDocument();
   });
 
-  it('navigates to confirmed view when Next is clicked', async () => {
+  it('navigates to confirmed view when Continue is clicked', async () => {
     render(
       <MemoryRouter initialEntries={['/dashboard/books']}>
         <StudentBooks />
       </MemoryRouter>
     );
 
-    const nextBtn = await screen.findByRole('button', { name: /Next/i });
+    const nextBtn = await screen.findByRole('button', { name: /Continue/i });
     fireEvent.click(nextBtn);
 
     await waitFor(() => {
