@@ -1177,26 +1177,7 @@ export default function StudentBooks() {
 
                       return (
                         <div className="sticky top-16 z-20 lg:static -mx-6 lg:mx-0 px-3 lg:px-0 py-2.5 lg:py-0 bg-background/90 lg:bg-transparent backdrop-blur-md lg:backdrop-blur-none border-b border-border/60 lg:border-0 space-y-2.5 lg:space-y-3">
-                          {/* Mobile app bar: compact back icon + subject */}
-                          <div className="flex items-center gap-2.5 lg:hidden">
-                            <button
-                              type="button"
-                              aria-label="Back to the previous page"
-                              onClick={handleBackFromChapters}
-                              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border/60 bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                            >
-                              <ArrowLeft className="h-4 w-4" />
-                            </button>
-                            <div className="min-w-0 flex-1">
-                              <h1 className="truncate font-display text-base font-bold leading-tight text-foreground">
-                                {subjectName}
-                              </h1>
-                              <p className="truncate text-[11px] text-muted-foreground">
-                                {gradeText} · {uploadedCount} of {totalUnits} chapters
-                              </p>
-                            </div>
-                          </div>
-
+                          {/* Mobile: only the search bar is shown (title/progress/back live in the desktop header) */}
                           {/* Desktop header */}
                           <div className="hidden lg:block">
                             <Button
@@ -1230,9 +1211,9 @@ export default function StudentBooks() {
                       );
                     })()}
 
-                    {/* Complete Curriculum Textbook Banner if available for this subject */}
+                    {/* Complete Curriculum Textbook Banner if available for this subject (desktop only) */}
                     {currentSubjectCurriculumBooks.length > 0 && (
-                      <div className="-mx-6 lg:mx-0 p-4 rounded-2xl bg-gradient-to-r from-primary/10 via-purple-500/10 to-indigo-500/10 border border-primary/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                      <div className="-mx-6 lg:mx-0 p-4 rounded-2xl bg-gradient-to-r from-primary/10 via-purple-500/10 to-indigo-500/10 border border-primary/25 hidden lg:flex sm:items-center justify-between gap-3 shadow-xs">
                         <div className="flex items-center gap-3">
                           <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0 shadow-xs">
                             <BookOpen className="h-5 w-5" />
