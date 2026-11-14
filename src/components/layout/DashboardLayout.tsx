@@ -550,6 +550,7 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
       { href: "/dashboard/community", label: "Community", icon: Users, badge: "Live" },
       { href: "/dashboard/results", label: t("dashboard.menu.myResults", "Results"), icon: Trophy },
       { href: "/dashboard/messages", label: "Contact Admin", icon: MessageSquare },
+      { href: "/settings", label: t("common.settings", "Settings"), icon: Settings },
     ];
   }, [t, isGuest]);
 
@@ -706,45 +707,6 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
           <div className="[&_button]:liquid-glass-squircle [&_button]:rounded-2xl">
             <ThemeToggle />
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0" aria-label="Open Profile Menu">
-                <Avatar className="h-9 w-9 ring-1 ring-sky-400/30">
-                  <AvatarFallback className="bg-sky-600/30 backdrop-blur-md text-foreground dark:text-white text-xs font-bold">
-                    {initials}
-                  </AvatarFallback>
-                </Avatar>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52 rounded-2xl shadow-xl liquid-glass-card">
-              <div className="px-3 py-2 text-xs border-b border-border/50">
-                <p className="font-semibold text-foreground truncate">{profile?.full_name || (isGuest ? "Guest Student" : "User")}</p>
-                <p className="text-[10px] text-muted-foreground">{isGuest ? "Guest Access" : role ? t(`common.${role}`) : ""}</p>
-              </div>
-              {isGuest && (
-                <>
-                  <DropdownMenuItem onClick={() => navigate("/")} className="font-semibold text-sky-600 dark:text-sky-400">
-                    <Home className="mr-2 h-4 w-4" />
-                    First Page
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                </>
-              )}
-              {!isGuest && (
-                <>
-                  <DropdownMenuItem onClick={() => navigate("/settings")}>
-                    <Settings className="mr-2 h-4 w-4" />
-                    {t("common.settings")}
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                </>
-              )}
-              <DropdownMenuItem onClick={confirmSignOut} className="text-destructive font-semibold">
-                <LogOut className="mr-2 h-4 w-4" />
-                {t("common.signOut", "Sign Out")}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
       </header>
 
@@ -837,21 +799,6 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
               );
             })}
 
-            {/* Student Sign Out — sits below Contact Admin in the left bar */}
-            {role !== "admin" && (
-              <button
-                type="button"
-                onClick={confirmSignOut}
-                className="group relative w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl transition-all duration-300 font-medium text-rose-300/90 hover:text-white hover:bg-rose-500/15 border border-transparent hover:border-rose-400/30"
-              >
-                <div className="p-2 rounded-xl transition-all duration-300 shrink-0 bg-rose-500/15 text-rose-300 group-hover:bg-rose-500/25 group-hover:text-rose-200">
-                  <LogOut className="h-4 w-4 transition-transform group-hover:scale-110" />
-                </div>
-                <span className="text-xs sm:text-sm tracking-wide truncate font-medium">
-                  {t("common.signOut", "Sign Out")}
-                </span>
-              </button>
-            )}
           </nav>
 
           {/* User section */}
@@ -889,17 +836,10 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
                     </DropdownMenuItem>
                   </>
                 ) : (
-                  <>
-                    <DropdownMenuItem onClick={() => navigate("/settings")}>
-                      <Settings className="mr-2 h-4 w-4" />
-                      {t("common.settings")}
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={confirmSignOut}>
-                      <LogOut className="mr-2 h-4 w-4" />
-                      {t("common.signOut")}
-                    </DropdownMenuItem>
-                  </>
+                  <DropdownMenuItem onClick={() => navigate("/settings")}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    {t("common.settings")}
+                  </DropdownMenuItem>
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
