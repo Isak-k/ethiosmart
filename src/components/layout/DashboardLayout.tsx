@@ -824,6 +824,22 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
                 </Link>
               );
             })}
+
+            {/* Student Sign Out — sits below Contact Admin in the left bar */}
+            {role !== "admin" && (
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="group relative w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl transition-all duration-300 font-medium text-rose-300/90 hover:text-white hover:bg-rose-500/15 border border-transparent hover:border-rose-400/30"
+              >
+                <div className="p-2 rounded-xl transition-all duration-300 shrink-0 bg-rose-500/15 text-rose-300 group-hover:bg-rose-500/25 group-hover:text-rose-200">
+                  <LogOut className="h-4 w-4 transition-transform group-hover:scale-110" />
+                </div>
+                <span className="text-xs sm:text-sm tracking-wide truncate font-medium">
+                  {t("common.signOut", "Sign Out")}
+                </span>
+              </button>
+            )}
           </nav>
 
           {/* User section */}
