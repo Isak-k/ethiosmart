@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { LanguageToggle } from "@/components/ui/language-toggle";
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { useTranslation } from "react-i18next";
 import { useToast } from "@/hooks/use-toast";
 import { usePWAInstall } from "@/hooks/use-pwa-install";
@@ -40,6 +40,9 @@ import { EthioSmartLogo } from "@/components/ui/EthioSmartLogo";
 import { EthioAccentBar } from "@/components/ui/EthioAccentBar";
 import { LiquidBackdrop } from "@/components/ui/LiquidBackdrop";
 import { LiquidTiltCard } from "@/components/ui/LiquidTiltCard";
+
+// Public pre-login EthioSmart assistant (lazy chunk; homepage unchanged).
+const ChatbotWidget = lazy(() => import("@/components/chatbot/ChatbotWidget"));
 
 const Index = () => {
   const navigate = useNavigate();
@@ -283,6 +286,11 @@ const Index = () => {
         deferredPrompt={deferredPrompt}
         onInstallClick={promptInstall}
       />
+
+      {/* Public pre-login EthioSmart assistant */}
+      <Suspense fallback={null}>
+        <ChatbotWidget />
+      </Suspense>
     </div>
   );
 };

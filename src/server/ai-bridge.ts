@@ -5,6 +5,10 @@ import { IncomingMessage, ServerResponse } from 'http';
 import { orchestrateGenerationBatch, getProviderStatus } from '../lib/ai-engine/orchestrator.ts';
 import type { GenerateBatchRequest, ProviderKeys } from '../lib/ai-engine/types.ts';
 import { validateGoogleDriveFile, extractGoogleDriveContent, downloadGoogleDriveBuffer } from './drive-bridge';
+import { handleChatbotAsk, resolveIpKey } from './chatbot';
+import { loadServerEnv } from './env';
+
+loadServerEnv();
 
 function loadEnvKeys(): ProviderKeys {
   const env: Record<string, string> = { ...process.env as Record<string, string> };
@@ -68,6 +72,43 @@ function sendJson(res: ServerResponse, statusCode: number, data: any) {
 export function createAiBridgeMiddleware() {
   return async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
     const url = req.url?.split('?')[0];
+
+    // Homepage promotional chatbot (same logic as the Firebase callable)
+    if (url === '/api/chatbot/ask') {
+      if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method not allowed' });
+      let body: any;
+      try {
+        body = await parseJsonBody(req);
+      } catch {
+        return sendJson(res, 400, { error: 'Invalid JSON body.' });
+      }
+      try {
+        const forwarded = req.headers['x-forwarded-for'];
+        const result = await handleChatbotAsk({
+          message: body?.message,
+          history: body?.history,
+          ipKey: resolveIpKey(
+            typeof forwarded === 'string' || Array.isArray(forwarded) ? forwarded : undefined,
+            typeof req.headers['x-vercel-forwarded-for'] === 'string'
+              ? req.headers['x-vercel-forwarded-for']
+              : undefined,
+            typeof req.headers['x-real-ip'] === 'string' ? req.headers['x-real-ip'] : undefined,
+          ),
+        });
+        if (result.ok === true) {
+          sendJson(res, 200, { answer: result.answer, links: result.links });
+        } else {
+          sendJson(res, result.status, { error: result.error });
+        }
+      } catch (err: any) {
+        console.error('[AI Dev Bridge] Chatbot error:', err);
+        sendJson(res, 503, {
+          error:
+            'The EthioSmart AI Assistant is temporarily unavailable. Please try again in a moment — or sign up and explore the app!',
+        });
+      }
+      return;
+    }
 
     // Status endpoint
     if (url === '/api/ai/provider-status' && req.method === 'GET') {
