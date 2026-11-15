@@ -8,6 +8,8 @@ import { getDepartments } from '@/lib/departments';
 import { getSubjects, getChapters } from '@/lib/subjects';
 import { getSubjectCover } from '@/lib/subject-covers';
 import { uploadSubjectCoverImage } from '@/lib/image-upload';
+import { auth, storage } from '@/integrations/firebase/client';
+import { deleteObject, ref, uploadBytes } from 'firebase/storage';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import {
@@ -86,6 +88,8 @@ export function BookFormDialog({
   const [subjectId, setSubjectId] = useState<string>('');
   const [driveUrl, setDriveUrl] = useState('');
   const [driveFileId, setDriveFileId] = useState('');
+  const [protectedFile, setProtectedFile] = useState<File | null>(null);
+  const [uploadingProtectedFile, setUploadingProtectedFile] = useState(false);
   const [description, setDescription] = useState('');
   const [author, setAuthor] = useState('');
   const [edition, setEdition] = useState('');
@@ -152,6 +156,7 @@ export function BookFormDialog({
         setShowCustomCoverInput(Boolean(book.coverImageUrl));
         setDriveUrl(book.driveUrl || '');
         setDriveFileId(book.driveFileId || '');
+        setProtectedFile(null);
         setDescription(book.description || '');
         setAuthor(book.author || '');
         setEdition(book.edition || '');
@@ -186,6 +191,7 @@ export function BookFormDialog({
         setShowCustomCoverInput(false);
         setDriveUrl('');
         setDriveFileId('');
+        setProtectedFile(null);
         setDescription('');
         setAuthor('');
         setEdition('');
@@ -317,8 +323,13 @@ export function BookFormDialog({
     }
 
     const finalFileId = driveFileId || extractDriveFileId(driveUrl);
-    if (!finalFileId) {
-      setFormError('Please enter a valid Google Drive sharing URL.');
+    const hasExistingProtectedFile = Boolean(book?.storagePath);
+    if (!protectedFile && !hasExistingProtectedFile && !finalFileId) {
+      setFormError('Upload a private PDF or enter a valid Google Drive sharing URL.');
+      return;
+    }
+    if (protectedFile && (protectedFile.type !== 'application/pdf' || protectedFile.size > 25 * 1024 * 1024)) {
+      setFormError('Upload a PDF file no larger than 25 MB.');
       return;
     }
 
@@ -382,7 +393,24 @@ export function BookFormDialog({
     };
 
     setIsSaving(true);
+    setUploadingProtectedFile(Boolean(protectedFile));
+    let uploadedStoragePath = book?.storagePath || '';
     try {
+      if (protectedFile) {
+        const currentUser = auth.currentUser;
+        if (!currentUser) throw new Error('Please sign in again before uploading a learning resource.');
+        const safeName = protectedFile.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-100) || 'resource.pdf';
+        uploadedStoragePath = `protected-books/${currentUser.uid}/${crypto.randomUUID()}/${safeName}`;
+        await uploadBytes(ref(storage, uploadedStoragePath), protectedFile, {
+          contentType: 'application/pdf',
+          customMetadata: { uploadedBy: currentUser.uid },
+        });
+        payload.storagePath = uploadedStoragePath;
+        payload.driveUrl = '';
+        payload.driveFileId = '';
+        payload.mimeType = 'application/pdf';
+        payload.fileSizeBytes = protectedFile.size;
+      }
       await onSave(payload);
       onOpenChange(false);
     } catch (err: any) {
@@ -397,6 +425,7 @@ export function BookFormDialog({
       }
     } finally {
       setIsSaving(false);
+      setUploadingProtectedFile(false);
     }
   };
 
@@ -758,7 +787,33 @@ export function BookFormDialog({
             </div>
           </div>
 
-          {/* Google Drive Integration */}
+          {/* Private Firebase Storage upload */}
+          <div className="space-y-3 p-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/5">
+            <div className="flex items-center gap-2">
+              <Upload className="h-4 w-4 text-emerald-600" />
+              <Label htmlFor="protected-book-file" className="font-semibold">Private PDF Upload (Recommended)</Label>
+              <Badge variant="secondary">Protected</Badge>
+            </div>
+            <Input
+              id="protected-book-file"
+              type="file"
+              accept="application/pdf,.pdf"
+              disabled={isSaving}
+              className="rounded-xl"
+              onChange={(event) => setProtectedFile(event.target.files?.[0] || null)}
+            />
+            {protectedFile ? (
+              <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                Selected: {protectedFile.name} ({(protectedFile.size / (1024 * 1024)).toFixed(2)} MB)
+              </p>
+            ) : book?.storagePath ? (
+              <p className="text-xs text-emerald-700 dark:text-emerald-400">A private Firebase file is already attached. Upload a new PDF to replace it.</p>
+            ) : (
+              <p className="text-xs text-muted-foreground">PDF only, maximum 25 MB. Students receive access only after server-side entitlement checks.</p>
+            )}
+          </div>
+
+          {/* Legacy Google Drive option for existing resources during migration */}
           <div className="space-y-3 p-4 rounded-2xl bg-primary/5 border border-primary/20">
             <div className="flex items-center justify-between">
               <Label htmlFor="drive-url" className="font-semibold flex items-center gap-1.5 text-foreground">
@@ -799,8 +854,7 @@ export function BookFormDialog({
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Paste the public or shared Google Drive document link. Make sure link sharing is set to{' '}
-              <strong className="text-foreground">&quot;Anyone with the link can view&quot;</strong>.
+              Legacy Google Drive links are supported for existing resources. New resources should use the private PDF upload above.
             </p>
 
             {validationError && (
