@@ -295,11 +295,10 @@ service cloud.firestore {
         channelId == 'announcements' ||
         channelId == 'general' ||
         (
-          channelId.matches('^dept_.+') &&
           isAuthenticated() &&
           exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.departmentId
-            == channelId.replace('dept_', '')
+          channelId == 'dept_' +
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.departmentId
         );
     }
 
