@@ -282,26 +282,74 @@ service cloud.firestore {
       );
     }
 
-    // --- Community Channels & Messages Collection ---
-    match /communityChannels/{channelId} {
-      allow read: if true;
-      allow write: if true;
-
-      match /messages/{messageId} {
-        allow read: if true;
-        allow create, update: if true;
-        allow delete: if true;
-      }
-
-      match /{allChildren=**} {
-        allow read: if true;
-        allow write: if true;
-      }
+    // --- Community Channels & Messages ---
+    function isCommunityStaff() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+          in ['admin', 'superadmin', 'teacher', 'examiner'];
     }
 
+    function canAccessCommunityChannel(channelId) {
+      return isCommunityStaff() ||
+        channelId == 'announcements' ||
+        channelId == 'general' ||
+        (
+          channelId.matches('^dept_.+') &&
+          isAuthenticated() &&
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.departmentId
+            == channelId.replace('dept_', '')
+        );
+    }
+
+    match /communityChannels/{channelId} {
+      // Community content is no longer publicly readable or writable.
+      allow read: if isAuthenticated() && canAccessCommunityChannel(channelId);
+      allow create, update, delete: if isCommunityStaff();
+
+      match /messages/{messageId} {
+        allow read: if isAuthenticated() && canAccessCommunityChannel(channelId);
+
+        allow create: if isAuthenticated() &&
+          canAccessCommunityChannel(channelId) &&
+          request.resource.data.userId == request.auth.uid &&
+          request.resource.data.text is string &&
+          request.resource.data.text.size() <= 5000 &&
+          request.resource.data.userName is string &&
+          request.resource.data.userName.size() <= 100 &&
+          (
+            channelId != 'announcements' ||
+            isCommunityStaff()
+          );
+
+        // Members may only change reactions on their own messages.
+        // Staff may also pin, soft-delete, and moderate messages.
+        allow update: if isAuthenticated() &&
+          canAccessCommunityChannel(channelId) &&
+          (
+            (
+              resource.data.userId == request.auth.uid &&
+              request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(['reactions'])
+            ) ||
+            (
+              isCommunityStaff() &&
+              request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(['isPinned', 'pinnedBy', 'pinnedAt', 'deleted', 'text', 'updatedAt', 'reactions'])
+            )
+          );
+
+        allow delete: if isCommunityStaff();
+      }
+
+      // No unrestricted wildcard rule: every nested collection needs its own policy.
+    }
+
+    // Legacy collection is not used by the current community chat client.
+    // Keep it closed until a specific authenticated use case is migrated.
     match /communityMessages/{document=**} {
-      allow read: if true;
-      allow write: if true;
+      allow read, write: if false;
     }
   }
 }
