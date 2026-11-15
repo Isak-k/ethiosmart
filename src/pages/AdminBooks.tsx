@@ -28,6 +28,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -59,6 +65,7 @@ import {
   ArrowRight,
   Image as ImageIcon,
   Check,
+  MoreHorizontal,
 } from 'lucide-react';
 
 export default function AdminBooks() {
@@ -73,7 +80,7 @@ export default function AdminBooks() {
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedType, setSelectedType] = useState<BookResourceType | 'all'>('all');
+  const [selectedType, setSelectedType] = useState<BookResourceType | 'all'>('short_note');
   const [selectedDept, setSelectedDept] = useState<string>('all');
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<BookStatus | 'all'>('all');
@@ -356,7 +363,8 @@ export default function AdminBooks() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            {selectedType === 'short_note' && (
+            {/* Primary action — contextual to the active tab */}
+            {selectedType === 'short_note' ? (
               <Button
                 onClick={() => {
                   setEditingSubject(null);
@@ -365,47 +373,53 @@ export default function AdminBooks() {
                 className="rounded-xl bg-purple-600 hover:bg-purple-700 text-white shadow-xs font-semibold"
               >
                 <Plus className="w-4 h-4 mr-1.5" />
-                <BookOpen className="w-4 h-4 mr-1.5" />
-                Create Notes Subject
+                New Notes Subject
+              </Button>
+            ) : (
+              <Button
+                onClick={() => {
+                  setEditingBook(null);
+                  setDialogOpen(true);
+                }}
+                className="rounded-xl bg-primary shadow-sm font-semibold"
+              >
+                <Plus className="w-4 h-4 mr-1.5" />
+                Add Book
               </Button>
             )}
 
-            <Button
-              variant="outline"
-              onClick={() => navigate('/dashboard/admin/shortnotes/create')}
-              className="rounded-xl border-purple-500/30 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/40 font-semibold"
-            >
-              <FileText className="w-4 h-4 mr-2" />
-              Chapter Shortnotes Studio
-            </Button>
-
-            <Button
-              onClick={() => setImportNoteOpen(true)}
-              className="rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-xs font-semibold"
-            >
-              <FileUp className="w-4 h-4 mr-1.5" />
-              Import Shortnote
-            </Button>
-
-            <Button
-              variant="outline"
-              onClick={() => navigate('/dashboard/admin/ai-generator')}
-              className="rounded-xl border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40"
-            >
-              <Sparkles className="w-4 h-4 mr-2" />
-              AI Exam Generator
-            </Button>
-
-            <Button
-              onClick={() => {
-                setEditingBook(null);
-                setDialogOpen(true);
-              }}
-              className="rounded-xl bg-primary shadow-sm font-semibold"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Add Resource
-            </Button>
+            {/* Secondary actions — organized into a single menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="rounded-xl font-semibold">
+                  <MoreHorizontal className="w-4 h-4 mr-1.5" />
+                  More
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="rounded-xl w-56">
+                <DropdownMenuItem
+                  onClick={() => setImportNoteOpen(true)}
+                  className="cursor-pointer"
+                >
+                  <FileUp className="w-4 h-4 mr-2" />
+                  Import Shortnote
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => navigate('/dashboard/admin/shortnotes/create')}
+                  className="cursor-pointer"
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  Chapter Shortnotes Studio
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => navigate('/dashboard/admin/ai-generator')}
+                  className="cursor-pointer"
+                >
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  AI Exam Generator
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
@@ -460,51 +474,19 @@ export default function AdminBooks() {
           </Card>
         </div>
 
-        {/* Quick Resource Type Switcher (All / Textbooks / Study Notes) */}
-        <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-card border shadow-xs w-full sm:w-fit overflow-x-auto">
-          <button
-            type="button"
-            onClick={() => setSelectedType('all')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 shrink-0 ${
-              selectedType === 'all'
-                ? 'bg-primary text-primary-foreground shadow-xs'
-                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-            }`}
-          >
-            <Layers className="h-4 w-4" />
-            <span>All Resources</span>
-            <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-mono">
-              {stats.total}
-            </Badge>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setSelectedType('textbook')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 shrink-0 ${
-              selectedType === 'textbook'
-                ? 'bg-primary text-primary-foreground shadow-xs'
-                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-            }`}
-          >
-            <BookOpen className="h-4 w-4" />
-            <span>Curriculum Books</span>
-            <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-mono">
-              {stats.textbooks}
-            </Badge>
-          </button>
-
+        {/* Two-way switcher — Notes (default) | Books */}
+        <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-card border shadow-xs w-full sm:w-fit">
           <button
             type="button"
             onClick={() => setSelectedType('short_note')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 shrink-0 ${
+            className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${
               selectedType === 'short_note'
                 ? 'bg-purple-600 text-white shadow-xs'
                 : 'text-muted-foreground hover:text-foreground hover:bg-purple-50 dark:hover:bg-purple-950/30'
             }`}
           >
             <FileText className="h-4 w-4" />
-            <span>Study Notes</span>
+            <span>Notes</span>
             <Badge
               variant="secondary"
               className={`text-[10px] h-5 px-1.5 font-mono ${
@@ -514,59 +496,61 @@ export default function AdminBooks() {
               {stats.shortNotes}
             </Badge>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedType('textbook')}
+            className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+              selectedType === 'textbook'
+                ? 'bg-primary text-primary-foreground shadow-xs'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+            }`}
+          >
+            <BookOpen className="h-4 w-4" />
+            <span>Books</span>
+            <Badge
+              variant="secondary"
+              className={`text-[10px] h-5 px-1.5 font-mono ${
+                selectedType === 'textbook' ? 'bg-white/20 text-white' : ''
+              }`}
+            >
+              {stats.textbooks}
+            </Badge>
+          </button>
         </div>
 
-        {/* If Study Notes is selected, allow switching between Subject Books View and Individual Notes View */}
+        {/* Study Notes: switch between per-subject books and all chapter notes */}
         {selectedType === 'short_note' && (
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-purple-500/10 border border-purple-500/20">
-            <div className="flex items-center gap-2 flex-wrap">
-              <Badge className="bg-purple-600 text-white font-bold text-xs rounded-lg px-2.5">
-                Study Notes Book Mode
-              </Badge>
-              <span className="text-xs text-muted-foreground font-medium">
-                Create subject books with custom coverpage images and assign chapter notes to them.
-              </span>
-            </div>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-2xl bg-purple-500/10 border border-purple-500/20">
+            <span className="text-xs text-muted-foreground font-medium">
+              Organize notes per subject book, or manage every chapter note directly.
+            </span>
 
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center rounded-xl bg-card border p-1 shadow-xs">
-                <button
-                  type="button"
-                  onClick={() => setStudyNotesViewMode('by_subject')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                    studyNotesViewMode === 'by_subject'
-                      ? 'bg-purple-600 text-white shadow-xs'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <BookOpen className="h-3.5 w-3.5" />
-                  <span>Subject Books ({subjectsWithStudyNotes.length})</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStudyNotesViewMode('all_notes')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                    studyNotesViewMode === 'all_notes'
-                      ? 'bg-purple-600 text-white shadow-xs'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <FileText className="h-3.5 w-3.5" />
-                  <span>All Chapter Notes ({stats.shortNotes})</span>
-                </button>
-              </div>
-
-              <Button
-                size="sm"
-                onClick={() => {
-                  setEditingSubject(null);
-                  setSubjectFormOpen(true);
-                }}
-                className="h-8 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-xs"
+            <div className="flex items-center rounded-xl bg-card border p-1 shadow-xs">
+              <button
+                type="button"
+                onClick={() => setStudyNotesViewMode('by_subject')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  studyNotesViewMode === 'by_subject'
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
               >
-                <Plus className="h-3.5 w-3.5 mr-1" />
-                New Notes Subject
-              </Button>
+                <BookOpen className="h-3.5 w-3.5" />
+                <span>By Subject ({subjectsWithStudyNotes.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setStudyNotesViewMode('all_notes')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  studyNotesViewMode === 'all_notes'
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <FileText className="h-3.5 w-3.5" />
+                <span>All Notes ({stats.shortNotes})</span>
+              </button>
             </div>
           </div>
         )}
@@ -574,9 +558,9 @@ export default function AdminBooks() {
         {/* Filter Bar */}
         <Card className="rounded-2xl border bg-card shadow-xs">
           <CardContent className="p-4 space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {/* Search */}
-              <div className="relative md:col-span-2">
+              <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search by title, author, or subject..."
@@ -584,23 +568,6 @@ export default function AdminBooks() {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9 rounded-xl text-sm"
                 />
-              </div>
-
-              {/* Type Filter */}
-              <div>
-                <Select
-                  value={selectedType}
-                  onValueChange={(val: any) => setSelectedType(val)}
-                >
-                  <SelectTrigger className="rounded-xl text-xs sm:text-sm">
-                    <SelectValue placeholder="All Categories" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Resources</SelectItem>
-                    <SelectItem value="textbook">📖 Books</SelectItem>
-                    <SelectItem value="short_note">📝 Notes</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
 
               {/* Department Filter */}
@@ -652,15 +619,13 @@ export default function AdminBooks() {
                 {books.length} resources
               </span>
 
-              {(selectedType !== 'all' ||
-                selectedDept !== 'all' ||
+              {(selectedDept !== 'all' ||
                 selectedSubject !== 'all' ||
                 selectedStatus !== 'all' ||
                 searchQuery.trim().length > 0) && (
                 <button
                   type="button"
                   onClick={() => {
-                    setSelectedType('all');
                     setSelectedDept('all');
                     setSelectedSubject('all');
                     setSelectedStatus('all');
@@ -717,7 +682,11 @@ export default function AdminBooks() {
                   return (
                     <Card
                       key={sub.id}
-                      className="rounded-3xl border bg-card hover:border-purple-500/50 hover:shadow-lg transition-all duration-200 overflow-hidden flex flex-col justify-between group"
+                      onClick={() => {
+                        setSelectedSubjectForNotes(sub);
+                        setNotesManagerOpen(true);
+                      }}
+                      className="rounded-3xl border bg-card hover:border-purple-500/50 hover:shadow-lg transition-all duration-200 overflow-hidden flex flex-col justify-between group cursor-pointer"
                     >
                       <div className="p-5 space-y-4">
                         {/* Book Cover Preview with 4:3 Aspect Ratio and realistic book spine */}
@@ -779,7 +748,8 @@ export default function AdminBooks() {
                         <div className="grid grid-cols-2 gap-2 pt-3">
                           {/* 1. Manage Chapters & Notes */}
                           <Button
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setSelectedSubjectForNotes(sub);
                               setNotesManagerOpen(true);
                             }}
@@ -792,7 +762,8 @@ export default function AdminBooks() {
                           {/* 2. Edit Subject & Cover */}
                           <Button
                             variant="outline"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setEditingSubject(sub);
                               setSubjectFormOpen(true);
                             }}
@@ -807,7 +778,8 @@ export default function AdminBooks() {
                           <span>{sub.notes.length} note guides assigned</span>
                           <button
                             type="button"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               const deptId = sub.departmentIds?.[0] || '';
                               navigate(`/dashboard/admin/shortnotes/create?subjectId=${sub.id}&departmentId=${deptId}`);
                             }}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { Subject, Chapter } from '@/types/subject';
 import { Book } from '@/types/book';
 import {
@@ -9,12 +10,14 @@ import {
   deleteChapter,
   updateSubject,
 } from '@/lib/subjects';
-import { updateBook, deleteBook } from '@/lib/books';
+import { updateBook, deleteBook, createBook } from '@/lib/books';
+import { extractDriveFileId } from '@/lib/google-drive';
 import { getSubjectCover } from '@/lib/subject-covers';
 import { uploadSubjectCoverImage, validateCoverImage } from '@/lib/image-upload';
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogDescription,
@@ -29,6 +32,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -57,6 +67,7 @@ import {
   Globe,
   GlobeLock,
   Upload,
+  Link2,
 } from 'lucide-react';
 
 export interface SubjectNotesManagerDialogProps {
@@ -78,6 +89,7 @@ export function SubjectNotesManagerDialog({
 }: SubjectNotesManagerDialogProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [loading, setLoading] = useState(false);
@@ -101,6 +113,17 @@ export function SubjectNotesManagerDialog({
   const [togglingNoteId, setTogglingNoteId] = useState<string | null>(null);
   const [deletingNote, setDeletingNote] = useState<Book | null>(null);
   const [isDeletingNote, setIsDeletingNote] = useState<boolean>(false);
+
+  // Add / Edit chapter note (Google Drive link) form state
+  const [noteFormOpen, setNoteFormOpen] = useState(false);
+  const [noteFormMode, setNoteFormMode] = useState<'create' | 'edit'>('create');
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [noteFormChapterId, setNoteFormChapterId] = useState<string>('');
+  const [noteFormTitle, setNoteFormTitle] = useState('');
+  const [noteFormDriveUrl, setNoteFormDriveUrl] = useState('');
+  const [noteFormStatus, setNoteFormStatus] = useState<'published' | 'draft'>('published');
+  const [savingNoteForm, setSavingNoteForm] = useState(false);
+  const [noteFormError, setNoteFormError] = useState<string | null>(null);
 
   // Notes Cover Image state & upload
   const [localCoverUrl, setLocalCoverUrl] = useState<string>('');
@@ -326,6 +349,98 @@ export function SubjectNotesManagerDialog({
     }
   };
 
+  const openCreateNoteForm = (chapterId?: string) => {
+    setNoteFormMode('create');
+    setEditingNoteId(null);
+    setNoteFormChapterId(chapterId || chapters[0]?.id || '');
+    setNoteFormTitle('');
+    setNoteFormDriveUrl('');
+    setNoteFormStatus('published');
+    setNoteFormError(null);
+    setNoteFormOpen(true);
+  };
+
+  const openEditNoteForm = (note: Book) => {
+    setNoteFormMode('edit');
+    setEditingNoteId(note.id);
+    setNoteFormChapterId(note.chapterId || chapters[0]?.id || '');
+    setNoteFormTitle(note.title || '');
+    setNoteFormDriveUrl(note.driveUrl || '');
+    setNoteFormStatus(note.status === 'draft' ? 'draft' : 'published');
+    setNoteFormError(null);
+    setNoteFormOpen(true);
+  };
+
+  const handleSaveNoteForm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!subject?.id) return;
+
+    const driveId = extractDriveFileId(noteFormDriveUrl);
+    if (!noteFormTitle.trim()) {
+      setNoteFormError('Please enter a note title.');
+      return;
+    }
+    if (!driveId) {
+      setNoteFormError('Please paste a valid Google Drive sharing link.');
+      return;
+    }
+
+    const chapter = chapters.find((c) => c.id === noteFormChapterId);
+    const departmentId = subject.departmentIds?.[0] || 'all';
+
+    setSavingNoteForm(true);
+    setNoteFormError(null);
+    try {
+      if (noteFormMode === 'create') {
+        await createBook(
+          {
+            title: noteFormTitle.trim(),
+            resourceType: 'short_note',
+            departmentId,
+            departmentIds: subject.departmentIds || [],
+            subjectId: subject.id,
+            subjectName: subject.name,
+            chapterId: chapter?.id || '',
+            chapterTitle: chapter?.title || '',
+            chapterNumber: chapter?.chapterNumber,
+            driveUrl: noteFormDriveUrl.trim(),
+            driveFileId: driveId,
+            status: noteFormStatus,
+            language: 'English',
+          },
+          user?.uid || ''
+        );
+        toast({
+          title: 'Chapter Note Added',
+          description: `"${noteFormTitle.trim()}" was linked${
+            chapter ? ` to Chapter ${chapter.chapterNumber ?? ''}: ${chapter.title}` : ''
+          }.`,
+        });
+      } else if (editingNoteId) {
+        await updateBook(editingNoteId, {
+          title: noteFormTitle.trim(),
+          driveUrl: noteFormDriveUrl.trim(),
+          driveFileId: driveId,
+          status: noteFormStatus,
+          chapterId: chapter?.id || '',
+          chapterTitle: chapter?.title || '',
+          chapterNumber: chapter?.chapterNumber,
+        } as Partial<Book>);
+        toast({
+          title: 'Chapter Note Updated',
+          description: `Changes to "${noteFormTitle.trim()}" saved successfully.`,
+        });
+      }
+      setNoteFormOpen(false);
+      await loadChapters();
+      onNotesChanged?.();
+    } catch (err: any) {
+      setNoteFormError(err.message || 'Could not save the note. Please try again.');
+    } finally {
+      setSavingNoteForm(false);
+    }
+  };
+
   if (!subject) return null;
 
   const coverUrl =
@@ -387,7 +502,7 @@ export function SubjectNotesManagerDialog({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+          <div className="flex flex-wrap items-center gap-2 self-start sm:self-center shrink-0">
             {/* Hidden cover file picker */}
             <input
               type="file"
@@ -418,12 +533,24 @@ export function SubjectNotesManagerDialog({
             </Button>
 
             <Button
+              variant="outline"
               size="sm"
               onClick={() => setShowAddForm(true)}
-              className="rounded-xl text-xs font-semibold bg-purple-600 text-white hover:bg-purple-700 gap-1.5 shadow-xs"
+              className="rounded-xl text-xs font-semibold gap-1.5"
             >
               <Plus className="h-3.5 w-3.5" />
               Add Chapter
+            </Button>
+
+            <Button
+              size="sm"
+              disabled={chapters.length === 0}
+              onClick={() => openCreateNoteForm()}
+              title={chapters.length === 0 ? 'Add a chapter first' : 'Add a chapter note by pasting a Google Drive link'}
+              className="rounded-xl text-xs font-semibold bg-purple-600 text-white hover:bg-purple-700 gap-1.5 shadow-xs"
+            >
+              <Link2 className="h-3.5 w-3.5" />
+              Add Note
             </Button>
           </div>
         </div>
@@ -538,16 +665,21 @@ export function SubjectNotesManagerDialog({
                   const isEditing = editingChapterId === ch.id;
                   const note = getNoteForChapter(ch);
                   const isDeleting = deletingId === ch.id;
+                  const hasRichContent = Boolean(
+                    note && ((note.sections && note.sections.length > 0) || note.content)
+                  );
 
                   return (
                     <div
                       key={ch.id}
-                      className={`p-4 sm:p-5 rounded-2xl border transition-all duration-200 bg-card ${
+                      className={`relative overflow-hidden p-4 sm:p-5 rounded-2xl border transition-all duration-200 bg-card ${
                         note
                           ? 'border-purple-500/30 hover:border-purple-500/60 shadow-xs'
                           : 'border-border/70 hover:border-border'
                       }`}
                     >
+                      {/* Left Curved Purple Accent Ribbon (matches student chapter list) */}
+                      <div className="absolute left-0 top-3 bottom-3 w-1.5 bg-[#7c3aed] rounded-r-full" />
                       {isEditing ? (
                         <div className="space-y-3">
                           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
@@ -695,18 +827,22 @@ export function SubjectNotesManagerDialog({
                                   <span className="hidden sm:inline">Read</span>
                                 </Button>
 
-                                {/* 3. Edit Note in Studio (U in CRUD) */}
+                                {/* 3. Edit Note (U in CRUD) — rich notes open the Studio, link-only notes open the link editor */}
                                 <Button
                                   size="sm"
                                   onClick={() => {
-                                    onOpenChange(false);
-                                    navigate(`/dashboard/admin/shortnotes/create?editBookId=${note.id}`);
+                                    if (hasRichContent) {
+                                      onOpenChange(false);
+                                      navigate(`/dashboard/admin/shortnotes/create?editBookId=${note.id}`);
+                                    } else {
+                                      openEditNoteForm(note);
+                                    }
                                   }}
                                   className="rounded-xl text-xs h-8 px-3 font-semibold bg-purple-600 hover:bg-purple-700 text-white gap-1.5 shadow-xs"
-                                  title="Edit Sections, Definitions, MCQs & Cover"
+                                  title={hasRichContent ? 'Edit sections, definitions, MCQs & cover' : 'Edit title, Google Drive link & status'}
                                 >
                                   <Pencil className="h-3.5 w-3.5" />
-                                  <span>Edit Note</span>
+                                  <span>Edit</span>
                                 </Button>
 
                                 {/* 4. Delete Note (D in CRUD) */}
@@ -738,22 +874,15 @@ export function SubjectNotesManagerDialog({
                                   <span>Generate AI</span>
                                 </Button>
 
-                                {/* Write Note Manually (C in CRUD) */}
+                                {/* Add Note via Google Drive link (C in CRUD) */}
                                 <Button
-                                  variant="outline"
                                   size="sm"
-                                  onClick={() => {
-                                    onOpenChange(false);
-                                    const deptId = subject.departmentIds?.[0] || '';
-                                    navigate(
-                                      `/dashboard/admin/shortnotes/create?subjectId=${subject.id}&chapterId=${ch.id}&chapterTitle=${encodeURIComponent(ch.title)}&departmentId=${deptId}&mode=manual`
-                                    );
-                                  }}
-                                  className="rounded-xl text-xs h-8 px-2.5 font-semibold border-purple-500/30 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/30 gap-1"
-                                  title="Write or upload note manually"
+                                  onClick={() => openCreateNoteForm(ch.id)}
+                                  className="rounded-xl text-xs h-8 px-3 font-semibold bg-purple-600 hover:bg-purple-700 text-white gap-1.5 shadow-xs"
+                                  title="Paste a Google Drive link to add a chapter note"
                                 >
-                                  <Plus className="h-3.5 w-3.5" />
-                                  <span className="hidden sm:inline">Write Note</span>
+                                  <Link2 className="h-3.5 w-3.5" />
+                                  <span>Add Note</span>
                                 </Button>
                               </>
                             )}
@@ -818,6 +947,121 @@ export function SubjectNotesManagerDialog({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Add / Edit Chapter Note (Google Drive link) Dialog */}
+        <Dialog open={noteFormOpen} onOpenChange={setNoteFormOpen}>
+          <DialogContent className="max-w-lg rounded-3xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-lg font-bold">
+                <Link2 className="h-5 w-5 text-purple-600" />
+                {noteFormMode === 'create' ? 'Add Chapter Note' : 'Edit Chapter Note'}
+              </DialogTitle>
+              <DialogDescription>
+                Paste a Google Drive link to attach a study note to a chapter of {subject?.name}.
+                Students will open it in the offline reader.
+              </DialogDescription>
+            </DialogHeader>
+
+            <form onSubmit={handleSaveNoteForm} className="space-y-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Chapter</Label>
+                <Select value={noteFormChapterId} onValueChange={setNoteFormChapterId}>
+                  <SelectTrigger className="rounded-xl h-10 text-sm">
+                    <SelectValue placeholder="Select a chapter" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[...chapters]
+                      .sort((a, b) => (a.chapterNumber ?? 0) - (b.chapterNumber ?? 0))
+                      .map((ch, i) => (
+                        <SelectItem key={ch.id} value={ch.id}>
+                          Chapter {ch.chapterNumber ?? i + 1}: {ch.title}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Note Title</Label>
+                <Input
+                  value={noteFormTitle}
+                  onChange={(e) => setNoteFormTitle(e.target.value)}
+                  placeholder="e.g. Chapter 1 — Further on Sets"
+                  className="rounded-xl h-10 text-sm"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Google Drive Link</Label>
+                <Input
+                  value={noteFormDriveUrl}
+                  onChange={(e) => setNoteFormDriveUrl(e.target.value)}
+                  placeholder="https://drive.google.com/file/d/..."
+                  className="rounded-xl h-10 text-sm"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Make sure the file is shared as &quot;Anyone with the link&quot;.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Visibility</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNoteFormStatus('published')}
+                    className={`flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition-all ${
+                      noteFormStatus === 'published'
+                        ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                        : 'border-border text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    <Globe className="h-3.5 w-3.5" />
+                    Publish
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNoteFormStatus('draft')}
+                    className={`flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition-all ${
+                      noteFormStatus === 'draft'
+                        ? 'border-amber-500/50 bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                        : 'border-border text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    <GlobeLock className="h-3.5 w-3.5" />
+                    Draft
+                  </button>
+                </div>
+              </div>
+
+              {noteFormError && (
+                <p className="rounded-xl bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">
+                  {noteFormError}
+                </p>
+              )}
+
+              <DialogFooter className="gap-2 pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setNoteFormOpen(false)}
+                  disabled={savingNoteForm}
+                  className="rounded-xl"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={savingNoteForm}
+                  className="rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold"
+                >
+                  {savingNoteForm && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  {noteFormMode === 'create' ? 'Add Note' : 'Save Changes'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </DialogContent>
     </Dialog>
   );
