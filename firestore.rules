@@ -11,6 +11,11 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    // Lifetime access is permanent once granted; no client-side update may revoke it.
+    function hasLifetimeAccess(data) {
+      return data.get('paymentAccess', {}).get('lifetime', false) == true;
+    }
+
     function isAdmin() {
       return isAuthenticated() &&
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
@@ -61,10 +66,11 @@ service cloud.firestore {
       allow create: if isAdmin() || (
         isUser(userId) &&
         request.resource.data.role == 'student' &&
-        !request.resource.data.keys().hasAny(['permissions', 'sectionPermissions', 'disabled'])
+        !request.resource.data.keys().hasAny(['permissions', 'sectionPermissions', 'disabled', 'paymentAccess'])
       );
-      allow update: if isAdmin() || (
+      allow update: if (isAdmin() && (!hasLifetimeAccess(resource.data) || hasLifetimeAccess(request.resource.data))) || (
         isUser(userId) &&
+        hasLifetimeAccess(request.resource.data) == hasLifetimeAccess(resource.data) &&
         request.resource.data.role == resource.data.role &&
         request.resource.data.get('permissions', null) == resource.data.get('permissions', null) &&
         request.resource.data.get('sectionPermissions', null) == resource.data.get('sectionPermissions', null) &&
