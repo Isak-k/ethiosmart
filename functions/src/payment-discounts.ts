@@ -25,7 +25,7 @@ function money(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
-function validDiscount(raw: any, requireEnabled: boolean): raw is { kind: DiscountKind; value: number } {
+function validDiscount(raw: any, requireEnabled: boolean): raw is Record<string, any> & { kind: DiscountKind; value: number } {
   if (!raw || (raw.kind !== 'percentage' && raw.kind !== 'fixed')) return false;
   if (requireEnabled && raw.enabled !== true && raw.active !== true) return false;
   const value = Number(raw.value);
