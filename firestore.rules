@@ -77,7 +77,8 @@ service cloud.firestore {
     match /sandboxReceiptFingerprints/{fingerprintId} {
       allow read, write: if false;
     }
-\n    // --- Users Collection ---
+
+    // --- Users Collection ---
     match /users/{userId} {
       allow read: if isUser(userId) || isAdmin();
       allow create: if isAdmin() || (
