@@ -8,7 +8,7 @@ const MAIN_ADMIN_EMAIL = 'isak@gmail.com';
 const RECEIPT_FOLDER = 'ethiosmart/payment-receipts';
 
 type PaymentStatus = 'Pending' | 'Approved' | 'Rejected';
-import { calculatePaymentDiscount } from './payment-discounts';
+import { calculatePaymentDiscount, getPaymentStorageCollections } from './payment-discounts';
 
 function requireAuth(context: functions.https.CallableContext): string {
   if (!context.auth) {
@@ -208,9 +208,10 @@ export const submitPayment = functions.https.onCall(async (data, context) => {
   }
 
   const mode = settings.mode === 'sandbox' ? 'sandbox' : 'production';
-  const paymentCollection = mode === 'sandbox' ? 'sandboxPayments' : 'payments';
-  const accountCollection = mode === 'sandbox' ? 'sandboxPaymentAccounts' : 'paymentAccounts';
-  const fingerprintCollection = mode === 'sandbox' ? 'sandboxReceiptFingerprints' : 'receiptFingerprints';
+  const storage = getPaymentStorageCollections(mode);
+  const paymentCollection = storage.payments;
+  const accountCollection = storage.accounts;
+  const fingerprintCollection = storage.fingerprints;
   const paymentRef = db.collection(paymentCollection).doc(paymentId);
   const accountRef = db.collection(accountCollection).doc(uid);
   const productionAccountRef = db.collection('paymentAccounts').doc(uid);
