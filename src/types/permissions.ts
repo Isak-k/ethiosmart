@@ -127,6 +127,7 @@ export const RESTRICTED_PERMISSIONS: UserPermissions = {
   editExaminerPermissions: false,
   deleteExaminers: false,
   enableDisableExaminers: false,
+  managePayments: false,
 };
 
 export const FULL_ADMIN_PERMISSIONS: UserPermissions = {
@@ -157,6 +158,7 @@ export const FULL_ADMIN_PERMISSIONS: UserPermissions = {
   viewAIAssistant: false,
   viewLeaderboard: true,
   manageLeaderboard: true,
+  managePayments: true,
   viewExaminers: false,
   addExaminers: false,
   editExaminerPermissions: false,
