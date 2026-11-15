@@ -483,8 +483,22 @@ export const getStudentExamQuestions = functions.https.onCall(async (data, conte
   }
 
   const questionsSnap = await examSnap.ref.collection('questions').get();
+  // Never send answer keys or explanations to the student during an active
+  // exam. Scoring is performed by submitStudentExamAttempt on the server.
   const questions = questionsSnap.docs
-    .map((questionDoc) => ({ questionId: questionDoc.id, ...questionDoc.data() }))
+    .map((questionDoc) => {
+      const raw = questionDoc.data();
+      const {
+        correctOptionIndex: _correctOptionIndex,
+        correctAnswer: _correctAnswer,
+        answer: _answer,
+        answerKey: _answerKey,
+        explanation: _explanation,
+        isCorrect: _isCorrect,
+        ...studentSafeQuestion
+      } = raw;
+      return { questionId: questionDoc.id, ...studentSafeQuestion };
+    })
     .sort((a: any, b: any) => (Number(a.orderIndex) || 0) - (Number(b.orderIndex) || 0));
 
   return {
