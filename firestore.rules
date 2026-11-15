@@ -164,13 +164,15 @@ service cloud.firestore {
         );
         // Answer ownership is inherited from the parent attempt. Client writes
         // cannot set correctness, manual grades, or grading metadata.
-        allow create, update: if isAuthenticated() &&
+        allow create, update: if isAdminOrSuper() || (
+          isAuthenticated() &&
           get(/databases/$(database)/documents/examAttempts/$(attemptId)).data.studentId == request.auth.uid &&
           get(/databases/$(database)/documents/examAttempts/$(attemptId)).data.isSubmitted != true &&
           request.resource.data.keys().hasOnly([
             'questionId', 'attemptId', 'selectedOptionIndex', 'studentAnswer',
             'timeSpentSeconds', 'answeredAt'
-          ]);
+          ])
+        );
         allow delete: if isAdminOrSuper();
       }
     }
