@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import app from "@/integrations/firebase/client";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -7,9 +7,42 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, RefreshCw, CheckCircle2, XCircle, Wallet, ExternalLink, Search } from "lucide-react";
+import { usePermissions } from "@/contexts/PermissionsContext";
+import { PaymentModeCard } from "@/components/admin/payments/PaymentModeCard";
+import { PaymentPriceCard } from "@/components/admin/payments/PaymentPriceCard";
+import { PaymentMethodsEditor } from "@/components/admin/payments/PaymentMethodsEditor";
+import { InstructionsCard } from "@/components/admin/payments/InstructionsCard";
+import { FreeAccessSettings } from "@/components/admin/payments/FreeAccessSettings";
+import { DiscountSettings } from "@/components/admin/payments/DiscountSettings";
+import {
+  defaultPaymentSettings,
+  normalizePaymentSettings,
+  type PaymentSettingsConfig,
+} from "@/components/admin/payments/types";
+import {
+  Loader2,
+  RefreshCw,
+  CheckCircle2,
+  XCircle,
+  ExternalLink,
+  Search,
+  Save,
+  Undo2,
+  Lock,
+  AlertTriangle,
+} from "lucide-react";
 
 const functions = getFunctions(app);
 const getPaymentAdminData = httpsCallable(functions, "getPaymentAdminData");
@@ -34,17 +67,22 @@ type Payment = {
 
 export default function AdminPayments() {
   const { toast } = useToast();
+  const { isSuperAdmin } = usePermissions();
+  const canManageSettings = isSuperAdmin;
+
+  const [tab, setTab] = useState<"review" | "settings">("review");
   const [payments, setPayments] = useState<Payment[]>([]);
   const [totals, setTotals] = useState({ total: 0, pending: 0, approved: 0, rejected: 0, revenueEtb: 0 });
-  const [price, setPrice] = useState("0");
-  const [enabled, setEnabled] = useState(true);
-  const [mode, setMode] = useState<"production" | "sandbox">("production");
-  const [instructions, setInstructions] = useState("");
-  const [methodsJson, setMethodsJson] = useState("[]");
+  const [settings, setSettings] = useState<PaymentSettingsConfig>(defaultPaymentSettings());
+  const [savedSettings, setSavedSettings] = useState<PaymentSettingsConfig>(defaultPaymentSettings());
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState("");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("Pending");
+  const [rejectTarget, setRejectTarget] = useState<Payment | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [approveTarget, setApproveTarget] = useState<Payment | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -53,63 +91,114 @@ export default function AdminPayments() {
       const data = response.data as any;
       setPayments(data.payments || []);
       setTotals(data.totals || { total: 0, pending: 0, approved: 0, rejected: 0, revenueEtb: 0 });
-      setPrice(String(data.settings?.priceEtb ?? 0));
-      setEnabled(data.settings?.enabled !== false);
-      setMode(data.settings?.mode === "sandbox" ? "sandbox" : "production");
-      setInstructions(data.settings?.instructions || "");
-      setMethodsJson(JSON.stringify(data.settings?.paymentMethods || [], null, 2));
+      const normalized = normalizePaymentSettings(data.settings);
+      setSettings(normalized);
+      setSavedSettings(normalized);
     } catch (error: any) {
-      toast({ title: "Could not load payment records", description: error?.message || "Check your administrator permissions.", variant: "destructive" });
+      toast({
+        title: "Could not load payment records",
+        description: error?.message || "Check your administrator permissions.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
   }, [status, toast]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  const decide = async (payment: Payment, decision: "Approved" | "Rejected") => {
-    let reason = "";
-    if (decision === "Rejected") {
-      const value = window.prompt("Enter the reason for rejecting this receipt:");
-      if (value === null) return;
-      reason = value.trim();
-      if (!reason) {
-        toast({ title: "A reason is required", variant: "destructive" });
-        return;
-      }
-    }
+  const dirty = useMemo(
+    () => JSON.stringify(settings) !== JSON.stringify(savedSettings),
+    [settings, savedSettings],
+  );
+
+  const enabledMethodCount = settings.paymentMethods.filter((method) => method.enabled && method.name.trim()).length;
+
+  const decide = async (payment: Payment, decision: "Approved" | "Rejected", reason = "") => {
     setBusyId(payment.id);
     try {
       await reviewPayment({ paymentId: payment.paymentId || payment.id, decision, reason });
-      toast({ title: decision === "Approved" ? "Payment approved" : "Payment rejected", description: decision === "Approved" ? "Lifetime access has been granted." : "The rejection reason has been saved." });
+      toast({
+        title: decision === "Approved" ? "Payment approved" : "Payment rejected",
+        description:
+          decision === "Approved"
+            ? settings.mode === "sandbox"
+              ? "Sandbox approval recorded. No real access was granted."
+              : "Lifetime access has been granted."
+            : "The rejection reason has been saved.",
+      });
+      setApproveTarget(null);
+      setRejectTarget(null);
+      setRejectReason("");
       await load();
     } catch (error: any) {
-      toast({ title: "Could not review payment", description: error?.message || "Please try again.", variant: "destructive" });
+      toast({
+        title: "Could not review payment",
+        description: error?.message || "Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setBusyId("");
     }
   };
 
-  const savePrice = async () => {
-    const amount = Number(price);
-    if (!Number.isFinite(amount) || amount < 0) {
-      toast({ title: "Enter a valid ETB amount", variant: "destructive" });
+  const submitRejection = () => {
+    if (!rejectTarget) return;
+    const reason = rejectReason.trim();
+    if (!reason) {
+      toast({ title: "A reason is required", variant: "destructive" });
       return;
     }
+    decide(rejectTarget, "Rejected", reason);
+  };
+
+  const saveSettings = async () => {
+    if (!Number.isFinite(settings.priceEtb) || settings.priceEtb < 0) {
+      toast({ title: "Enter a valid ETB price", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
     try {
-      const paymentMethods = JSON.parse(methodsJson);
-      if (!Array.isArray(paymentMethods)) throw new Error("Payment methods must be a JSON array.");
-      await savePaymentSettings({ priceEtb: amount, enabled, mode, instructions, paymentMethods });
-      toast({ title: "Payment settings saved", description: "The new price applies to new payment submissions." });
+      await savePaymentSettings({
+        priceEtb: settings.priceEtb,
+        enabled: settings.enabled,
+        mode: settings.mode,
+        instructions: settings.instructions,
+        paymentMethods: settings.paymentMethods,
+        freeAccess: settings.freeAccess,
+        discounts: settings.discounts,
+      });
+      setSavedSettings(settings);
+      toast({
+        title: "Payment settings saved",
+        description: "The changes are now live. A new price applies to new submissions only.",
+      });
       await load();
     } catch (error: any) {
-      toast({ title: "Settings could not be saved", description: error?.message || "Only the main administrator can change these settings.", variant: "destructive" });
+      toast({
+        title: "Settings could not be saved",
+        description: error?.message || "Only the main administrator can change payment settings.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
     }
   };
 
-  const filtered = payments.filter((p) => {
+  const patchSettings = (patch: Partial<PaymentSettingsConfig>) => {
+    setSettings((prev) => ({ ...prev, ...patch }));
+  };
+
+  const filtered = payments.filter((payment) => {
     const q = search.toLowerCase();
-    return !q || [p.userName, p.email, p.phone, p.userId, p.paymentId].some((v) => String(v || "").toLowerCase().includes(q));
+    return (
+      !q ||
+      [payment.userName, payment.email, payment.phone, payment.userId, payment.paymentId].some((value) =>
+        String(value || "").toLowerCase().includes(q),
+      )
+    );
   });
 
   return (
@@ -118,76 +207,301 @@ export default function AdminPayments() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Payment Management</h1>
-            <p className="text-sm text-muted-foreground">Review manual transfers and manage lifetime access approvals.</p>
+            <p className="text-sm text-muted-foreground">
+              Review manual transfers, manage lifetime access approvals and configure the payment system.
+            </p>
           </div>
-          <Button variant="outline" onClick={load} disabled={loading}><RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />Refresh</Button>
+          <div className="flex items-center gap-2">
+            <Badge variant={settings.mode === "sandbox" ? "secondary" : "default"}>
+              {settings.mode === "sandbox" ? "Sandbox mode" : "Production mode"}
+            </Badge>
+            <Button variant="outline" onClick={load} disabled={loading}>
+              <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Pending</p><p className="mt-1 text-2xl font-bold">{totals.pending}</p></CardContent></Card>
-          <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Approved</p><p className="mt-1 text-2xl font-bold">{totals.approved}</p></CardContent></Card>
-          <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Rejected</p><p className="mt-1 text-2xl font-bold">{totals.rejected}</p></CardContent></Card>
-          <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Recorded revenue</p><p className="mt-1 text-2xl font-bold">{totals.revenueEtb.toLocaleString()} ETB</p></CardContent></Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">Pending</p>
+              <p className="mt-1 text-2xl font-bold">{totals.pending}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">Approved</p>
+              <p className="mt-1 text-2xl font-bold">{totals.approved}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">Rejected</p>
+              <p className="mt-1 text-2xl font-bold">{totals.rejected}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">Recorded revenue</p>
+              <p className="mt-1 text-2xl font-bold">{Number(totals.revenueEtb || 0).toLocaleString()} ETB</p>
+            </CardContent>
+          </Card>
         </div>
 
-        <Card>
-          <CardHeader><CardTitle className="flex items-center gap-2"><Wallet className="h-5 w-5" /> Payment price</CardTitle></CardHeader>
-          <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <div className="flex-1 space-y-2"><label className="text-sm font-medium">Fixed price (ETB)</label><Input type="number" min="0" value={price} onChange={(e) => setPrice(e.target.value)} /></div>
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> Accept new payments</label>
-            <Button onClick={savePrice}>Save price</Button>
-          </CardContent>
-        </Card>
+        <Tabs value={tab} onValueChange={(value) => setTab(value as "review" | "settings")}>
+          <TabsList className="grid w-full grid-cols-2 sm:w-80">
+            <TabsTrigger value="review">Review payments</TabsTrigger>
+            <TabsTrigger value="settings">Settings</TabsTrigger>
+          </TabsList>
 
-        <Card>
-          <CardHeader><CardTitle>Payment configuration</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-2"><label className="text-sm font-medium">Environment</label><select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={mode} onChange={(e) => setMode(e.target.value as "production" | "sandbox")}><option value="production">Production payments</option><option value="sandbox">Sandbox / test payments</option></select><p className="text-xs text-muted-foreground">Sandbox approvals never grant real lifetime access. Switching modes changes which payment queue is displayed.</p></div>
-              <div className="space-y-2"><label className="text-sm font-medium">Instructions shown to students</label><Textarea rows={3} value={instructions} onChange={(e) => setInstructions(e.target.value)} /></div>
-            </div>
-            <div className="space-y-2"><label className="text-sm font-medium">Payment methods (JSON)</label><Textarea rows={12} className="font-mono text-xs" value={methodsJson} onChange={(e) => setMethodsJson(e.target.value)} /><p className="text-xs text-muted-foreground">Each method needs id, name, type, accountName, accountNumber, instructions and enabled.</p></div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader><CardTitle>Payment submissions</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <Tabs value={status} onValueChange={setStatus}>
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="Pending">Pending</TabsTrigger>
-                <TabsTrigger value="Approved">Approved</TabsTrigger>
-                <TabsTrigger value="Rejected">Rejected</TabsTrigger>
-                <TabsTrigger value="All">All</TabsTrigger>
-              </TabsList>
-              <TabsContent value={status} className="space-y-4">
-                <div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input className="pl-9" placeholder="Search name, email, phone or user ID" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
-                {loading ? <div className="flex justify-center py-12"><Loader2 className="h-7 w-7 animate-spin" /></div> : filtered.length === 0 ? <div className="py-12 text-center text-sm text-muted-foreground">No payment submissions found.</div> : (
+          {/* Review queue */}
+          <TabsContent value="review" className="space-y-4">
+            <Card>
+              <CardHeader className="flex-row items-center justify-between space-y-0">
+                <CardTitle>Payment submissions</CardTitle>
+                <Badge variant={settings.mode === "sandbox" ? "secondary" : "default"}>
+                  {settings.mode === "sandbox" ? "Sandbox queue" : "Production queue"}
+                </Badge>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid w-full grid-cols-4 gap-1 rounded-lg bg-muted p-1">
+                  {(["Pending", "Approved", "Rejected", "All"] as const).map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setStatus(value)}
+                      className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                        status === value ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {value}
+                    </button>
+                  ))}
+                </div>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    className="pl-9"
+                    placeholder="Search name, email, phone or user ID"
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                  />
+                </div>
+                {loading ? (
+                  <div className="flex justify-center py-12">
+                    <Loader2 className="h-7 w-7 animate-spin" />
+                  </div>
+                ) : filtered.length === 0 ? (
+                  <div className="py-12 text-center text-sm text-muted-foreground">No payment submissions found.</div>
+                ) : (
                   <div className="space-y-3">
                     {filtered.map((payment) => (
-                      <div key={payment.id} className="rounded-xl border p-4 space-y-3">
+                      <div key={payment.id} className="space-y-3 rounded-xl border border-border/60 p-4">
                         <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div><p className="font-semibold">{payment.userName || "Student"}</p><p className="text-xs text-muted-foreground">{payment.email || payment.userId}</p><p className="text-xs text-muted-foreground">{payment.phone || ""}</p></div>
-                          <Badge variant={payment.status === "Approved" ? "default" : payment.status === "Rejected" ? "destructive" : "secondary"}>{payment.status}</Badge>
+                          <div>
+                            <p className="font-semibold">{payment.userName || "Student"}</p>
+                            <p className="text-xs text-muted-foreground">{payment.email || payment.userId}</p>
+                            <p className="text-xs text-muted-foreground">{payment.phone || ""}</p>
+                          </div>
+                          <Badge
+                            variant={
+                              payment.status === "Approved"
+                                ? "default"
+                                : payment.status === "Rejected"
+                                  ? "destructive"
+                                  : "secondary"
+                            }
+                          >
+                            {payment.status}
+                          </Badge>
                         </div>
                         <div className="grid grid-cols-2 gap-2 text-sm md:grid-cols-4">
-                          <div><p className="text-xs text-muted-foreground">Payment method</p><p>{payment.methodName}</p></div>
-                          <div><p className="text-xs text-muted-foreground">Expected</p><p>{Number(payment.expectedAmountEtb || 0).toLocaleString()} ETB</p></div>
-                          <div><p className="text-xs text-muted-foreground">Transferred</p><p>{Number(payment.amountPaidEtb || 0).toLocaleString()} ETB</p></div>
-                          <div><p className="text-xs text-muted-foreground">User ID</p><p className="truncate">{payment.userId}</p></div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Payment method</p>
+                            <p>{payment.methodName}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Expected</p>
+                            <p>{Number(payment.expectedAmountEtb || 0).toLocaleString()} ETB</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Transferred</p>
+                            <p>{Number(payment.amountPaidEtb || 0).toLocaleString()} ETB</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">User ID</p>
+                            <p className="truncate">{payment.userId}</p>
+                          </div>
                         </div>
-                        {payment.receiptUrl && <a className="inline-flex items-center gap-2 text-sm font-medium text-primary underline" href={payment.receiptUrl} target="_blank" rel="noreferrer">View receipt <ExternalLink className="h-3.5 w-3.5" /></a>}
-                        {payment.rejectionReason && <p className="text-sm text-destructive">Reason: {payment.rejectionReason}</p>}
-                        {payment.status === "Pending" && <div className="flex flex-wrap gap-2"><Button disabled={!!busyId} onClick={() => decide(payment, "Approved")}><CheckCircle2 className="mr-2 h-4 w-4" />Approve</Button><Button variant="destructive" disabled={!!busyId} onClick={() => decide(payment, "Rejected")}><XCircle className="mr-2 h-4 w-4" />Reject</Button>{busyId === payment.id && <Loader2 className="h-5 w-5 animate-spin" />}</div>}
+                        {payment.receiptUrl && (
+                          <a
+                            className="inline-flex items-center gap-2 text-sm font-medium text-primary underline"
+                            href={payment.receiptUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            View receipt <ExternalLink className="h-3.5 w-3.5" />
+                          </a>
+                        )}
+                        {payment.rejectionReason && (
+                          <p className="text-sm text-destructive">Reason: {payment.rejectionReason}</p>
+                        )}
+                        {payment.status === "Pending" && (
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              className="btn-primary"
+                              disabled={!!busyId}
+                              onClick={() => setApproveTarget(payment)}
+                            >
+                              <CheckCircle2 className="mr-2 h-4 w-4" />
+                              Approve
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              disabled={!!busyId}
+                              onClick={() => {
+                                setRejectTarget(payment);
+                                setRejectReason("");
+                              }}
+                            >
+                              <XCircle className="mr-2 h-4 w-4" />
+                              Reject
+                            </Button>
+                            {busyId === payment.id && <Loader2 className="h-5 w-5 animate-spin" />}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
                 )}
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Settings */}
+          <TabsContent value="settings" className="space-y-5">
+            {!canManageSettings ? (
+              <Alert className="border-border/60">
+                <Lock className="h-4 w-4" />
+                <AlertTitle>Read-only</AlertTitle>
+                <AlertDescription className="text-muted-foreground">
+                  You can review payments, but only the main administrator can change payment settings or grant
+                  lifetime access.
+                </AlertDescription>
+              </Alert>
+            ) : null}
+
+            {settings.enabled && enabledMethodCount === 0 ? (
+              <Alert className="border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200 [&>svg]:text-amber-600">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>No enabled payment methods</AlertTitle>
+                <AlertDescription className="text-amber-900/80 dark:text-amber-200/80">
+                  Payments are accepted but no method is enabled, so students cannot submit a receipt. Enable at least
+                  one payment method below.
+                </AlertDescription>
+              </Alert>
+            ) : null}
+
+            <PaymentModeCard value={settings.mode} onChange={(mode) => patchSettings({ mode })} disabled={!canManageSettings} />
+
+            <PaymentPriceCard
+              price={settings.priceEtb}
+              enabled={settings.enabled}
+              onPriceChange={(priceEtb) => patchSettings({ priceEtb })}
+              onEnabledChange={(enabled) => patchSettings({ enabled })}
+              disabled={!canManageSettings}
+            />
+
+            <PaymentMethodsEditor
+              value={settings.paymentMethods}
+              onChange={(paymentMethods) => patchSettings({ paymentMethods })}
+              disabled={!canManageSettings}
+            />
+
+            <InstructionsCard
+              value={settings.instructions}
+              onChange={(instructions) => patchSettings({ instructions })}
+              disabled={!canManageSettings}
+            />
+
+            <FreeAccessSettings
+              value={settings.freeAccess}
+              onChange={(freeAccess) => patchSettings({ freeAccess })}
+              disabled={!canManageSettings}
+            />
+
+            <DiscountSettings
+              value={settings.discounts}
+              onChange={(discounts) => patchSettings({ discounts })}
+              disabled={!canManageSettings}
+            />
+
+            {canManageSettings ? (
+              <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/60 bg-background/95 p-3 shadow-sm backdrop-blur">
+                <p className="text-sm text-muted-foreground">
+                  {dirty ? "You have unsaved changes." : "All changes are saved."}
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" onClick={() => setSettings(savedSettings)} disabled={!dirty || saving}>
+                    <Undo2 className="mr-2 h-4 w-4" /> Reset
+                  </Button>
+                  <Button className="btn-primary" onClick={saveSettings} disabled={!dirty || saving}>
+                    {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                    Save settings
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+          </TabsContent>
+        </Tabs>
       </div>
+
+      {/* Approve confirmation */}
+      <ConfirmDialog
+        open={!!approveTarget}
+        onOpenChange={(open) => !open && setApproveTarget(null)}
+        title="Approve this payment?"
+        description={
+          settings.mode === "sandbox"
+            ? "This is a sandbox approval. It records the review only and never grants real lifetime access."
+            : "Approving grants permanent lifetime access to this student. This cannot be undone by changing settings later."
+        }
+        confirmLabel="Approve payment"
+        loading={busyId === approveTarget?.id}
+        onConfirm={() => approveTarget && decide(approveTarget, "Approved")}
+      />
+
+      {/* Reject reason dialog */}
+      <Dialog open={!!rejectTarget} onOpenChange={(open) => !open && setRejectTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject this payment</DialogTitle>
+            <DialogDescription>
+              A rejection reason is required. The student will see it with their payment status.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            rows={3}
+            maxLength={500}
+            value={rejectReason}
+            placeholder="e.g. The receipt is unreadable or the amount does not match."
+            onChange={(event) => setRejectReason(event.target.value)}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejectTarget(null)} disabled={!!busyId}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={submitRejection}
+              disabled={!!busyId || !rejectReason.trim()}
+            >
+              {busyId === rejectTarget?.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <XCircle className="mr-2 h-4 w-4" />}
+              Reject payment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
