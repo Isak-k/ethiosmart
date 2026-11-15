@@ -23,10 +23,10 @@ import { getQuestions } from '@/lib/firebase-exams';
 
 export async function createAttempt(
   examId: string,
-  studentId: string,
-  examTitle: string,
-  studentName: string,
-  studentEmail: string
+  _studentId: string,
+  _examTitle: string,
+  _studentName: string,
+  _studentEmail: string
 ): Promise<string> {
   // Normal exam attempts are created by a trusted callable. The server
   // derives the student identity from Firebase Auth and atomically reserves
