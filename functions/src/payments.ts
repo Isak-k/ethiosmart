@@ -30,13 +30,13 @@ async function requireAdmin(uid: string, canReview = false): Promise<FirebaseFir
     throw new functions.https.HttpsError('permission-denied', 'Administrator access is required.');
   }
   if (canReview && profile.email?.toLowerCase() !== MAIN_ADMIN_EMAIL &&
-      profile.permissions?.managePayments !== true &&
-      profile.paymentPermissions?.review !== true) {
+      profile.role !== 'superadmin' &&
+      profile.permissions?.managePayments !== true) {
     throw new functions.https.HttpsError('permission-denied', 'You are not assigned to review payments.');
   }
   if (!canReview && profile.email?.toLowerCase() !== MAIN_ADMIN_EMAIL &&
       profile.role !== 'superadmin' &&
-      profile.paymentPermissions?.manageSettings !== true) {
+      false) {
     throw new functions.https.HttpsError('permission-denied', 'Only the main administrator or an assigned payment manager can change payment settings.');
   }
   return profile;
@@ -65,7 +65,7 @@ function defaultSettings() {
     discounts: { codes: [], selectedUsers: [], promotions: [] },
     support: { inApp: true, telegram: '', whatsapp: '', phone: '', email: '' },
     instructions: 'Choose a payment method, transfer the displayed amount, and upload a clear receipt.',
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: null,
   };
 }
 
@@ -241,8 +241,6 @@ export const reviewPayment = functions.https.onCall(async (data, context) => {
     const payment = snap.data()!;
     if (payment.status !== 'Pending') throw new functions.https.HttpsError('failed-precondition', 'This payment has already been reviewed.');
     const accountRef = db.collection('paymentAccounts').doc(payment.userId);
-    const accountSnap = await tx.get(accountRef);
-    const account = accountSnap.data() || {};
     const decisionData = {
       status: decision, reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
       reviewedBy: uid, reviewerName: cleanString(reviewer.fullName, 120),
