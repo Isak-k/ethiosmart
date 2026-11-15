@@ -35,3 +35,8 @@ export {
   savePaymentSettings,
   grantLifetimePaymentAccess
 } from './payments';
+
+export {
+  getStudentBookCatalog,
+  getStudentBook
+} from './content-access';
