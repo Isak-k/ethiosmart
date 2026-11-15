@@ -203,21 +203,18 @@ export const getPaymentAdminData = functions.https.onCall(async (data, context) 
   if (status && ['Pending', 'Approved', 'Rejected'].includes(status)) {
     query = db.collection('payments').where('status', '==', status).orderBy('submittedAt', 'desc').limit(limit);
   }
-  const [paymentsSnap, usersSnap, settingsSnap] = await Promise.all([
-    query.get(), db.collection('users').limit(1000).get(), db.doc(SETTINGS_PATH).get(),
+  const [paymentsSnap, allPaymentsSnap, settingsSnap] = await Promise.all([
+    query.get(), db.collection('payments').orderBy('submittedAt', 'desc').limit(2000).get(), db.doc(SETTINGS_PATH).get(),
   ]);
   const payments = paymentsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-  const users = usersSnap.docs.map((doc) => {
-    const u = doc.data();
-    return { userId: doc.id, fullName: u.fullName || u.full_name || '', email: u.email || '', phone: u.phone || u.phoneNumber || '' };
-  });
-  const totals = { total: payments.length, pending: 0, approved: 0, rejected: 0, revenueEtb: 0 };
-  payments.forEach((p: any) => {
+  const allPayments = allPaymentsSnap.docs.map((doc) => doc.data());
+  const totals = { total: allPayments.length, pending: 0, approved: 0, rejected: 0, revenueEtb: 0 };
+  allPayments.forEach((p: any) => {
     if (p.status === 'Pending') totals.pending++;
     if (p.status === 'Approved') { totals.approved++; totals.revenueEtb += Number(p.amountPaidEtb || 0); }
     if (p.status === 'Rejected') totals.rejected++;
   });
-  return { payments, users, totals, settings: settingsSnap.exists ? settingsSnap.data() : defaultSettings() };
+  return { payments, totals, settings: settingsSnap.exists ? settingsSnap.data() : defaultSettings() };
 });
 
 export const reviewPayment = functions.https.onCall(async (data, context) => {
