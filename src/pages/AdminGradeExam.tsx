@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { getExam } from "@/lib/firebase-exams";
+import { getExam, getAdminExamQuestions } from "@/lib/firebase-exams";
 import { getAttempt, getAnswers, saveAnswerGrade } from "@/lib/firebase-attempts";
 import { deleteAttemptProtected } from "@/lib/firebase-admin-protected";
-import { getQuestions } from "@/lib/firebase-exams";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -115,7 +114,7 @@ const AdminGradeExam = () => {
       setExamTitle(exam.title);
 
       // 3. Fetch Questions (ALL types)
-      const questionsData = await getQuestions(attempt.examId);
+      const questionsData = await getAdminExamQuestions(attempt.examId);
       questionsData.sort((a, b) => a.orderIndex - b.orderIndex);
       setQuestions(questionsData as QuestionData[]);
 
