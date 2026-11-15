@@ -832,7 +832,7 @@ export function BookFormDialog({
                 onChange={(e) => handleDriveUrlChange(e.target.value)}
                 disabled={isSaving}
                 className="rounded-xl font-mono text-xs sm:text-sm"
-                required
+                required={false}
               />
               <Button
                 type="button"
