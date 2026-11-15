@@ -41,12 +41,13 @@ export default function StudentPayment() {
     let active = true;
     (async () => {
       try {
-        const [settingsResult, myResult] = await Promise.all([getPaymentSettings(), getMyPayment()]);
+        const [settingsResult, myResult, quoteResult] = await Promise.all([getPaymentSettings(), getMyPayment(), quotePaymentDiscount({ discountCode: "" })]);
         if (!active) return;
         const settings = settingsResult.data as any;
         const mine = myResult.data as any;
         setMethods((settings.paymentMethods || []).filter((m: Method) => m.enabled));
         setPrice(Number(settings.priceEtb || 0));
+        setDiscountQuote(quoteResult.data as any);
         setInstructions(settings.instructions || "");
         setPayment(mine.payment || null);
         setAccess(mine.paymentAccess?.lifetime === true);
