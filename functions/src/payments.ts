@@ -71,15 +71,36 @@ function cleanString(value: unknown, max = 500): string {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
 }
 
-function isCloudinaryReceipt(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    return parsed.protocol === 'https:' &&
-      parsed.hostname.endsWith('res.cloudinary.com') &&
-      parsed.pathname.includes('/image/upload/');
-  } catch {
-    return false;
+async function verifyCloudinaryReceipt(url: string, expectedPublicId: string): Promise<{ fingerprint: string; contentType: string }> {
+  let parsed: URL;
+  try { parsed = new URL(url); } catch {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid receipt image URL.');
   }
+  if (parsed.protocol !== 'https:' || parsed.hostname !== 'res.cloudinary.com' ||
+      !parsed.pathname.includes('/image/upload/') ||
+      !decodeURIComponent(parsed.pathname).includes(expectedPublicId)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Receipt must be the image uploaded for this payment request.');
+  }
+  const response = await fetch(url);
+  if (!response.ok) throw new functions.https.HttpsError('invalid-argument', 'Receipt image could not be verified.');
+  const contentType = (response.headers.get('content-type') || '').split(';')[0].toLowerCase();
+  if (contentType !== 'image/jpeg' && contentType !== 'image/png') {
+    throw new functions.https.HttpsError('invalid-argument', 'Only JPG and PNG receipts are accepted.');
+  }
+  const declaredLength = Number(response.headers.get('content-length') || 0);
+  if (declaredLength > 5 * 1024 * 1024) {
+    throw new functions.https.HttpsError('invalid-argument', 'Receipt image must be 5 MB or smaller.');
+  }
+  const bytes = Buffer.from(await response.arrayBuffer());
+  if (!bytes.length || bytes.length > 5 * 1024 * 1024) {
+    throw new functions.https.HttpsError('invalid-argument', 'Receipt image must be 5 MB or smaller.');
+  }
+  const isJpeg = bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  const isPng = bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  if ((contentType === 'image/jpeg' && !isJpeg) || (contentType === 'image/png' && !isPng)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Receipt image format could not be verified.');
+  }
+  return { fingerprint: crypto.createHash('sha256').update(bytes).digest('hex'), contentType };
 }
 
 export const getPaymentSettings = functions.https.onCall(async (_data, context) => {
@@ -116,7 +137,12 @@ export const submitPayment = functions.https.onCall(async (data, context) => {
   const methodId = cleanString(data?.methodId, 80);
   const receiptUrl = cleanString(data?.receiptUrl, 1500);
   const receiptPublicId = cleanString(data?.receiptPublicId, 200);
-  const fingerprint = cleanString(data?.receiptFingerprint, 128);
+  const expectedPublicId = RECEIPT_FOLDER + '/' + paymentId + '_' + uid;
+  if (receiptPublicId !== expectedPublicId) {
+    throw new functions.https.HttpsError('invalid-argument', 'Receipt upload does not match this payment request.');
+  }
+  const verifiedReceipt = await verifyCloudinaryReceipt(receiptUrl, expectedPublicId);
+  const fingerprint = verifiedReceipt.fingerprint;
   if (!/^[a-zA-Z0-9_-]{12,80}$/.test(paymentId) || !methodId ||
       !isCloudinaryReceipt(receiptUrl) || !receiptPublicId.startsWith(RECEIPT_FOLDER + '/')) {
     throw new functions.https.HttpsError('invalid-argument', 'A valid payment method and uploaded JPG/PNG receipt are required.');
