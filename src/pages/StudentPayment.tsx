@@ -42,28 +42,61 @@ export default function StudentPayment() {
     let active = true;
     (async () => {
       try {
-        const [settingsResult, myResult] = await Promise.all([getPaymentSettings(), getMyPayment()]);
+        // Load settings independently from the student's payment history. A failure
+        // in getMyPayment must not hide valid price/method settings (the old
+        // Promise.all rejected both requests and left the page showing 0 ETB).
+        const settingsResult = await getPaymentSettings();
         if (!active) return;
         const settings = settingsResult.data as any;
-        const mine = myResult.data as any;
-        setMethods((settings.paymentMethods || []).filter((m: Method) => m.enabled));
-        setPrice(Number(settings.priceEtb || 0));
+        const enabledMethods = (settings.paymentMethods || []).filter((m: Method) => m.enabled);
+        const configuredPrice = Number(settings.priceEtb || 0);
+        setMethods(enabledMethods);
+        setPrice(configuredPrice);
         setInstructions(settings.instructions || "");
-        try {
-          const quoteResult = await quotePaymentDiscount({ discountCode: "" });
-          if (!active) return;
-          setDiscountQuote(quoteResult.data as any);
-          setQuoteReady(true);
-        } catch (quoteError: any) {
-          setQuoteReady(false);
-          toast({ title: "Could not calculate your current discount", description: quoteError?.message || "Refresh the payment page before submitting.", variant: "destructive" });
-        }
-        setPayment(mine.payment || null);
-        setAccess(mine.paymentAccess?.lifetime === true);
-        const first = (settings.paymentMethods || []).find((m: Method) => m.enabled);
+        const first = enabledMethods[0];
         if (first) setSelectedMethod(first.id);
+
+        // Payment history is useful, but it is not required to display the
+        // configured payment instructions and price.
+        try {
+          const myResult = await getMyPayment();
+          if (!active) return;
+          const mine = myResult.data as any;
+          setPayment(mine.payment || null);
+          setAccess(mine.paymentAccess?.lifetime === true);
+        } catch (paymentError: any) {
+          console.error("Could not load student payment history:", paymentError);
+          toast({
+            title: "Payment history is temporarily unavailable",
+            description: paymentError?.message || "Your payment options are still available. Please refresh later to check your status.",
+            variant: "destructive",
+          });
+        }
+
+        // A zero price means the administrator has not configured payments yet.
+        // Do not call the quote endpoint until a positive price is configured.
+        if (settings.enabled !== false && configuredPrice > 0) {
+          try {
+            const quoteResult = await quotePaymentDiscount({ discountCode: "" });
+            if (!active) return;
+            setDiscountQuote(quoteResult.data as any);
+            setQuoteReady(true);
+          } catch (quoteError: any) {
+            if (!active) return;
+            setQuoteReady(false);
+            toast({ title: "Could not calculate your current discount", description: quoteError?.message || "Refresh the payment page before submitting.", variant: "destructive" });
+          }
+        } else {
+          setDiscountQuote(null);
+          setQuoteReady(false);
+        }
       } catch (error: any) {
-        toast({ title: "Could not load payment information", description: error?.message || "Please try again online.", variant: "destructive" });
+        console.error("Could not load payment settings:", error);
+        toast({
+          title: "Could not load payment settings",
+          description: error?.message || "The payment service is unavailable. Please try again online.",
+          variant: "destructive",
+        });
       } finally {
         if (active) setLoading(false);
       }
