@@ -184,8 +184,7 @@ export const submitPayment = functions.https.onCall(async (data, context) => {
   const duplicateRef = fingerprint ? db.collection(fingerprintCollection).doc(fingerprint) : null;
   await db.runTransaction(async (tx) => {
     const userRef = db.collection('users').doc(uid);
-    const [accountSnap, productionAccountSnap, sandboxAccountSnap, paymentSnap, duplicateSnap, userSnap] = await Promise.all([
-      tx.get(accountRef),
+    const [productionAccountSnap, sandboxAccountSnap, paymentSnap, duplicateSnap, userSnap] = await Promise.all([
       tx.get(productionAccountRef),
       tx.get(sandboxAccountRef),
       tx.get(paymentRef),
