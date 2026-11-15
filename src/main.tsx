@@ -27,9 +27,16 @@ if ('serviceWorker' in navigator) {
     });
     navigator.serviceWorker.addEventListener('controllerchange', () => {});
   } else {
+    // Local development: never let a stale production service worker poison the
+    // dev server with outdated builds. Unregister every SW and purge its caches.
     navigator.serviceWorker.getRegistrations().then((regs) => {
-      regs.forEach((r) => r.unregister());
+      for (const registration of regs) {
+        registration.unregister();
+      }
     });
+    if (typeof caches !== 'undefined') {
+      caches.keys().then((keys) => Promise.all(keys.map((key) => caches.delete(key))));
+    }
   }
 }
 

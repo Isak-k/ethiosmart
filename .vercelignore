@@ -1,0 +1,40 @@
+# Vercel deployment ignore — keeps secrets, tests and dev artifacts out of
+# the deployment context. NOTE: functions/src/ IS required at build time
+# (api/chatbot/ask.ts imports pure helpers from functions/src/chatbot/core.ts),
+# so only the secret files inside functions/ are excluded, never the folder.
+
+# VCS / tooling
+.git
+.github
+.kiro
+.vscode
+.idea
+
+# Local secrets — never deploy
+.env
+.env.local
+.env.production
+.env.*.local
+.secret.local
+functions/.env
+functions/.env.local
+functions/.secret.local
+
+# Dependencies & build output (rebuilt on Vercel)
+node_modules
+functions/node_modules
+dist
+dev-dist
+functions/lib
+
+# Documentation (may reference or have contained credentials)
+docs
+*.md
+
+# Tests and standalone dev scripts — not needed at runtime
+**/*.test.ts
+**/*.test.tsx
+**/*.test.js
+test-translations.html
+verify-amharic.js
+verify-amharic.mjs

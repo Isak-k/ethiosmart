@@ -56,7 +56,7 @@ paths:
           description: Firebase Web API Key for the project
           schema:
             type: string
-          example: "AIzaSyA5UNpm_8VghlXdPuvo0UhETORUKitJmo4"
+          example: "<YOUR_KEY_REDACTED>"
       requestBody:
         required: true
         content:

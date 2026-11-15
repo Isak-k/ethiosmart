@@ -4,7 +4,7 @@ import * as admin from 'firebase-admin';
 admin.initializeApp();
 
 // Export functions
-export { 
+export {
   calculateDepartmentLeaderboard,
   calculateGlobalDepartmentLeaderboard,
   onExamAttemptUpdate,
@@ -21,3 +21,6 @@ export {
   validateGoogleDriveResource
 } from './books';
 
+export {
+  askEthioSmartAssistant
+} from './chatbot';

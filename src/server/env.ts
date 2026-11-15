@@ -23,8 +23,13 @@ import fs from 'fs';
 import path from 'path';
 
 const ALLOWED_KEYS = new Set([
-  // Private AI provider key (server-side only; NEVER with a VITE_ prefix)
+  // Private AI provider keys (server-side only; NEVER with a VITE_ prefix)
   'GEMINI_API_KEY',
+  'GROQ_API_KEY',
+  'OPENROUTER_API_KEY',
+  'HUGGINGFACE_API_KEY',
+  // Server-side integrations used by the dev bridge
+  'GOOGLE_DRIVE_API_KEY',
   // Chatbot deployment knobs (non-secret)
   'CHATBOT_ENABLED',
   'CHATBOT_MODEL',

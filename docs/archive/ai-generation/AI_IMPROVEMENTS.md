@@ -82,7 +82,7 @@ Added a dropdown to select exactly how many questions to generate:
 
 ### Step 3: Enter API Key
 ```
-1. Paste: AIzaSyCA75QWEPkYtGOAQgwYtM7cZA3dS5TzyPE
+1. Paste: <YOUR_KEY_REDACTED>
 2. Key is masked for security
 ```
 
@@ -267,7 +267,7 @@ The AI now generates questions that:
 4. Click "AI Generation" tab
 5. Select "20 questions" from dropdown
 6. Upload your PDF
-7. Enter API key: AIzaSyCA75QWEPkYtGOAQgwYtM7cZA3dS5TzyPE
+7. Enter API key: <YOUR_KEY_REDACTED>
 8. Click "Generate 20 MCQs from PDF"
 9. Wait ~30 seconds
 10. Review and import!

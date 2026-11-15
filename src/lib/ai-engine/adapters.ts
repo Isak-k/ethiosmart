@@ -310,7 +310,7 @@ export async function callHuggingFace(
   timeoutMs: number = 40000
 ): Promise<NormalizedQuestion[]> {
   if (!apiKey) {
-    throw new Error('HUGGING_FACE_API_KEY is not configured');
+    throw new Error('HUGGINGFACE_API_KEY is not configured');
   }
 
   const systemPrompt = buildSystemPrompt();

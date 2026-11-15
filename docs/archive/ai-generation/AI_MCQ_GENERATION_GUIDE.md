@@ -19,7 +19,7 @@ Automatically generates multiple-choice questions from PDF files using Google's 
 
 ## 🔑 Your API Key
 
-**Your Google AI API Key**: `AIzaSyBQJPUuNWPFyB68XlieBAawz0BqhM43thM`
+**Your Google AI API Key**: `<YOUR_KEY_REDACTED>`
 
 This key is already configured and ready to use!
 
@@ -51,7 +51,7 @@ This key is already configured and ready to use!
 
 ### Step 3: Enter API Key
 ```
-1. Paste your API key: AIzaSyBQJPUuNWPFyB68XlieBAawz0BqhM43thM
+1. Paste your API key: <YOUR_KEY_REDACTED>
 2. Key is masked for security
 3. Not stored anywhere (session only)
 ```
@@ -210,7 +210,7 @@ Explanation: Explanation here. (Source: Page Y)
 
 3. Upload and Generate
    - Choose your PDF file
-   - Enter API key: AIzaSyBQJPUuNWPFyB68XlieBAawz0BqhM43thM
+   - Enter API key: <YOUR_KEY_REDACTED>
    - Click "Generate MCQs from PDF"
    - Wait 10-30 seconds
 
@@ -373,7 +373,7 @@ You'll know it's working when:
 
 The AI MCQ generation feature is fully functional and ready to use!
 
-**Your API Key**: `AIzaSyBQJPUuNWPFyB68XlieBAawz0BqhM43thM`
+**Your API Key**: `<YOUR_KEY_REDACTED>`
 
 **Quick Start**:
 1. Edit any exam

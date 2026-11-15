@@ -120,7 +120,7 @@ if (!apiKey || apiKey.trim() === "") {
 ### API Key Format:
 - Starts with: `AIza`
 - Length: ~39 characters
-- Example: `AIzaSyDxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`
+- Example: `<YOUR_KEY_REDACTED>`
 
 ## Benefits
 
@@ -209,7 +209,7 @@ if (!apiKey || apiKey.trim() === "") {
 
 **Before (Environment Variable):**
 ```env
-VITE_GOOGLE_AI_API_KEY=AIzaSyDxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+VITE_GOOGLE_AI_API_KEY=<YOUR_KEY_REDACTED>
 ```
 
 **After (User Input):**

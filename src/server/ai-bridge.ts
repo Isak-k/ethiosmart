@@ -1,6 +1,4 @@
 import type { Plugin, ViteDevServer } from 'vite';
-import fs from 'fs';
-import path from 'path';
 import { IncomingMessage, ServerResponse } from 'http';
 import { orchestrateGenerationBatch, getProviderStatus } from '../lib/ai-engine/orchestrator.ts';
 import type { GenerateBatchRequest, ProviderKeys } from '../lib/ai-engine/types.ts';
@@ -11,34 +9,12 @@ import { loadServerEnv } from './env';
 loadServerEnv();
 
 function loadEnvKeys(): ProviderKeys {
-  const env: Record<string, string> = { ...process.env as Record<string, string> };
-
-  const envPath = path.resolve(process.cwd(), '.env');
-  if (fs.existsSync(envPath)) {
-    try {
-      const content = fs.readFileSync(envPath, 'utf8');
-      for (const line of content.split('\n')) {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith('#')) continue;
-        const idx = trimmed.indexOf('=');
-        if (idx > 0) {
-          const key = trimmed.slice(0, idx).trim();
-          const val = trimmed.slice(idx + 1).trim().replace(/^["']|["']$/g, '');
-          if (!env[key]) {
-            env[key] = val;
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('[AI Dev Bridge] Error reading .env file:', e);
-    }
-  }
-
+  // Shell env wins, then .env.local, then .env (via loadServerEnv()).
   return {
-    gemini: env.GEMINI_API_KEY,
-    groq: env.GROQ_API_KEY,
-    openrouter: env.OPENROUTER_API_KEY,
-    huggingface: env.HUGGING_FACE_API_KEY,
+    gemini: process.env.GEMINI_API_KEY,
+    groq: process.env.GROQ_API_KEY,
+    openrouter: process.env.OPENROUTER_API_KEY,
+    huggingface: process.env.HUGGINGFACE_API_KEY,
   };
 }
 
@@ -72,6 +48,24 @@ function sendJson(res: ServerResponse, statusCode: number, data: any) {
 export function createAiBridgeMiddleware() {
   return async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
     const url = req.url?.split('?')[0];
+
+    // Dev-server hardening: never serve dotfiles (e.g. .env, .secret.local)
+    // or plain-text logs over HTTP — EXCEPT Vite's own internals under
+    // /node_modules/ (its optimized dependency cache lives under
+    // /node_modules/.vite/deps and the app cannot start without those
+    // files). Vite's internal file serving is required for the app to run;
+    // repo secrets never live inside /node_modules/ in a committed checkout.
+    const pathname = url || '';
+    const isViteInternal = pathname.startsWith('/node_modules/');
+    if (
+      !isViteInternal &&
+      (/(?:^|\/)\.[^/]+(?:\/|$)/.test(pathname) || /\.log$/i.test(pathname))
+    ) {
+      res.statusCode = 403;
+      res.setHeader('Content-Type', 'text/plain');
+      res.end('403 Restricted');
+      return;
+    }
 
     // Homepage promotional chatbot (same logic as the Firebase callable)
     if (url === '/api/chatbot/ask') {
@@ -196,8 +190,7 @@ export function createAiBridgeMiddleware() {
           return sendJson(res, 400, { success: false, error: 'File ID or URL is required' });
         }
 
-        const envKeys: any = loadEnvKeys();
-        const apiKey = envKeys.googleDrive || process.env.GOOGLE_DRIVE_API_KEY;
+        const apiKey = process.env.GOOGLE_DRIVE_API_KEY;
         const info = await validateGoogleDriveFile(fileId, apiKey);
 
         if (info.accessible) {

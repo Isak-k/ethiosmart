@@ -1,19 +1,14 @@
 import { getProviderStatus } from '../../src/lib/ai-engine/orchestrator.ts';
 import type { ProviderKeys } from '../../src/lib/ai-engine/types.ts';
 
-const BUILTIN_KEYS: ProviderKeys = {
-  gemini: 'AIzaSyBDNhU8bdkqYdPidT6TnxjInTxg7HuiB-k',
-  groq: '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',
-  openrouter: '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',
-  huggingface: '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',
-};
-
 function loadEnvKeys(): ProviderKeys {
+  // Server-side environment configuration only — no hardcoded or committed
+  // fallback keys. Private keys must be set in the host's env (Vercel env vars).
   return {
-    gemini: process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || BUILTIN_KEYS.gemini,
-    groq: process.env.GROQ_API_KEY || process.env.VITE_GROQ_API_KEY || BUILTIN_KEYS.groq,
-    openrouter: process.env.OPENROUTER_API_KEY || process.env.VITE_OPENROUTER_API_KEY || BUILTIN_KEYS.openrouter,
-    huggingface: process.env.HUGGING_FACE_API_KEY || process.env.VITE_HUGGING_FACE_API_KEY || BUILTIN_KEYS.huggingface,
+    gemini: process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || '',
+    groq: process.env.GROQ_API_KEY || process.env.VITE_GROQ_API_KEY || '',
+    openrouter: process.env.OPENROUTER_API_KEY || process.env.VITE_OPENROUTER_API_KEY || '',
+    huggingface: process.env.HUGGINGFACE_API_KEY || '',
   };
 }
 

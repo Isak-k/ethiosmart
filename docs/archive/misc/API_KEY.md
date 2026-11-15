@@ -3,7 +3,7 @@
 ## Current Active API Key
 
 ```
-AIzaSyCA75QWEPkYtGOAQgwYtM7cZA3dS5TzyPE
+<YOUR_KEY_REDACTED>
 ```
 
 ## How to Use
@@ -13,7 +13,7 @@ AIzaSyCA75QWEPkYtGOAQgwYtM7cZA3dS5TzyPE
 3. Click "Bulk Import" button
 4. Click "AI Generation" tab
 5. Upload your PDF file
-6. Paste this API key: `AIzaSyCA75QWEPkYtGOAQgwYtM7cZA3dS5TzyPE`
+6. Paste this API key: `<YOUR_KEY_REDACTED>`
 7. Click "Generate MCQs from PDF"
 
 ## Important Notes

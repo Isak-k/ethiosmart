@@ -2243,7 +2243,7 @@ async function logAction(log: AuditLog) {
    ```typescript
    // src/integrations/firebase/config.ts
    export const firebaseConfig = {
-     apiKey: "AIzaSyA5UNpm_8VghlXdPuvo0UhETORUKitJmo4",
+     apiKey: "<YOUR_KEY_REDACTED>",
      authDomain: "online-exam-f443c.firebaseapp.com",
      projectId: "online-exam-f443c",
      storageBucket: "online-exam-f443c.firebasestorage.app",

@@ -34,22 +34,21 @@ const SETTINGS_DOC_ID = 'ai_providers';
 const LOCAL_STORAGE_KEY = 'exampro_ai_system_settings';
 
 /**
- * Pre-configured built-in fallback keys guaranteed to provide out-of-the-box readiness
- * without forcing the user to manually enter keys before generating questions.
+ * Built-in provider keys have been removed on purpose (security): shipping
+ * shared keys in the client bundle exposed them to every visitor. AI
+ * generation now requires either:
+ *   - an admin-configured key (Admin → AI Provider Settings; stored in
+ *     Firestore/local storage, user-configured), or
+ *   - build-time/runtime env vars for the admin's own convenience.
+ * There is intentionally NO default key.
  */
-export const BUILTIN_DEFAULT_KEYS: ProviderKeys = {
-  gemini: 'AIzaSyBDNhU8bdkqYdPidT6TnxjInTxg7HuiB-k',
-  groq: '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',
-  openrouter: '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',
-  huggingface: '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',
-};
 
 export const DEFAULT_AI_SETTINGS: AISystemSettings = {
   providers: {
     gemini: {
       id: 'gemini',
       name: 'Google Gemini',
-      apiKey: BUILTIN_DEFAULT_KEYS.gemini || '',
+      apiKey: '',
       enabled: true,
       model: 'gemini-flash-lite-latest',
       priority: 1,
@@ -66,7 +65,7 @@ export const DEFAULT_AI_SETTINGS: AISystemSettings = {
     groq: {
       id: 'groq',
       name: 'Groq (LPU Inference)',
-      apiKey: BUILTIN_DEFAULT_KEYS.groq || '',
+      apiKey: '',
       enabled: true,
       model: 'qwen/qwen3.8-27b',
       priority: 2,
@@ -81,7 +80,7 @@ export const DEFAULT_AI_SETTINGS: AISystemSettings = {
     openrouter: {
       id: 'openrouter',
       name: 'OpenRouter Gateway',
-      apiKey: BUILTIN_DEFAULT_KEYS.openrouter || '',
+      apiKey: '',
       enabled: true,
       model: 'meta-llama/llama-3.3-70b-instruct',
       priority: 3,
@@ -97,7 +96,7 @@ export const DEFAULT_AI_SETTINGS: AISystemSettings = {
     huggingface: {
       id: 'huggingface',
       name: 'Hugging Face Inference',
-      apiKey: BUILTIN_DEFAULT_KEYS.huggingface || '',
+      apiKey: '',
       enabled: true,
       model: 'Qwen/Qwen2.5-72B-Instruct',
       priority: 4,
@@ -119,7 +118,8 @@ export const DEFAULT_AI_SETTINGS: AISystemSettings = {
 };
 
 /**
- * Load initial keys from environment variables, local storage, or built-in defaults
+ * Load initial keys from environment variables and local storage
+ * (built-in default keys were removed — see DEFAULT_AI_SETTINGS note)
  */
 function getPreconfiguredEnvKeys(): ProviderKeys {
   const meta: Record<string, string | undefined> = (import.meta as any).env || {};
@@ -141,26 +141,23 @@ function getPreconfiguredEnvKeys(): ProviderKeys {
       meta.GEMINI_API_KEY ||
       getStorage('gemini_api_key') ||
       getStorage('GEMINI_API_KEY') ||
-      getStorage('google_ai_api_key') ||
-      BUILTIN_DEFAULT_KEYS.gemini,
+      getStorage('google_ai_api_key'),
     groq:
       meta.VITE_GROQ_API_KEY ||
       meta.GROQ_API_KEY ||
       getStorage('groq_api_key') ||
-      getStorage('GROQ_API_KEY') ||
-      BUILTIN_DEFAULT_KEYS.groq,
+      getStorage('GROQ_API_KEY'),
     openrouter:
       meta.VITE_OPENROUTER_API_KEY ||
       meta.OPENROUTER_API_KEY ||
       getStorage('openrouter_api_key') ||
-      getStorage('OPENROUTER_API_KEY') ||
-      BUILTIN_DEFAULT_KEYS.openrouter,
+      getStorage('OPENROUTER_API_KEY'),
     huggingface:
+      meta.VITE_HUGGINGFACE_API_KEY ||
       meta.VITE_HUGGING_FACE_API_KEY ||
       meta.HUGGING_FACE_API_KEY ||
       getStorage('huggingface_api_key') ||
-      getStorage('HUGGING_FACE_API_KEY') ||
-      BUILTIN_DEFAULT_KEYS.huggingface,
+      getStorage('HUGGING_FACE_API_KEY'),
   };
 }
 
@@ -229,7 +226,7 @@ function mergeWithDefaults(data: Partial<AISystemSettings>): AISystemSettings {
 
   const getEffectiveKey = (userKey: string | undefined, provider: AIProviderId): string => {
     if (userKey && userKey.trim().length > 0) return userKey.trim();
-    return envKeys[provider] || BUILTIN_DEFAULT_KEYS[provider] || '';
+    return envKeys[provider] || '';
   };
 
   const merged: AISystemSettings = {

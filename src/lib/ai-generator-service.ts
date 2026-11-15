@@ -28,7 +28,7 @@ import {
   getProviderStatus,
 } from './ai-engine/orchestrator.ts';
 import type { ProviderKeys } from './ai-engine/types.ts';
-import { getEffectiveProviderKeys, getAISettings, BUILTIN_DEFAULT_KEYS } from './ai-settings';
+import { getEffectiveProviderKeys, getAISettings } from './ai-settings';
 
 /**
  * Retrieve AI provider API keys available to client environment or local storage
@@ -72,29 +72,26 @@ export function getClientProviderKeys(): ProviderKeys {
       meta.GEMINI_API_KEY ||
       getStorage('gemini_api_key') ||
       getStorage('GEMINI_API_KEY') ||
-      getStorage('google_ai_api_key') ||
-      BUILTIN_DEFAULT_KEYS.gemini,
+      getStorage('google_ai_api_key'),
     groq:
       settingsKeys.groq ||
       meta.VITE_GROQ_API_KEY ||
       meta.GROQ_API_KEY ||
       getStorage('groq_api_key') ||
-      getStorage('GROQ_API_KEY') ||
-      BUILTIN_DEFAULT_KEYS.groq,
+      getStorage('GROQ_API_KEY'),
     openrouter:
       settingsKeys.openrouter ||
       meta.VITE_OPENROUTER_API_KEY ||
       meta.OPENROUTER_API_KEY ||
       getStorage('openrouter_api_key') ||
-      getStorage('OPENROUTER_API_KEY') ||
-      BUILTIN_DEFAULT_KEYS.openrouter,
+      getStorage('OPENROUTER_API_KEY'),
     huggingface:
       settingsKeys.huggingface ||
+      meta.VITE_HUGGINGFACE_API_KEY ||
       meta.VITE_HUGGING_FACE_API_KEY ||
       meta.HUGGING_FACE_API_KEY ||
       getStorage('huggingface_api_key') ||
-      getStorage('HUGGING_FACE_API_KEY') ||
-      BUILTIN_DEFAULT_KEYS.huggingface,
+      getStorage('HUGGING_FACE_API_KEY'),
   };
 }
 
