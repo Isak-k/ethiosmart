@@ -181,6 +181,7 @@ export default function AdminBooks() {
       shortNotes: books.filter((b) => b.resourceType === 'short_note').length,
       published: books.filter((b) => b.status === 'published').length,
       drafts: books.filter((b) => b.status === 'draft').length,
+      legacyDriveResources: books.filter((b) => !b.storagePath && Boolean(b.driveFileId || b.driveUrl)).length,
     };
   }, [books]);
 
@@ -422,6 +423,22 @@ export default function AdminBooks() {
             </DropdownMenu>
           </div>
         </div>
+
+        {stats.legacyDriveResources > 0 && (
+          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  {stats.legacyDriveResources} resource{stats.legacyDriveResources === 1 ? '' : 's'} still use Google Drive
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  These older files may still be accessible outside EthioSmart. Edit each resource, upload its PDF using Private PDF Upload, save it, then change the original Google Drive sharing setting to Restricted.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Stats Metrics Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
