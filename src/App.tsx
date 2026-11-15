@@ -58,6 +58,7 @@ const BookDetails = lazy(() => import("./pages/BookDetails"));
 const BookReader = lazy(() => import("./pages/BookReader"));
 const AdminSystemSettings = lazy(() => import("./pages/AdminSystemSettings"));
 const AdminPayments = lazy(() => import("./pages/AdminPayments"));
+const StudentPayment = lazy(() => import("./pages/StudentPayment"));
 const StudentVideoTutorials = lazy(() => import("./pages/StudentVideoTutorials"));
 const CommunityChat = lazy(() => import("./pages/CommunityChat"));
 
@@ -139,6 +140,7 @@ function AppRoutes() {
         
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+        <Route path="/dashboard/payment" element={<ProtectedRoute allowedRoles={["student"]}><StudentPayment /></ProtectedRoute>} />
           
         {/* Admin Routes - Restricted to Admins; fine-grained via permissions where needed */}
         <Route path="/dashboard/admin/payments" element={<ProtectedRoute allowedRoles={["admin"]} requireAnyPermissions={["managePayments"]}><AdminPayments /></ProtectedRoute>} />
