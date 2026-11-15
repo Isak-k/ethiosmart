@@ -20,6 +20,10 @@ function fetchWithRedirects(
       const allowedHost = host === 'drive.google.com' ||
         host === 'docs.google.com' ||
         host === 'drive.usercontent.google.com' ||
+        host === 'firebasestorage.googleapis.com' ||
+        host === 'storage.googleapis.com' ||
+        host.endsWith('.firebasestorage.app') ||
+        host.endsWith('.appspot.com') ||
         host.endsWith('.googleusercontent.com') ||
         host.endsWith('.googleapis.com');
       if (parsed.protocol !== 'https:' || !allowedHost) {
@@ -71,7 +75,7 @@ function fetchWithRedirects(
   });
 }
 
-async function resolveAuthorizedDriveFile(bookId: string, idToken: string): Promise<string> {
+async function resolveAuthorizedBookFile(bookId: string, idToken: string): Promise<{ fileId?: string; privateUrl?: string }> {
   const projectId = process.env.FIREBASE_PROJECT_ID || 'online-exam-f443c';
   const region = process.env.FIREBASE_FUNCTIONS_REGION || 'us-central1';
   const callableUrl = process.env.GET_STUDENT_BOOK_CALLABLE_URL ||
@@ -97,6 +101,18 @@ async function resolveAuthorizedDriveFile(bookId: string, idToken: string): Prom
 
   const payload = await response.json() as any;
   const book = payload?.result?.book || payload?.data?.book;
+  if (typeof book?.protectedDownloadUrl === 'string') {
+    const privateUrl = new URL(book.protectedDownloadUrl);
+    const allowedPrivateHost = privateUrl.hostname === 'firebasestorage.googleapis.com' ||
+      privateUrl.hostname === 'storage.googleapis.com' ||
+      privateUrl.hostname.endsWith('.firebasestorage.app') ||
+      privateUrl.hostname.endsWith('.appspot.com');
+    if (privateUrl.protocol !== 'https:' || !allowedPrivateHost) {
+      throw Object.assign(new Error('The protected storage URL is invalid.'), { statusCode: 502 });
+    }
+    return { privateUrl: privateUrl.toString() };
+  }
+
   const fileId = typeof book?.driveFileId === 'string'
     ? book.driveFileId
     : typeof book?.driveUrl === 'string'
@@ -106,7 +122,7 @@ async function resolveAuthorizedDriveFile(bookId: string, idToken: string): Prom
   if (!fileId || !/^[A-Za-z0-9_-]{10,200}$/.test(fileId)) {
     throw Object.assign(new Error('This resource does not have a valid downloadable file.'), { statusCode: 404 });
   }
-  return fileId;
+  return { fileId };
 }
 
 function extractDriveFileId(url: string): string {
@@ -117,6 +133,21 @@ function extractDriveFileId(url: string): string {
   } catch {
     return '';
   }
+}
+
+async function downloadPrivateStorageBuffer(url: string): Promise<{ buffer: Buffer; contentType: string; fileName: string }> {
+  const result = await fetchWithRedirects(url, { timeoutMs: 20000, maxBytes: 25 * 1024 * 1024 });
+  if (result.statusCode !== 200 || !result.body.length) {
+    throw Object.assign(new Error('Unable to download the protected learning file.'), { statusCode: 502 });
+  }
+  if (result.body.slice(0, 5).toString('ascii') !== '%PDF') {
+    throw Object.assign(new Error('The protected learning file is not a valid PDF.'), { statusCode: 415 });
+  }
+  return {
+    buffer: result.body,
+    contentType: 'application/pdf',
+    fileName: 'learning-resource.pdf',
+  };
 }
 
 async function downloadGoogleDriveBuffer(fileId: string): Promise<{ buffer: Buffer; contentType: string; fileName: string }> {
@@ -193,8 +224,10 @@ export default async function handler(req: any, res: any) {
       return;
     }
 
-    const fileId = await resolveAuthorizedDriveFile(bookId, tokenMatch[1]);
-    const downloaded = await downloadGoogleDriveBuffer(fileId);
+    const authorizedFile = await resolveAuthorizedBookFile(bookId, tokenMatch[1]);
+    const downloaded = authorizedFile.privateUrl
+      ? await downloadPrivateStorageBuffer(authorizedFile.privateUrl)
+      : await downloadGoogleDriveBuffer(authorizedFile.fileId!);
     res.statusCode = 200;
     res.setHeader('Content-Type', downloaded.contentType);
     res.setHeader('Content-Length', downloaded.buffer.length);
