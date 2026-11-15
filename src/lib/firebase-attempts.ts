@@ -197,18 +197,20 @@ export async function getAnswers(attemptId: string): Promise<Answer[]> {
 
 export async function submitAttempt(
   attemptId: string,
-  totalScore: number,
-  maxScore: number,
+  _totalScore: number,
+  _maxScore: number,
   timeSpentSeconds: number
 ) {
-  const docRef = doc(db, 'examAttempts', attemptId);
-  await updateDoc(docRef, {
-    isSubmitted: true,
-    submittedAt: serverTimestamp(),
-    totalScore,
-    maxScore,
-    timeSpentSeconds
-  });
+  // The server loads the official questions and saved answers, calculates
+  // objective marks, and atomically finalizes the attempt. Client scores
+  // are intentionally ignored.
+  const functions = getFunctions(app);
+  const submitSecureAttempt = httpsCallable<
+    { attemptId: string; timeSpentSeconds: number },
+    { totalScore: number; maxScore: number }
+  >(functions, 'submitStudentExamAttempt');
+  const response = await submitSecureAttempt({ attemptId, timeSpentSeconds });
+  return response.data;
 }
 
 export function calculateScoreFromAnswers(questions: Question[], answers: Answer[]): { totalScore: number; maxScore: number } {
