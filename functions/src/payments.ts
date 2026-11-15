@@ -24,20 +24,18 @@ async function getProfile(uid: string): Promise<FirebaseFirestore.DocumentData> 
   return snap.data() || {};
 }
 
-async function requireAdmin(uid: string, canReview = false): Promise<FirebaseFirestore.DocumentData> {
+async function requireAdmin(uid: string, canReview = false, manageSettings = false): Promise<FirebaseFirestore.DocumentData> {
   const profile = await getProfile(uid);
   if (profile.role !== 'admin' && profile.role !== 'superadmin') {
     throw new functions.https.HttpsError('permission-denied', 'Administrator access is required.');
   }
-  if (canReview && profile.email?.toLowerCase() !== MAIN_ADMIN_EMAIL &&
-      profile.role !== 'superadmin' &&
-      profile.permissions?.managePayments !== true) {
+  const isMainAdmin = profile.email?.toLowerCase() === MAIN_ADMIN_EMAIL;
+  const isSuperAdmin = profile.role === 'superadmin';
+  if (canReview && !isMainAdmin && !isSuperAdmin && profile.permissions?.managePayments !== true) {
     throw new functions.https.HttpsError('permission-denied', 'You are not assigned to review payments.');
   }
-  if (!canReview && profile.email?.toLowerCase() !== MAIN_ADMIN_EMAIL &&
-      profile.role !== 'superadmin' &&
-      false) {
-    throw new functions.https.HttpsError('permission-denied', 'Only the main administrator or an assigned payment manager can change payment settings.');
+  if (manageSettings && !isMainAdmin && !isSuperAdmin) {
+    throw new functions.https.HttpsError('permission-denied', 'Only the main administrator can change payment settings or grant lifetime access.');
   }
   return profile;
 }
@@ -198,7 +196,7 @@ export const getMyPayment = functions.https.onCall(async (_data, context) => {
 
 export const getPaymentAdminData = functions.https.onCall(async (data, context) => {
   const uid = requireAuth(context);
-  await requireAdmin(uid, false);
+  await requireAdmin(uid);
   const limit = Math.min(Math.max(Number(data?.limit) || 100, 1), 300);
   const status = cleanString(data?.status, 20);
   let query: FirebaseFirestore.Query = db.collection('payments').orderBy('submittedAt', 'desc').limit(limit);
@@ -267,7 +265,7 @@ export const reviewPayment = functions.https.onCall(async (data, context) => {
 
 export const savePaymentSettings = functions.https.onCall(async (data, context) => {
   const uid = requireAuth(context);
-  await requireAdmin(uid, false);
+  await requireAdmin(uid, false, true);
   const priceEtb = Number(data?.priceEtb);
   if (!Number.isFinite(priceEtb) || priceEtb < 0 || priceEtb > 10000000) {
     throw new functions.https.HttpsError('invalid-argument', 'Enter a valid ETB price.');
@@ -311,7 +309,7 @@ export const savePaymentSettings = functions.https.onCall(async (data, context) 
 
 export const grantLifetimePaymentAccess = functions.https.onCall(async (data, context) => {
   const uid = requireAuth(context);
-  await requireAdmin(uid, false);
+  await requireAdmin(uid, false, true);
   const targetUid = cleanString(data?.userId, 128);
   const reason = cleanString(data?.reason, 300);
   if (!targetUid) throw new functions.https.HttpsError('invalid-argument', 'Select a user.');
