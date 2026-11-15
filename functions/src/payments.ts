@@ -8,6 +8,7 @@ const MAIN_ADMIN_EMAIL = 'isak@gmail.com';
 const RECEIPT_FOLDER = 'ethiosmart/payment-receipts';
 
 type PaymentStatus = 'Pending' | 'Approved' | 'Rejected';
+import { calculatePaymentDiscount } from './payment-discounts';
 
 function requireAuth(context: functions.https.CallableContext): string {
   if (!context.auth) {
