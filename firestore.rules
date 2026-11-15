@@ -227,8 +227,10 @@ service cloud.firestore {
 
     // --- Digital Book Library Collection ---
     match /books/{bookId} {
-      // Authenticated users or public published reading
-      allow read: if isAuthenticated() || resource.data.status == 'published';
+      // Student clients must use the entitlement-checking content callables.
+      // Direct reads are reserved for administrators and the book creator.
+      allow read: if isAdminOrSuper() ||
+        (isAuthenticated() && resource.data.createdBy == request.auth.uid);
       // Allow admins, superadmins, or authenticated creators to create books
       allow create: if isAuthenticated() && (
         isAdminOrSuper() ||
