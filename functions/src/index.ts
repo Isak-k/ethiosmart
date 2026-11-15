@@ -27,6 +27,7 @@ export {
 
 export {
   getPaymentSettings,
+  quotePaymentDiscount,
   createReceiptUploadSignature,
   submitPayment,
   getMyPayment,
