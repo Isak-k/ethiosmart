@@ -9,7 +9,7 @@ import { getSubjects, getChapters } from '@/lib/subjects';
 import { getSubjectCover } from '@/lib/subject-covers';
 import { uploadSubjectCoverImage } from '@/lib/image-upload';
 import { auth, storage } from '@/integrations/firebase/client';
-import { deleteObject, ref, uploadBytes } from 'firebase/storage';
+import { ref, uploadBytes } from 'firebase/storage';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import {
@@ -89,7 +89,6 @@ export function BookFormDialog({
   const [driveUrl, setDriveUrl] = useState('');
   const [driveFileId, setDriveFileId] = useState('');
   const [protectedFile, setProtectedFile] = useState<File | null>(null);
-  const [uploadingProtectedFile, setUploadingProtectedFile] = useState(false);
   const [description, setDescription] = useState('');
   const [author, setAuthor] = useState('');
   const [edition, setEdition] = useState('');
@@ -393,7 +392,6 @@ export function BookFormDialog({
     };
 
     setIsSaving(true);
-    setUploadingProtectedFile(Boolean(protectedFile));
     let uploadedStoragePath = book?.storagePath || '';
     try {
       if (protectedFile) {
@@ -425,7 +423,6 @@ export function BookFormDialog({
       }
     } finally {
       setIsSaving(false);
-      setUploadingProtectedFile(false);
     }
   };
 
