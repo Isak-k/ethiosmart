@@ -145,6 +145,28 @@ export const createReceiptUploadSignature = functions.https.onCall(async (data, 
   return { cloudName, apiKey, timestamp, folder: RECEIPT_FOLDER, publicId, signature };
 });
 
+export const quotePaymentDiscount = functions.https.onCall(async (data, context) => {
+  const uid = requireAuth(context);
+  const [profile, settingsSnap] = await Promise.all([
+    getProfile(uid),
+    db.doc(SETTINGS_PATH).get(),
+  ]);
+  const settings = settingsSnap.exists ? settingsSnap.data()! : defaultSettings();
+  if (settings.enabled !== true || Number(settings.priceEtb) <= 0) {
+    throw new functions.https.HttpsError('failed-precondition', 'Payments are not configured yet.');
+  }
+  try {
+    return calculatePaymentDiscount(
+      settings.priceEtb,
+      settings.discounts,
+      { uid, email: cleanString(profile.email, 254) },
+      data?.discountCode,
+    );
+  } catch (error: any) {
+    throw new functions.https.HttpsError('invalid-argument', error?.message || 'Discount could not be applied.');
+  }
+});
+
 export const submitPayment = functions.https.onCall(async (data, context) => {
   const uid = requireAuth(context);
   const profile = await getProfile(uid);
