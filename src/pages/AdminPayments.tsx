@@ -61,6 +61,9 @@ type Payment = {
   status: "Pending" | "Approved" | "Rejected";
   methodName: string;
   expectedAmountEtb: number;
+  originalPriceEtb?: number;
+  discountEtb?: number;
+  discountSnapshot?: { source?: string | null; label?: string | null; code?: string | null; kind?: string | null; value?: number } | null;
   amountPaidEtb: number;
   receiptUrl: string;
   submittedAt?: { seconds?: number };
@@ -341,7 +344,7 @@ export default function AdminPayments() {
                             {payment.status}
                           </Badge>
                         </div>
-                        <div className="grid grid-cols-2 gap-2 text-sm md:grid-cols-4">
+                        <div className="grid grid-cols-2 gap-2 text-sm md:grid-cols-5">
                           <div>
                             <p className="text-xs text-muted-foreground">Payment method</p>
                             <p>{payment.methodName}</p>
@@ -350,6 +353,16 @@ export default function AdminPayments() {
                             <p className="text-xs text-muted-foreground">Expected</p>
                             <p>{Number(payment.expectedAmountEtb || 0).toLocaleString()} ETB</p>
                           </div>
+                          {Number(payment.discountEtb || 0) > 0 && (
+                            <div>
+                              <p className="text-xs text-muted-foreground">Discount</p>
+                              <p className="text-emerald-600">−{Number(payment.discountEtb).toLocaleString()} ETB</p>
+                              <p className="text-xs text-muted-foreground">
+                                {payment.discountSnapshot?.label || payment.discountSnapshot?.source || "Applied discount"}
+                                {payment.discountSnapshot?.code ? ` · ${payment.discountSnapshot.code}` : ""}
+                              </p>
+                            </div>
+                          )}
                           <div>
                             <p className="text-xs text-muted-foreground">Transferred</p>
                             <p>{Number(payment.amountPaidEtb || 0).toLocaleString()} ETB</p>
