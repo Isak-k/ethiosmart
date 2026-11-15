@@ -92,7 +92,7 @@ export default function AdminPayments() {
       return;
     }
     try {
-      await savePaymentSettings({ priceEtb: amount, enabled, mode: "production", paymentMethods: [], freeAccess: { enabled: true } });
+      await savePaymentSettings({ priceEtb: amount, enabled });
       toast({ title: "Payment settings saved", description: "The new price applies to new payment submissions." });
       await load();
     } catch (error: any) {
