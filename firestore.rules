@@ -60,6 +60,23 @@ service cloud.firestore {
     match /receiptFingerprints/{fingerprintId} {
       allow read, write: if false;
     }
+
+    match /userNotifications/{userId}/items/{notificationId} {
+      allow read: if isUser(userId);
+      allow create, update, delete: if false;
+    }
+
+    match /sandboxPayments/{paymentId} {
+      allow read, write: if false;
+    }
+
+    match /sandboxPaymentAccounts/{userId} {
+      allow read, write: if false;
+    }
+
+    match /sandboxReceiptFingerprints/{fingerprintId} {
+      allow read, write: if false;
+    }
 \n    // --- Users Collection ---
     match /users/{userId} {
       allow read: if isUser(userId) || isAdmin();
