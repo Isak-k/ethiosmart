@@ -319,6 +319,86 @@ export const createStudentExamAttempt = functions.https.onCall(async (data, cont
 });
 
 /**
+ * Finalizes a student's attempt and computes objective marks on the server.
+ * Client-supplied scores are deliberately ignored.
+ */
+export const submitStudentExamAttempt = functions.https.onCall(async (data, context) => {
+  const uid = requireAuth(context);
+  const attemptId = typeof data?.attemptId === 'string' ? data.attemptId.trim() : '';
+  const timeSpentSeconds = Math.max(0, Math.min(24 * 60 * 60,
+    Math.floor(Number(data?.timeSpentSeconds) || 0)));
+  if (!attemptId || attemptId.length > 150) {
+    throw new functions.https.HttpsError('invalid-argument', 'A valid attempt ID is required.');
+  }
+
+  const attemptRef = db.collection('examAttempts').doc(attemptId);
+  const attemptSnap = await attemptRef.get();
+  if (!attemptSnap.exists) throw new functions.https.HttpsError('not-found', 'Exam attempt not found.');
+  const attempt = attemptSnap.data() || {};
+  if (attempt.studentId !== uid) {
+    throw new functions.https.HttpsError('permission-denied', 'You cannot submit another student’s attempt.');
+  }
+  if (attempt.isSubmitted === true) {
+    throw new functions.https.HttpsError('failed-precondition', 'This attempt has already been submitted.');
+  }
+
+  const examId = String(attempt.examId || '');
+  let examSnap = await db.collection('exams').doc(examId).get();
+  if (!examSnap.exists) {
+    const alternate = await db.collection('exams').where('examId', '==', examId).limit(1).get();
+    if (!alternate.empty) examSnap = alternate.docs[0];
+  }
+  if (!examSnap.exists) throw new functions.https.HttpsError('not-found', 'Exam not found.');
+
+  const [questionsSnap, answersSnap] = await Promise.all([
+    examSnap.ref.collection('questions').get(),
+    attemptRef.collection('answers').get(),
+  ]);
+  const answerById = new Map(answersSnap.docs.map((doc) => [doc.id, doc.data()]));
+  let totalScore = 0;
+  let maxScore = 0;
+  questionsSnap.docs.forEach((questionDoc) => {
+    const question = questionDoc.data();
+    const marks = Math.max(0, Number(question.marks) || 0);
+    maxScore += marks;
+    const answer = answerById.get(questionDoc.id) || {};
+    const type = String(question.questionType || question.type || '').toLowerCase();
+    if (type === 'shortanswer' || type === 'essay' || type === 'short_answer' || type === 'essay_question') {
+      return; // Requires teacher grading; client cannot award itself marks.
+    }
+    let correct = false;
+    if (typeof question.correctOptionIndex === 'number') {
+      correct = answer.selectedOptionIndex === question.correctOptionIndex;
+    } else if (typeof question.correctAnswer === 'boolean') {
+      correct = answer.studentAnswer === question.correctAnswer ||
+        String(answer.studentAnswer).toLowerCase() === String(question.correctAnswer).toLowerCase();
+    } else if (typeof question.correctAnswer === 'string') {
+      correct = String(answer.studentAnswer ?? '').trim().toLowerCase() === question.correctAnswer.trim().toLowerCase();
+    }
+    if (correct) totalScore += marks;
+  });
+
+  await db.runTransaction(async (tx) => {
+    const fresh = await tx.get(attemptRef);
+    if (!fresh.exists || fresh.data()?.studentId !== uid) {
+      throw new functions.https.HttpsError('permission-denied', 'Attempt ownership could not be verified.');
+    }
+    if (fresh.data()?.isSubmitted === true) {
+      throw new functions.https.HttpsError('failed-precondition', 'This attempt has already been submitted.');
+    }
+    tx.update(attemptRef, {
+      isSubmitted: true,
+      submittedAt: admin.firestore.FieldValue.serverTimestamp(),
+      timeSpentSeconds,
+      totalScore,
+      maxScore,
+    });
+  });
+
+  return { totalScore, maxScore };
+});
+
+/**
  * Server-gated exam question delivery. Free attempts are limited across the
  * student's selected free exams; existing attempt documents are used as the
  * source of truth. Client migration and Firestore rule tightening are separate
