@@ -214,7 +214,7 @@ export const getStudentBook = functions.https.onCall(async (data, context) => {
       ...book,
       id: book.id,
     },
-    entitlement: lifetime ? 'lifetime' : isAdmin ? 'admin' : isExamOwner ? 'owner' : 'free',
+    entitlement: isAdmin ? 'admin' : lifetime ? 'lifetime' : 'free',
   };
 });
 
