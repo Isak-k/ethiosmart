@@ -146,15 +146,9 @@ service cloud.firestore {
         (resource.data.studentId == request.auth.uid || isAdminOrSuper());
       // Normal attempts are created only by createStudentExamAttempt (Admin SDK).
       allow create: if false;
-      // Students may submit their own attempt, but cannot write scores or grading fields.
-      allow update: if isAdminOrSuper() || (
-        isAuthenticated() &&
-        resource.data.studentId == request.auth.uid &&
-        resource.data.isSubmitted != true &&
-        request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['isSubmitted', 'submittedAt', 'timeSpentSeconds']) &&
-        request.resource.data.isSubmitted == true
-      );
+      // Attempt submission and score updates are performed only by trusted
+      // Firebase Functions using the Admin SDK.
+      allow update: if isAdminOrSuper();
       allow delete: if isAdminOrSuper();
 
       match /answers/{answerId} {
