@@ -8,8 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
-import { Loader2, RefreshCw, CheckCircle2, XCircle, Clock3, Wallet, ExternalLink, Search } from "lucide-react";
+import { Loader2, RefreshCw, CheckCircle2, XCircle, Wallet, ExternalLink, Search } from "lucide-react";
 
 const functions = getFunctions(app);
 const getPaymentAdminData = httpsCallable(functions, "getPaymentAdminData");
@@ -33,7 +32,6 @@ type Payment = {
 };
 
 export default function AdminPayments() {
-  const { user } = useAuth();
   const { toast } = useToast();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [totals, setTotals] = useState({ total: 0, pending: 0, approved: 0, rejected: 0, revenueEtb: 0 });
