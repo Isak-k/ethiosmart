@@ -4,9 +4,11 @@ import { URL } from 'url';
 
 function fetchWithRedirects(
   targetUrl: string,
-  options: { method?: string; headers?: Record<string, string>; maxRedirects?: number } = {}
+  options: { method?: string; headers?: Record<string, string>; maxRedirects?: number; timeoutMs?: number; maxBytes?: number } = {}
 ): Promise<{ statusCode: number; headers: http.IncomingHttpHeaders; body: Buffer }> {
   const maxRedirects = options.maxRedirects ?? 5;
+  const timeoutMs = options.timeoutMs ?? 20000;
+  const maxBytes = options.maxBytes ?? 25 * 1024 * 1024;
   const method = options.method || 'GET';
   const customHeaders = options.headers || {};
 
@@ -14,7 +16,15 @@ function fetchWithRedirects(
     function doRequest(currentUrl: string, redirectsRemaining: number) {
       if (redirectsRemaining < 0) return reject(new Error('Too many redirects'));
       const parsed = new URL(currentUrl);
-      if (parsed.protocol !== 'https:') return reject(new Error('Only HTTPS redirects are allowed.'));
+      const host = parsed.hostname.toLowerCase();
+      const allowedHost = host === 'drive.google.com' ||
+        host === 'docs.google.com' ||
+        host === 'drive.usercontent.google.com' ||
+        host.endsWith('.googleusercontent.com') ||
+        host.endsWith('.googleapis.com');
+      if (parsed.protocol !== 'https:' || !allowedHost) {
+        return reject(new Error('Download redirected to an untrusted host.'));
+      }
       const req = https.request(parsed, {
         method,
         headers: {
@@ -28,13 +38,31 @@ function fetchWithRedirects(
           response.resume();
           return doRequest(nextUrl, redirectsRemaining - 1);
         }
+        const declaredLength = Number(response.headers['content-length'] || 0);
+        if (declaredLength > maxBytes) {
+          response.destroy();
+          return reject(Object.assign(new Error('Document exceeds the 25 MB download limit.'), { statusCode: 413 }));
+        }
         const chunks: Buffer[] = [];
-        response.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+        let receivedBytes = 0;
+        response.on('data', (chunk) => {
+          const buffer = Buffer.from(chunk);
+          receivedBytes += buffer.length;
+          if (receivedBytes > maxBytes) {
+            response.destroy(Object.assign(new Error('Document exceeds the 25 MB download limit.'), { statusCode: 413 }));
+            return;
+          }
+          chunks.push(buffer);
+        });
         response.on('end', () => resolve({
           statusCode: response.statusCode || 200,
           headers: response.headers,
           body: Buffer.concat(chunks),
         }));
+        response.on('error', reject);
+      });
+      req.setTimeout(timeoutMs, () => {
+        req.destroy(Object.assign(new Error('Document download timed out.'), { statusCode: 504 }));
       });
       req.on('error', reject);
       req.end();
@@ -91,9 +119,10 @@ function extractDriveFileId(url: string): string {
 }
 
 async function downloadGoogleDriveBuffer(fileId: string): Promise<{ buffer: Buffer; contentType: string; fileName: string }> {
+  const downloadOptions = { timeoutMs: 20000, maxBytes: 25 * 1024 * 1024 };
   const docsExportUrl = `https://docs.google.com/document/d/${encodeURIComponent(fileId)}/export?format=pdf`;
   try {
-    const docsRes = await fetchWithRedirects(docsExportUrl);
+    const docsRes = await fetchWithRedirects(docsExportUrl, downloadOptions);
     if (docsRes.statusCode === 200 && docsRes.body.length > 50 &&
       docsRes.body.slice(0, 5).toString('ascii').startsWith('%PDF')) {
       return { buffer: docsRes.body, contentType: 'application/pdf', fileName: `${fileId}.pdf` };
@@ -103,7 +132,7 @@ async function downloadGoogleDriveBuffer(fileId: string): Promise<{ buffer: Buff
   }
 
   const downloadUrl = `https://drive.google.com/uc?export=download&id=${encodeURIComponent(fileId)}`;
-  let result = await fetchWithRedirects(downloadUrl);
+  let result = await fetchWithRedirects(downloadUrl, downloadOptions);
   if (result.statusCode === 200) {
     const sample = result.body.slice(0, 2000).toString('utf8');
     if (sample.includes('uc-download-link') || sample.includes('export=download')) {
@@ -113,7 +142,7 @@ async function downloadGoogleDriveBuffer(fileId: string): Promise<{ buffer: Buff
         const confirmUrl = match[1].startsWith('http')
           ? match[1]
           : `https://drive.google.com${match[1].replace(/&amp;/g, '&')}`;
-        result = await fetchWithRedirects(confirmUrl);
+        result = await fetchWithRedirects(confirmUrl, downloadOptions);
       }
     }
   }
