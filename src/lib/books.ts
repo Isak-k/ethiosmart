@@ -251,6 +251,7 @@ export async function createBook(input: BookInput, creatorId: string): Promise<s
     sourceResourceId: input.sourceResourceId || '',
     driveUrl: input.driveUrl?.trim() || '',
     driveFileId: input.driveFileId?.trim() || '',
+    storagePath: input.storagePath?.trim() || '',
     description: input.description?.trim() || '',
     author: input.author?.trim() || '',
     edition: input.edition?.trim() || '',
