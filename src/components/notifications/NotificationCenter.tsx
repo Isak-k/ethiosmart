@@ -4,6 +4,7 @@ import {
   Bell,
   Sparkles,
   ClipboardList,
+  CreditCard,
   BookOpen,
   FileText,
   Megaphone,
@@ -125,6 +126,8 @@ export function NotificationCenter({ userDepartmentId, className }: Notification
         return <FileText className="h-4 w-4 text-amber-500" />;
       case 'announcement':
         return <Megaphone className="h-4 w-4 text-blue-500" />;
+      case 'payment':
+        return <CreditCard className="h-4 w-4 text-emerald-500" />;
     }
   };
 
