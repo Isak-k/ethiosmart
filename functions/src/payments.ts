@@ -179,20 +179,26 @@ export const submitPayment = functions.https.onCall(async (data, context) => {
   const fingerprintCollection = mode === 'sandbox' ? 'sandboxReceiptFingerprints' : 'receiptFingerprints';
   const paymentRef = db.collection(paymentCollection).doc(paymentId);
   const accountRef = db.collection(accountCollection).doc(uid);
+  const productionAccountRef = db.collection('paymentAccounts').doc(uid);
+  const sandboxAccountRef = db.collection('sandboxPaymentAccounts').doc(uid);
   const duplicateRef = fingerprint ? db.collection(fingerprintCollection).doc(fingerprint) : null;
   await db.runTransaction(async (tx) => {
     const userRef = db.collection('users').doc(uid);
-    const [accountSnap, paymentSnap, duplicateSnap, userSnap] = await Promise.all([
+    const [accountSnap, productionAccountSnap, sandboxAccountSnap, paymentSnap, duplicateSnap, userSnap] = await Promise.all([
       tx.get(accountRef),
+      tx.get(productionAccountRef),
+      tx.get(sandboxAccountRef),
       tx.get(paymentRef),
       duplicateRef ? tx.get(duplicateRef) : Promise.resolve(null),
       tx.get(userRef),
     ]);
     const account = accountSnap.data() || {};
-    if (account.paymentAccess?.lifetime === true || userSnap.data()?.paymentAccess?.lifetime === true) {
+    const productionAccount = productionAccountSnap.data() || {};
+    const sandboxAccount = sandboxAccountSnap.data() || {};
+    if (productionAccount.paymentAccess?.lifetime === true || userSnap.data()?.paymentAccess?.lifetime === true) {
       throw new functions.https.HttpsError('already-exists', 'Your account already has lifetime access.');
     }
-    if (account.pendingPaymentId) {
+    if (productionAccount.pendingPaymentId || sandboxAccount.pendingPaymentId) {
       throw new functions.https.HttpsError('already-exists', 'You already have a pending payment. Please wait for its review.');
     }
     if (paymentSnap.exists) throw new functions.https.HttpsError('already-exists', 'This payment request already exists.');
@@ -223,23 +229,31 @@ export const getMyPayment = functions.https.onCall(async (_data, context) => {
   const uid = requireAuth(context);
   const settingsSnap = await db.doc(SETTINGS_PATH).get();
   const mode = settingsSnap.data()?.mode === 'sandbox' ? 'sandbox' : 'production';
-  const accountCollection = mode === 'sandbox' ? 'sandboxPaymentAccounts' : 'paymentAccounts';
-  const paymentCollection = mode === 'sandbox' ? 'sandboxPayments' : 'payments';
-  const [accountSnap, userSnap] = await Promise.all([
-    db.collection(accountCollection).doc(uid).get(), db.collection('users').doc(uid).get(),
+  const [productionAccountSnap, sandboxAccountSnap, userSnap] = await Promise.all([
+    db.collection('paymentAccounts').doc(uid).get(),
+    db.collection('sandboxPaymentAccounts').doc(uid).get(),
+    db.collection('users').doc(uid).get(),
   ]);
-  const account = accountSnap.data() || {};
-  // Sandbox approvals must never create or expose real lifetime entitlement.
+  const productionAccount = productionAccountSnap.data() || {};
+  const sandboxAccount = sandboxAccountSnap.data() || {};
+  const activeAccount = mode === 'sandbox' ? sandboxAccount : productionAccount;
+  const fallbackAccount = mode === 'sandbox' ? productionAccount : sandboxAccount;
+  // Production entitlement is authoritative and survives sandbox mode switches.
   const userPaymentAccess = userSnap.data()?.paymentAccess;
   const permanentAccess = userPaymentAccess?.lifetime === true
     ? userPaymentAccess
-    : mode === 'production' && account.paymentAccess?.lifetime === true
-      ? account.paymentAccess
+    : productionAccount.paymentAccess?.lifetime === true
+      ? productionAccount.paymentAccess
       : { lifetime: false };
+  const activeCollection = mode === 'sandbox' ? 'sandboxPayments' : 'payments';
+  const fallbackCollection = mode === 'sandbox' ? 'payments' : 'sandboxPayments';
+  const selectedAccount = activeAccount.pendingPaymentId || activeAccount.lastPaymentId
+    ? activeAccount : fallbackAccount;
+  const selectedCollection = selectedAccount === activeAccount ? activeCollection : fallbackCollection;
   let payment: FirebaseFirestore.DocumentData | null = null;
-  if (account.pendingPaymentId || account.lastPaymentId) {
-    const id = account.pendingPaymentId || account.lastPaymentId;
-    const snap = await db.collection(paymentCollection).doc(id).get();
+  if (selectedAccount.pendingPaymentId || selectedAccount.lastPaymentId) {
+    const id = selectedAccount.pendingPaymentId || selectedAccount.lastPaymentId;
+    const snap = await db.collection(selectedCollection).doc(id).get();
     if (snap.exists) {
       const data = snap.data()!;
       payment = {
@@ -250,7 +264,7 @@ export const getMyPayment = functions.https.onCall(async (_data, context) => {
       };
     }
   }
-  return { paymentAccess: permanentAccess, paymentStatus: account.paymentStatus || null, payment };
+  return { paymentAccess: permanentAccess, paymentStatus: selectedAccount.paymentStatus || null, payment };
 });
 
 export const getPaymentAdminData = functions.https.onCall(async (data, context) => {
