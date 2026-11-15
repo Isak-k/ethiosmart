@@ -177,7 +177,7 @@ export default function BookReader() {
       incrementBookView(id);
 
       // Pre-fetch through the authenticated, entitlement-checking document proxy.
-      if (normalizedBook.driveFileId && user) {
+      if ((normalizedBook.storagePath || normalizedBook.driveFileId) && user) {
         user.getIdToken()
           .then((idToken) => fetch(`/api/drive/download?bookId=${encodeURIComponent(normalizedBook.id)}`, {
             headers: { Authorization: `Bearer ${idToken}` },
