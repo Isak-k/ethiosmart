@@ -748,16 +748,12 @@ export default function StudentBooks() {
     setSelectedNotesSubjectId(null);
   };
 
-  // Back from a subject's chapter list — returns to the page the student came from.
+  // Back from a subject's chapter list — always returns to the study page
+  // (the subjects list). This keeps the flow predictable after reading a note:
+  // reader -> chapters -> study page, instead of bouncing back into the reader.
   const handleBackFromChapters = () => {
     setSearchQuery('');
-    const historyIdx =
-      (window.history.state && (window.history.state as { idx?: number }).idx) || 0;
-    if (historyIdx > 0) {
-      navigate(-1);
-    } else {
-      setSelectedNotesSubjectId(null);
-    }
+    setSelectedNotesSubjectId(null);
   };
 
   return (
