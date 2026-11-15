@@ -40,6 +40,31 @@ service firebase.storage {
                      isValidSize();
     }
 
+    // Protected learning resources: uploads are admin-only and never client-readable.
+    // Students receive short-lived, entitlement-checked download links from the backend.
+    match /protected-books/{adminUid}/{resourceId}/{fileName} {
+      allow read: if false;
+      allow write: if isAuthenticated() &&
+        request.auth.uid == adminUid &&
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role
+          in ['admin', 'superadmin'] &&
+        request.resource.size <= 25 * 1024 * 1024 &&
+        request.resource.contentType == 'application/pdf' &&
+        fileName.matches('^[A-Za-z0-9._-]+
+    match /subject-covers/{allPaths=**} {
+      // Publicly readable so students can view covers on dashboard and cards
+      allow read: if true;
+      
+      // Authenticated users can upload subject covers
+      allow write: if isAuthenticated() &&
+                     isImageFile() &&
+                     isValidSize();
+    }
+  }
+}
+);
+    }
+
     // Subject cover images
     match /subject-covers/{allPaths=**} {
       // Publicly readable so students can view covers on dashboard and cards
