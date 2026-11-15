@@ -219,6 +219,106 @@ export const getStudentBook = functions.https.onCall(async (data, context) => {
 });
 
 /**
+ * Atomically reserves and creates a normal exam attempt.
+ * Free-attempt allowance is held in one per-student counter document so
+ * concurrent starts cannot exceed the configured limit.
+ */
+export const createStudentExamAttempt = functions.https.onCall(async (data, context) => {
+  const uid = requireAuth(context);
+  const examId = typeof data?.examId === 'string' ? data.examId.trim() : '';
+  if (!examId || examId.length > 150) {
+    throw new functions.https.HttpsError('invalid-argument', 'A valid exam ID is required.');
+  }
+
+  const [profileSnap, settingsSnap, accountSnap] = await Promise.all([
+    db.collection('users').doc(uid).get(),
+    db.doc(SETTINGS_PATH).get(),
+    db.collection('paymentAccounts').doc(uid).get(),
+  ]);
+  if (!profileSnap.exists) {
+    throw new functions.https.HttpsError('permission-denied', 'Student profile not found.');
+  }
+
+  let examSnap = await db.collection('exams').doc(examId).get();
+  if (!examSnap.exists) {
+    const alternate = await db.collection('exams').where('examId', '==', examId).limit(1).get();
+    if (!alternate.empty) examSnap = alternate.docs[0];
+  }
+  if (!examSnap.exists) throw new functions.https.HttpsError('not-found', 'This exam was not found.');
+
+  const profile = profileSnap.data() || {};
+  const exam = examSnap.data() || {};
+  const adminAccess = isAdminProfile(profile);
+  const ownerAccess = exam.createdBy === uid;
+  const departmentId = String(profile.departmentId || profile.department || '');
+  const examDepartment = String(exam.departmentId || '');
+  const examDepartments = Array.isArray(exam.departmentIds) ? exam.departmentIds : [];
+  if (!adminAccess && !ownerAccess && departmentId && examDepartment &&
+      examDepartment !== 'all' && examDepartment !== departmentId &&
+      !examDepartments.includes(departmentId) && !examDepartments.includes('all')) {
+    throw new functions.https.HttpsError('permission-denied', 'This exam is not available for your department.');
+  }
+  if (!adminAccess && !ownerAccess && exam.status &&
+      !['published', 'active'].includes(String(exam.status).toLowerCase()) &&
+      exam.isPublished !== true) {
+    throw new functions.https.HttpsError('not-found', 'This exam is not currently published.');
+  }
+
+  const lifetime = profile.paymentAccess?.lifetime === true ||
+    accountSnap.data()?.paymentAccess?.lifetime === true;
+  const settings = settingsSnap.data() || {};
+  const free = settings.freeAccess || {};
+  const configuredFreeExamIds: string[] = Array.isArray(free.freeExamIds) ? free.freeExamIds : [];
+  const selectedAsFree = configuredFreeExamIds.includes(examSnap.id) ||
+    configuredFreeExamIds.includes(String(exam.examId || ''));
+  const isFreeStudent = !adminAccess && !ownerAccess && !lifetime;
+  if (isFreeStudent && (free.enabled === false || !selectedAsFree)) {
+    throw new functions.https.HttpsError('permission-denied', 'Approved lifetime access is required for this exam.');
+  }
+
+  const attemptRef = db.collection('examAttempts').doc();
+  const usageRef = db.collection('freeExamUsage').doc(uid);
+  const maxFreeAttempts = Math.max(0, Math.floor(Number(free.freeExamAttempts) || 0));
+  const result = await db.runTransaction(async (tx) => {
+    let usageCount = 0;
+    if (isFreeStudent) {
+      if (maxFreeAttempts <= 0) {
+        throw new functions.https.HttpsError('permission-denied', 'Free exam attempts are not currently available.');
+      }
+      const usageSnap = await tx.get(usageRef);
+      usageCount = Math.max(0, Math.floor(Number(usageSnap.data()?.attemptCount) || 0));
+      if (usageCount >= maxFreeAttempts) {
+        throw new functions.https.HttpsError('permission-denied', 'Your free exam attempt allowance has been used.');
+      }
+      tx.set(usageRef, {
+        attemptCount: usageCount + 1,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+    }
+
+    tx.create(attemptRef, {
+      examId: examSnap.id,
+      studentId: uid,
+      examTitle: String(exam.title || exam.examTitle || ''),
+      studentName: String(profile.full_name || profile.fullName || context.auth?.token.name || 'Student'),
+      studentEmail: String(profile.email || context.auth?.token.email || ''),
+      startedAt: admin.firestore.FieldValue.serverTimestamp(),
+      submittedAt: null,
+      isSubmitted: false,
+      timeSpentSeconds: null,
+      totalScore: null,
+      maxScore: null,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      accessType: adminAccess ? 'admin' : ownerAccess ? 'owner' : lifetime ? 'lifetime' : 'free',
+      freeAttemptReservation: isFreeStudent,
+    });
+    return { attemptId: attemptRef.id, freeAttemptsRemaining: isFreeStudent ? maxFreeAttempts - usageCount - 1 : null };
+  });
+
+  return result;
+});
+
+/**
  * Server-gated exam question delivery. Free attempts are limited across the
  * student's selected free exams; existing attempt documents are used as the
  * source of truth. Client migration and Firestore rule tightening are separate
