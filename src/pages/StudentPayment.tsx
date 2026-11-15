@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { getFunctions, httpsCallable } from "firebase/functions";
-import { doc, getDoc } from "firebase/firestore";
 import app, { db } from "@/integrations/firebase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -21,7 +20,7 @@ const getMyPayment = httpsCallable(functions, "getMyPayment");
 type Method = { id: string; name: string; accountName?: string; accountNumber?: string; instructions?: string; enabled: boolean };
 
 export default function StudentPayment() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [methods, setMethods] = useState<Method[]>([]);
   const [price, setPrice] = useState(0);
