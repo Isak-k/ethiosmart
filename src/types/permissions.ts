@@ -44,7 +44,7 @@ export interface UserPermissions {
   viewLeaderboard: boolean;
   manageLeaderboard: boolean;
   
-  // Examiner Management (Super Admin only)
+  // Payment review access for selected administrators\n  managePayments: boolean;\n  \n  // Examiner Management (Super Admin only)
   viewExaminers: boolean;
   addExaminers: boolean;
   editExaminerPermissions: boolean;
@@ -210,7 +210,7 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   addExaminers: 'Add Examiners',
   editExaminerPermissions: 'Edit Examiner Permissions',
   deleteExaminers: 'Delete Examiners',
-  enableDisableExaminers: 'Enable/Disable Examiners',
+  enableDisableExaminers: 'Enable/Disable Examiners',\n  managePayments: 'Review Payments',
 };
 
 export const PERMISSION_GROUPS = {
@@ -252,7 +252,7 @@ export const PERMISSION_GROUPS = {
     'viewAIAssistant',
   ] as PermissionKey[],
   'Leaderboard': ['viewLeaderboard', 'manageLeaderboard'] as PermissionKey[],
-  'Examiner Management': [
+  'Payment Management': ['managePayments'] as PermissionKey[],\n  'Examiner Management': [
     'viewExaminers',
     'addExaminers',
     'editExaminerPermissions',
