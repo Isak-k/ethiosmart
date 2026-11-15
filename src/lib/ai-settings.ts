@@ -74,7 +74,7 @@ export const DEFAULT_AI_SETTINGS: AISystemSettings = {
       recommendedModels: [
         'qwen/qwen3.8-27b',
         'openai/gpt-oss-120b',
-        'llama-3.1-8b-instant',
+        'openai/gpt-oss-20b',
       ],
     },
     openrouter: {
@@ -262,7 +262,7 @@ function mergeWithDefaults(data: Partial<AISystemSettings>): AISystemSettings {
   };
 
   // Auto-migrate legacy or deprecated models from older saved configs
-  if (merged.providers.groq.model === 'llama-3.3-70b-versatile' || !merged.providers.groq.model) {
+  if (merged.providers.groq.model === 'llama-3.3-70b-versatile' || merged.providers.groq.model === 'llama-3.1-8b-instant' || !merged.providers.groq.model) {
     merged.providers.groq.model = 'qwen/qwen3.8-27b';
   }
   if (

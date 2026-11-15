@@ -80,6 +80,29 @@ function isRetryableServerError(status?: number): boolean {
   return [500, 502, 503, 504].includes(status);
 }
 
+function isModelAccessError(err: any): boolean {
+  if (!err) return false;
+  const msg = String(err?.message || '').toLowerCase();
+  return (
+    msg.includes('does not exist') ||
+    msg.includes('not found') ||
+    msg.includes('no access') ||
+    msg.includes('do not have access') ||
+    msg.includes('model_not_found') ||
+    msg.includes('deprecated') ||
+    msg.includes('not supported')
+  );
+}
+
+function isAuthError(err: any): boolean {
+  if (err?.status === 401) return true;
+  if (err?.status === 403 && !isModelAccessError(err)) {
+    const msg = String(err?.message || '').toLowerCase();
+    return msg.includes('key') || msg.includes('unauthorized') || msg.includes('invalid') || msg.includes('forbidden');
+  }
+  return false;
+}
+
 async function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -208,9 +231,14 @@ export async function orchestrateGenerationBatch(
           break;
         }
 
-        // Check 401 / 403 Unauthorized
-        if (err.status === 401 || err.status === 403) {
+        // Check 401 / 403 Unauthorized (but not model-access errors)
+        if (isAuthError(err)) {
           setProviderCooldown(provider, 600, 'Invalid Credentials / Unauthorized');
+          break;
+        }
+
+        // Check 403 model-access errors (model not available for this key)
+        if (err.status === 403 && isModelAccessError(err)) {
           break;
         }
 

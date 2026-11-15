@@ -780,7 +780,7 @@ async function callAIForNotes(prompt: string, effectiveKeys: ReturnType<typeof g
   // 2. Try Groq (Ultra-fast failover with 35s timeout)
   const groqKey = effectiveKeys.groq;
   if (groqKey) {
-    const models = ['qwen/qwen3.8-27b', 'openai/gpt-oss-120b', 'llama-3.1-8b-instant'];
+    const models = ['qwen/qwen3.8-27b', 'openai/gpt-oss-120b', 'openai/gpt-oss-20b'];
     for (const model of models) {
       try {
         const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {

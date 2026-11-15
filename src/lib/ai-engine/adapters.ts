@@ -68,7 +68,8 @@ export async function callGemini(
           res.status === 429 ||
           res.status === 503 ||
           res.status === 500 ||
-          (res.status === 400 && (errorMsg.includes('not found') || errorMsg.includes('deprecated') || errorMsg.includes('not supported')));
+          (res.status === 400 && (errorMsg.includes('not found') || errorMsg.includes('deprecated') || errorMsg.includes('not supported'))) ||
+          (res.status === 403 && (errorMsg.includes('access') || errorMsg.includes('permission') || errorMsg.includes('model') || errorMsg.includes('quota')));
 
         if (isModelOrQuotaError) {
           console.warn(`[Gemini Adapter] Model '${model}' failed (HTTP ${res.status}: ${errorMsg}). Trying fallback model...`);
@@ -128,7 +129,7 @@ export async function callGroq(
     ...(requestedModel ? [requestedModel] : []),
     'qwen/qwen3.8-27b',
     'openai/gpt-oss-120b',
-    'llama-3.1-8b-instant'
+    'openai/gpt-oss-20b'
   ].filter((m, idx, arr) => arr.indexOf(m) === idx);
   let lastError: any = null;
 
@@ -164,7 +165,8 @@ export async function callGroq(
           res.status === 404 ||
           res.status === 429 ||
           res.status === 503 ||
-          (res.status === 400 && (responseBody?.error?.code === 'model_not_found' || errorMsg.includes('model') || errorMsg.includes('deprecated')));
+          (res.status === 400 && (responseBody?.error?.code === 'model_not_found' || errorMsg.includes('model') || errorMsg.includes('deprecated'))) ||
+          (res.status === 403 && (errorMsg.includes('access') || errorMsg.includes('permission') || errorMsg.includes('model')));
 
         if (isModelOrQuotaError) {
           console.warn(`[Groq Adapter] Model '${model}' failed (HTTP ${res.status}: ${errorMsg}). Trying fallback model...`);
@@ -264,7 +266,8 @@ export async function callOpenRouter(
           res.status === 404 ||
           res.status === 429 ||
           res.status === 503 ||
-          (res.status === 400 && (errorMsg.includes('model') || errorMsg.includes('not supported') || errorMsg.includes('deprecated')));
+          (res.status === 400 && (errorMsg.includes('model') || errorMsg.includes('not supported') || errorMsg.includes('deprecated'))) ||
+          (res.status === 403 && (errorMsg.includes('access') || errorMsg.includes('permission') || errorMsg.includes('model') || errorMsg.includes('quota')));
 
         if (isModelOrQuotaError) {
           console.warn(`[OpenRouter Adapter] Model '${model}' failed (HTTP ${res.status}: ${errorMsg}). Trying fallback model...`);
@@ -366,7 +369,8 @@ export async function callHuggingFace(
           res.status === 404 ||
           res.status === 429 ||
           res.status === 503 ||
-          (res.status === 400 && String(errorMsg).includes('Model not supported'));
+          (res.status === 400 && String(errorMsg).includes('Model not supported')) ||
+          (res.status === 403 && (String(errorMsg).includes('access') || String(errorMsg).includes('permission') || String(errorMsg).includes('model') || String(errorMsg).includes('quota')));
 
         if (isModelOrQuotaError) {
           console.warn(`[Hugging Face Adapter] Model '${model}' failed (HTTP ${res.status}: ${errorMsg}). Trying fallback model...`);
