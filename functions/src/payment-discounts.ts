@@ -25,9 +25,9 @@ function money(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
-function validDiscount(raw: any, requireEnabled: boolean): raw is Record<string, any> & { kind: DiscountKind; value: number } {
+function validDiscount(raw: any, activationField?: 'enabled' | 'active'): raw is Record<string, any> & { kind: DiscountKind; value: number } {
   if (!raw || (raw.kind !== 'percentage' && raw.kind !== 'fixed')) return false;
-  if (requireEnabled && raw.enabled !== true && raw.active !== true) return false;
+  if (activationField && raw[activationField] !== true) return false;
   const value = Number(raw.value);
   if (!Number.isFinite(value) || value < 0) return false;
   if (raw.kind === 'percentage' && value > 100) return false;
@@ -65,7 +65,7 @@ export function calculatePaymentDiscount(
     const match = codes.find((item: any) =>
       typeof item?.code === 'string' && item.code.trim().toUpperCase() === code
     );
-    if (!match || !validDiscount(match, true)) {
+    if (!match || !validDiscount(match, 'enabled')) {
       throw new Error('This discount code is invalid or unavailable.');
     }
     candidates.push({ source: 'code', label: code, code, kind: match.kind, value: Number(match.value) });
@@ -75,7 +75,7 @@ export function calculatePaymentDiscount(
   const assigned = selectedUsers.find((item: any) =>
     typeof item?.identifier === 'string' &&
     identifiers.includes(item.identifier.trim().toLowerCase()) &&
-    validDiscount(item, false)
+    validDiscount(item)
   );
   if (assigned) candidates.push({
     source: 'selected_user', label: 'Selected-user discount',
@@ -83,7 +83,7 @@ export function calculatePaymentDiscount(
   });
 
   promotions.forEach((item: any) => {
-    if (item?.active === true && validDiscount(item, true)) {
+    if (item?.active === true && validDiscount(item, 'active')) {
       candidates.push({
         source: 'promotion',
         label: typeof item.label === 'string' && item.label.trim() ? item.label.trim().slice(0, 100) : 'Automatic promotion',
