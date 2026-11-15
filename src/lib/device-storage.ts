@@ -629,3 +629,65 @@ export function updateDeviceSyncTimestamp(): void {
     // ignore
   }
 }
+
+// -----------------------------------------------------------------------------
+// CACHE INVALIDATION
+// -----------------------------------------------------------------------------
+
+const CONTENT_STORES = [
+  STORE_SUBJECTS,
+  STORE_CHAPTERS,
+  STORE_EXAMS,
+  STORE_BOOKS,
+  STORE_DEPARTMENTS,
+  STORE_META,
+];
+
+/**
+ * Wipe every cached *content* snapshot (localStorage + IndexedDB) so the next
+ * read fetches fresh data from the server.
+ *
+ * IMPORTANT: this intentionally does NOT touch the `exam_pro_offline_books`
+ * IndexedDB database, so notes/books a user downloaded for offline reading are
+ * preserved.
+ */
+export async function clearDeviceContentCaches(): Promise<void> {
+  // 1. localStorage snapshots
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const keysToRemove: string[] = [
+        LS_SUBJECTS_KEY,
+        LS_EXAMS_KEY,
+        LS_BOOKS_KEY,
+        LS_DEPTS_KEY,
+        LS_SYNC_META_KEY,
+      ];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('exampro_cache_chapters_')) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach((key) => localStorage.removeItem(key));
+    }
+  } catch {
+    // ignore
+  }
+
+  // 2. IndexedDB content stores
+  try {
+    const db = await getDeviceDB();
+    const storeNames = CONTENT_STORES.filter((name) => db.objectStoreNames.contains(name));
+    if (storeNames.length > 0) {
+      await new Promise<void>((resolve) => {
+        const tx = db.transaction(storeNames, 'readwrite');
+        storeNames.forEach((name) => tx.objectStore(name).clear());
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+        tx.onabort = () => resolve();
+      });
+    }
+  } catch {
+    // ignore
+  }
+}

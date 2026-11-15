@@ -1,5 +1,9 @@
 // Service Worker for EthioSmart - Enhanced Offline Support
-const CACHE_VERSION = 'v3';
+// The build version is passed through the registration URL (`/sw.js?v=<build>`),
+// so every new release gets a fresh cache name and old caches are purged on
+// activate — a device never keeps serving a stale app shell after an update.
+const SW_BUILD_VERSION = new URL(self.location.href).searchParams.get('v') || 'v3';
+const CACHE_VERSION = SW_BUILD_VERSION;
 const CACHE_NAME = `ethiosmart-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `ethiosmart-runtime-${CACHE_VERSION}`;
 const IMAGE_CACHE = `ethiosmart-images-${CACHE_VERSION}`;

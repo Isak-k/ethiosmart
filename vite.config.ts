@@ -4,8 +4,15 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { aiDevPlugin } from "./src/server/ai-bridge";
 
+// Unique id per build. Bump-free: it changes on every build/deploy so the app
+// can detect a new version and invalidate stale caches on launch.
+const APP_BUILD_VERSION = String(Date.now());
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  define: {
+    __APP_VERSION__: JSON.stringify(APP_BUILD_VERSION),
+  },
   server: {
     host: "::",
     port: 8080,
