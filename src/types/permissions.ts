@@ -46,7 +46,8 @@ export interface UserPermissions {
   
   // Payment review access for selected administrators
   managePayments: boolean;
-  \n  // Examiner Management (Super Admin only)
+  
+  // Examiner Management (Super Admin only)
   viewExaminers: boolean;
   addExaminers: boolean;
   editExaminerPermissions: boolean;
