@@ -16,7 +16,8 @@ import {
   deleteDoc,
   writeBatch
 } from 'firebase/firestore';
-import { db } from '@/integrations/firebase/client';
+import app, { db } from '@/integrations/firebase/client';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { ExamAttempt, Answer, Question } from '@/integrations/firebase/types';
 import { getQuestions } from '@/lib/firebase-exams';
 
@@ -27,23 +28,16 @@ export async function createAttempt(
   studentName: string,
   studentEmail: string
 ): Promise<string> {
-  const attemptData: Omit<ExamAttempt, 'attemptId'> = {
-    examId,
-    studentId,
-    examTitle,
-    studentName,
-    studentEmail,
-    startedAt: Timestamp.now(),
-    submittedAt: null,
-    isSubmitted: false,
-    timeSpentSeconds: null,
-    totalScore: null,
-    maxScore: null,
-    createdAt: Timestamp.now()
-  };
-  
-  const docRef = await addDoc(collection(db, 'examAttempts'), attemptData);
-  return docRef.id;
+  // Normal exam attempts are created by a trusted callable. The server
+  // derives the student identity from Firebase Auth and atomically reserves
+  // any configured free-attempt allowance.
+  const functions = getFunctions(app);
+  const createSecureAttempt = httpsCallable<
+    { examId: string },
+    { attemptId: string; freeAttemptsRemaining: number | null }
+  >(functions, 'createStudentExamAttempt');
+  const response = await createSecureAttempt({ examId });
+  return response.data.attemptId;
 }
 
 export async function getAttempt(attemptId: string): Promise<ExamAttempt | null> {
