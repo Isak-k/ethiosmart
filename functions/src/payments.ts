@@ -274,6 +274,8 @@ export const savePaymentSettings = functions.https.onCall(async (data, context) 
   if (!Number.isFinite(priceEtb) || priceEtb < 0 || priceEtb > 10000000) {
     throw new functions.https.HttpsError('invalid-argument', 'Enter a valid ETB price.');
   }
+  const existingSnap = await db.doc(SETTINGS_PATH).get();
+  const existing = existingSnap.data() || defaultSettings();
   const methods = Array.isArray(data?.paymentMethods) ? data.paymentMethods.slice(0, 20).map((m: any, i: number) => ({
     id: cleanString(m.id, 80) || 'method-' + i,
     name: cleanString(m.name, 80),
@@ -282,11 +284,11 @@ export const savePaymentSettings = functions.https.onCall(async (data, context) 
     accountNumber: cleanString(m.accountNumber, 100),
     instructions: cleanString(m.instructions, 1000),
     enabled: m.enabled === true,
-  })).filter((m: any) => m.name) : [];
-  const free = data?.freeAccess || {};
+  })).filter((m: any) => m.name) : existing.paymentMethods;
+  const free = { ...(existing.freeAccess || {}), ...(data?.freeAccess || {}) };
   const settings = {
-    enabled: data?.enabled === true,
-    mode: data?.mode === 'sandbox' ? 'sandbox' : 'production',
+    enabled: data?.enabled === undefined ? existing.enabled : data.enabled === true,
+    mode: data?.mode === undefined ? existing.mode : (data.mode === 'sandbox' ? 'sandbox' : 'production'),
     currency: 'ETB',
     priceEtb,
     paymentMethods: methods,
@@ -299,9 +301,9 @@ export const savePaymentSettings = functions.https.onCall(async (data, context) 
       freeExamIds: Array.isArray(free.freeExamIds) ? free.freeExamIds.slice(0, 500) : [],
       freeNoteIds: Array.isArray(free.freeNoteIds) ? free.freeNoteIds.slice(0, 500) : [],
     },
-    discounts: data?.discounts || { codes: [], selectedUsers: [], promotions: [] },
-    support: data?.support || { inApp: true, telegram: '', whatsapp: '', phone: '', email: '' },
-    instructions: cleanString(data?.instructions, 3000),
+    discounts: data?.discounts || existing.discounts || { codes: [], selectedUsers: [], promotions: [] },
+    support: data?.support || existing.support || { inApp: true, telegram: '', whatsapp: '', phone: '', email: '' },
+    instructions: data?.instructions === undefined ? existing.instructions : cleanString(data.instructions, 3000),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedBy: uid,
   };
