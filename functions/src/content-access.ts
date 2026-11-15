@@ -487,16 +487,13 @@ export const getStudentExamQuestions = functions.https.onCall(async (data, conte
   // exam. Scoring is performed by submitStudentExamAttempt on the server.
   const questions = questionsSnap.docs
     .map((questionDoc) => {
-      const raw = questionDoc.data();
-      const {
-        correctOptionIndex: _correctOptionIndex,
-        correctAnswer: _correctAnswer,
-        answer: _answer,
-        answerKey: _answerKey,
-        explanation: _explanation,
-        isCorrect: _isCorrect,
-        ...studentSafeQuestion
-      } = raw;
+      const studentSafeQuestion: Record<string, any> = { ...questionDoc.data() };
+      delete studentSafeQuestion.correctOptionIndex;
+      delete studentSafeQuestion.correctAnswer;
+      delete studentSafeQuestion.answer;
+      delete studentSafeQuestion.answerKey;
+      delete studentSafeQuestion.explanation;
+      delete studentSafeQuestion.isCorrect;
       return { questionId: questionDoc.id, ...studentSafeQuestion };
     })
     .sort((a: any, b: any) => (Number(a.orderIndex) || 0) - (Number(b.orderIndex) || 0));
