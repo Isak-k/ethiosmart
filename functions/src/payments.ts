@@ -195,6 +195,17 @@ export const submitPayment = functions.https.onCall(async (data, context) => {
   if (!Number.isFinite(amountPaid) || amountPaid <= 0 || amountPaid > 10000000) {
     throw new functions.https.HttpsError('invalid-argument', 'Enter the amount you transferred.');
   }
+  let discountQuote;
+  try {
+    discountQuote = calculatePaymentDiscount(
+      settings.priceEtb,
+      settings.discounts,
+      { uid, email: cleanString(profile.email, 254) },
+      data?.discountCode,
+    );
+  } catch (error: any) {
+    throw new functions.https.HttpsError('invalid-argument', error?.message || 'Discount could not be applied.');
+  }
 
   const mode = settings.mode === 'sandbox' ? 'sandbox' : 'production';
   const paymentCollection = mode === 'sandbox' ? 'sandboxPayments' : 'payments';
@@ -232,7 +243,10 @@ export const submitPayment = functions.https.onCall(async (data, context) => {
       status: 'Pending' as PaymentStatus,
       methodId, methodName: method.name,
       methodSnapshot: { name: method.name, accountName: method.accountName || '', accountNumber: method.accountNumber || '' },
-      expectedAmountEtb: Number(settings.priceEtb),
+      originalPriceEtb: discountQuote.originalPriceEtb,
+      discountEtb: discountQuote.discountEtb,
+      discountSnapshot: discountQuote.discount,
+      expectedAmountEtb: discountQuote.finalAmountEtb,
       amountPaidEtb: amountPaid,
       currency: 'ETB',
       receiptUrl, receiptPublicId, receiptFingerprint: fingerprint || null,
