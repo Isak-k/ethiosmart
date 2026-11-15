@@ -133,9 +133,13 @@ export const submitPayment = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('invalid-argument', 'Enter the amount you transferred.');
   }
 
-  const paymentRef = db.collection('payments').doc(paymentId);
-  const accountRef = db.collection('paymentAccounts').doc(uid);
-  const duplicateRef = fingerprint ? db.collection('receiptFingerprints').doc(fingerprint) : null;
+  const mode = settings.mode === 'sandbox' ? 'sandbox' : 'production';
+  const paymentCollection = mode === 'sandbox' ? 'sandboxPayments' : 'payments';
+  const accountCollection = mode === 'sandbox' ? 'sandboxPaymentAccounts' : 'paymentAccounts';
+  const fingerprintCollection = mode === 'sandbox' ? 'sandboxReceiptFingerprints' : 'receiptFingerprints';
+  const paymentRef = db.collection(paymentCollection).doc(paymentId);
+  const accountRef = db.collection(accountCollection).doc(uid);
+  const duplicateRef = fingerprint ? db.collection(fingerprintCollection).doc(fingerprint) : null;
   await db.runTransaction(async (tx) => {
     const [accountSnap, paymentSnap, duplicateSnap] = await Promise.all([
       tx.get(accountRef),
@@ -163,7 +167,7 @@ export const submitPayment = functions.https.onCall(async (data, context) => {
       amountPaidEtb: amountPaid,
       currency: 'ETB',
       receiptUrl, receiptPublicId, receiptFingerprint: fingerprint || null,
-      mode: settings.mode === 'sandbox' ? 'sandbox' : 'production',
+      mode,
       submittedAt: admin.firestore.FieldValue.serverTimestamp(),
       reviewedAt: null, reviewedBy: null, rejectionReason: null,
     });
@@ -175,12 +179,16 @@ export const submitPayment = functions.https.onCall(async (data, context) => {
 
 export const getMyPayment = functions.https.onCall(async (_data, context) => {
   const uid = requireAuth(context);
-  const accountSnap = await db.collection('paymentAccounts').doc(uid).get();
+  const settingsSnap = await db.doc(SETTINGS_PATH).get();
+  const mode = settingsSnap.data()?.mode === 'sandbox' ? 'sandbox' : 'production';
+  const accountCollection = mode === 'sandbox' ? 'sandboxPaymentAccounts' : 'paymentAccounts';
+  const paymentCollection = mode === 'sandbox' ? 'sandboxPayments' : 'payments';
+  const accountSnap = await db.collection(accountCollection).doc(uid).get();
   const account = accountSnap.data() || {};
   let payment: FirebaseFirestore.DocumentData | null = null;
   if (account.pendingPaymentId || account.lastPaymentId) {
     const id = account.pendingPaymentId || account.lastPaymentId;
-    const snap = await db.collection('payments').doc(id).get();
+    const snap = await db.collection(paymentCollection).doc(id).get();
     if (snap.exists) {
       const data = snap.data()!;
       payment = {
@@ -198,13 +206,16 @@ export const getPaymentAdminData = functions.https.onCall(async (data, context) 
   const uid = requireAuth(context);
   await requireAdmin(uid);
   const limit = Math.min(Math.max(Number(data?.limit) || 100, 1), 300);
+  const settingsSnap = await db.doc(SETTINGS_PATH).get();
+  const mode = settingsSnap.data()?.mode === 'sandbox' ? 'sandbox' : 'production';
+  const paymentCollection = mode === 'sandbox' ? 'sandboxPayments' : 'payments';
   const status = cleanString(data?.status, 20);
-  let query: FirebaseFirestore.Query = db.collection('payments').orderBy('submittedAt', 'desc').limit(limit);
+  let query: FirebaseFirestore.Query = db.collection(paymentCollection).orderBy('submittedAt', 'desc').limit(limit);
   if (status && ['Pending', 'Approved', 'Rejected'].includes(status)) {
-    query = db.collection('payments').where('status', '==', status).orderBy('submittedAt', 'desc').limit(limit);
+    query = db.collection(paymentCollection).where('status', '==', status).orderBy('submittedAt', 'desc').limit(limit);
   }
   const [paymentsSnap, allPaymentsSnap, settingsSnap] = await Promise.all([
-    query.get(), db.collection('payments').orderBy('submittedAt', 'desc').limit(2000).get(), db.doc(SETTINGS_PATH).get(),
+    query.get(), db.collection(paymentCollection).orderBy('submittedAt', 'desc').limit(2000).get(), Promise.resolve(settingsSnap),
   ]);
   const payments = paymentsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
   const allPayments = allPaymentsSnap.docs.map((doc) => doc.data());
@@ -229,13 +240,17 @@ export const reviewPayment = functions.https.onCall(async (data, context) => {
   if (decision === 'Rejected' && !reason) {
     throw new functions.https.HttpsError('invalid-argument', 'A rejection reason is required.');
   }
-  const paymentRef = db.collection('payments').doc(paymentId);
+  const productionRef = db.collection('payments').doc(paymentId);
+  const sandboxRef = db.collection('sandboxPayments').doc(paymentId);
   await db.runTransaction(async (tx) => {
-    const snap = await tx.get(paymentRef);
+    const [productionSnap, sandboxSnap] = await Promise.all([tx.get(productionRef), tx.get(sandboxRef)]);
+    const isSandbox = !productionSnap.exists && sandboxSnap.exists;
+    const paymentRef = isSandbox ? sandboxRef : productionRef;
+    const snap = isSandbox ? sandboxSnap : productionSnap;
     if (!snap.exists) throw new functions.https.HttpsError('not-found', 'Payment not found.');
     const payment = snap.data()!;
     if (payment.status !== 'Pending') throw new functions.https.HttpsError('failed-precondition', 'This payment has already been reviewed.');
-    const accountRef = db.collection('paymentAccounts').doc(payment.userId);
+    const accountRef = db.collection(isSandbox ? 'sandboxPaymentAccounts' : 'paymentAccounts').doc(payment.userId);
     const decisionData = {
       status: decision, reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
       reviewedBy: uid, reviewerName: cleanString(reviewer.fullName, 120),
@@ -251,7 +266,7 @@ export const reviewPayment = functions.https.onCall(async (data, context) => {
       } : {}),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
-    if (decision === 'Approved') {
+    if (decision === 'Approved' && !isSandbox) {
       tx.set(db.collection('users').doc(payment.userId), {
         paymentAccess: { lifetime: true, source: 'payment', grantedAt: admin.firestore.FieldValue.serverTimestamp(), paymentId },
       }, { merge: true });
