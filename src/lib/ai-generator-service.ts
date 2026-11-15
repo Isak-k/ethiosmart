@@ -27,6 +27,7 @@ import {
   orchestrateGenerationBatch,
   getProviderStatus,
 } from './ai-engine/orchestrator.ts';
+import { validateNormalizedQuestion } from './ai-engine/normalizer.ts';
 import type { ProviderKeys } from './ai-engine/types.ts';
 import { getEffectiveProviderKeys, getAISettings } from './ai-settings';
 
@@ -384,6 +385,8 @@ export async function saveQuestionsToExam(
   examId: string,
   questions: NormalizedQuestion[]
 ): Promise<{ addedCount: number; skippedCount: number }> {
+  validateQuestionsForSaving(questions);
+
   const mappedQuestions = questions.map((q, idx) => ({
     examId,
     questionText: q.questionText,
@@ -400,6 +403,33 @@ export async function saveQuestionsToExam(
   }));
 
   return await saveQuestionsBatch(examId, mappedQuestions);
+}
+
+export function validateQuestionsForSaving(questions: NormalizedQuestion[]): void {
+  if (questions.length === 0) {
+    throw new Error('There are no generated questions to save.');
+  }
+  const seen = new Set<string>();
+  questions.forEach((question, index) => {
+    validateNormalizedQuestion(question, index);
+    const fingerprint = question.questionText
+      .normalize('NFC')
+      .trim()
+      .replace(/\s+/g, ' ')
+      .toLocaleLowerCase();
+    if (seen.has(fingerprint)) {
+      throw new Error(`Question ${index + 1} duplicates another question in this batch.`);
+    }
+    seen.add(fingerprint);
+  });
+}
+
+export function getAIGeneratedExamId(jobId: string): string {
+  const safeJobId = jobId.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+  if (!safeJobId) {
+    throw new Error('The generation job is missing. Generate questions again before creating an exam.');
+  }
+  return `ai_gen_${safeJobId}`;
 }
 
 /**

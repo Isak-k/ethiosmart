@@ -69,7 +69,8 @@ import {
   saveJobToFirestore,
   getRecentJobs,
   saveQuestionsToExam,
-  detectDuplicateQuestions
+  detectDuplicateQuestions,
+  getAIGeneratedExamId
 } from '@/lib/ai-generator-service';
 import {
   detectScopeFromPrompt,
@@ -1135,6 +1136,9 @@ export default function AdminAIGenerator() {
 
       if (destinationMode === 'new') {
         if (!user) throw new Error('Must be authenticated');
+        if (!currentJobId) {
+          throw new Error('The generation job is missing. Generate questions again before creating an exam.');
+        }
 
         const newExamId = await createExam({
           title: examTitle.trim() || 'AI Generated Exam',
@@ -1153,7 +1157,7 @@ export default function AdminAIGenerator() {
           questionCount: 0,
           totalMarks: 0,
           examType: examType as any
-        });
+        }, getAIGeneratedExamId(currentJobId));
         targetExamId = newExamId;
       }
 
@@ -1234,7 +1238,7 @@ export default function AdminAIGenerator() {
                 title="Click to view & configure AI engines and API keys"
               >
                 <span className={cn("h-2 w-2 rounded-full", configuredProvidersCount > 0 ? "bg-emerald-500 animate-pulse shadow-sm shadow-emerald-500" : "bg-amber-500")} />
-                <span>{configuredProvidersCount > 0 ? `${configuredProvidersCount} AI Engines Ready` : 'Configure AI Engines'}</span>
+                <span>{configuredProvidersCount > 0 ? `${configuredProvidersCount} AI Providers Configured` : 'Configure AI Engines'}</span>
               </Badge>
 
               <Button asChild variant="outline" size="sm" className="rounded-full text-xs font-semibold h-8.5 px-4 bg-background/80 hover:bg-background border-border/80 shadow-xs">

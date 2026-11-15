@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { detectDuplicateQuestions, removeUndefinedFields } from './ai-generator-service';
+import {
+  detectDuplicateQuestions,
+  getAIGeneratedExamId,
+  removeUndefinedFields,
+  validateQuestionsForSaving,
+} from './ai-generator-service';
 import { NormalizedQuestion } from '@/types/ai-generator';
 
 describe('AI Generator Frontend Service & Utilities', () => {
@@ -103,6 +108,36 @@ describe('AI Generator Frontend Service & Utilities', () => {
     expect(mapped.questionType).toBe('truefalse');
     expect(mapped.generatedByAI).toBe(true);
     expect(mapped.marks).toBe(2);
+  });
+
+  it('validates generated question schemas before saving and rejects duplicates', () => {
+    const valid: NormalizedQuestion = {
+      id: 'q1',
+      questionText: 'Which planet is closest to the Sun?',
+      questionType: 'mcq',
+      options: ['Mercury', 'Venus', 'Earth', 'Mars'],
+      correctOptionIndex: 0,
+      correctAnswer: 'Mercury',
+      explanation: 'Mercury orbits closest to the Sun.',
+      difficulty: 'Easy',
+      marks: 1,
+      providerUsed: 'gemini',
+      batchIndex: 1,
+    };
+    expect(() => validateQuestionsForSaving([valid])).not.toThrow();
+    expect(() => validateQuestionsForSaving([{ ...valid, options: ['Mercury', 'Venus'] }]))
+      .toThrow(/valid four-option multiple-choice/);
+    expect(() => validateQuestionsForSaving([
+      valid,
+      { ...valid, id: 'q2', questionText: '  WHICH PLANET IS CLOSEST TO THE SUN? ' },
+    ])).toThrow(/duplicates another question/);
+  });
+
+  it('uses a stable exam ID for retries of the same AI generation job', () => {
+    const id = getAIGeneratedExamId('job_123_abcd');
+    expect(id).toBe('ai_gen_job_123_abcd');
+    expect(getAIGeneratedExamId('job_123_abcd')).toBe(id);
+    expect(() => getAIGeneratedExamId(' ')).toThrow(/generation job is missing/);
   });
 
   it('correctly splits specific question type counts (e.g. 8 T/F + 7 MCQs) into batches', () => {

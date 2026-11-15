@@ -16,8 +16,7 @@ export async function callGroq(
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-  // Confirmed active models on Groq:
-  const modelsToTry = ['qwen/qwen3.8-27b', 'openai/gpt-oss-120b', 'openai/gpt-oss-20b'];
+  const modelsToTry = ['openai/gpt-oss-20b', 'qwen/qwen3.8-27b', 'openai/gpt-oss-120b'];
   let lastError: any = null;
 
   for (const model of modelsToTry) {
@@ -48,12 +47,21 @@ export async function callGroq(
         err.status = res.status;
         err.retryAfter = res.headers.get('Retry-After');
         
-        // If model does not exist or user doesn't have access, try next model in the list
-        if (res.status === 400 && responseBody?.error?.code === 'model_not_found') {
-          lastError = err;
-          continue;
-        }
-        if (res.status === 404) {
+        const normalizedError = errorMsg.toLowerCase();
+        const modelUnavailable =
+          res.status === 404 ||
+          (res.status === 400 &&
+            (responseBody?.error?.code === 'model_not_found' ||
+              normalizedError.includes('model') ||
+              normalizedError.includes('deprecated'))) ||
+          (res.status === 403 &&
+            normalizedError.includes('model') &&
+            (normalizedError.includes('does not exist') ||
+              normalizedError.includes('not found') ||
+              normalizedError.includes('not available') ||
+              normalizedError.includes('no access') ||
+              normalizedError.includes('do not have access')));
+        if (modelUnavailable) {
           lastError = err;
           continue;
         }
@@ -76,6 +84,7 @@ export async function callGroq(
       if (err.status === 404 || (err.status === 400 && err.message?.includes('model'))) {
         continue;
       }
+      clearTimeout(timeoutId);
       throw err;
     }
   }

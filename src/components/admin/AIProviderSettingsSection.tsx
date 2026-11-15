@@ -318,7 +318,7 @@ export function AIProviderSettingsSection({
                   </Badge>
                 </div>
                 <CardDescription className="text-xs mt-0.5 line-clamp-1 sm:line-clamp-none">
-                  Configure API keys, preferred models, and failover priority for automated question generation.
+                  Configure API keys, preferred models, and failover priority. Run Test All to verify credentials and model access.
                 </CardDescription>
               </div>
             </div>
@@ -374,7 +374,7 @@ export function AIProviderSettingsSection({
                     <span className="font-semibold text-xs truncate">{p.name.split(' ')[0]}</span>
                     {hasKey ? (
                       <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-emerald-500/40 text-emerald-700 dark:text-emerald-400 bg-emerald-500/10">
-                        Ready
+                        Configured
                       </Badge>
                     ) : (
                       <Badge variant="secondary" className="text-[9px] px-1.5 py-0">

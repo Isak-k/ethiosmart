@@ -184,15 +184,45 @@ export function extractJsonFromText(rawText: string): any {
 
   // Strip markdown code fences like ```json ... ``` or ``` ... ```
   if (text.startsWith('```')) {
-    text = text.replace(/^```[a-zA-Z]*\n?/, '').replace(/\n?```$/, '').trim();
+    text = text.replace(/^```[a-zA-Z]*\s*/, '').replace(/\s*```$/, '').trim();
   }
 
-  // If text contains JSON embedded between other text, locate the outermost { and }
-  const firstBrace = text.indexOf('{');
-  const lastBrace = text.lastIndexOf('}');
-  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-    text = text.substring(firstBrace, lastBrace + 1);
+  const start = text.search(/[\[{]/);
+  if (start < 0) {
+    throw new Error('AI response did not contain a JSON object or array');
   }
+
+  const openingStack: string[] = [];
+  let inString = false;
+  let escaped = false;
+  let end = -1;
+  for (let index = start; index < text.length; index++) {
+    const character = text[index];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (character === '\\') escaped = true;
+      else if (character === '"') inString = false;
+      continue;
+    }
+    if (character === '"') {
+      inString = true;
+    } else if (character === '{' || character === '[') {
+      openingStack.push(character);
+    } else if (character === '}' || character === ']') {
+      const opening = openingStack.pop();
+      if ((character === '}' && opening !== '{') || (character === ']' && opening !== '[')) {
+        break;
+      }
+      if (openingStack.length === 0) {
+        end = index + 1;
+        break;
+      }
+    }
+  }
+  if (end < 0) {
+    throw new Error('AI response did not contain a complete JSON object or array');
+  }
+  text = text.slice(start, end);
 
   try {
     return JSON.parse(text);
@@ -316,42 +346,57 @@ export function normalizeQuestions(
 
   for (let i = 0; i < list.length; i++) {
     const raw = list[i];
-    if (!raw || typeof raw !== 'object') continue;
+    const number = i + 1;
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      throw new Error(`Invalid AI response: Question ${number} is not an object.`);
+    }
 
-    const rawQuestionText = (raw.questionText || raw.question || raw.prompt || '').trim();
-    if (!rawQuestionText) continue;
+    const rawQuestionText = String(raw.questionText || raw.question || raw.prompt || '').trim();
+    if (!rawQuestionText) {
+      throw new Error(`Invalid AI response: Question ${number} has no question text.`);
+    }
     const questionText = sanitizeResourceDependentWording(rawQuestionText);
 
-    let qType: QuestionType = 'mcq';
     const rawType = String(raw.questionType || raw.type || '').toLowerCase();
+    let qType: QuestionType;
     if (rawType.includes('true') || rawType.includes('false') || rawType === 'tf') {
       qType = 'truefalse';
     } else if (rawType.includes('short') || rawType.includes('text') || rawType === 'sa') {
       qType = 'shortanswer';
-    } else {
+    } else if (rawType.includes('mcq') || rawType.includes('multiple') || rawType.includes('choice')) {
       qType = 'mcq';
+    } else {
+      throw new Error(`Invalid AI response: Question ${number} has an unsupported question type.`);
     }
 
     let options: string[] = [];
-    let correctOptionIndex = 0;
+    let correctOptionIndex = -1;
     let correctAnswer: string | undefined = undefined;
 
     if (qType === 'truefalse') {
       options = ['True', 'False'];
-      const rawAns = String(raw.correctAnswer || raw.answer || raw.correctOption || '').toLowerCase();
-      if (typeof raw.correctOptionIndex === 'number') {
-        correctOptionIndex = raw.correctOptionIndex === 1 ? 1 : 0;
-      } else if (rawAns.includes('false') || rawAns === '1' || rawAns === 'b' || rawAns === 'f') {
-        correctOptionIndex = 1;
+      if (Number.isInteger(raw.correctOptionIndex)) {
+        correctOptionIndex = raw.correctOptionIndex;
       } else {
-        correctOptionIndex = 0;
+        const answer = String(raw.correctAnswer || raw.answer || raw.correctOption || '').trim().toLowerCase();
+        if (['true', '0', 'a', 't'].includes(answer)) correctOptionIndex = 0;
+        if (['false', '1', 'b', 'f'].includes(answer)) correctOptionIndex = 1;
+      }
+      if (correctOptionIndex !== 0 && correctOptionIndex !== 1) {
+        throw new Error(`Invalid AI response: Question ${number} has no valid True/False answer.`);
       }
       correctAnswer = options[correctOptionIndex];
     } else if (qType === 'shortanswer') {
       options = [];
-      correctOptionIndex = -1;
-      const rawAns = (raw.correctAnswer || raw.answer || raw.explanation || '').trim();
+      const suppliedOptions = Array.isArray(raw.options) ? raw.options.filter(Boolean) : [];
+      if (suppliedOptions.length > 0) {
+        throw new Error(`Invalid AI response: Short-answer question ${number} must not include options.`);
+      }
+      const rawAns = String(raw.correctAnswer || raw.answer || '').trim();
       correctAnswer = sanitizeResourceDependentWording(rawAns);
+      if (!correctAnswer) {
+        throw new Error(`Invalid AI response: Short-answer question ${number} has no reference answer.`);
+      }
     } else {
       // MCQ
       if (Array.isArray(raw.options)) {
@@ -361,38 +406,31 @@ export function normalizeQuestions(
         options = Object.values(raw.options).map((opt: any) => sanitizeResourceDependentWording(String(opt).trim())).filter(Boolean);
       }
 
-      // Ensure 4 options
-      if (options.length < 2) {
-        // Invalid options, skip
-        continue;
-      }
-      while (options.length < 4) {
-        options.push(`Option ${String.fromCharCode(65 + options.length)}`);
-      }
-      if (options.length > 4) {
-        options = options.slice(0, 4);
+      if (options.length !== 4 || new Set(options.map(option => option.toLocaleLowerCase())).size !== 4) {
+        throw new Error(`Invalid AI response: Multiple-choice question ${number} must have four distinct, nonempty options.`);
       }
 
       // Determine correctOptionIndex
-      if (typeof raw.correctOptionIndex === 'number' && raw.correctOptionIndex >= 0 && raw.correctOptionIndex < options.length) {
+      if (Number.isInteger(raw.correctOptionIndex)) {
         correctOptionIndex = raw.correctOptionIndex;
       } else {
-        const rawAns = String(raw.correctAnswer || raw.answer || raw.correctOption || '').trim().toUpperCase();
-        if (rawAns === 'A' || rawAns === '0') correctOptionIndex = 0;
-        else if (rawAns === 'B' || rawAns === '1') correctOptionIndex = 1;
-        else if (rawAns === 'C' || rawAns === '2') correctOptionIndex = 2;
-        else if (rawAns === 'D' || rawAns === '3') correctOptionIndex = 3;
-        else {
-          // Check if correctAnswer matches one of the options
-          const matchedIdx = options.findIndex(opt => opt.toLowerCase() === rawAns.toLowerCase());
-          correctOptionIndex = matchedIdx !== -1 ? matchedIdx : 0;
-        }
+        const rawAns = String(raw.correctAnswer || raw.answer || raw.correctOption || '').trim();
+        const letter = rawAns.match(/^(?:option\s*)?([a-d])(?:[\s.):]|$)/i)?.[1]?.toUpperCase();
+        if (letter) correctOptionIndex = letter.charCodeAt(0) - 65;
+        else if (/^[0-3]$/.test(rawAns)) correctOptionIndex = Number(rawAns);
+        else correctOptionIndex = options.findIndex(opt => opt.toLocaleLowerCase() === rawAns.toLocaleLowerCase());
+      }
+      if (correctOptionIndex < 0 || correctOptionIndex >= options.length) {
+        throw new Error(`Invalid AI response: Multiple-choice question ${number} has no valid correct answer.`);
       }
       correctAnswer = options[correctOptionIndex];
     }
 
-    const rawExplanation = (raw.explanation || raw.feedback || raw.rationale || 'The selected answer is correct.').trim();
+    const rawExplanation = String(raw.explanation || raw.feedback || raw.rationale || '').trim();
     const explanation = sanitizeResourceDependentWording(rawExplanation);
+    if (!explanation) {
+      throw new Error(`Invalid AI response: Question ${number} has no explanation.`);
+    }
 
     let difficulty: 'Easy' | 'Medium' | 'Hard' = 'Medium';
     const rawDiff = String(raw.difficulty || '').toLowerCase();
@@ -415,4 +453,88 @@ export function normalizeQuestions(
   }
 
   return normalized;
+}
+
+export function validateNormalizedQuestion(question: NormalizedQuestion, index: number): void {
+  const number = index + 1;
+  if (!question.questionText?.trim() || !question.explanation?.trim()) {
+    throw new Error(`Question ${number} must have question text and an explanation.`);
+  }
+  if (!Number.isFinite(question.marks) || question.marks <= 0) {
+    throw new Error(`Question ${number} must have a positive mark value.`);
+  }
+  if (!Array.isArray(question.options)) {
+    throw new Error(`Question ${number} has an invalid options list.`);
+  }
+
+  if (question.questionType === 'mcq') {
+    if (
+      question.options.length !== 4 ||
+      question.options.some(option => !option.trim()) ||
+      new Set(question.options.map(option => option.toLocaleLowerCase())).size !== 4 ||
+      !Number.isInteger(question.correctOptionIndex) ||
+      question.correctOptionIndex < 0 ||
+      question.correctOptionIndex > 3
+    ) {
+      throw new Error(`Question ${number} must be a valid four-option multiple-choice question.`);
+    }
+    return;
+  }
+  if (question.questionType === 'truefalse') {
+    if (
+      question.options.length !== 2 ||
+      question.options[0] !== 'True' ||
+      question.options[1] !== 'False' ||
+      ![0, 1].includes(question.correctOptionIndex)
+    ) {
+      throw new Error(`Question ${number} must be a valid True/False question.`);
+    }
+    return;
+  }
+  if (
+    question.questionType !== 'shortanswer' ||
+    question.options.length !== 0 ||
+    question.correctOptionIndex !== -1 ||
+    !question.correctAnswer?.trim()
+  ) {
+    throw new Error(`Question ${number} must be a valid short-answer question with a reference answer.`);
+  }
+}
+
+export function validateGeneratedQuestionBatch(
+  questions: NormalizedQuestion[],
+  req: GenerateBatchRequest
+): NormalizedQuestion[] {
+  if (questions.length !== req.count) {
+    throw new Error(`Invalid AI response: Expected ${req.count} questions but received ${questions.length}.`);
+  }
+
+  const requestedTypes = Array.isArray(req.questionTypes) && req.questionTypes.length > 0
+    ? req.questionTypes
+    : ['mcq'];
+  const counts: Record<QuestionType, number> = { mcq: 0, truefalse: 0, shortanswer: 0 };
+  const seen = new Set<string>();
+  questions.forEach((question, index) => {
+    validateNormalizedQuestion(question, index);
+    if (!requestedTypes.includes(question.questionType)) {
+      throw new Error(`Invalid AI response: Question ${index + 1} has an unrequested type.`);
+    }
+    counts[question.questionType]++;
+    const normalizedText = question.questionText.normalize('NFC').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+    if (seen.has(normalizedText)) {
+      throw new Error('Invalid AI response: The batch contains duplicate questions.');
+    }
+    seen.add(normalizedText);
+  });
+
+  if (req.questionTypeCounts) {
+    for (const type of ['mcq', 'truefalse', 'shortanswer'] as const) {
+      const expected = req.questionTypeCounts[type];
+      if (expected !== undefined && counts[type] !== expected) {
+        throw new Error(`Invalid AI response: Expected ${expected} ${type} questions but received ${counts[type]}.`);
+      }
+    }
+  }
+
+  return questions;
 }

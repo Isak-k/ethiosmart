@@ -8,6 +8,7 @@ import type {
   ProviderKeys
 } from './types.ts';
 import { callGemini, callGroq, callOpenRouter, callHuggingFace } from './adapters.ts';
+import { validateGeneratedQuestionBatch } from './normalizer.ts';
 
 export type { ProviderKeys };
 
@@ -182,6 +183,7 @@ export async function orchestrateGenerationBatch(
           default:
             throw new Error(`Unsupported provider: ${provider}`);
         }
+        validateGeneratedQuestionBatch(result, req);
 
         const latency = Date.now() - startTime;
         lastLatencies.set(provider, latency);
@@ -198,8 +200,11 @@ export async function orchestrateGenerationBatch(
         break;
       } catch (err: any) {
         const latency = Date.now() - startTime;
-        attemptError = err;
-        lastErrors.set(provider, err.message || 'Unknown error');
+        const displayError = err?.name === 'AbortError'
+          ? new Error(`${provider} request timed out. The next provider will be tried.`)
+          : err;
+        attemptError = displayError;
+        lastErrors.set(provider, displayError.message || 'Unknown error');
 
         // Check if content safety violation
         if (isContentSafetyError(err)) {
@@ -244,6 +249,10 @@ export async function orchestrateGenerationBatch(
 
         // Check 400 Bad Request
         if (err.status === 400) {
+          break;
+        }
+
+        if (err?.name === 'AbortError') {
           break;
         }
 
@@ -295,6 +304,6 @@ export async function orchestrateGenerationBatch(
     questions: [],
     fallbackOccurred: true,
     attempts,
-    error: `All configured AI providers failed. Summary: [${failedSummaries}]`
+    error: `All configured AI providers failed. Summary: [${failedSummaries}] Check API keys and model access in AI Provider Settings, then use Test All to verify them.`
   };
 }

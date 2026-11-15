@@ -67,14 +67,14 @@ export const DEFAULT_AI_SETTINGS: AISystemSettings = {
       name: 'Groq (LPU Inference)',
       apiKey: '',
       enabled: true,
-      model: 'qwen/qwen3.8-27b',
+      model: 'openai/gpt-oss-20b',
       priority: 2,
       description: 'Extremely fast inference on custom LPU chips, ideal for high-throughput batch generation.',
       consoleUrl: 'https://console.groq.com/keys',
       recommendedModels: [
-        'qwen/qwen3.8-27b',
-        'openai/gpt-oss-120b',
         'openai/gpt-oss-20b',
+        'openai/gpt-oss-120b',
+        'qwen/qwen3.8-27b',
       ],
     },
     openrouter: {
@@ -262,8 +262,12 @@ function mergeWithDefaults(data: Partial<AISystemSettings>): AISystemSettings {
   };
 
   // Auto-migrate legacy or deprecated models from older saved configs
-  if (merged.providers.groq.model === 'llama-3.3-70b-versatile' || merged.providers.groq.model === 'llama-3.1-8b-instant' || !merged.providers.groq.model) {
-    merged.providers.groq.model = 'qwen/qwen3.8-27b';
+  if (
+    merged.providers.groq.model === 'llama-3.3-70b-versatile' ||
+    merged.providers.groq.model === 'llama-3.1-8b-instant' ||
+    !merged.providers.groq.model
+  ) {
+    merged.providers.groq.model = 'openai/gpt-oss-20b';
   }
   if (
     merged.providers.gemini.model === 'gemini-1.5-flash' ||
@@ -428,7 +432,7 @@ export async function testAIProviderConnection(
       }
 
       case 'groq': {
-        const targetModel = model || 'qwen/qwen3.8-27b';
+        const targetModel = model || 'openai/gpt-oss-20b';
         const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
           headers: {

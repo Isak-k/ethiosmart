@@ -10,6 +10,7 @@ import {
   where,
   orderBy,
   Timestamp,
+  runTransaction,
   writeBatch,
   deleteField,
   getDocFromCache,
@@ -30,13 +31,28 @@ import { getCachedData, setCachedData, invalidateCacheKey } from '@/lib/app-cach
 const examFunctions = getFunctions(app);
 const getStudentExamQuestionsCallable = httpsCallable(examFunctions, 'getStudentExamQuestions');
 
-export async function createExam(examData: Omit<Exam, 'examId' | 'createdAt' | 'updatedAt'>) {
+export async function createExam(
+  examData: Omit<Exam, 'examId' | 'createdAt' | 'updatedAt'>,
+  idempotencyId?: string
+) {
   const base = { ...examData };
   const sanitized: Record<string, any> = {};
   Object.entries(base).forEach(([k, v]) => {
     if (v !== undefined) sanitized[k] = v;
   });
   const exam = { ...sanitized, createdAt: Timestamp.now(), updatedAt: Timestamp.now() };
+
+  if (idempotencyId) {
+    const docRef = doc(db, 'exams', idempotencyId);
+    await runTransaction(db, async (transaction) => {
+      const existing = await transaction.get(docRef);
+      if (!existing.exists()) {
+        transaction.set(docRef, { ...exam, examId: idempotencyId });
+      }
+    });
+    invalidateCacheKey('published_exams_');
+    return idempotencyId;
+  }
   
   const docRef = await addDoc(collection(db, 'exams'), exam);
   

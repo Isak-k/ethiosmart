@@ -93,9 +93,11 @@ export async function callGemini(
     } catch (err: any) {
       lastError = err;
       if (err.name === 'AbortError') {
+        clearTimeout(timeoutId);
         throw err;
       }
       if (err.status === 401 || (err.status === 403 && String(err.message).toLowerCase().includes('key'))) {
+        clearTimeout(timeoutId);
         throw err;
       }
       continue;
@@ -125,11 +127,15 @@ export async function callGroq(
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   const requestedModel = req.providerModels?.groq;
+  const unavailableGroqModels = new Set([
+    'llama-3.1-8b-instant',
+    'llama-3.3-70b-versatile',
+  ]);
   const modelsToTry = [
-    ...(requestedModel ? [requestedModel] : []),
+    ...(requestedModel && !unavailableGroqModels.has(requestedModel) ? [requestedModel] : []),
+    'openai/gpt-oss-20b',
     'qwen/qwen3.8-27b',
-    'openai/gpt-oss-120b',
-    'openai/gpt-oss-20b'
+    'openai/gpt-oss-120b'
   ].filter((m, idx, arr) => arr.indexOf(m) === idx);
   let lastError: any = null;
 

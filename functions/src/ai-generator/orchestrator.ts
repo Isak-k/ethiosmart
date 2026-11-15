@@ -10,6 +10,7 @@ import { callGemini } from './adapters/gemini';
 import { callGroq } from './adapters/groq';
 import { callOpenRouter } from './adapters/openrouter';
 import { callHuggingFace } from './adapters/huggingface';
+import { validateGeneratedQuestionBatch } from './normalizer';
 
 export interface ProviderKeys {
   gemini?: string;
@@ -85,6 +86,19 @@ function isContentSafetyError(err: any): boolean {
 function isRetryableServerError(status?: number): boolean {
   if (!status) return true; // network timeouts are potentially recoverable
   return [500, 502, 503, 504].includes(status);
+}
+
+function isModelAccessError(err: any): boolean {
+  const message = String(err?.message || '').toLowerCase();
+  return (
+    message.includes('does not exist') ||
+    message.includes('not found') ||
+    message.includes('no access') ||
+    message.includes('do not have access') ||
+    message.includes('model_not_found') ||
+    message.includes('deprecated') ||
+    message.includes('not supported')
+  );
 }
 
 async function sleep(ms: number): Promise<void> {
@@ -167,6 +181,7 @@ export async function orchestrateGenerationBatch(
           default:
             throw new Error(`Unsupported provider: ${provider}`);
         }
+        validateGeneratedQuestionBatch(result, req);
 
         const latency = Date.now() - startTime;
         lastLatencies.set(provider, latency);
@@ -183,8 +198,11 @@ export async function orchestrateGenerationBatch(
         break; // Success! Break retry loop
       } catch (err: any) {
         const latency = Date.now() - startTime;
-        attemptError = err;
-        lastErrors.set(provider, err.message || 'Unknown error');
+        const displayError = err?.name === 'AbortError'
+          ? new Error(`${provider} request timed out. The next provider will be tried.`)
+          : err;
+        attemptError = displayError;
+        lastErrors.set(provider, displayError.message || 'Unknown error');
 
         // Check if content safety violation: Do NOT bypass safety policies by switching providers!
         if (isContentSafetyError(err)) {
@@ -216,15 +234,23 @@ export async function orchestrateGenerationBatch(
           break; // Fall back to next provider
         }
 
-        // Check 401 / 403 Unauthorized
-        if (err.status === 401 || err.status === 403) {
+        // Check 401 / 403 Unauthorized (but not model-access errors)
+        if (err.status === 401 || (err.status === 403 && !isModelAccessError(err))) {
           setProviderCooldown(provider, 600, 'Invalid Credentials / Unauthorized');
           break; // Fall back to next provider
+        }
+
+        if (err.status === 403 && isModelAccessError(err)) {
+          break; // Model is unavailable; fall back without marking credentials invalid
         }
 
         // Check 400 Bad Request
         if (err.status === 400) {
           // Do not retry unchanged invalid request
+          break;
+        }
+
+        if (err?.name === 'AbortError') {
           break;
         }
 
@@ -264,6 +290,6 @@ export async function orchestrateGenerationBatch(
     questions: [],
     fallbackOccurred: true,
     attempts,
-    error: `All configured AI providers failed. Summary: [${failedSummaries}]`
+    error: `All configured AI providers failed. Summary: [${failedSummaries}] Check API keys and model access in AI Provider Settings, then use Test All to verify them.`
   };
 }
