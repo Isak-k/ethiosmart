@@ -390,7 +390,7 @@ export default function BookReader() {
   const hasInteractiveSections = Array.isArray(book.sections) && book.sections.length > 0;
 
   const fileId = book.driveFileId || extractDriveFileId(book.driveUrl || '');
-  const hasDriveDocument = Boolean(fileId);
+  const hasDriveDocument = Boolean(fileId || book.storagePath);
 
   // Notes return to their subject's chapter list; books return to the study page.
   const readerBackTarget =
