@@ -229,8 +229,13 @@ export const getMyPayment = functions.https.onCall(async (_data, context) => {
     db.collection(accountCollection).doc(uid).get(), db.collection('users').doc(uid).get(),
   ]);
   const account = accountSnap.data() || {};
-  const permanentAccess = userSnap.data()?.paymentAccess?.lifetime === true
-    ? userSnap.data()?.paymentAccess : account.paymentAccess || { lifetime: false };
+  // Sandbox approvals must never create or expose real lifetime entitlement.
+  const userPaymentAccess = userSnap.data()?.paymentAccess;
+  const permanentAccess = userPaymentAccess?.lifetime === true
+    ? userPaymentAccess
+    : mode === 'production' && account.paymentAccess?.lifetime === true
+      ? account.paymentAccess
+      : { lifetime: false };
   let payment: FirebaseFirestore.DocumentData | null = null;
   if (account.pendingPaymentId || account.lastPaymentId) {
     const id = account.pendingPaymentId || account.lastPaymentId;
@@ -308,7 +313,9 @@ export const reviewPayment = functions.https.onCall(async (data, context) => {
       type: 'payment',
       title: decision === 'Approved' ? 'Payment approved' : 'Payment receipt rejected',
       description: decision === 'Approved'
-        ? 'Your payment was approved. Lifetime access is now active.'
+        ? (isSandbox
+          ? 'Your sandbox payment was approved. No real account access was changed.'
+          : 'Your payment was approved. Lifetime access is now active.')
         : 'Your receipt was rejected: ' + reason,
       link: '/dashboard/payment',
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -318,7 +325,7 @@ export const reviewPayment = functions.https.onCall(async (data, context) => {
       pendingPaymentId: admin.firestore.FieldValue.delete(),
       lastPaymentId: paymentId,
       paymentStatus: decision,
-      ...(decision === 'Approved' ? {
+      ...(decision === 'Approved' && !isSandbox ? {
         paymentAccess: { lifetime: true, source: 'payment', grantedAt: admin.firestore.FieldValue.serverTimestamp(), paymentId },
       } : {}),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
