@@ -1,4 +1,22 @@
-import { calculatePaymentDiscount } from './payment-discounts';
+import { calculatePaymentDiscount, getPaymentStorageCollections } from './payment-discounts';
+
+describe('payment storage mode isolation', () => {
+  it('routes sandbox submissions to sandbox-only collections', () => {
+    expect(getPaymentStorageCollections('sandbox')).toEqual({
+      payments: 'sandboxPayments',
+      accounts: 'sandboxPaymentAccounts',
+      fingerprints: 'sandboxReceiptFingerprints',
+    });
+  });
+
+  it('keeps production submissions in production collections', () => {
+    expect(getPaymentStorageCollections('production')).toEqual({
+      payments: 'payments',
+      accounts: 'paymentAccounts',
+      fingerprints: 'receiptFingerprints',
+    });
+  });
+});
 
 describe('calculatePaymentDiscount', () => {
   const user = { uid: 'user-123', email: 'student@example.com' };
