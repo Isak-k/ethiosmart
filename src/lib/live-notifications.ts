@@ -8,12 +8,13 @@ import {
   getDocs,
   Timestamp,
 } from 'firebase/firestore';
+import { auth } from '@/integrations/firebase/client';
 import { db } from '@/integrations/firebase/client';
 import { getCachedData, setCachedData } from '@/lib/app-cache';
 
 export interface AppNotification {
   id: string;
-  type: 'exam' | 'book' | 'short_note' | 'announcement';
+  type: 'exam' | 'book' | 'short_note' | 'announcement' | 'payment';
   title: string;
   description: string;
   link: string;
@@ -174,6 +175,29 @@ export async function fetchRecentNotifications(userDeptId?: string): Promise<App
       });
     } catch (e) {
       // Announcements channel collection might be empty initially
+    }
+
+    // 4. Payment status notifications for the signed-in account
+    if (auth.currentUser) {
+      try {
+        const paymentRef = collection(db, 'userNotifications', auth.currentUser.uid, 'items');
+        const paymentSnap = await getDocs(query(paymentRef, orderBy('createdAt', 'desc'), limit(10)));
+        paymentSnap.docs.forEach((doc) => {
+          const data = doc.data();
+          const ts = data.createdAt?.toMillis?.() || Date.now();
+          notifications.push({
+            id: 'payment_' + doc.id,
+            type: 'payment',
+            title: data.title || 'Payment update',
+            description: data.description || 'Your payment status has changed.',
+            link: data.link || '/dashboard/payment',
+            timestamp: ts,
+            isRead: readIds.has('payment_' + doc.id) || data.isRead === true,
+          });
+        });
+      } catch (e) {
+        console.warn('Payment notifications could not be loaded:', e);
+      }
     }
 
     // Sort newest first
