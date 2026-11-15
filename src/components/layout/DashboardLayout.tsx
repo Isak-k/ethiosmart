@@ -48,6 +48,7 @@ import {
   Sparkles,
   Video,
   Download,
+  Wallet,
 } from "lucide-react";
 import { usePWAInstall } from "@/hooks/use-pwa-install";
 import { PwaInstallDialog } from "@/components/ui/pwa-install-dialog";
@@ -558,6 +559,7 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
     { href: "/dashboard", label: t("dashboard.menu.dashboard"), icon: LayoutDashboard, permission: 'viewDashboard' },
     { href: "/dashboard/admin/exams", label: t("dashboard.menu.manageExams"), icon: FileText, permission: 'viewAllExams' },
     { href: "/dashboard/admin/ai-generator", label: "AI Exam Generator", icon: Sparkles, permission: 'viewAllExams' },
+    { href: "/dashboard/admin/payments", label: "Payments", icon: Wallet, permission: 'managePayments' },
     { href: "/dashboard/admin/books", label: "Books", icon: Library, permission: 'viewAllExams' },
     { href: "/dashboard/community", label: "Community Chat", icon: Users, permission: 'viewDashboard' },
     { href: "/dashboard/all-results", label: t("dashboard.menu.allResults"), icon: Trophy, permission: 'viewAllResults' },
