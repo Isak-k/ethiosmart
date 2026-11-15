@@ -192,7 +192,6 @@ export const submitPayment = functions.https.onCall(async (data, context) => {
       duplicateRef ? tx.get(duplicateRef) : Promise.resolve(null),
       tx.get(userRef),
     ]);
-    const account = accountSnap.data() || {};
     const productionAccount = productionAccountSnap.data() || {};
     const sandboxAccount = sandboxAccountSnap.data() || {};
     if (productionAccount.paymentAccess?.lifetime === true || userSnap.data()?.paymentAccess?.lifetime === true) {
