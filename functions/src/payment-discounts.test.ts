@@ -17,6 +17,12 @@ describe('calculatePaymentDiscount', () => {
     expect(() => calculatePaymentDiscount(100, { codes: [{ code: 'OLD', kind: 'fixed', value: 10, enabled: false }] }, user, 'OLD')).toThrow(/invalid or unavailable/i);
   });
 
+  it('does not let a promotion active flag reactivate a disabled code', () => {
+    expect(() => calculatePaymentDiscount(100, {
+      codes: [{ code: 'OFF', kind: 'fixed', value: 10, enabled: false, active: true }],
+    }, user, 'OFF')).toThrow(/invalid or unavailable/i);
+  });
+
   it('rejects unknown codes', () => {
     expect(() => calculatePaymentDiscount(100, { codes: [] }, user, 'NOPE')).toThrow(/invalid or unavailable/i);
   });
