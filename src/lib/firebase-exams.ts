@@ -16,7 +16,8 @@ import {
   getDocsFromCache,
   limit
 } from 'firebase/firestore';
-import { db } from '@/integrations/firebase/client';
+import app, { db } from '@/integrations/firebase/client';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { Exam, Question } from '@/integrations/firebase/types';
 import {
   saveDeviceExams,
@@ -25,6 +26,9 @@ import {
 } from '@/lib/device-storage';
 import { getOfflineQuestions, getDownloadedExams } from '@/lib/offline-storage';
 import { getCachedData, setCachedData, invalidateCacheKey } from '@/lib/app-cache';
+
+const examFunctions = getFunctions(app);
+const getStudentExamQuestionsCallable = httpsCallable(examFunctions, 'getStudentExamQuestions');
 
 export async function createExam(examData: Omit<Exam, 'examId' | 'createdAt' | 'updatedAt'>) {
   const base = { ...examData };
@@ -453,69 +457,43 @@ export async function addQuestion(examId: string, questionData: Omit<Question, '
 export async function getQuestions(examId: string): Promise<Question[]> {
   if (!examId) return [];
 
-  // 1. Fetch from Firestore subcollection (simple query, client-side sorted)
   try {
-    const colRef = collection(db, 'exams', examId, 'questions');
-    const snap = await getDocs(colRef);
-    
-    if (!snap.empty) {
-      const list = snap.docs.map(doc => ({
-        questionId: doc.id,
-        ...doc.data()
-      })) as Question[];
-
-      return list.sort((a, b) => (Number(a.orderIndex) || 0) - (Number(b.orderIndex) || 0));
+    // Server verifies the student's department, payment entitlement and free
+    // attempt allowance before returning questions. Admins/creators are allowed.
+    const response = await getStudentExamQuestionsCallable({ examId });
+    const payload = response.data as { questions?: Question[] };
+    const questions = payload.questions || [];
+    return questions.sort((a, b) =>
+      (Number(a.orderIndex) || 0) - (Number(b.orderIndex) || 0)
+    );
+  } catch (error: any) {
+    const code = String(error?.code || '');
+    if (code.includes('permission-denied') || code.includes('unauthenticated') ||
+        code.includes('not-found')) {
+      // Never fall back to direct Firestore/cache reads after an explicit denial.
+      throw error;
     }
-  } catch (error) {
-    console.warn(`Direct fetch for questions in exam ${examId} failed, trying cache:`, error);
-    try {
-      const colRef = collection(db, 'exams', examId, 'questions');
-      const cached = await getDocsFromCache(colRef);
-      if (!cached.empty) {
-        const list = cached.docs.map(doc => ({
-          questionId: doc.id,
-          ...doc.data()
-        })) as Question[];
-        return list.sort((a, b) => (Number(a.orderIndex) || 0) - (Number(b.orderIndex) || 0));
-      }
-    } catch (cacheErr) {
-      console.warn(`Cache questions fetch failed for ${examId}:`, cacheErr);
-    }
+    console.warn(`Secure question delivery unavailable for ${examId}; trying previously downloaded questions:`, error);
   }
 
-  // 1b. Fallback: If no questions found and examId was a custom field rather than doc.id
-  try {
-    const q = query(collection(db, 'exams'), where('examId', '==', examId), limit(1));
-    const snap = await getDocs(q);
-    if (!snap.empty && snap.docs[0].id !== examId) {
-      const altDocId = snap.docs[0].id;
-      const altColRef = collection(db, 'exams', altDocId, 'questions');
-      const altSnap = await getDocs(altColRef);
-      if (!altSnap.empty) {
-        const list = altSnap.docs.map(doc => ({
-          questionId: doc.id,
-          ...doc.data()
-        })) as Question[];
-        return list.sort((a, b) => (Number(a.orderIndex) || 0) - (Number(b.orderIndex) || 0));
-      }
-    }
-  } catch {}
-
-  // 2. Fallback to offline IndexedDB questions
+  // Previously downloaded exam material remains usable offline. This fallback
+  // is only reached for connectivity/server failures, never entitlement denial.
   try {
     const offlineQuestions = await getOfflineQuestions(examId);
-    if (offlineQuestions && offlineQuestions.length > 0) {
-      return offlineQuestions;
-    }
-  } catch {}
+    if (offlineQuestions?.length) return offlineQuestions;
+  } catch (error) {
+    console.warn('Could not read offline exam questions:', error);
+  }
 
-  // 3. Fallback to questions embedded directly on device exam
   try {
     const deviceExam = await getDeviceExam(examId);
-    if (deviceExam && Array.isArray((deviceExam as any).questions) && (deviceExam as any).questions.length > 0) {
+    if (deviceExam && Array.isArray((deviceExam as any).questions) &&
+        (deviceExam as any).questions.length > 0) {
       return (deviceExam as any).questions;
     }
-  } catch {}
+  } catch (error) {
+    console.warn('Could not read downloaded exam question cache:', error);
+  }
 
   return [];
 }
