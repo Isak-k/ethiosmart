@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
@@ -21,6 +21,7 @@ import { BookCard } from '@/components/book/BookCard';
 import { getPublishedExams } from '@/lib/firebase-exams';
 import { getSubjectVisualTheme } from '@/components/book/InteractiveShortNoteReader';
 import { getCachedDefaultDepartmentId } from '@/lib/system-settings';
+import { isContentLocked, usePaymentAccess } from '@/lib/payment-access';
 import { buildDriveViewUrl, extractDriveFileId } from '@/lib/google-drive';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -78,6 +79,7 @@ export default function StudentBooks() {
   const { toast } = useToast();
 
   const isAdmin = role === 'admin' || role === 'superadmin';
+  const paymentAccess = usePaymentAccess();
   const defaultDeptId = getCachedDefaultDepartmentId();
   const userDeptId = profile?.departmentId || (profile as any)?.department_id || defaultDeptId;
 
@@ -679,6 +681,28 @@ export default function StudentBooks() {
     return undefined;
   };
 
+  // Resolve whether a note is gated by the payment setting for the current student.
+  // Chapter 1 notes stay free whenever the default free trial is switched on.
+  const resolveNoteLocked = useCallback(
+    (note: Book, isChapterOne: boolean) => {
+      const free = paymentAccess.freeAccess;
+      const chapterId = note.chapterId;
+      return isContentLocked({
+        paymentsEnabled: paymentAccess.paymentsEnabled,
+        freeAccess: free,
+        isStaff: isAdmin,
+        hasLifetime: Boolean((profile as any)?.isPremium),
+        isPremium: Boolean((note as any)?.isPremium),
+        isChapterOne,
+        isExplicitlyFree:
+          free.enabled &&
+          (free.freeNoteIds.includes(note.id) ||
+            (!!chapterId && free.freeChapterIds.includes(chapterId))),
+      });
+    },
+    [paymentAccess.freeAccess, paymentAccess.paymentsEnabled, isAdmin, profile],
+  );
+
   // Computed list of Chapter / Unit items matching the screenshot UI
   const displayUnits = useMemo(() => {
     if (!selectedNotesSubjectId) return [];
@@ -698,8 +722,9 @@ export default function StudentBooks() {
             (n.chapterTitle && ch.title && n.chapterTitle.toLowerCase().trim() === ch.title.toLowerCase().trim())
         );
 
-        // All units with uploaded notes are open; locked only if note has not been uploaded yet
-        const isLocked = !note;
+        // Locked if the note has not been uploaded yet, or if the payment setting
+        // gates it and it is not covered by the Chapter 1 free trial / free access.
+        const isLocked = !note || resolveNoteLocked(note, unitNum === 1);
 
         return {
           id: ch.id,
@@ -739,7 +764,7 @@ export default function StudentBooks() {
         return idx + 1;
       };
       const unitNum = getNum(note);
-      const isLocked = Boolean(note.isPremium && role !== 'admin' && !profile?.isPremium);
+      const isLocked = resolveNoteLocked(note, unitNum === 1);
 
       return {
         id: note.id,
@@ -757,6 +782,7 @@ export default function StudentBooks() {
     role,
     profile,
     availableExams,
+    resolveNoteLocked,
   ]);
 
   // Handler when the user taps a resource tile on the choice screen (enters directly)

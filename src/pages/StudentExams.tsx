@@ -8,6 +8,7 @@ import { getBooks } from "@/lib/books";
 import { calculateAllSubjectsProgress } from "@/lib/subject-progress";
 import { getSubjectCover } from "@/lib/subject-covers";
 import { getCachedDefaultDepartmentId } from "@/lib/system-settings";
+import { usePaymentAccess } from "@/lib/payment-access";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ExamCard } from "@/components/exam/ExamCard";
 import { SubjectCard } from "@/components/subject/SubjectCard";
@@ -78,6 +79,7 @@ interface UnitDisplayItem {
 
 const StudentExams = () => {
   const { user, profile } = useAuth();
+  const paymentAccess = usePaymentAccess();
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -616,6 +618,13 @@ const StudentExams = () => {
                               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-200/80 shrink-0">
                                 <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
                                 Completed
+                              </span>
+                            )}
+
+                            {paymentAccess.chapterOneTrial && unit.unitNumber === 1 && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100 text-purple-800 dark:bg-purple-950/70 dark:text-purple-300 border border-purple-200/80 shrink-0">
+                                <Sparkles className="w-3 h-3 text-purple-600 dark:text-purple-400" />
+                                Free trial
                               </span>
                             )}
                           </div>

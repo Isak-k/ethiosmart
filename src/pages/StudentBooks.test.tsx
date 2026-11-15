@@ -75,6 +75,25 @@ vi.mock('@/lib/system-settings', () => ({
   getCachedDefaultDepartmentId: vi.fn().mockReturnValue('dept-1'),
 }));
 
+vi.mock('@/lib/payment-access', () => ({
+  usePaymentAccess: () => ({
+    paymentsEnabled: true,
+    freeAccess: {
+      enabled: true,
+      freeChaptersPerSubject: 0,
+      freeExamAttempts: 0,
+      freeNotesCount: 0,
+      freeChapterIds: [],
+      freeExamIds: [],
+      freeNoteIds: [],
+    },
+    chapterOneTrial: false,
+    loading: false,
+    refresh: vi.fn(),
+  }),
+  isContentLocked: () => false,
+}));
+
 vi.mock('@/components/layout/DashboardLayout', () => ({
   DashboardLayout: ({ children }: { children: React.ReactNode }) => <div data-testid="dashboard-layout">{children}</div>,
 }));

@@ -25,10 +25,12 @@ import { PaymentPriceCard } from "@/components/admin/payments/PaymentPriceCard";
 import { PaymentMethodsEditor } from "@/components/admin/payments/PaymentMethodsEditor";
 import { InstructionsCard } from "@/components/admin/payments/InstructionsCard";
 import { FreeAccessSettings } from "@/components/admin/payments/FreeAccessSettings";
+import { FreeTrialToggleCard } from "@/components/admin/payments/FreeTrialToggleCard";
 import { DiscountSettings } from "@/components/admin/payments/DiscountSettings";
 import {
   defaultPaymentSettings,
   normalizePaymentSettings,
+  type FreeAccessConfig,
   type PaymentSettingsConfig,
 } from "@/components/admin/payments/types";
 import {
@@ -154,22 +156,25 @@ export default function AdminPayments() {
     decide(rejectTarget, "Rejected", reason);
   };
 
-  const saveSettings = async () => {
-    if (!Number.isFinite(settings.priceEtb) || settings.priceEtb < 0) {
-      toast({ title: "Enter a valid ETB price", variant: "destructive" });
-      return;
+  const persistSettings = async (next: PaymentSettingsConfig) => {
+    if (!Number.isFinite(next.priceEtb) || next.priceEtb < 0) {
+      throw new Error("Enter a valid ETB price");
     }
+    await savePaymentSettings({
+      priceEtb: next.priceEtb,
+      enabled: next.enabled,
+      mode: next.mode,
+      instructions: next.instructions,
+      paymentMethods: next.paymentMethods,
+      freeAccess: next.freeAccess,
+      discounts: next.discounts,
+    });
+  };
+
+  const saveSettings = async () => {
     setSaving(true);
     try {
-      await savePaymentSettings({
-        priceEtb: settings.priceEtb,
-        enabled: settings.enabled,
-        mode: settings.mode,
-        instructions: settings.instructions,
-        paymentMethods: settings.paymentMethods,
-        freeAccess: settings.freeAccess,
-        discounts: settings.discounts,
-      });
+      await persistSettings(settings);
       setSavedSettings(settings);
       toast({
         title: "Payment settings saved",
@@ -184,6 +189,27 @@ export default function AdminPayments() {
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Persist the free-trial toggle immediately so the state survives without a manual save.
+  const saveFreeTrialNow = async (freeAccess: FreeAccessConfig) => {
+    const next = { ...settings, freeAccess };
+    setSettings(next);
+    try {
+      await persistSettings(next);
+      setSavedSettings(next);
+      toast({
+        title: "Free trial updated",
+        description: "Chapter 1 notes and exams were provisioned and saved.",
+      });
+      await load();
+    } catch (error: any) {
+      toast({
+        title: "Free trial could not be saved",
+        description: error?.message || "Only the main administrator can change payment settings.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -421,6 +447,13 @@ export default function AdminPayments() {
             <InstructionsCard
               value={settings.instructions}
               onChange={(instructions) => patchSettings({ instructions })}
+              disabled={!canManageSettings}
+            />
+
+            <FreeTrialToggleCard
+              value={settings.freeAccess}
+              onChange={(freeAccess) => patchSettings({ freeAccess })}
+              onCommit={canManageSettings ? saveFreeTrialNow : undefined}
               disabled={!canManageSettings}
             />
 
