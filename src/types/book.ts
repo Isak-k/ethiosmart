@@ -105,6 +105,7 @@ export interface Book {
   generationSettings?: ShortNoteGenerationSettings;
   driveUrl: string;
   driveFileId: string;
+  storagePath?: string;
   description?: string;
   author?: string;
   edition?: string;
@@ -151,6 +152,7 @@ export interface BookInput {
   generationSettings?: ShortNoteGenerationSettings;
   driveUrl?: string;
   driveFileId?: string;
+  storagePath?: string;
   description?: string;
   author?: string;
   edition?: string;
