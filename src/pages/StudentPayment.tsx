@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import app from "@/integrations/firebase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -57,7 +57,7 @@ export default function StudentPayment() {
     return () => { active = false; };
   }, [toast]);
 
-  const submit = async (event: React.FormEvent) => {
+  const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!user || !receipt || !selectedMethod) return;
     if (!["image/jpeg", "image/png"].includes(receipt.type) || receipt.size > 5 * 1024 * 1024) {
