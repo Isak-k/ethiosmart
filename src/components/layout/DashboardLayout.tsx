@@ -536,7 +536,6 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
       return [
         { href: "/dashboard/exams", label: "Exams", icon: ClipboardList },
         { href: "/dashboard/books", label: "Study", icon: BookOpen },
-      { href: "/dashboard/payment", label: "Payment & Access", icon: Wallet },
         { href: "/dashboard/video-tutorials", label: "Videos", icon: Video, badge: "Soon" },
         { href: "/dashboard/ai-assistant", label: "AI Tutor", icon: Brain, badge: "Soon" },
         { href: "/dashboard/results", label: t("dashboard.menu.myResults", "Results"), icon: Trophy },
@@ -546,6 +545,7 @@ export function DashboardLayout({ children, contentClassName }: DashboardLayoutP
     return [
       { href: "/dashboard", label: t("dashboard.menu.dashboard", "Home"), icon: LayoutDashboard },
       { href: "/dashboard/books", label: "Study", icon: BookOpen },
+      { href: "/dashboard/payment", label: "Payment & Access", icon: Wallet },
       { href: "/dashboard/exams", label: "Exams", icon: ClipboardList },
       { href: "/dashboard/video-tutorials", label: "Video Tutorials", icon: Video, badge: "Soon" },
       { href: "/dashboard/ai-assistant", label: "AI Tutor", icon: Brain, badge: "Soon" },
