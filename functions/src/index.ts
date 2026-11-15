@@ -39,5 +39,6 @@ export {
 export {
   getStudentBookCatalog,
   getStudentBook,
-  getStudentExamQuestions
+  getStudentExamQuestions,
+  createStudentExamAttempt
 } from './content-access';
