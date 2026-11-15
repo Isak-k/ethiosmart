@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, RefreshCw, CheckCircle2, XCircle, Wallet, ExternalLink, Search } from "lucide-react";
@@ -37,6 +38,9 @@ export default function AdminPayments() {
   const [totals, setTotals] = useState({ total: 0, pending: 0, approved: 0, rejected: 0, revenueEtb: 0 });
   const [price, setPrice] = useState("0");
   const [enabled, setEnabled] = useState(true);
+  const [mode, setMode] = useState<"production" | "sandbox">("production");
+  const [instructions, setInstructions] = useState("");
+  const [methodsJson, setMethodsJson] = useState("[]");
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState("");
   const [search, setSearch] = useState("");
@@ -51,6 +55,9 @@ export default function AdminPayments() {
       setTotals(data.totals || { total: 0, pending: 0, approved: 0, rejected: 0, revenueEtb: 0 });
       setPrice(String(data.settings?.priceEtb ?? 0));
       setEnabled(data.settings?.enabled !== false);
+      setMode(data.settings?.mode === "sandbox" ? "sandbox" : "production");
+      setInstructions(data.settings?.instructions || "");
+      setMethodsJson(JSON.stringify(data.settings?.paymentMethods || [], null, 2));
     } catch (error: any) {
       toast({ title: "Could not load payment records", description: error?.message || "Check your administrator permissions.", variant: "destructive" });
     } finally {
@@ -90,7 +97,9 @@ export default function AdminPayments() {
       return;
     }
     try {
-      await savePaymentSettings({ priceEtb: amount, enabled });
+      const paymentMethods = JSON.parse(methodsJson);
+      if (!Array.isArray(paymentMethods)) throw new Error("Payment methods must be a JSON array.");
+      await savePaymentSettings({ priceEtb: amount, enabled, mode, instructions, paymentMethods });
       toast({ title: "Payment settings saved", description: "The new price applies to new payment submissions." });
       await load();
     } catch (error: any) {
@@ -127,6 +136,17 @@ export default function AdminPayments() {
             <div className="flex-1 space-y-2"><label className="text-sm font-medium">Fixed price (ETB)</label><Input type="number" min="0" value={price} onChange={(e) => setPrice(e.target.value)} /></div>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> Accept new payments</label>
             <Button onClick={savePrice}>Save price</Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>Payment configuration</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2"><label className="text-sm font-medium">Environment</label><select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={mode} onChange={(e) => setMode(e.target.value as "production" | "sandbox")}><option value="production">Production payments</option><option value="sandbox">Sandbox / test payments</option></select><p className="text-xs text-muted-foreground">Sandbox approvals never grant real lifetime access. Switching modes changes which payment queue is displayed.</p></div>
+              <div className="space-y-2"><label className="text-sm font-medium">Instructions shown to students</label><Textarea rows={3} value={instructions} onChange={(e) => setInstructions(e.target.value)} /></div>
+            </div>
+            <div className="space-y-2"><label className="text-sm font-medium">Payment methods (JSON)</label><Textarea rows={12} className="font-mono text-xs" value={methodsJson} onChange={(e) => setMethodsJson(e.target.value)} /><p className="text-xs text-muted-foreground">Each method needs id, name, type, accountName, accountNumber, instructions and enabled.</p></div>
           </CardContent>
         </Card>
 
