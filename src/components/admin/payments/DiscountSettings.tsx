@@ -1,13 +1,12 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { BadgePercent, Plus, Trash2, AlertTriangle } from "lucide-react";
+import { BadgePercent, Plus, Trash2 } from "lucide-react";
 import type { DiscountKind, DiscountsConfig } from "./types";
 
 interface DiscountSettingsProps {
@@ -61,15 +60,10 @@ export function DiscountSettings({ value, onChange, disabled }: DiscountSettings
         <CardDescription>Define discount codes, automatic promotions and per-user discounts.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
-        <Alert className="border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200 [&>svg]:text-amber-600">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Not yet applied to payments</AlertTitle>
-          <AlertDescription className="text-amber-900/80 dark:text-amber-200/80">
-            These definitions are saved through the existing payment settings, but the current backend does not yet
-            apply them when computing the amount a student pays — the amount charged is always the fixed price above.
-            Configure them now so they are ready when discount processing is added.
-          </AlertDescription>
-        </Alert>
+        <p className="text-sm text-muted-foreground">
+          Valid discounts are checked by the payment server. Only the single best eligible discount is applied;
+          discounts are not stacked. Percentage values must be between 0 and 100.
+        </p>
 
         {/* Discount codes */}
         <section className="space-y-3">
