@@ -141,13 +141,36 @@ service cloud.firestore {
 
     // --- Exam Attempts Collection ---
     match /examAttempts/{attemptId} {
-      allow read: if true;
-      allow create: if true;
-      allow update: if true;
+      // Students can read only their own attempts. Admins can review all attempts.
+      allow read: if isAuthenticated() &&
+        (resource.data.studentId == request.auth.uid || isAdminOrSuper());
+      // Normal attempts are created only by createStudentExamAttempt (Admin SDK).
+      allow create: if false;
+      // Students may submit their own attempt, but cannot write scores or grading fields.
+      allow update: if isAdminOrSuper() || (
+        isAuthenticated() &&
+        resource.data.studentId == request.auth.uid &&
+        resource.data.isSubmitted != true &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['isSubmitted', 'submittedAt', 'timeSpentSeconds']) &&
+        request.resource.data.isSubmitted == true
+      );
       allow delete: if isAdminOrSuper();
 
       match /answers/{answerId} {
-        allow read, create, update: if true;
+        allow read: if isAuthenticated() && (
+          get(/databases/$(database)/documents/examAttempts/$(attemptId)).data.studentId == request.auth.uid ||
+          isAdminOrSuper()
+        );
+        // Answer ownership is inherited from the parent attempt. Client writes
+        // cannot set correctness, manual grades, or grading metadata.
+        allow create, update: if isAuthenticated() &&
+          get(/databases/$(database)/documents/examAttempts/$(attemptId)).data.studentId == request.auth.uid &&
+          get(/databases/$(database)/documents/examAttempts/$(attemptId)).data.isSubmitted != true &&
+          request.resource.data.keys().hasOnly([
+            'questionId', 'attemptId', 'selectedOptionIndex', 'studentAnswer',
+            'timeSpentSeconds', 'answeredAt'
+          ]);
         allow delete: if isAdminOrSuper();
       }
     }
