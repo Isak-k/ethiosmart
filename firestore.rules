@@ -85,8 +85,11 @@ service cloud.firestore {
         request.resource.data.role == 'student' &&
         !request.resource.data.keys().hasAny(['permissions', 'sectionPermissions', 'disabled', 'paymentAccess'])
       );
-      allow update: if (isAdmin() && (!hasLifetimeAccess(resource.data) || hasLifetimeAccess(request.resource.data))) || (
+      allow update: if (isAdmin() &&
+        request.resource.data.get('paymentAccess', null) == resource.data.get('paymentAccess', null) &&
+        (!hasLifetimeAccess(resource.data) || hasLifetimeAccess(request.resource.data))) || (
         isUser(userId) &&
+        request.resource.data.get('paymentAccess', null) == resource.data.get('paymentAccess', null) &&
         hasLifetimeAccess(request.resource.data) == hasLifetimeAccess(resource.data) &&
         request.resource.data.role == resource.data.role &&
         request.resource.data.get('permissions', null) == resource.data.get('permissions', null) &&
