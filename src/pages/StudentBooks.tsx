@@ -69,7 +69,6 @@ import {
   ChevronRight,
   Eye,
   ExternalLink,
-  Download,
 } from 'lucide-react';
 
 export default function StudentBooks() {
@@ -95,6 +94,7 @@ export default function StudentBooks() {
   const [storageStats, setStorageStats] = useState({ totalBytes: 0, formattedSize: '0 B', count: 0 });
   const [downloadingBookId, setDownloadingBookId] = useState<string | null>(null);
   const [preparingNoteId, setPreparingNoteId] = useState<string | null>(null);
+  const [noteDownloadProgress, setNoteDownloadProgress] = useState<{ id: string; percent: number } | null>(null);
   const [preparingBookId, setPreparingBookId] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
@@ -379,22 +379,38 @@ export default function StudentBooks() {
 
   // Tap-to-read for chapters: download the note for offline reading first, then open it
   // instantly from the local copy (no loading screen). Notes without a Google Drive file
-  // (AI text-only) open directly.
+  // (AI text-only) open directly. Notes already cached on the device open instantly with
+  // no download at all — they stay stored on the user's device between sessions.
   const handleReadChapter = async (note: Book) => {
     if (preparingNoteId) return;
 
     const driveId = note.driveFileId || extractDriveFileId(note.driveUrl || '');
 
     // No Drive document → nothing to download, open directly.
+    // Already downloaded once → open instantly from device storage (no re-download).
     if (!driveId || offlineBookIds.has(note.id)) {
       navigate(`/dashboard/books/${note.id}/read`);
       return;
     }
 
+    // First-time download: show a green line that fills with the download speed.
     setPreparingNoteId(note.id);
+    setNoteDownloadProgress({ id: note.id, percent: 6 });
+    const creep = window.setInterval(() => {
+      setNoteDownloadProgress((prev) =>
+        prev && prev.id === note.id && prev.percent < 92
+          ? { id: note.id, percent: Math.min(92, prev.percent + Math.max(1, Math.round((96 - prev.percent) / 12))) }
+          : prev
+      );
+    }, 180);
     try {
-      await downloadAndSaveBookOffline(note);
+      await downloadAndSaveBookOffline(note, undefined, (pct) => {
+        setNoteDownloadProgress((prev) =>
+          prev && prev.id === note.id ? { id: note.id, percent: Math.max(prev.percent, pct) } : prev
+        );
+      });
       await loadOfflineData();
+      setNoteDownloadProgress({ id: note.id, percent: 100 });
     } catch (err: any) {
       toast({
         title: 'Opening in online mode',
@@ -402,7 +418,9 @@ export default function StudentBooks() {
         variant: 'destructive',
       });
     } finally {
+      window.clearInterval(creep);
       setPreparingNoteId(null);
+      setNoteDownloadProgress(null);
       navigate(`/dashboard/books/${note.id}/read`);
     }
   };
@@ -1433,81 +1451,8 @@ export default function StudentBooks() {
                                   </div>
                                 </div>
 
-                                {/* Right Side: Drive Link, Summary Button, Exam Link & Right Chevron */}
+                                {/* Right Side: Practice Exam Link & Right Chevron */}
                                 <div className="flex flex-wrap items-center gap-1.5 pr-1 sm:shrink-0 sm:gap-2 sm:justify-end">
-                                  {/* Direct Google Drive Link (Alternative: Zero-wait native viewing) */}
-                                  {(() => {
-                                    const driveId = unit.note?.driveFileId || (unit.note?.driveUrl ? extractDriveFileId(unit.note.driveUrl) : null);
-                                    const driveLink = driveId ? buildDriveViewUrl(driveId) : unit.note?.driveUrl;
-                                    if (!driveLink) return null;
-                                    return (
-                                      <a
-                                        href={driveLink}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        onClick={(e) => e.stopPropagation()}
-                                        title="Open directly in Google Drive in a new tab (Instant display)"
-                                        className="h-8 px-2 sm:px-2.5 rounded-xl bg-blue-500/10 hover:bg-blue-600 hover:text-white text-blue-600 dark:text-blue-400 text-xs font-bold flex items-center gap-1 transition-all shadow-xs border border-blue-500/25"
-                                      >
-                                        <ExternalLink className="h-3.5 w-3.5" />
-                                        <span className="hidden sm:inline">Drive</span>
-                                      </a>
-                                    );
-                                  })()}
-
-                                  {/* Offline status: tap the chapter to download it, then read instantly */}
-                                  {unit.note && (() => {
-                                    const isCached = offlineBookIds.has(unit.note!.id);
-                                    const isPreparing = preparingNoteId === unit.note!.id;
-                                    return (
-                                      <span
-                                        className={`h-8 px-2 sm:px-2.5 rounded-xl text-xs font-bold flex items-center gap-1 transition-all border shadow-xs ${
-                                          isCached
-                                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25'
-                                            : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 border-border/80'
-                                        }`}
-                                        title={
-                                          isCached
-                                            ? 'Saved for offline reading'
-                                            : 'Tap the chapter to download it, then read offline'
-                                        }
-                                      >
-                                        {isPreparing ? (
-                                          <>
-                                            <Loader2 className="h-3.5 w-3.5 animate-spin text-purple-600 dark:text-purple-400" />
-                                            <span className="hidden sm:inline">Opening…</span>
-                                          </>
-                                        ) : isCached ? (
-                                          <>
-                                            <CheckCircle2 className="h-3.5 w-3.5" />
-                                            <span className="hidden sm:inline">Offline</span>
-                                          </>
-                                        ) : (
-                                          <>
-                                            <Download className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
-                                            <span className="hidden sm:inline">Download</span>
-                                          </>
-                                        )}
-                                      </span>
-                                    );
-                                  })()}
-
-                                  {/* Quick Chapter Summary (Alternative: Read notes text instantly) */}
-                                  {unit.note && (
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setQuickSummaryNote(unit.note);
-                                      }}
-                                      title="Read Chapter Summary & Key Concepts"
-                                      className="h-8 px-2 sm:px-2.5 rounded-xl bg-slate-100 hover:bg-purple-600 hover:text-white text-slate-700 dark:bg-slate-800 dark:text-slate-200 text-xs font-bold flex items-center gap-1 transition-all border border-border/80 shadow-xs"
-                                    >
-                                      <FileText className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
-                                      <span className="hidden md:inline">Summary</span>
-                                    </button>
-                                  )}
-
                                   {unit.matchedExam && (
                                     <button
                                       type="button"
@@ -1525,6 +1470,16 @@ export default function StudentBooks() {
 
                                   <ChevronRight className="hidden sm:block w-5 h-5 text-slate-400 group-hover:text-purple-600 group-hover:translate-x-1 transition-all" />
                                 </div>
+
+                                {/* First-time download progress — a green line that fills with the download speed */}
+                                {preparingNoteId === unit.note?.id && noteDownloadProgress?.id === unit.note?.id && (
+                                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500/15">
+                                    <div
+                                      className="h-full bg-emerald-500 transition-all duration-200 ease-out"
+                                      style={{ width: `${noteDownloadProgress.percent}%` }}
+                                    />
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
