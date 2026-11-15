@@ -122,9 +122,10 @@ service cloud.firestore {
               get(/databases/$(database)/documents/exams/$(examId)).data.get('isPublished', false) != true
             );
         }
-        allow read: if isAuthenticated() || 
-          get(/databases/$(database)/documents/exams/$(examId)).data.get('isPublished', false) == true ||
-          get(/databases/$(database)/documents/exams/$(examId)).data.get('published', false) == true;
+        // Question documents are protected content. Students must obtain
+        // them through the entitlement-checking callable; only admins and the
+        // exam creator may read them directly for management.
+        allow read: if isAdminOrSuper() || isParentExamCreator();
         allow create, update: if (isAdmin() || isParentExamCreator()) && canSaveQuestionData();
         allow delete: if isAdmin() || isParentExamCreator();
       }
