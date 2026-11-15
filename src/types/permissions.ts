@@ -177,6 +177,7 @@ export const SUPER_ADMIN_PERMISSIONS: UserPermissions = {
   editExaminerPermissions: true,
   deleteExaminers: true,
   enableDisableExaminers: true,
+  managePayments: true,
   viewExamResults: true,
   deleteResults: true,
   gradeExams: true,
