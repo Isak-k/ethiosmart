@@ -388,6 +388,45 @@ export const reviewPayment = functions.https.onCall(async (data, context) => {
   return { success: true, status: decision };
 });
 
+function validateDiscountSettings(raw: any): any {
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const codes = Array.isArray(source.codes) ? source.codes : [];
+  const promotions = Array.isArray(source.promotions) ? source.promotions : [];
+  const selectedUsers = Array.isArray(source.selectedUsers) ? source.selectedUsers : [];
+  if (codes.length > 200 || promotions.length > 200 || selectedUsers.length > 500) {
+    throw new functions.https.HttpsError('invalid-argument', 'Too many discount entries.');
+  }
+  const validateValue = (kind: unknown, value: unknown) => {
+    const amount = Number(value);
+    if ((kind !== 'percentage' && kind !== 'fixed') || !Number.isFinite(amount) ||
+        amount < 0 || (kind === 'percentage' && amount > 100) || amount > 10000000) {
+      throw new functions.https.HttpsError('invalid-argument', 'Discount type or value is invalid.');
+    }
+    return amount;
+  };
+  const seenCodes = new Set<string>();
+  const cleanCodes = codes.map((item: any) => {
+    const code = cleanString(item?.code, 40).toUpperCase();
+    if (!/^[A-Z0-9_-]{3,40}$/.test(code) || seenCodes.has(code)) {
+      throw new functions.https.HttpsError('invalid-argument', 'Discount codes must be unique and contain 3–40 letters, numbers, underscores or hyphens.');
+    }
+    seenCodes.add(code);
+    return { code, kind: item.kind, value: validateValue(item.kind, item.value), enabled: item.enabled === true };
+  });
+  const cleanPromotions = promotions.map((item: any) => ({
+    label: cleanString(item?.label, 100),
+    kind: item?.kind,
+    value: validateValue(item?.kind, item?.value),
+    active: item?.active === true,
+  }));
+  const cleanUsers = selectedUsers.map((item: any) => {
+    const identifier = cleanString(item?.identifier, 254);
+    if (!identifier) throw new functions.https.HttpsError('invalid-argument', 'Every selected-user discount needs a user ID or email.');
+    return { identifier, kind: item.kind, value: validateValue(item.kind, item.value) };
+  });
+  return { codes: cleanCodes, promotions: cleanPromotions, selectedUsers: cleanUsers };
+}
+
 export const savePaymentSettings = functions.https.onCall(async (data, context) => {
   const uid = requireAuth(context);
   await requireAdmin(uid, false, true);
@@ -422,7 +461,7 @@ export const savePaymentSettings = functions.https.onCall(async (data, context) 
       freeExamIds: Array.isArray(free.freeExamIds) ? free.freeExamIds.slice(0, 500) : [],
       freeNoteIds: Array.isArray(free.freeNoteIds) ? free.freeNoteIds.slice(0, 500) : [],
     },
-    discounts: data?.discounts || existing.discounts || { codes: [], selectedUsers: [], promotions: [] },
+    discounts: validateDiscountSettings(data?.discounts === undefined ? existing.discounts : data.discounts),
     support: data?.support || existing.support || { inApp: true, telegram: '', whatsapp: '', phone: '', email: '' },
     instructions: data?.instructions === undefined ? existing.instructions : cleanString(data.instructions, 3000),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
