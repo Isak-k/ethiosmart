@@ -2,78 +2,47 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    
-    // Helper functions
     function isAuthenticated() {
       return request.auth != null;
     }
-    
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) &&
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'superadmin'];
+    }
+
     function isImageFile() {
       return request.resource.contentType.matches('image/.*');
     }
-    
-    function isValidSize() {
-      return request.resource.size < 5 * 1024 * 1024; // 5MB limit
-    }
-    
-    // Avatar images
-    match /avatars/{userId}/{fileName} {
-      // Anyone authenticated can read avatars
-      allow read: if isAuthenticated();
-      
-      // Users can only upload their own avatar
-      allow write: if isAuthenticated() && 
-                     request.auth.uid == userId &&
-                     isImageFile() &&
-                     isValidSize();
-    }
-    
-    // Exam images (for questions)
-    match /exam-images/{examId}/{fileName} {
-      // Anyone authenticated can read exam images
-      allow read: if isAuthenticated();
-      
-      // Only authenticated users can upload exam images
-      // Note: We rely on Firestore rules to ensure only admins create exams
-      allow write: if isAuthenticated() &&
-                     isImageFile() &&
-                     isValidSize();
+
+    function isValidImageSize() {
+      return request.resource.size < 5 * 1024 * 1024;
     }
 
-    // Protected learning resources: uploads are admin-only and never client-readable.
-    // Students receive short-lived, entitlement-checked download links from the backend.
+    match /avatars/{userId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && request.auth.uid == userId && isImageFile() && isValidImageSize();
+    }
+
+    match /exam-images/{examId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() && isImageFile() && isValidImageSize();
+    }
+
+    // Private learning PDFs: client uploads only; all reads go through Admin SDK after entitlement checks.
     match /protected-books/{adminUid}/{resourceId}/{fileName} {
       allow read: if false;
-      allow write: if isAuthenticated() &&
+      allow create: if isAdmin() &&
         request.auth.uid == adminUid &&
-        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role
-          in ['admin', 'superadmin'] &&
         request.resource.size <= 25 * 1024 * 1024 &&
-        request.resource.contentType == 'application/pdf' &&
-        fileName.matches('^[A-Za-z0-9._-]+
-    match /subject-covers/{allPaths=**} {
-      // Publicly readable so students can view covers on dashboard and cards
-      allow read: if true;
-      
-      // Authenticated users can upload subject covers
-      allow write: if isAuthenticated() &&
-                     isImageFile() &&
-                     isValidSize();
-    }
-  }
-}
-);
+        request.resource.contentType == 'application/pdf';
+      allow update, delete: if false;
     }
 
-    // Subject cover images
     match /subject-covers/{allPaths=**} {
-      // Publicly readable so students can view covers on dashboard and cards
       allow read: if true;
-      
-      // Authenticated users can upload subject covers
-      allow write: if isAuthenticated() &&
-                     isImageFile() &&
-                     isValidSize();
+      allow write: if isAuthenticated() && isImageFile() && isValidImageSize();
     }
   }
 }
