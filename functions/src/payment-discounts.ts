@@ -1,3 +1,9 @@
+export function getPaymentStorageCollections(mode: 'production' | 'sandbox') {
+  return mode === 'sandbox'
+    ? { payments: 'sandboxPayments', accounts: 'sandboxPaymentAccounts', fingerprints: 'sandboxReceiptFingerprints' }
+    : { payments: 'payments', accounts: 'paymentAccounts', fingerprints: 'receiptFingerprints' };
+}
+
 export type DiscountKind = 'percentage' | 'fixed';
 
 export interface DiscountCandidate {
