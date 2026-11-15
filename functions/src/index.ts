@@ -24,3 +24,14 @@ export {
 export {
   askEthioSmartAssistant
 } from './chatbot';
+
+export {
+  getPaymentSettings,
+  createReceiptUploadSignature,
+  submitPayment,
+  getMyPayment,
+  getPaymentAdminData,
+  reviewPayment,
+  savePaymentSettings,
+  grantLifetimePaymentAccess
+} from './payments';
