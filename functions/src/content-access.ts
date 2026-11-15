@@ -209,10 +209,27 @@ export const getStudentBook = functions.https.onCall(async (data, context) => {
     });
   }
 
+  let protectedDownloadUrl: string | null = null;
+  if (typeof book.storagePath === 'string' &&
+      book.storagePath.startsWith('protected-books/') &&
+      book.allowDownload !== false) {
+    try {
+      const [signedUrl] = await admin.storage().bucket().file(book.storagePath).getSignedUrl({
+        action: 'read',
+        expires: Date.now() + 2 * 60 * 1000,
+      });
+      protectedDownloadUrl = signedUrl;
+    } catch (error) {
+      console.error('Unable to create protected book download URL:', error);
+      throw new functions.https.HttpsError('unavailable', 'The protected learning file is temporarily unavailable.');
+    }
+  }
+
   return {
     book: {
       ...book,
       id: book.id,
+      protectedDownloadUrl,
     },
     entitlement: isAdmin ? 'admin' : lifetime ? 'lifetime' : 'free',
   };
