@@ -27,6 +27,7 @@ export default function StudentPayment() {
   const [price, setPrice] = useState(0);
   const [discountCode, setDiscountCode] = useState("");
   const [discountQuote, setDiscountQuote] = useState<any>(null);
+  const [quoteReady, setQuoteReady] = useState(false);
   const [quoting, setQuoting] = useState(false);
   const [instructions, setInstructions] = useState("");
   const [selectedMethod, setSelectedMethod] = useState("");
@@ -41,14 +42,22 @@ export default function StudentPayment() {
     let active = true;
     (async () => {
       try {
-        const [settingsResult, myResult, quoteResult] = await Promise.all([getPaymentSettings(), getMyPayment(), quotePaymentDiscount({ discountCode: "" })]);
+        const [settingsResult, myResult] = await Promise.all([getPaymentSettings(), getMyPayment()]);
         if (!active) return;
         const settings = settingsResult.data as any;
         const mine = myResult.data as any;
         setMethods((settings.paymentMethods || []).filter((m: Method) => m.enabled));
         setPrice(Number(settings.priceEtb || 0));
-        setDiscountQuote(quoteResult.data as any);
         setInstructions(settings.instructions || "");
+        try {
+          const quoteResult = await quotePaymentDiscount({ discountCode: "" });
+          if (!active) return;
+          setDiscountQuote(quoteResult.data as any);
+          setQuoteReady(true);
+        } catch (quoteError: any) {
+          setQuoteReady(false);
+          toast({ title: "Could not calculate your current discount", description: quoteError?.message || "Refresh the payment page before submitting.", variant: "destructive" });
+        }
         setPayment(mine.payment || null);
         setAccess(mine.paymentAccess?.lifetime === true);
         const first = (settings.paymentMethods || []).find((m: Method) => m.enabled);
@@ -67,9 +76,11 @@ export default function StudentPayment() {
     try {
       const result = await quotePaymentDiscount({ discountCode });
       setDiscountQuote(result.data as any);
+      setQuoteReady(true);
       toast({ title: "Discount updated", description: "The payable amount was calculated by the server." });
     } catch (error: any) {
       setDiscountQuote(null);
+      setQuoteReady(false);
       toast({ title: "Discount not applied", description: error?.message || "Check the code and try again.", variant: "destructive" });
     } finally {
       setQuoting(false);
@@ -79,6 +90,10 @@ export default function StudentPayment() {
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!user || !receipt || !selectedMethod) return;
+    if (!quoteReady) {
+      toast({ title: "Confirm your payment amount", description: "Apply your discount code (or refresh the quote) before submitting the receipt.", variant: "destructive" });
+      return;
+    }
     if (!["image/jpeg", "image/png"].includes(receipt.type) || receipt.size > 5 * 1024 * 1024) {
       toast({ title: "Invalid receipt", description: "Choose a JPG or PNG image up to 5 MB.", variant: "destructive" });
       return;
@@ -147,14 +162,14 @@ export default function StudentPayment() {
                   <div className="space-y-2">
                     <Label htmlFor="discount-code">Discount code (optional)</Label>
                     <div className="flex gap-2">
-                      <Input id="discount-code" value={discountCode} onChange={(e) => { setDiscountCode(e.target.value.toUpperCase()); setDiscountQuote(null); }} placeholder="Enter discount code" />
+                      <Input id="discount-code" value={discountCode} onChange={(e) => { setDiscountCode(e.target.value.toUpperCase()); setDiscountQuote(null); setQuoteReady(false); }} placeholder="Enter discount code" />
                       <Button type="button" variant="outline" onClick={applyDiscount} disabled={quoting}>{quoting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Apply"}</Button>
                     </div>
                     <p className="text-xs text-muted-foreground">Your final price is recalculated and validated securely when you submit.</p>
                   </div>
                   <div className="space-y-2"><Label htmlFor="amount-paid">Amount transferred (ETB)</Label><Input id="amount-paid" type="number" min="1" step="0.01" required value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
                   <div className="space-y-2"><Label htmlFor="receipt-file">Payment receipt (JPG or PNG, max 5 MB)</Label><Input id="receipt-file" type="file" accept="image/jpeg,image/png" required onChange={(e) => setReceipt(e.target.files?.[0] || null)} />{receipt && <p className="text-xs text-muted-foreground">{receipt.name} · {(receipt.size / 1024).toFixed(0)} KB</p>}</div>
-                  <Button className="w-full" type="submit" disabled={submitting || !receipt || !selectedMethod || price <= 0}>{submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Uploading and submitting…</> : <><Upload className="mr-2 h-4 w-4" />Submit receipt</>}</Button>
+                  <Button className="w-full" type="submit" disabled={submitting || !receipt || !selectedMethod || price <= 0 || !quoteReady}>{submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Uploading and submitting…</> : <><Upload className="mr-2 h-4 w-4" />Submit receipt</>}</Button>
                 </form>}
               {payment?.status === "Rejected" && <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm"><p className="font-semibold text-destructive">Previous receipt rejected</p><p>{payment.rejectionReason || "Please upload a correct receipt."}</p></div>}
               <p className="flex items-center gap-2 text-xs text-muted-foreground"><ShieldCheck className="h-4 w-4" /> Receipts are uploaded securely. Access is granted only after administrator approval.</p>
