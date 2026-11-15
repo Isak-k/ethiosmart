@@ -33,7 +33,29 @@ service cloud.firestore {
       allow write: if isAdminOrSuper() || isAdmin();
     }
 
-    // --- Users Collection ---
+
+    // --- Manual payment system: clients are read-only; trusted callable functions write ---
+    match /paymentSettings/{settingId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+
+    match /payments/{paymentId} {
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isAdminOrSuper()
+      );
+      allow create, update, delete: if false;
+    }
+
+    match /paymentAccounts/{userId} {
+      allow read: if isUser(userId) || isAdminOrSuper();
+      allow write: if false;
+    }
+
+    match /receiptFingerprints/{fingerprintId} {
+      allow read, write: if false;
+    }
+\n    // --- Users Collection ---
     match /users/{userId} {
       allow read: if isUser(userId) || isAdmin();
       allow create: if isAdmin() || (
