@@ -178,10 +178,16 @@ export async function saveAnswer(
   questionId: string,
   answerData: Omit<Answer, 'attemptId' | 'questionId'>
 ) {
-  const answer: Answer = {
+  // Never persist client-computed correctness. Official grading is performed
+  // by the trusted callable using the question bank on the server.
+  const { isCorrect: _clientIsCorrect, manualGrade: _clientManualGrade, ...studentAnswerData } =
+    answerData as Omit<Answer, 'attemptId' | 'questionId'> & { manualGrade?: number };
+  const answer = {
     questionId,
     attemptId,
-    ...answerData,
+    selectedOptionIndex: studentAnswerData.selectedOptionIndex ?? null,
+    studentAnswer: studentAnswerData.studentAnswer ?? null,
+    timeSpentSeconds: studentAnswerData.timeSpentSeconds ?? null,
     answeredAt: Timestamp.now()
   };
   
