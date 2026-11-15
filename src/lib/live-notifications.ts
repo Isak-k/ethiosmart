@@ -136,12 +136,14 @@ export async function fetchRecentNotifications(userDeptId?: string): Promise<App
       else if (data.createdAt?.seconds) ts = data.createdAt.seconds * 1000;
 
       const isNote = data.resourceType === 'short_note';
+      // Point to the category *list* view (Library), not the individual detail
+      // page, so the user can browse all notes/books in that category.
       notifications.push({
         id: `book_${doc.id}`,
         type: isNote ? 'short_note' : 'book',
         title: isNote ? `New Study Note: ${data.title}` : `New Textbook: ${data.title}`,
         description: data.description || (isNote ? 'Quick revision notes have been uploaded.' : 'A new curriculum textbook is available.'),
-        link: `/dashboard/books/${doc.id}`,
+        link: isNote ? '/dashboard/books?type=notes' : '/dashboard/books?type=books',
         timestamp: ts,
         departmentId: data.departmentId,
         isRead: readIds.has(`book_${doc.id}`),
@@ -264,12 +266,14 @@ export function subscribeToLivePublications(
         const notifId = `book_${change.doc.id}`;
         if (ts > mountTime && !readIds.has(notifId)) {
           const isNote = data.resourceType === 'short_note';
+          // Point to the category *list* view (Library), not the individual detail
+          // page, so the user can browse all notes/books in that category.
           onNewItem({
             id: notifId,
             type: isNote ? 'short_note' : 'book',
             title: isNote ? `New Study Note: ${data.title}` : `New Textbook: ${data.title}`,
             description: data.description || (isNote ? 'New study notes uploaded to your library.' : 'New textbook available for download.'),
-            link: `/dashboard/books/${change.doc.id}`,
+            link: isNote ? '/dashboard/books?type=notes' : '/dashboard/books?type=books',
             timestamp: ts,
             departmentId: data.departmentId,
             isRead: false,
