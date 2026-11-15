@@ -1,4 +1,5 @@
 import { Book } from '@/types/book';
+import { auth } from '@/integrations/firebase/client';
 import { incrementBookDownload } from '@/lib/books';
 import { formatFileSize, extractDriveFileId } from '@/lib/google-drive';
 
@@ -225,74 +226,39 @@ export async function downloadAndSaveBookOffline(
   onProgress?: (message: string) => void,
   onProgressPercent?: (percent: number) => void
 ): Promise<void> {
-  const fileId = book.driveFileId || extractDriveFileId(book.driveUrl || '');
-  if (!fileId) {
-    throw new Error('This resource does not have a valid Google Drive file ID.');
+  if (!auth.currentUser) {
+    throw new Error('Please sign in again before downloading this resource.');
   }
 
-  onProgress?.('Connecting to Google Drive...');
+  onProgress?.('Verifying your access and connecting...');
+  const idToken = await auth.currentUser.getIdToken();
+  const proxyUrl = `/api/drive/download?bookId=${encodeURIComponent(book.id)}`;
+  const response = await fetch(proxyUrl, {
+    headers: { Authorization: `Bearer ${idToken}` },
+  });
 
-  let blob: Blob | null = null;
-  let resolvedFileName = `${book.title}.pdf`;
-
-  // 1. Try local dev bridge / proxy first
-  try {
-    onProgress?.('Downloading document file...');
-    const proxyUrl = `/api/drive/download?fileId=${encodeURIComponent(fileId)}`;
-    const res = await fetch(proxyUrl);
-    if (res.ok) {
-      const contentType = res.headers.get('content-type') || '';
-      if (!contentType.includes('text/html')) {
-        const potentialBlob = await readResponseWithProgress(res, onProgressPercent);
-        if (potentialBlob.size > 50) {
-          const head = new Uint8Array(await potentialBlob.slice(0, 5).arrayBuffer());
-          if (head[0] === 0x25 && head[1] === 0x50 && head[2] === 0x44 && head[3] === 0x46) {
-            blob = potentialBlob;
-            const disposition = res.headers.get('content-disposition');
-            if (disposition) {
-              const match = disposition.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)["']?/i);
-              if (match && match[1]) {
-                resolvedFileName = decodeURIComponent(match[1]);
-              }
-            }
-          }
-        }
-      }
-    }
-  } catch (e) {
-    console.warn('Proxy download attempt failed, falling back to direct URL:', e);
+  if (!response.ok) {
+    const errorPayload = await response.json().catch(() => ({}));
+    throw new Error(errorPayload.error || 'You are not authorized to download this resource.');
   }
 
-  // 2. Fallback to direct Google Drive export download
-  if (!blob || blob.size === 0) {
-    try {
-      const directUrl = `https://drive.google.com/uc?export=download&id=${encodeURIComponent(fileId)}`;
-      const res = await fetch(directUrl, { mode: 'cors' });
-      if (res.ok) {
-        blob = await readResponseWithProgress(res, onProgressPercent);
-      }
-    } catch (e) {
-      console.warn('Direct fetch failed:', e);
-    }
-  }
-
-  if (!blob || blob.size === 0) {
-    throw new Error(
-      'Could not download file from Google Drive. Please ensure the file is shared with "Anyone with the link can view".'
-    );
-  }
-
-  // Ensure downloaded payload is valid PDF binary
+  onProgress?.('Downloading authorized document...');
+  const blob = await readResponseWithProgress(response, onProgressPercent);
   const headBytes = new Uint8Array(await blob.slice(0, 5).arrayBuffer());
-  const isPdf = headBytes[0] === 0x25 && headBytes[1] === 0x50 && headBytes[2] === 0x44 && headBytes[3] === 0x46;
+  const isPdf = headBytes[0] === 0x25 && headBytes[1] === 0x50 &&
+    headBytes[2] === 0x44 && headBytes[3] === 0x46;
   if (!isPdf) {
-    throw new Error('The downloaded content is not a valid PDF file. Please ensure public access permissions are enabled on the Google Drive file.');
+    throw new Error('The downloaded content is not a valid PDF document.');
   }
+
+  const disposition = response.headers.get('content-disposition');
+  const fileNameMatch = disposition?.match(/filename="([^"]+)"/i);
+  const resolvedFileName = fileNameMatch?.[1]
+    ? decodeURIComponent(fileNameMatch[1])
+    : `${book.title}.pdf`;
 
   onProgress?.('Saving to local storage for offline browsing...');
   await saveBookOffline(book, blob, resolvedFileName);
-
-  // Increment download counter in Firestore (non-blocking)
   incrementBookDownload(book.id).catch(() => {});
 }
 
