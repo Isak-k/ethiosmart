@@ -293,7 +293,6 @@ service cloud.firestore {
     function canAccessCommunityChannel(channelId) {
       return isCommunityStaff() ||
         channelId == 'announcements' ||
-        channelId == 'general' ||
         (
           isAuthenticated() &&
           exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
@@ -313,6 +312,8 @@ service cloud.firestore {
         allow create: if isAuthenticated() &&
           canAccessCommunityChannel(channelId) &&
           request.resource.data.userId == request.auth.uid &&
+          request.resource.data.userRole ==
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role &&
           request.resource.data.text is string &&
           request.resource.data.text.size() <= 5000 &&
           request.resource.data.userName is string &&
