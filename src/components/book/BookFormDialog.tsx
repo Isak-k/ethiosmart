@@ -323,8 +323,8 @@ export function BookFormDialog({
 
     const finalFileId = driveFileId || extractDriveFileId(driveUrl);
     const hasExistingProtectedFile = Boolean(book?.storagePath);
-    if (!protectedFile && !hasExistingProtectedFile && !finalFileId) {
-      setFormError('Upload a private PDF or enter a valid Google Drive sharing URL.');
+    if (!protectedFile && !hasExistingProtectedFile && !book?.driveFileId && !book?.driveUrl) {
+      setFormError('New learning resources must use a private PDF upload. Google Drive is available only to keep existing legacy resources working during migration.');
       return;
     }
     if (protectedFile && (protectedFile.type !== 'application/pdf' || protectedFile.size > 25 * 1024 * 1024)) {
@@ -806,7 +806,7 @@ export function BookFormDialog({
             ) : book?.storagePath ? (
               <p className="text-xs text-emerald-700 dark:text-emerald-400">A private Firebase file is already attached. Upload a new PDF to replace it.</p>
             ) : (
-              <p className="text-xs text-muted-foreground">PDF only, maximum 25 MB. Students receive access only after server-side entitlement checks.</p>
+              <p className="text-xs text-muted-foreground">PDF only, maximum 25 MB. New resources must use this private upload. Students receive access only after server-side entitlement checks.</p>
             )}
           </div>
 
