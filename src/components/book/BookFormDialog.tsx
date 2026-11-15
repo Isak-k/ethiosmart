@@ -837,7 +837,8 @@ export function BookFormDialog({
               </div>
             )}
 
-            {/* Choose Chapter for this Link */}
+            {/* Choose Chapter for this Link — only relevant for study notes scoped to a chapter */}
+            {resourceType !== 'textbook' && (
             <div className="pt-3 border-t border-primary/20 space-y-2.5">
               <div className="flex items-center justify-between">
                 <Label className="text-xs font-semibold flex items-center gap-1.5 text-foreground">
@@ -977,6 +978,7 @@ export function BookFormDialog({
                 </div>
               )}
             </div>
+            )}
           </div>
 
           {/* Title & Author */}

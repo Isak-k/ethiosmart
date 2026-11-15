@@ -5,6 +5,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import {
   Book,
   BookInput,
+  BookStatus,
   ShortNoteSection,
   KeyTerm,
   ShortNoteSourceType,
@@ -230,6 +231,8 @@ export default function AdminShortnotesStudio() {
   const [existingNotesList, setExistingNotesList] = useState<Book[]>([]);
   const [loadingExistingNotes, setLoadingExistingNotes] = useState(false);
   const [existingNotesSearch, setExistingNotesSearch] = useState('');
+  const [listActionNoteId, setListActionNoteId] = useState<string | null>(null);
+  const [noteToDeleteFromList, setNoteToDeleteFromList] = useState<Book | null>(null);
 
   const handleOpenBrowseNotes = async () => {
     setBrowseNotesOpen(true);
@@ -256,6 +259,55 @@ export default function AdminShortnotesStudio() {
       );
     });
   }, [existingNotesList, existingNotesSearch]);
+
+  const handleToggleNoteStatusFromList = async (note: Book) => {
+    const nextStatus: BookStatus = note.status === 'published' ? 'draft' : 'published';
+    setListActionNoteId(note.id);
+    try {
+      await updateBook(note.id, { status: nextStatus });
+      setExistingNotesList((prev) =>
+        prev.map((n) => (n.id === note.id ? { ...n, status: nextStatus } : n))
+      );
+      toast({
+        title: nextStatus === 'published' ? 'Note Published' : 'Saved as Draft',
+        description:
+          nextStatus === 'published'
+            ? `"${note.title}" is now visible to students.`
+            : `"${note.title}" is now hidden from students as a draft.`,
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Failed to update note',
+        description: err.message || 'Permission denied or network error.',
+        variant: 'destructive',
+      });
+    } finally {
+      setListActionNoteId(null);
+    }
+  };
+
+  const handleDeleteNoteFromList = async () => {
+    if (!noteToDeleteFromList) return;
+    const target = noteToDeleteFromList;
+    setListActionNoteId(target.id);
+    try {
+      await deleteBook(target.id);
+      setExistingNotesList((prev) => prev.filter((n) => n.id !== target.id));
+      toast({
+        title: 'Study Note Deleted',
+        description: `"${target.title}" has been permanently removed from the library.`,
+      });
+      setNoteToDeleteFromList(null);
+    } catch (err: any) {
+      toast({
+        title: 'Failed to delete note',
+        description: err.message || 'Permission denied or network error.',
+        variant: 'destructive',
+      });
+    } finally {
+      setListActionNoteId(null);
+    }
+  };
 
   const handleCoverFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -3260,6 +3312,37 @@ export default function AdminShortnotesStudio() {
                           <Edit className="h-3 w-3 mr-1" />
                           <span>{isCurrent ? 'Currently Editing' : 'Edit Note'}</span>
                         </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleToggleNoteStatusFromList(note)}
+                          disabled={listActionNoteId === note.id}
+                          title={note.status === 'published' ? 'Unpublish (move to draft)' : 'Publish note'}
+                          className={`rounded-xl text-xs font-semibold h-8 px-3 ${
+                            note.status === 'published'
+                              ? 'border-amber-500/40 text-amber-600 hover:bg-amber-500/10'
+                              : 'border-emerald-500/40 text-emerald-600 hover:bg-emerald-500/10'
+                          }`}
+                        >
+                          {listActionNoteId === note.id ? (
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          ) : note.status === 'published' ? (
+                            <GlobeLock className="h-3 w-3 mr-1" />
+                          ) : (
+                            <Globe className="h-3 w-3 mr-1" />
+                          )}
+                          <span>{note.status === 'published' ? 'Draft' : 'Publish'}</span>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setNoteToDeleteFromList(note)}
+                          disabled={listActionNoteId === note.id}
+                          title="Delete note"
+                          className="rounded-xl text-xs font-semibold h-8 px-2.5 border-destructive/40 text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
                       </div>
                     </div>
                   );
@@ -3268,6 +3351,34 @@ export default function AdminShortnotesStudio() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Delete Note (from picker list) Confirmation Dialog */}
+        <AlertDialog open={Boolean(noteToDeleteFromList)} onOpenChange={(o) => !o && setNoteToDeleteFromList(null)}>
+          <AlertDialogContent className="rounded-3xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete This Study Note?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to permanently delete &quot;{noteToDeleteFromList?.title}&quot;?
+                All sections, learning outcomes, definitions, and exercises in this note will be erased.
+                This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="rounded-xl" disabled={Boolean(listActionNoteId)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleDeleteNoteFromList();
+                }}
+                disabled={Boolean(listActionNoteId)}
+                className="rounded-xl bg-destructive hover:bg-destructive/90 text-white font-semibold"
+              >
+                {listActionNoteId && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Delete Note
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Delete Current Note Confirmation Dialog */}
         <AlertDialog open={deleteNoteDialogOpen} onOpenChange={setDeleteNoteDialogOpen}>
