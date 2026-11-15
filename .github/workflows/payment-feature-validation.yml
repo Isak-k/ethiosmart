@@ -35,3 +35,5 @@ jobs:
         working-directory: functions
       - run: npm run build
         working-directory: functions
+      - run: npm test -- --runInBand src/payment-discounts.test.ts
+        working-directory: functions
