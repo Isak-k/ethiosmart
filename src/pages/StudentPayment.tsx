@@ -14,6 +14,7 @@ import { Loader2, Upload, CheckCircle2, Clock3, ShieldCheck, CreditCard } from "
 const functions = getFunctions(app);
 const getPaymentSettings = httpsCallable(functions, "getPaymentSettings");
 const createReceiptUploadSignature = httpsCallable(functions, "createReceiptUploadSignature");
+const quotePaymentDiscount = httpsCallable(functions, "quotePaymentDiscount");
 const submitPayment = httpsCallable(functions, "submitPayment");
 const getMyPayment = httpsCallable(functions, "getMyPayment");
 
@@ -24,6 +25,9 @@ export default function StudentPayment() {
   const { toast } = useToast();
   const [methods, setMethods] = useState<Method[]>([]);
   const [price, setPrice] = useState(0);
+  const [discountCode, setDiscountCode] = useState("");
+  const [discountQuote, setDiscountQuote] = useState<any>(null);
+  const [quoting, setQuoting] = useState(false);
   const [instructions, setInstructions] = useState("");
   const [selectedMethod, setSelectedMethod] = useState("");
   const [amount, setAmount] = useState("");
@@ -57,6 +61,20 @@ export default function StudentPayment() {
     return () => { active = false; };
   }, [toast]);
 
+  const applyDiscount = async () => {
+    setQuoting(true);
+    try {
+      const result = await quotePaymentDiscount({ discountCode });
+      setDiscountQuote(result.data as any);
+      toast({ title: "Discount updated", description: "The payable amount was calculated by the server." });
+    } catch (error: any) {
+      setDiscountQuote(null);
+      toast({ title: "Discount not applied", description: error?.message || "Check the code and try again.", variant: "destructive" });
+    } finally {
+      setQuoting(false);
+    }
+  };
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!user || !receipt || !selectedMethod) return;
@@ -88,9 +106,9 @@ export default function StudentPayment() {
       const fingerprint = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
       await submitPayment({
         paymentId, methodId: selectedMethod, receiptUrl: uploaded.secure_url,
-        receiptPublicId: uploaded.public_id, receiptFingerprint: fingerprint, amountPaid: paid,
+        receiptPublicId: uploaded.public_id, receiptFingerprint: fingerprint, amountPaid: paid, discountCode: discountCode.trim(),
       });
-      setPayment({ status: "Pending", expectedAmountEtb: price, amountPaidEtb: paid, methodName: methods.find((m) => m.id === selectedMethod)?.name });
+      setPayment({ status: "Pending", expectedAmountEtb: discountQuote?.finalAmountEtb ?? price, amountPaidEtb: paid, methodName: methods.find((m) => m.id === selectedMethod)?.name });
       setReceipt(null);
       toast({ title: "Receipt submitted", description: "Your payment is pending administrator review." });
     } catch (error: any) {
@@ -111,11 +129,28 @@ export default function StudentPayment() {
           <Card>
             <CardHeader><CardTitle className="flex items-center gap-2"><CreditCard className="h-5 w-5" /> Lifetime access</CardTitle><CardDescription>One-time payment. No recurring subscription.</CardDescription></CardHeader>
             <CardContent className="space-y-5">
-              <div className="rounded-xl bg-primary/5 p-4"><p className="text-sm text-muted-foreground">Current price</p><p className="text-3xl font-bold">{price.toLocaleString()} ETB</p></div>
+              <div className="rounded-xl bg-primary/5 p-4 space-y-2">
+                <p className="text-sm text-muted-foreground">Payment price</p>
+                <p className="text-3xl font-bold">{(discountQuote?.finalAmountEtb ?? price).toLocaleString()} ETB</p>
+                {discountQuote && <div className="text-sm space-y-1">
+                  <p className="text-muted-foreground">Original price: {Number(discountQuote.originalPriceEtb).toLocaleString()} ETB</p>
+                  <p className="text-emerald-600">Discount: −{Number(discountQuote.discountEtb).toLocaleString()} ETB</p>
+                  <p className="font-semibold">You should transfer: {Number(discountQuote.finalAmountEtb).toLocaleString()} ETB</p>
+                  {discountQuote.discount?.label && <p className="text-xs text-muted-foreground">Applied: {discountQuote.discount.label}</p>}
+                </div>}
+              </div>
               {methods.length === 0 ? <p className="text-sm text-muted-foreground">Payment methods are not available yet. Please contact the administrator.</p> :
                 <form onSubmit={submit} className="space-y-4">
                   <div className="space-y-2"><Label>Choose payment method</Label><div className="grid gap-2 sm:grid-cols-2">{methods.map((method) => <button type="button" key={method.id} onClick={() => setSelectedMethod(method.id)} className={`rounded-xl border p-3 text-left transition ${selectedMethod === method.id ? "border-primary bg-primary/5 ring-1 ring-primary" : "hover:bg-muted"}`}><span className="font-semibold">{method.name}</span>{method.accountName && <span className="block text-xs text-muted-foreground">{method.accountName}</span>}{method.accountNumber && <span className="block text-sm font-medium">{method.accountNumber}</span>}{method.instructions && <span className="mt-1 block text-xs text-muted-foreground">{method.instructions}</span>}</button>)}</div></div>
                   {instructions && <div className="rounded-lg bg-muted p-3 text-sm">{instructions}</div>}
+                  <div className="space-y-2">
+                    <Label htmlFor="discount-code">Discount code (optional)</Label>
+                    <div className="flex gap-2">
+                      <Input id="discount-code" value={discountCode} onChange={(e) => { setDiscountCode(e.target.value.toUpperCase()); setDiscountQuote(null); }} placeholder="Enter discount code" />
+                      <Button type="button" variant="outline" onClick={applyDiscount} disabled={quoting}>{quoting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Apply"}</Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Your final price is recalculated and validated securely when you submit.</p>
+                  </div>
                   <div className="space-y-2"><Label htmlFor="amount-paid">Amount transferred (ETB)</Label><Input id="amount-paid" type="number" min="1" step="0.01" required value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
                   <div className="space-y-2"><Label htmlFor="receipt-file">Payment receipt (JPG or PNG, max 5 MB)</Label><Input id="receipt-file" type="file" accept="image/jpeg,image/png" required onChange={(e) => setReceipt(e.target.files?.[0] || null)} />{receipt && <p className="text-xs text-muted-foreground">{receipt.name} · {(receipt.size / 1024).toFixed(0)} KB</p>}</div>
                   <Button className="w-full" type="submit" disabled={submitting || !receipt || !selectedMethod || price <= 0}>{submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Uploading and submitting…</> : <><Upload className="mr-2 h-4 w-4" />Submit receipt</>}</Button>
