@@ -1,0 +1,21 @@
+name: Firebase security rules validation
+
+on:
+  push:
+    branches:
+      - feature/manual-payment-system
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  rules:
+    name: Compile Firestore and Storage rules in emulators
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Validate Firebase security rules
+        run: npx --yes firebase-tools@14 emulators:exec --project demo-ethiosmart --only firestore,storage "echo Firebase security rules compiled successfully"
