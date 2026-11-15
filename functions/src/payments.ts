@@ -144,7 +144,7 @@ export const submitPayment = functions.https.onCall(async (data, context) => {
   const verifiedReceipt = await verifyCloudinaryReceipt(receiptUrl, expectedPublicId);
   const fingerprint = verifiedReceipt.fingerprint;
   if (!/^[a-zA-Z0-9_-]{12,80}$/.test(paymentId) || !methodId ||
-      !isCloudinaryReceipt(receiptUrl) || !receiptPublicId.startsWith(RECEIPT_FOLDER + '/')) {
+      !receiptPublicId.startsWith(RECEIPT_FOLDER + '/')) {
     throw new functions.https.HttpsError('invalid-argument', 'A valid payment method and uploaded JPG/PNG receipt are required.');
   }
   const settingsSnap = await db.doc(SETTINGS_PATH).get();
@@ -240,8 +240,8 @@ export const getPaymentAdminData = functions.https.onCall(async (data, context) 
   if (status && ['Pending', 'Approved', 'Rejected'].includes(status)) {
     query = db.collection(paymentCollection).where('status', '==', status).orderBy('submittedAt', 'desc').limit(limit);
   }
-  const [paymentsSnap, allPaymentsSnap, settingsSnap] = await Promise.all([
-    query.get(), db.collection(paymentCollection).orderBy('submittedAt', 'desc').limit(2000).get(), Promise.resolve(settingsSnap),
+  const [paymentsSnap, allPaymentsSnap] = await Promise.all([
+    query.get(), db.collection(paymentCollection).orderBy('submittedAt', 'desc').limit(2000).get(),
   ]);
   const payments = paymentsSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
   const allPayments = allPaymentsSnap.docs.map((doc) => doc.data());
