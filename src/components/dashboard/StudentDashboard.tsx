@@ -8,7 +8,7 @@ import { SimpleLeaderboard } from "@/components/SimpleLeaderboard";
 import { StatCard } from "./StatCard";
 import { ExamCard } from "@/components/exam/ExamCard";
 import { DashboardNotificationsSection } from "@/components/dashboard/DashboardNotificationsSection";
-import { ClipboardList, Trophy, Clock, CheckCircle, Sparkles, GraduationCap, Users } from "lucide-react";
+import { ClipboardList, Trophy, Clock, CheckCircle, Sparkles, GraduationCap, Users, Wallet, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
 import { EthioAccentBar } from "@/components/ui/EthioAccentBar";
@@ -128,6 +128,31 @@ export function StudentDashboard() {
         </div>
         <EthioAccentBar className="absolute bottom-0 left-0 right-0" size="sm" />
       </LiquidTiltCard>
+
+      {/* Payment and lifetime access shortcut */}
+      <Link
+        to="/dashboard/payment"
+        className="group block rounded-3xl border border-blue-500/25 bg-gradient-to-r from-blue-600/10 via-sky-500/10 to-cyan-500/10 p-5 shadow-sm transition-all hover:border-blue-500/50 hover:shadow-lg"
+      >
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3.5">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-md shadow-blue-600/20 transition-transform group-hover:scale-105">
+              <Wallet className="h-6 w-6" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="flex items-center gap-2 text-base font-bold text-foreground transition-colors group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                Payment & Learning Access
+              </h2>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                View your payment status, choose a payment method, upload a receipt, and unlock full learning access.
+              </p>
+            </div>
+          </div>
+          <span className="inline-flex h-10 shrink-0 items-center justify-center gap-2 self-start rounded-xl bg-blue-600 px-4 text-xs font-semibold text-white transition-colors group-hover:bg-blue-700 sm:self-center">
+            Manage Payment <ArrowRight className="h-4 w-4" />
+          </span>
+        </div>
+      </Link>
 
       {/* Academic Stats */}
       <div className="space-y-3">
