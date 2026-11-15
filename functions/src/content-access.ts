@@ -211,8 +211,7 @@ export const getStudentBook = functions.https.onCall(async (data, context) => {
 
   let protectedDownloadUrl: string | null = null;
   if (typeof book.storagePath === 'string' &&
-      book.storagePath.startsWith('protected-books/') &&
-      book.allowDownload !== false) {
+      book.storagePath.startsWith('protected-books/')) {
     try {
       const [signedUrl] = await admin.storage().bucket().file(book.storagePath).getSignedUrl({
         action: 'read',
