@@ -1,4 +1,5 @@
-import { db } from '@/integrations/firebase/client';
+import app, { db } from '@/integrations/firebase/client';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import {
   collection,
   doc,
@@ -28,6 +29,9 @@ import {
 
 const BOOKS_COLLECTION = 'books';
 const BOOKMARKS_COLLECTION = 'bookBookmarks';
+const contentFunctions = getFunctions(app);
+const getStudentBookCatalogCallable = httpsCallable(contentFunctions, 'getStudentBookCatalog');
+const getStudentBookCallable = httpsCallable(contentFunctions, 'getStudentBook');
 
 /**
  * Fetch all books matching filter options with department & role protection.
@@ -38,10 +42,54 @@ export async function getBooks(
   userDeptId?: string
 ): Promise<Book[]> {
   const cacheKey = `books_${userRole || 'student'}_${userDeptId || 'all'}_${JSON.stringify(options)}`;
-  const cachedList = getCachedData<Book[]>(cacheKey);
-  if (cachedList) {
-    return cachedList;
+  const isAdmin = userRole === 'admin' || userRole === 'superadmin';
+
+  // Student catalogs are delivered by a callable that omits protected fields.
+  // Always ask the server first; only previously cached metadata is a fallback.
+  if (!isAdmin) {
+    try {
+      const response = await getStudentBookCatalogCallable();
+      const payload = response.data as { books?: Book[] };
+      let list = payload.books || [];
+      const targetDeptId = options.departmentId || userDeptId;
+      if (targetDeptId && targetDeptId !== 'all') {
+        list = list.filter((book) =>
+          !book.departmentId || book.departmentId === 'all' ||
+          book.departmentId === targetDeptId ||
+          (Array.isArray(book.departmentIds) &&
+            (book.departmentIds.includes(targetDeptId) || book.departmentIds.includes('all')))
+        );
+      }
+      if (options.subjectId && options.subjectId !== 'all') {
+        list = list.filter((book) => book.subjectId === options.subjectId);
+      }
+      if (options.resourceType && options.resourceType !== 'all') {
+        list = list.filter((book) => book.resourceType === options.resourceType);
+      }
+      if (options.searchQuery?.trim()) {
+        const search = options.searchQuery.toLowerCase().trim();
+        list = list.filter((book) =>
+          book.title?.toLowerCase().includes(search) ||
+          book.author?.toLowerCase().includes(search) ||
+          book.description?.toLowerCase().includes(search) ||
+          book.subjectName?.toLowerCase().includes(search) ||
+          (Array.isArray(book.chapterLabels) && book.chapterLabels.some((label) => label.toLowerCase().includes(search)))
+        );
+      }
+      setCachedData(cacheKey, list, 60 * 1000);
+      return list;
+    } catch (error) {
+      console.warn('Secure book catalog unavailable; falling back to cached device metadata:', error);
+      try {
+        return await getDeviceBooks(options, userRole, userDeptId);
+      } catch {
+        return [];
+      }
+    }
   }
+
+  const cachedList = getCachedData<Book[]>(cacheKey);
+  if (cachedList) return cachedList;
 
   try {
     const booksRef = collection(db, BOOKS_COLLECTION);
@@ -148,18 +196,16 @@ export async function getBooks(
  */
 export async function getBook(id: string): Promise<Book | null> {
   try {
-    const docRef = doc(db, BOOKS_COLLECTION, id);
-    const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      const book = {
-        id: snap.id,
-        ...restoreFirestoreData(snap.data()),
-      } as Book;
-      saveDeviceBooks([book]).catch(() => {});
-      return book;
-    }
+    const response = await getStudentBookCallable({ bookId: id });
+    const payload = response.data as { book: Book };
+    const book = {
+      ...restoreFirestoreData(payload.book),
+      id: payload.book.id || id,
+    } as Book;
+    saveDeviceBooks([book]).catch(() => {});
+    return book;
   } catch (error) {
-    console.warn(`Error fetching book ${id} from Firestore, trying device storage:`, error);
+    console.warn(`Secure book fetch failed for ${id}; trying previously authorized offline content:`, error);
   }
 
   // Offline device storage fallback
