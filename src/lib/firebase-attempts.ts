@@ -180,14 +180,12 @@ export async function saveAnswer(
 ) {
   // Never persist client-computed correctness. Official grading is performed
   // by the trusted callable using the question bank on the server.
-  const { isCorrect: _clientIsCorrect, manualGrade: _clientManualGrade, ...studentAnswerData } =
-    answerData as Omit<Answer, 'attemptId' | 'questionId'> & { manualGrade?: number };
   const answer = {
     questionId,
     attemptId,
-    selectedOptionIndex: studentAnswerData.selectedOptionIndex ?? null,
-    studentAnswer: studentAnswerData.studentAnswer ?? null,
-    timeSpentSeconds: studentAnswerData.timeSpentSeconds ?? null,
+    selectedOptionIndex: answerData.selectedOptionIndex ?? null,
+    studentAnswer: answerData.studentAnswer ?? null,
+    timeSpentSeconds: answerData.timeSpentSeconds ?? null,
     answeredAt: Timestamp.now()
   };
   
