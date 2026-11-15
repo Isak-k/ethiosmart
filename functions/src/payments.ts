@@ -283,6 +283,17 @@ export const reviewPayment = functions.https.onCall(async (data, context) => {
       rejectionReason: decision === 'Rejected' ? reason : null,
     };
     tx.update(paymentRef, decisionData);
+    const notificationRef = db.collection('userNotifications').doc(payment.userId).collection('items').doc('payment_' + paymentId);
+    tx.set(notificationRef, {
+      type: 'payment',
+      title: decision === 'Approved' ? 'Payment approved' : 'Payment receipt rejected',
+      description: decision === 'Approved'
+        ? 'Your payment was approved. Lifetime access is now active.'
+        : 'Your receipt was rejected: ' + reason,
+      link: '/dashboard/payment',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      isRead: false,
+    });
     tx.set(accountRef, {
       pendingPaymentId: admin.firestore.FieldValue.delete(),
       lastPaymentId: paymentId,
