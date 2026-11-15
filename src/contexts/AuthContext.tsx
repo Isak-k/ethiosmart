@@ -213,7 +213,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }, 3000);
     }
 
-    // Try to restore session from localStorage first
+    // Try to restore session from localStorage first so returning users
+    // don't have to stare at the splash while Firebase re-hydrates the session.
     const restoredData = getSessionRestoreData();
     if (restoredData && !user) {
       console.log('✓ Restored session from storage');
@@ -221,6 +222,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setRole(restoredData.role as AppRole);
       setIsOfflineMode(true);
       setOfflineModeInfo(getOfflineModeInfo());
+
+      // Rebuild a lightweight user object from the cache so route guards work
+      // immediately; Firebase replaces it with the real user once ready.
+      if (restoredData.user?.uid) {
+        const cachedUser = {
+          uid: restoredData.user.uid,
+          email: restoredData.user.email,
+          displayName: restoredData.user.displayName ?? null,
+          isAnonymous: false,
+        } as unknown as User;
+        setUser(cachedUser);
+        setSession({ user: cachedUser });
+      }
+
+      // We already have everything needed to render — skip the splash.
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
+      }
+      setLoading(false);
+      globalAuthInitialized = true;
     }
 
     // Setup online/offline listeners
