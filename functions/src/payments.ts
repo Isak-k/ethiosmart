@@ -106,7 +106,21 @@ async function verifyCloudinaryReceipt(url: string, expectedPublicId: string): P
 export const getPaymentSettings = functions.https.onCall(async (_data, context) => {
   requireAuth(context);
   const snap = await db.doc(SETTINGS_PATH).get();
-  return snap.exists ? snap.data() : defaultSettings();
+  const settings = snap.exists ? snap.data()! : defaultSettings();
+  return {
+    enabled: settings.enabled !== false,
+    mode: settings.mode === 'sandbox' ? 'sandbox' : 'production',
+    currency: 'ETB',
+    priceEtb: Number(settings.priceEtb || 0),
+    paymentMethods: (settings.paymentMethods || []).map((method: any) => ({
+      id: method.id, name: method.name, type: method.type,
+      accountName: method.accountName, accountNumber: method.accountNumber,
+      instructions: method.instructions, enabled: method.enabled === true,
+    })),
+    instructions: settings.instructions || '',
+    support: settings.support || { inApp: true },
+    freeAccess: settings.freeAccess || defaultSettings().freeAccess,
+  };
 });
 
 export const createReceiptUploadSignature = functions.https.onCall(async (data, context) => {
@@ -167,13 +181,15 @@ export const submitPayment = functions.https.onCall(async (data, context) => {
   const accountRef = db.collection(accountCollection).doc(uid);
   const duplicateRef = fingerprint ? db.collection(fingerprintCollection).doc(fingerprint) : null;
   await db.runTransaction(async (tx) => {
-    const [accountSnap, paymentSnap, duplicateSnap] = await Promise.all([
+    const userRef = db.collection('users').doc(uid);
+    const [accountSnap, paymentSnap, duplicateSnap, userSnap] = await Promise.all([
       tx.get(accountRef),
       tx.get(paymentRef),
       duplicateRef ? tx.get(duplicateRef) : Promise.resolve(null),
+      tx.get(userRef),
     ]);
     const account = accountSnap.data() || {};
-    if (account.paymentAccess?.lifetime === true) {
+    if (account.paymentAccess?.lifetime === true || userSnap.data()?.paymentAccess?.lifetime === true) {
       throw new functions.https.HttpsError('already-exists', 'Your account already has lifetime access.');
     }
     if (account.pendingPaymentId) {
@@ -209,8 +225,12 @@ export const getMyPayment = functions.https.onCall(async (_data, context) => {
   const mode = settingsSnap.data()?.mode === 'sandbox' ? 'sandbox' : 'production';
   const accountCollection = mode === 'sandbox' ? 'sandboxPaymentAccounts' : 'paymentAccounts';
   const paymentCollection = mode === 'sandbox' ? 'sandboxPayments' : 'payments';
-  const accountSnap = await db.collection(accountCollection).doc(uid).get();
+  const [accountSnap, userSnap] = await Promise.all([
+    db.collection(accountCollection).doc(uid).get(), db.collection('users').doc(uid).get(),
+  ]);
   const account = accountSnap.data() || {};
+  const permanentAccess = userSnap.data()?.paymentAccess?.lifetime === true
+    ? userSnap.data()?.paymentAccess : account.paymentAccess || { lifetime: false };
   let payment: FirebaseFirestore.DocumentData | null = null;
   if (account.pendingPaymentId || account.lastPaymentId) {
     const id = account.pendingPaymentId || account.lastPaymentId;
@@ -225,7 +245,7 @@ export const getMyPayment = functions.https.onCall(async (_data, context) => {
       };
     }
   }
-  return { paymentAccess: account.paymentAccess || { lifetime: false }, paymentStatus: account.paymentStatus || null, payment };
+  return { paymentAccess: permanentAccess, paymentStatus: account.paymentStatus || null, payment };
 });
 
 export const getPaymentAdminData = functions.https.onCall(async (data, context) => {
