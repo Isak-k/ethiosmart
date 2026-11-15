@@ -78,6 +78,7 @@ async function resolveAuthorizedDriveFile(bookId: string, idToken: string): Prom
     `https://${region}-${projectId}.cloudfunctions.net/getStudentBook`;
 
   const response = await fetch(callableUrl, {
+    signal: AbortSignal.timeout(15000),
     method: 'POST',
     headers: {
       Authorization: `Bearer ${idToken}`,
@@ -127,8 +128,11 @@ async function downloadGoogleDriveBuffer(fileId: string): Promise<{ buffer: Buff
       docsRes.body.slice(0, 5).toString('ascii').startsWith('%PDF')) {
       return { buffer: docsRes.body, contentType: 'application/pdf', fileName: `${fileId}.pdf` };
     }
-  } catch {
-    // Try the regular Drive download route below.
+  } catch (error: any) {
+    // A size-limit or timeout failure is intentional; do not retry the same
+    // oversized/stalled document through the alternate Drive endpoint.
+    if (Number(error?.statusCode) === 413 || Number(error?.statusCode) === 504) throw error;
+    // Try the regular Drive download route below for unsupported Docs exports.
   }
 
   const downloadUrl = `https://drive.google.com/uc?export=download&id=${encodeURIComponent(fileId)}`;
