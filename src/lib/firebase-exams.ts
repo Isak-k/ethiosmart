@@ -498,6 +498,21 @@ export async function getQuestions(examId: string): Promise<Question[]> {
   return [];
 }
 
+/**
+ * Admin-only grading helper. The Firestore rules permit this direct read only
+ * for admins and exam creators; students must use getQuestions().
+ */
+export async function getAdminExamQuestions(examId: string): Promise<Question[]> {
+  if (!examId) return [];
+  const questionsRef = collection(db, 'exams', examId, 'questions');
+  const snapshot = await getDocs(query(questionsRef, orderBy('orderIndex', 'asc')));
+  return snapshot.docs.map((item) => ({
+    ...item.data(),
+    questionId: item.id,
+    examId,
+  } as Question));
+}
+
 export async function updateQuestion(examId: string, questionId: string, updates: Partial<Question>) {
   const docRef = doc(db, 'exams', examId, 'questions', questionId);
   const payload: Record<string, any> = {};
