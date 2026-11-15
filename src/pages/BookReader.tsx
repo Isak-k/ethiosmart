@@ -176,11 +176,14 @@ export default function BookReader() {
       setIsSavedOffline(saved);
       incrementBookView(id);
 
-      // Pre-fetch document binary via proxy for responsive Canvas reading on mobile and desktop
-      const targetFileId = normalizedBook.driveFileId;
-      if (targetFileId) {
-        fetch(`/api/drive/download?fileId=${encodeURIComponent(targetFileId)}`)
+      // Pre-fetch through the authenticated, entitlement-checking document proxy.
+      if (normalizedBook.driveFileId && user) {
+        user.getIdToken()
+          .then((idToken) => fetch(`/api/drive/download?bookId=${encodeURIComponent(normalizedBook.id)}`, {
+            headers: { Authorization: `Bearer ${idToken}` },
+          }))
           .then(async (res) => {
+            if (!res) return;
             if (res.ok) {
               const contentType = res.headers.get('content-type') || '';
               if (!contentType.includes('text/html')) {
