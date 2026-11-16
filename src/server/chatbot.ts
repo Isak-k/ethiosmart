@@ -96,7 +96,7 @@ export function resolveGeminiKey(): string | undefined {
 
 function resolveModel(): string {
   const raw = (process.env.CHATBOT_MODEL || '').trim();
-  return /^[A-Za-z0-9.-]{1,64}$/.test(raw) ? raw : 'gemini-3.5-flash-lite';
+  return /^[A-Za-z0-9.-]{1,64}$/.test(raw) ? raw : 'gemini-2.5-flash';
 }
 
 function isEnabled(): boolean {

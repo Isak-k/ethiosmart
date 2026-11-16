@@ -268,6 +268,6 @@ describe('prompt + gemini body', () => {
     expect(body.contents[0].role).toBe('user');
     expect(body.contents[1].role).toBe('model');
     expect(body.contents[2].parts[0].text).toBe('What is EthioSmart?');
-    expect(body.generationConfig.maxOutputTokens).toBe(350);
+    expect(body.generationConfig.maxOutputTokens).toBe(800);
   });
 });

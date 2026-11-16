@@ -34,12 +34,12 @@ const REQUEST_TIMEOUT_MS = 15_000;
  * GEMINI_API_KEY remains a secret (declared in runWith below) and is NOT here.
  */
 const CHATBOT_ENABLED = defineBoolean('CHATBOT_ENABLED', { default: true });
-const CHATBOT_MODEL = defineString('CHATBOT_MODEL', { default: 'gemini-3.5-flash-lite' });
+const CHATBOT_MODEL = defineString('CHATBOT_MODEL', { default: 'gemini-2.5-flash' });
 
 /** Conservative model id check — letters, digits, dots and hyphens only. */
 function resolveModel(): string {
   const raw = (CHATBOT_MODEL.value() || '').trim();
-  return /^[A-Za-z0-9.-]{1,64}$/.test(raw) ? raw : 'gemini-3.5-flash-lite';
+  return /^[A-Za-z0-9.-]{1,64}$/.test(raw) ? raw : 'gemini-2.5-flash';
 }
 
 const UNAVAILABLE_MESSAGE =
