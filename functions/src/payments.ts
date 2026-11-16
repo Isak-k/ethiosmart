@@ -152,7 +152,7 @@ export const quotePaymentDiscount = functions.https.onCall(async (data, context)
     db.doc(SETTINGS_PATH).get(),
   ]);
   const settings = settingsSnap.exists ? settingsSnap.data()! : defaultSettings();
-  if (settings.enabled !== true || Number(settings.priceEtb) <= 0) {
+  if (settings.enabled === false || Number(settings.priceEtb) <= 0) {
     throw new functions.https.HttpsError('failed-precondition', 'Payments are not configured yet.');
   }
   try {
@@ -186,7 +186,7 @@ export const submitPayment = functions.https.onCall(async (data, context) => {
   }
   const settingsSnap = await db.doc(SETTINGS_PATH).get();
   const settings = settingsSnap.exists ? settingsSnap.data()! : defaultSettings();
-  if (settings.enabled !== true || settings.priceEtb <= 0) {
+  if (settings.enabled === false || Number(settings.priceEtb) <= 0) {
     throw new functions.https.HttpsError('failed-precondition', 'Payments are not configured yet. Please contact the administrator.');
   }
   const method = (settings.paymentMethods || []).find((item: any) => item.id === methodId && item.enabled);

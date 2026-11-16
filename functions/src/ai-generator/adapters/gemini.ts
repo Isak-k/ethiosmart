@@ -18,7 +18,16 @@ export async function callGemini(
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-  const modelsToTry = ['gemini-2.5-flash', 'gemini-1.5-flash'];
+  const requestedModel = req.providerModels?.gemini;
+  const modelsToTry = [
+    ...(requestedModel ? [requestedModel] : []),
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite',
+    'gemini-2.5-pro',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash',
+    'gemini-1.5-pro'
+  ].filter((m, idx, arr) => arr.indexOf(m) === idx);
   let lastError: any = null;
 
   for (const model of modelsToTry) {

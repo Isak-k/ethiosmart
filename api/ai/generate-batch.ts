@@ -38,7 +38,12 @@ function loadEnvKeys(): ProviderKeys {
     gemini: process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || '',
     groq: process.env.GROQ_API_KEY || process.env.VITE_GROQ_API_KEY || '',
     openrouter: process.env.OPENROUTER_API_KEY || process.env.VITE_OPENROUTER_API_KEY || '',
-    huggingface: process.env.HUGGINGFACE_API_KEY || '',
+    huggingface:
+      process.env.HUGGINGFACE_API_KEY ||
+      process.env.HUGGING_FACE_API_KEY ||
+      process.env.VITE_HUGGING_FACE_API_KEY ||
+      process.env.VITE_HUGGINGFACE_API_KEY ||
+      '',
   };
 }
 
@@ -95,10 +100,10 @@ export default async function handler(req: any, res: any) {
     const envKeys = loadEnvKeys();
     const clientKeys = (body as any).providerKeys || {};
     const keys: ProviderKeys = {
-      gemini: clientKeys.gemini || envKeys.gemini,
-      groq: clientKeys.groq || envKeys.groq,
-      openrouter: clientKeys.openrouter || envKeys.openrouter,
-      huggingface: clientKeys.huggingface || envKeys.huggingface,
+      gemini: envKeys.gemini || clientKeys.gemini,
+      groq: envKeys.groq || clientKeys.groq,
+      openrouter: envKeys.openrouter || clientKeys.openrouter,
+      huggingface: envKeys.huggingface || clientKeys.huggingface,
     };
     const result = await orchestrateGenerationBatch(body, keys);
 

@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { usePaymentAccess } from "@/lib/payment-access";
 import { useAuth } from "@/contexts/AuthContext";
 import { getStoredGuestProfile } from "@/lib/guest-session";
 import { getExam, getQuestions } from "@/lib/firebase-exams";
@@ -65,6 +66,8 @@ import {
   AlertCircle, 
   Flag, 
   Check,
+  Lock,
+  Sparkles,
   X
 } from "lucide-react";
 import type { Exam, Question, PracticeExamConfig, ExamType, PracticeModeType } from "@/integrations/firebase/types";
@@ -93,6 +96,8 @@ const TakeExam = () => {
   const { id } = useParams<{ id: string }>();
   const { user, profile: authProfile, isGuest, requireStudentLogin } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const paymentAccess = usePaymentAccess();
   const { toast } = useToast();
   const { t } = useTranslation();
   
@@ -131,6 +136,7 @@ const TakeExam = () => {
   const [enteredPassword, setEnteredPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [isLockedExam, setIsLockedExam] = useState(false);
 
   // ============== Effects ==============
 
@@ -175,6 +181,57 @@ const TakeExam = () => {
       setPracticeConfig(loadedConfig);
       setExamType(loadedExam.examType || 'normal');
       setIsOfflineMode(isOffline);
+
+      // Enforce Free Trial: Chapter 1 is free for all students; Chapter 2+ requires lifetime access
+      const hasLifetime = Boolean(authProfile?.paymentAccess?.lifetime);
+      const isStaff = authProfile?.role === "admin" || authProfile?.role === "examiner" || authProfile?.role === "teacher";
+
+      if (paymentAccess.paymentsEnabled && !hasLifetime && !isStaff) {
+        const chapterParam = searchParams.get("chapter");
+        const freeExamIds: string[] = paymentAccess.freeAccess?.freeExamIds || [];
+        const examIdentifier = String(loadedExam.id || id || (loadedExam as any).examId || "");
+
+        let isChapterOne = false;
+
+        // 1. Explicit chapter navigation parameter (highest priority)
+        if (chapterParam === "1") {
+          isChapterOne = true;
+        } else if (chapterParam && parseInt(chapterParam, 10) > 1) {
+          isChapterOne = false;
+        } else if (freeExamIds.includes(examIdentifier)) {
+          // 2. Exam ID explicitly configured as free trial exam in admin payment settings
+          isChapterOne = true;
+        } else if (Number(loadedExam.unitNumber) === 1 || Number((loadedExam as any).chapterNumber) === 1) {
+          // 3. Document property unitNumber or chapterNumber equals 1
+          isChapterOne = true;
+        } else {
+          // 4. Check title or chapter title pattern
+          const titleText = String(loadedExam.title || (loadedExam as any).chapterTitle || "");
+          const match = titleText.match(/(?:chapter|unit|ch)\s*(\d+)/i);
+          if (match) {
+            isChapterOne = parseInt(match[1], 10) === 1;
+          } else if (loadedExam.chapterId && loadedExam.subjectId) {
+            // 5. Look up linked chapter document in Firestore
+            try {
+              const [{ doc, getDoc }, { db }] = await Promise.all([
+                import("firebase/firestore"),
+                import("@/integrations/firebase/client"),
+              ]);
+              const chSnap = await getDoc(doc(db, "subjects", loadedExam.subjectId, "chapters", loadedExam.chapterId));
+              if (chSnap.exists()) {
+                const chNum = chSnap.data()?.chapterNumber ?? chSnap.data()?.unitNumber;
+                isChapterOne = Number(chNum) === 1;
+              }
+            } catch {}
+          }
+        }
+
+        if (!isChapterOne) {
+          setIsLockedExam(true);
+          setLoading(false);
+          return;
+        }
+      }
 
       if (!loadedQuestions || loadedQuestions.length === 0) {
         setLoadError("This assessment does not have any questions uploaded yet. Please check back later.");
@@ -789,6 +846,40 @@ const TakeExam = () => {
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-10 w-10 animate-spin text-primary" />
           <p className="text-muted-foreground">{t("student.exam.loading")}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Locked Exam State for non-paid students
+  if (isLockedExam) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="max-w-md w-full p-6 sm:p-8 rounded-3xl border border-amber-500/30 bg-card text-center space-y-4 shadow-sm animate-fade-in">
+          <div className="h-16 w-16 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto">
+            <Lock className="h-8 w-8" />
+          </div>
+          <h2 className="text-xl font-bold font-display text-foreground">
+            Lifetime Access Required
+          </h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            This assessment belongs to an advanced chapter. Under the <strong>Free Trial</strong>, you can take any Chapter 1 exam for free. Upgrade to permanent Lifetime Access to unlock all chapters!
+          </p>
+          <div className="pt-2 flex flex-col gap-2.5">
+            <Button
+              onClick={() => navigate("/dashboard/payment")}
+              className="w-full h-11 rounded-xl bg-[#7c3aed] hover:bg-[#6d28d9] text-white font-bold"
+            >
+              <Sparkles className="mr-2 h-4 w-4" /> Upgrade to Lifetime Access
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => navigate("/dashboard/exams")}
+              className="w-full rounded-xl"
+            >
+              Back to Free Assessments
+            </Button>
+          </div>
         </div>
       </div>
     );

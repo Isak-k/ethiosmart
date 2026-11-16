@@ -8,7 +8,7 @@ import type {
   ProviderKeys
 } from './types.ts';
 import { callGemini, callGroq, callOpenRouter, callHuggingFace } from './adapters.ts';
-import { validateGeneratedQuestionBatch } from './normalizer.ts';
+import { validateGeneratedQuestionBatch, validateNormalizedQuestion } from './normalizer.ts';
 
 export type { ProviderKeys };
 
@@ -26,6 +26,14 @@ export function setProviderCooldown(provider: AIProviderId, seconds: number, rea
     until: Date.now() + seconds * 1000,
     reason
   });
+}
+
+export function clearProviderCooldown(provider: AIProviderId): void {
+  providerCooldowns.delete(provider);
+}
+
+export function clearAllProviderCooldowns(): void {
+  providerCooldowns.clear();
 }
 
 export function getProviderCooldown(provider: AIProviderId): { inCooldown: boolean; remainingSeconds: number; reason?: string } {
@@ -183,7 +191,20 @@ export async function orchestrateGenerationBatch(
           default:
             throw new Error(`Unsupported provider: ${provider}`);
         }
-        validateGeneratedQuestionBatch(result, req);
+        try {
+          validateGeneratedQuestionBatch(result, req);
+        } catch (valErr: any) {
+          // If the batch failed strict batch-level count/type requirements, but returned valid questions,
+          // verify that each individual question is well-formed. If at least 1 question is valid,
+          // accept the valid questions rather than discarding them all!
+          if (result && Array.isArray(result) && result.length > 0) {
+            for (let qIdx = 0; qIdx < result.length; qIdx++) {
+              validateNormalizedQuestion(result[qIdx], qIdx);
+            }
+          } else {
+            throw valErr;
+          }
+        }
 
         const latency = Date.now() - startTime;
         lastLatencies.set(provider, latency);
@@ -225,20 +246,20 @@ export async function orchestrateGenerationBatch(
 
         // Check 429 Rate Limit
         if (err.status === 429) {
-          const retryAfterSec = err.retryAfter ? parseInt(err.retryAfter, 10) : 60;
-          setProviderCooldown(provider, Math.min(Math.max(retryAfterSec, 30), 300), 'Rate limit (429)');
+          const retryAfterSec = err.retryAfter ? parseInt(err.retryAfter, 10) : 30;
+          setProviderCooldown(provider, Math.min(Math.max(retryAfterSec, 10), 60), 'Rate limit (429)');
           break;
         }
 
         // Check 402 Quota
         if (err.status === 402 || err.code === 'quota_exceeded') {
-          setProviderCooldown(provider, 300, 'Quota / Payment Required (402)');
+          setProviderCooldown(provider, 45, 'Quota / Payment Required (402)');
           break;
         }
 
         // Check 401 / 403 Unauthorized (but not model-access errors)
         if (isAuthError(err)) {
-          setProviderCooldown(provider, 600, 'Invalid Credentials / Unauthorized');
+          setProviderCooldown(provider, 30, 'Invalid Credentials / Unauthorized');
           break;
         }
 

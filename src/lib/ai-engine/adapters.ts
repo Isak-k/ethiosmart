@@ -23,11 +23,12 @@ export async function callGemini(
   const requestedModel = req.providerModels?.gemini;
   const modelsToTry = [
     ...(requestedModel ? [requestedModel] : []),
-    'gemini-flash-lite-latest',
-    'gemini-3.5-flash-lite',
-    'gemini-3-flash-preview',
-    'gemini-flash-latest',
     'gemini-2.5-flash',
+    'gemini-2.5-flash-lite',
+    'gemini-2.5-pro',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash',
+    'gemini-1.5-pro',
   ].filter((m, idx, arr) => arr.indexOf(m) === idx);
   let lastError: any = null;
 
@@ -127,15 +128,19 @@ export async function callGroq(
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   const requestedModel = req.providerModels?.groq;
-  const unavailableGroqModels = new Set([
-    'llama-3.1-8b-instant',
-    'llama-3.3-70b-versatile',
+  const decommissionedGroqModels = new Set([
+    'gemma2-9b-it',
+    'mixtral-8x7b-32768',
+    'gemma-7b-it',
+    'llama2-70b-4096',
   ]);
   const modelsToTry = [
-    ...(requestedModel && !unavailableGroqModels.has(requestedModel) ? [requestedModel] : []),
+    ...(requestedModel && !decommissionedGroqModels.has(requestedModel) ? [requestedModel] : []),
+    'openai/gpt-oss-120b',
     'openai/gpt-oss-20b',
     'qwen/qwen3.8-27b',
-    'openai/gpt-oss-120b'
+    'llama-3.3-70b-versatile',
+    'llama-3.1-8b-instant',
   ].filter((m, idx, arr) => arr.indexOf(m) === idx);
   let lastError: any = null;
 
@@ -167,12 +172,13 @@ export async function callGroq(
         err.status = res.status;
         err.retryAfter = res.headers.get('Retry-After');
 
+        const normalizedMsg = errorMsg.toLowerCase();
         const isModelOrQuotaError =
           res.status === 404 ||
           res.status === 429 ||
           res.status === 503 ||
-          (res.status === 400 && (responseBody?.error?.code === 'model_not_found' || errorMsg.includes('model') || errorMsg.includes('deprecated'))) ||
-          (res.status === 403 && (errorMsg.includes('access') || errorMsg.includes('permission') || errorMsg.includes('model')));
+          (res.status === 400 && (responseBody?.error?.code === 'model_not_found' || normalizedMsg.includes('model') || normalizedMsg.includes('deprecated') || normalizedMsg.includes('decommissioned'))) ||
+          (res.status === 403 && (normalizedMsg.includes('access') || normalizedMsg.includes('permission') || normalizedMsg.includes('model')));
 
         if (isModelOrQuotaError) {
           console.warn(`[Groq Adapter] Model '${model}' failed (HTTP ${res.status}: ${errorMsg}). Trying fallback model...`);
@@ -231,6 +237,8 @@ export async function callOpenRouter(
   const modelsToTry = [
     ...(requestedModel ? [requestedModel] : []),
     'meta-llama/llama-3.3-70b-instruct',
+    'openai/gpt-4o',
+    'openai/gpt-4o-mini',
     'google/gemini-2.0-flash-exp:free',
     'mistralai/mistral-small-24b-instruct-2501',
     'deepseek/deepseek-chat'

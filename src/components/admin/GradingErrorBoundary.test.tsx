@@ -20,7 +20,7 @@ describe('GradingErrorBoundary', () => {
       </GradingErrorBoundary>
     );
 
-    expect(screen.getByRole('heading', { name: 'The grading page could not be displayed' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Reload grading page' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Grading Page Notice' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Reload Page/i })).toBeInTheDocument();
   });
 });

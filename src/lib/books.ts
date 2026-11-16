@@ -1,5 +1,4 @@
-import app, { db } from '@/integrations/firebase/client';
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import { callBackend, isBackendPermissionDenied } from '@/lib/api/backend';
 import {
   collection,
   doc,
@@ -26,16 +25,11 @@ import {
   getDeviceBooks,
   getDeviceBook,
 } from '@/lib/device-storage';
+import { db } from '@/integrations/firebase/client';
 
 const BOOKS_COLLECTION = 'books';
 const BOOKMARKS_COLLECTION = 'bookBookmarks';
-const contentFunctions = getFunctions(app);
-const getStudentBookCatalogCallable = httpsCallable(contentFunctions, 'getStudentBookCatalog');
-const getStudentBookCallable = httpsCallable(contentFunctions, 'getStudentBook');
 
-/**
- * Fetch all books matching filter options with department & role protection.
- */
 export async function getBooks(
   options: BookFilterOptions = {},
   userRole?: string,
@@ -44,12 +38,9 @@ export async function getBooks(
   const cacheKey = `books_${userRole || 'student'}_${userDeptId || 'all'}_${JSON.stringify(options)}`;
   const isAdmin = userRole === 'admin' || userRole === 'superadmin';
 
-  // Student catalogs are delivered by a callable that omits protected fields.
-  // Always ask the server first; only previously cached metadata is a fallback.
   if (!isAdmin) {
     try {
-      const response = await getStudentBookCatalogCallable();
-      const payload = response.data as { books?: Book[] };
+      const payload = await callBackend<{ books?: Book[] }>('/api/content-access/getStudentBookCatalog');
       let list = payload.books || [];
       const targetDeptId = options.departmentId || userDeptId;
       if (targetDeptId && targetDeptId !== 'all') {
@@ -93,11 +84,6 @@ export async function getBooks(
 
   try {
     const booksRef = collection(db, BOOKS_COLLECTION);
-    const isAdmin = userRole === 'admin' || userRole === 'superadmin';
-
-    // Fetch books with fallback:
-    // If student, query specifically where status == 'published'
-    // If that fails (e.g. index/permission rule variations), fall back to basic getDocs
     let snapshot;
     try {
       if (!isAdmin) {
@@ -113,20 +99,15 @@ export async function getBooks(
 
     let list: Book[] = snapshot.docs.map((d) => {
       const data = restoreFirestoreData(d.data());
-      return {
-        id: d.id,
-        ...data,
-      } as Book;
+      return { id: d.id, ...data } as Book;
     });
 
-    // 1. Role-based status filtering: Non-admins ONLY see published resources
     if (!isAdmin) {
       list = list.filter((b) => b.status === 'published' || !b.status);
     } else if (options.status && options.status !== 'all') {
       list = list.filter((b) => b.status === options.status);
     }
 
-    // 2. Sort by createdAt descending in memory (resilient against Firestore index issues)
     list.sort((a, b) => {
       const getMillis = (val: any) => {
         if (!val) return 0;
@@ -138,7 +119,6 @@ export async function getBooks(
       return getMillis(b.createdAt) - getMillis(a.createdAt);
     });
 
-    // 3. Department filtering:
     const targetDeptId = options.departmentId || (!isAdmin && userDeptId && userDeptId !== 'all' ? userDeptId : undefined);
     if (targetDeptId && targetDeptId !== 'all') {
       list = list.filter((b) => {
@@ -148,18 +128,12 @@ export async function getBooks(
         return false;
       });
     }
-
-    // 4. Subject filtering
     if (options.subjectId && options.subjectId !== 'all') {
       list = list.filter((b) => b.subjectId === options.subjectId);
     }
-
-    // 5. Resource type filtering ('textbook' vs 'short_note')
     if (options.resourceType && options.resourceType !== 'all') {
       list = list.filter((b) => b.resourceType === options.resourceType);
     }
-
-    // 6. Search query filtering (matches title, author, description, subject, or chapter labels)
     if (options.searchQuery && options.searchQuery.trim().length > 0) {
       const qLower = options.searchQuery.toLowerCase().trim();
       list = list.filter((b) => {
@@ -172,71 +146,47 @@ export async function getBooks(
       });
     }
 
-    // Auto-cache all fetched books and notes on device and in-memory cache
     saveDeviceBooks(list).catch(() => {});
     setCachedData(cacheKey, list, 3 * 60 * 1000);
-
     return list;
   } catch (error) {
     console.warn('Error fetching books from Firestore, loading from device storage:', error);
     try {
       const deviceList = await getDeviceBooks(options, userRole, userDeptId);
-      if (deviceList && deviceList.length > 0) {
-        return deviceList;
-      }
-    } catch (deviceErr) {
-      console.warn('Error reading books from device storage:', deviceErr);
-    }
+      if (deviceList && deviceList.length > 0) return deviceList;
+    } catch {}
     return [];
   }
 }
 
-/**
- * Fetch a single book by ID
- */
 export async function getBook(id: string): Promise<Book | null> {
   try {
-    const response = await getStudentBookCallable({ bookId: id });
-    const payload = response.data as { book: Book };
-    const book = {
-      ...restoreFirestoreData(payload.book),
-      id: payload.book.id || id,
-    } as Book;
+    const payload = await callBackend<{ book: Book }>('/api/content-access/getStudentBook', { bookId: id });
+    const book = { ...restoreFirestoreData(payload.book), id: payload.book.id || id } as Book;
     saveDeviceBooks([book]).catch(() => {});
     return book;
   } catch (error) {
+    if (isBackendPermissionDenied(error)) throw error;
     console.warn(`Secure book fetch failed for ${id}; trying previously authorized offline content:`, error);
   }
 
-  // Offline device storage fallback
   try {
     const deviceBook = await getDeviceBook(id);
     if (deviceBook) return deviceBook;
-  } catch {
-    // ignore
-  }
-
+  } catch {}
   return null;
 }
 
-/**
- * Create a new book document
- */
 export async function createBook(input: BookInput, creatorId: string): Promise<string> {
   const booksRef = collection(db, BOOKS_COLLECTION);
   const now = serverTimestamp();
 
-  // If coverImageUrl is empty, automatically look up the subject's cover
   let coverImageUrl = input.coverImageUrl?.trim() || '';
   if (!coverImageUrl && input.subjectId) {
     try {
       const sub = await getSubject(input.subjectId);
-      if (sub) {
-        coverImageUrl = sub.coverImageUrl || getSubjectCover(sub.name).url;
-      }
-    } catch (err) {
-      console.warn('Could not auto-fetch subject cover in createBook:', err);
-    }
+      if (sub) coverImageUrl = sub.coverImageUrl || getSubjectCover(sub.name).url;
+    } catch {}
   }
 
   const data: Record<string, any> = {
@@ -263,8 +213,7 @@ export async function createBook(input: BookInput, creatorId: string): Promise<s
     mimeType: input.mimeType || (input.resourceType === 'short_note' ? 'text/markdown' : 'application/pdf'),
     fileSizeBytes: input.fileSizeBytes || (input.content ? new Blob([input.content]).size : 0),
     pageCount: input.pageCount || (input.sections ? input.sections.length : 0),
-    coverImageUrl: coverImageUrl,
-    // Interactive Shortnotes fields
+    coverImageUrl,
     content: input.content || '',
     summary: input.summary || '',
     learningOutcomes: input.learningOutcomes || [],
@@ -280,107 +229,58 @@ export async function createBook(input: BookInput, creatorId: string): Promise<s
     downloadCount: 0,
   };
 
-  if (input.chapterNumber !== undefined) {
-    data.chapterNumber = input.chapterNumber;
-  }
-  if (input.examId) {
-    data.examId = input.examId;
-  }
-  if (input.gradeLevel) {
-    data.gradeLevel = input.gradeLevel;
-  }
-  if (input.courseName) {
-    data.courseName = input.courseName;
-  }
-  if (input.subjectCategory) {
-    data.subjectCategory = input.subjectCategory;
-  }
-  if (input.subjectName) {
-    data.subjectName = input.subjectName;
-  }
-  if (input.departmentName) {
-    data.departmentName = input.departmentName;
-  }
-  if (input.generationSettings) {
-    data.generationSettings = input.generationSettings;
-  }
+  if (input.chapterNumber !== undefined) data.chapterNumber = input.chapterNumber;
+  if (input.examId) data.examId = input.examId;
+  if (input.gradeLevel) data.gradeLevel = input.gradeLevel;
+  if (input.courseName) data.courseName = input.courseName;
+  if (input.subjectCategory) data.subjectCategory = input.subjectCategory;
+  if (input.subjectName) data.subjectName = input.subjectName;
+  if (input.departmentName) data.departmentName = input.departmentName;
+  if (input.generationSettings) data.generationSettings = input.generationSettings;
 
-  // Deeply strip any undefined values to satisfy Firestore addDoc validation
   const cleanData = removeUndefinedFields(data);
   const docRef = await addDoc(booksRef, cleanData);
   invalidateCacheKey('books_');
   return docRef.id;
 }
 
-/**
- * Update an existing book document
- */
 export async function updateBook(id: string, updates: Partial<Book>): Promise<void> {
   const docRef = doc(db, BOOKS_COLLECTION, id);
-
-  // If subjectId is specified and no custom coverImageUrl is set, sync subject cover
   if (updates.subjectId && !updates.coverImageUrl) {
     try {
       const sub = await getSubject(updates.subjectId);
-      if (sub) {
-        updates.coverImageUrl = sub.coverImageUrl || getSubjectCover(sub.name).url;
-      }
-    } catch (err) {
-      console.warn('Could not auto-fetch subject cover in updateBook:', err);
-    }
+      if (sub) updates.coverImageUrl = sub.coverImageUrl || getSubjectCover(sub.name).url;
+    } catch {}
   }
-
-  // Deeply strip any undefined keys or nested undefined values to satisfy Firestore updateDoc validation
   const cleanUpdates = removeUndefinedFields(updates);
   if (cleanUpdates.status !== undefined) {
     cleanUpdates.status = cleanUpdates.status === 'draft' ? 'draft' : 'published';
   }
   cleanUpdates.updatedAt = serverTimestamp();
-
   await updateDoc(docRef, cleanUpdates);
   invalidateCacheKey('books_');
 }
 
-/**
- * Delete a book document
- */
 export async function deleteBook(id: string): Promise<void> {
   const docRef = doc(db, BOOKS_COLLECTION, id);
   await deleteDoc(docRef);
   invalidateCacheKey('books_');
 }
 
-/**
- * Increment view count
- */
 export async function incrementBookView(id: string): Promise<void> {
   try {
     const docRef = doc(db, BOOKS_COLLECTION, id);
-    await updateDoc(docRef, {
-      viewCount: increment(1),
-    });
-  } catch (e) {
-    console.warn(`Could not increment view for book ${id}:`, e);
-  }
+    await updateDoc(docRef, { viewCount: increment(1) });
+  } catch {}
 }
 
-/**
- * Increment download count
- */
 export async function incrementBookDownload(id: string): Promise<void> {
   try {
     const docRef = doc(db, BOOKS_COLLECTION, id);
-    await updateDoc(docRef, {
-      downloadCount: increment(1),
-    });
-  } catch (e) {
-    console.warn(`Could not increment download for book ${id}:`, e);
-  }
+    await updateDoc(docRef, { downloadCount: increment(1) });
+  } catch {}
 }
 
-/**
- * Get all book IDs bookmarked by a user
- */
 export async function getUserBookBookmarks(userId: string): Promise<string[]> {
   if (!userId) return [];
   try {
@@ -388,57 +288,29 @@ export async function getUserBookBookmarks(userId: string): Promise<string[]> {
     const q = query(bookmarksRef, where('userId', '==', userId));
     const snap = await getDocs(q);
     return snap.docs.map((d) => d.data().bookId as string);
-  } catch (error) {
-    console.error('Error fetching user bookmarks:', error);
-    return [];
-  }
+  } catch { return []; }
 }
 
-/**
- * Toggle a bookmark for a user (add if missing, remove if present).
- * Returns true if book is now bookmarked, false if unbookmarked.
- */
 export async function toggleBookBookmark(userId: string, bookId: string): Promise<boolean> {
   if (!userId || !bookId) return false;
   const bookmarkDocId = `${userId}_${bookId}`;
   const docRef = doc(db, BOOKMARKS_COLLECTION, bookmarkDocId);
-
   try {
     const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      await deleteDoc(docRef);
-      return false;
-    } else {
-      await updateDoc(docRef, {
-        userId,
-        bookId,
-        createdAt: serverTimestamp(),
-      }).catch(async () => {
-        // Fallback to set if document doesn't exist
+    if (snap.exists()) { await deleteDoc(docRef); return false; }
+    else {
+      await updateDoc(docRef, { userId, bookId, createdAt: serverTimestamp() }).catch(async () => {
         const { setDoc } = await import('firebase/firestore');
-        await setDoc(docRef, {
-          userId,
-          bookId,
-          createdAt: serverTimestamp(),
-        });
+        await setDoc(docRef, { userId, bookId, createdAt: serverTimestamp() });
       });
       return true;
     }
-  } catch (error) {
-    console.error('Error toggling bookmark:', error);
-    return false;
-  }
+  } catch { return false; }
 }
 
-/**
- * Fetch recently added books for the shelf
- */
 export async function getRecentBooks(limitCount = 6, userDeptId?: string): Promise<Book[]> {
   try {
     const allBooks = await getBooks({}, 'student', userDeptId);
     return allBooks.slice(0, limitCount);
-  } catch (e) {
-    console.error('Error fetching recent books:', e);
-    return [];
-  }
+  } catch { return []; }
 }

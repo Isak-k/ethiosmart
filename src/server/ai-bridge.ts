@@ -11,10 +11,14 @@ loadServerEnv();
 function loadEnvKeys(): ProviderKeys {
   // Shell env wins, then .env.local, then .env (via loadServerEnv()).
   return {
-    gemini: process.env.GEMINI_API_KEY,
-    groq: process.env.GROQ_API_KEY,
-    openrouter: process.env.OPENROUTER_API_KEY,
-    huggingface: process.env.HUGGINGFACE_API_KEY,
+    gemini: process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY,
+    groq: process.env.VITE_GROQ_API_KEY || process.env.GROQ_API_KEY,
+    openrouter: process.env.VITE_OPENROUTER_API_KEY || process.env.OPENROUTER_API_KEY,
+    huggingface:
+      process.env.VITE_HUGGING_FACE_API_KEY ||
+      process.env.VITE_HUGGINGFACE_API_KEY ||
+      process.env.HUGGING_FACE_API_KEY ||
+      process.env.HUGGINGFACE_API_KEY,
   };
 }
 
@@ -24,7 +28,7 @@ function parseJsonBody(req: IncomingMessage): Promise<any> {
     req.on('data', chunk => {
       data += chunk;
       // Protect against oversized requests (limit 1MB)
-      if (data.length > 1024 * 1024) {
+      if (data.length > 10 * 1024 * 1024) {
         reject(new Error('Request payload too large'));
       }
     });
@@ -45,18 +49,75 @@ function sendJson(res: ServerResponse, statusCode: number, data: any) {
   res.end(JSON.stringify(data));
 }
 
-export function createAiBridgeMiddleware() {
+import path from 'path';
+import { pathToFileURL } from 'url';
+
+export function createAiBridgeMiddleware(opts: { ssrLoad?: (id: string) => Promise<any> } = {}) {
   return async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
     const url = req.url?.split('?')[0];
 
     // Dev-server hardening: never serve dotfiles (e.g. .env, .secret.local)
-    // or plain-text logs over HTTP — EXCEPT Vite's own internals under
+    // or plain-text logs over HTTP �?" EXCEPT Vite's own internals under
     // /node_modules/ (its optimized dependency cache lives under
     // /node_modules/.vite/deps and the app cannot start without those
     // files). Vite's internal file serving is required for the app to run;
     // repo secrets never live inside /node_modules/ in a committed checkout.
     const pathname = url || '';
     const isViteInternal = pathname.startsWith('/node_modules/');
+
+    // Local dev handlers for Vercel-style payment/content-access API routes
+    if (pathname.startsWith('/api/payments/') || pathname.startsWith('/api/content-access/')) {
+      try {
+        const rel = pathname.replace(/^\/api\//, '').replace(/\/$/, '');
+        const modPath = path.resolve(process.cwd(), 'api', `${rel}.ts`);
+        const mod = opts.ssrLoad
+          ? await opts.ssrLoad(modPath)
+          : await import(/* @vite-ignore */ pathToFileURL(modPath).href);
+        const handler = mod?.default;
+        if (typeof handler !== 'function') {
+          sendJson(res, 500, { error: 'Invalid API handler' });
+          return;
+        }
+
+        // Parse JSON body for methods with payloads in Node dev environment
+        if ((req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') && (req as any).body === undefined) {
+          try {
+            (req as any).body = await parseJsonBody(req);
+          } catch {
+            (req as any).body = {};
+          }
+        }
+
+        const vres: any = res;
+        if (typeof vres.status !== 'function') {
+          vres.status = (code: number) => { vres.statusCode = code; return vres; };
+        }
+        if (typeof vres.json !== 'function') {
+          vres.json = (data: any) => {
+            if (!vres.headersSent) vres.setHeader('Content-Type', 'application/json');
+            vres.end(JSON.stringify(data));
+            return vres;
+          };
+        }
+        if (typeof vres.send !== 'function') {
+          vres.send = (data: any) => {
+            if (!vres.headersSent) {
+              if (typeof data === 'object') vres.setHeader('Content-Type', 'application/json');
+            }
+            vres.end(typeof data === 'object' ? JSON.stringify(data) : data);
+            return vres;
+          };
+        }
+        await handler(req, vres);
+      } catch (e: any) {
+        console.error('[API Dev Bridge Error]', pathname, e?.message || e);
+        const msg = e?.message || 'API route failed';
+        const status = msg.includes('Cannot find module') ? 404 : 500;
+        sendJson(res, status, { error: msg });
+      }
+      return;
+    }
+
     if (
       !isViteInternal &&
       (/(?:^|\/)\.[^/]+(?:\/|$)/.test(pathname) || /\.log$/i.test(pathname))
@@ -115,10 +176,10 @@ export function createAiBridgeMiddleware() {
           try { clientKeys = JSON.parse(queryKeys); } catch {}
         }
         const keys: ProviderKeys = {
-          gemini: clientKeys.gemini || envKeys.gemini,
-          groq: clientKeys.groq || envKeys.groq,
-          openrouter: clientKeys.openrouter || envKeys.openrouter,
-          huggingface: clientKeys.huggingface || envKeys.huggingface,
+          gemini: envKeys.gemini || clientKeys.gemini,
+          groq: envKeys.groq || clientKeys.groq,
+          openrouter: envKeys.openrouter || clientKeys.openrouter,
+          huggingface: envKeys.huggingface || clientKeys.huggingface,
         };
         const statuses = getProviderStatus(keys);
         sendJson(res, 200, { success: true, statuses });
@@ -156,10 +217,10 @@ export function createAiBridgeMiddleware() {
         const envKeys = loadEnvKeys();
         const clientKeys = (body as any).providerKeys || {};
         const keys: ProviderKeys = {
-          gemini: clientKeys.gemini || envKeys.gemini,
-          groq: clientKeys.groq || envKeys.groq,
-          openrouter: clientKeys.openrouter || envKeys.openrouter,
-          huggingface: clientKeys.huggingface || envKeys.huggingface,
+          gemini: envKeys.gemini || clientKeys.gemini,
+          groq: envKeys.groq || clientKeys.groq,
+          openrouter: envKeys.openrouter || clientKeys.openrouter,
+          huggingface: envKeys.huggingface || clientKeys.huggingface,
         };
         const result = await orchestrateGenerationBatch(body, keys);
 
@@ -257,13 +318,14 @@ export function createAiBridgeMiddleware() {
 }
 
 export function aiDevPlugin(): Plugin {
-  const middleware = createAiBridgeMiddleware();
   return {
     name: 'exampro-ai-dev-bridge',
     configureServer(server: ViteDevServer) {
+      const middleware = createAiBridgeMiddleware({ ssrLoad: (id) => server.ssrLoadModule(id) });
       server.middlewares.use(middleware);
     },
     configurePreviewServer(server: any) {
+      const middleware = createAiBridgeMiddleware();
       server.middlewares.use(middleware);
     }
   };

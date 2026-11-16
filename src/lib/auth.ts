@@ -161,6 +161,7 @@ export async function getUserProfile(userId: string) {
         departmentId: data.departmentId,
         sectionPermissions: data.sectionPermissions,
         permissions: data.permissions || null,
+        paymentAccess: data.paymentAccess || null,
       };
       
       console.log('Returning profile with sectionPermissions:', profile.sectionPermissions);

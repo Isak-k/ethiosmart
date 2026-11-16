@@ -23,16 +23,38 @@ import fs from 'fs';
 import path from 'path';
 
 const ALLOWED_KEYS = new Set([
-  // Private AI provider keys (server-side only; NEVER with a VITE_ prefix)
+  // AI provider keys (both server and Vite-prefixed variants from .env)
   'GEMINI_API_KEY',
+  'VITE_GEMINI_API_KEY',
   'GROQ_API_KEY',
+  'VITE_GROQ_API_KEY',
   'OPENROUTER_API_KEY',
+  'VITE_OPENROUTER_API_KEY',
   'HUGGINGFACE_API_KEY',
+  'HUGGING_FACE_API_KEY',
+  'VITE_HUGGINGFACE_API_KEY',
+  'VITE_HUGGING_FACE_API_KEY',
   // Server-side integrations used by the dev bridge
   'GOOGLE_DRIVE_API_KEY',
+  'GOOGLE_APPLICATION_CREDENTIALS',
   // Chatbot deployment knobs (non-secret)
   'CHATBOT_ENABLED',
   'CHATBOT_MODEL',
+  // Firebase Admin (Vercel payment/content-access API, dev middleware only)
+  'FIREBASE_SERVICE_ACCOUNT_JSON',
+  'FIREBASE_SERVICE_ACCOUNT',
+  'FIREBASE_PROJECT_ID',
+  'VITE_FIREBASE_PROJECT_ID',
+  'FIREBASE_CLIENT_EMAIL',
+  'FIREBASE_PRIVATE_KEY',
+  'FIREBASE_STORAGE_BUCKET',
+  'VITE_FIREBASE_STORAGE_BUCKET',
+  // Cloudinary receipt signing/verification (server-side only)
+  'CLOUDINARY_CLOUD_NAME',
+  'CLOUDINARY_API_KEY',
+  'CLOUDINARY_API_SECRET',
+  // API CORS allowlist (dev/prod behavior handled in http.ts)
+  'CORS_ALLOWED_ORIGINS',
 ]);
 
 function parseEnvFile(file: string): Map<string, string> {
@@ -44,8 +66,9 @@ function parseEnvFile(file: string): Map<string, string> {
     return result;
   }
 
-  for (const rawLine of content.split('\n')) {
-    const line = rawLine.trim();
+  const rawLines = content.split(/\r?\n/);
+  for (let i = 0; i < rawLines.length; i++) {
+    const line = rawLines[i].trim();
     if (!line || line.startsWith('#')) continue;
     const idx = line.indexOf('=');
     if (idx <= 0) continue;
@@ -53,12 +76,33 @@ function parseEnvFile(file: string): Map<string, string> {
     if (!ALLOWED_KEYS.has(key)) continue;
 
     let value = line.slice(idx + 1).trim();
+
+    // Support multiline quoted values (e.g. JSON service accounts or private keys)
     if (
+      (value.startsWith('"') && !value.endsWith('"')) ||
+      (value.startsWith("'") && !value.endsWith("'"))
+    ) {
+      const quote = value[0];
+      const collected = [value.slice(1)];
+      i++;
+      while (i < rawLines.length) {
+        const nextLine = rawLines[i];
+        if (nextLine.trim().endsWith(quote)) {
+          collected.push(nextLine.trim().slice(0, -1));
+          break;
+        } else {
+          collected.push(nextLine);
+          i++;
+        }
+      }
+      value = collected.join('\n');
+    } else if (
       (value.startsWith('"') && value.endsWith('"') && value.length >= 2) ||
       (value.startsWith("'") && value.endsWith("'") && value.length >= 2)
     ) {
       value = value.slice(1, -1);
     }
+
     if (value) result.set(key, value);
   }
   return result;

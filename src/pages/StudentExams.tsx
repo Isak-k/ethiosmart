@@ -27,9 +27,9 @@ import {
   FileText,
   Clock,
   ChevronRight,
-  WifiOff,
   HardDrive,
-  Play
+  Play,
+  Lock,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
@@ -75,6 +75,7 @@ interface UnitDisplayItem {
   hasExam: boolean;
   hasAttempted: boolean;
   isDownloaded?: boolean;
+  isGeneralAssessment?: boolean;
 }
 
 const StudentExams = () => {
@@ -97,6 +98,9 @@ const StudentExams = () => {
   const [subjectChapters, setSubjectChapters] = useState<Chapter[]>([]);
   const [chaptersLoading, setChaptersLoading] = useState(false);
   const [selectedMultiExamUnit, setSelectedMultiExamUnit] = useState<UnitDisplayItem | null>(null);
+  const [upgradeModalUnit, setUpgradeModalUnit] = useState<UnitDisplayItem | null>(null);
+  const hasLifetime = Boolean(profile?.paymentAccess?.lifetime);
+  const isStaff = profile?.role === "admin" || profile?.role === "examiner" || profile?.role === "teacher";
 
   const { toast } = useToast();
 
@@ -305,12 +309,30 @@ const StudentExams = () => {
         (a, b) => (a.chapterNumber ?? 0) - (b.chapterNumber ?? 0)
       );
 
+      const freeExamIds = paymentAccess.freeAccess?.freeExamIds || [];
       sortedChapters.forEach((ch, idx) => {
         const unitNum = ch.chapterNumber ?? idx + 1;
         const chapterExams = currentSubjectExams.filter((e) => {
+          // 1. Direct chapterId match
           if (e.chapterId === ch.id) return true;
+
+          // 2. Direct unit/chapter number properties on exam
+          const examUnitNum = Number((e as any).unitNumber ?? (e as any).chapterNumber);
+          if (Number.isFinite(examUnitNum) && examUnitNum === unitNum) return true;
+
+          // 3. For Chapter 1: Check admin settings freeExamIds
+          if (unitNum === 1 && freeExamIds.includes(e.id)) return true;
+
+          // 4. Chapter title direct match
           if (e.chapterTitle && ch.title && e.chapterTitle.toLowerCase().trim() === ch.title.toLowerCase().trim()) return true;
-          if (e.title && ch.title && e.title.toLowerCase().includes(ch.title.toLowerCase())) return true;
+
+          // 5. Title includes full chapter title
+          if (ch.title && e.title && e.title.toLowerCase().includes(ch.title.toLowerCase().trim())) return true;
+
+          // 6. Regex match for "Chapter {unitNum}", "Unit {unitNum}", "Ch {unitNum}"
+          const unitRegex = new RegExp(`(?:chapter|unit|ch)\\s*0*${unitNum}(?!\\d)`, 'i');
+          if (unitRegex.test(e.title || '') || unitRegex.test(e.chapterTitle || '')) return true;
+
           return false;
         });
 
@@ -328,58 +350,28 @@ const StudentExams = () => {
         });
       });
 
-      // Include remaining exams with explicit chapter title
-      const remainingExamsWithTitle = currentSubjectExams.filter(
-        (e) => !assignedExamIds.has(e.id) && Boolean(e.chapterTitle)
-      );
-      const derivedTitles = Array.from(
-        new Set(remainingExamsWithTitle.map((e) => e.chapterTitle!.trim()))
-      );
-
-      derivedTitles.forEach((title, idx) => {
-        const chapterExams = remainingExamsWithTitle.filter(
-          (e) => e.chapterTitle?.trim() === title
-        );
-        chapterExams.forEach((e) => assignedExamIds.add(e.id));
-        const matchNum = title.match(/unit\s*(\d+)|chapter\s*(\d+)/i);
-        const unitNum = matchNum ? parseInt(matchNum[1] || matchNum[2], 10) : units.length + idx + 1;
-        units.push({
-          id: `derived_${idx}_${title}`,
-          unitNumber: unitNum,
-          title,
-          exams: chapterExams,
-          hasExam: chapterExams.length > 0,
-          hasAttempted: chapterExams.some((e) => attemptedExamIds.has(e.id)),
-        });
-      });
-
-      // Ensure totalUnits from subject (e.g. Grade 9 9 units) are represented
-      const targetCount = Math.max(activeSubject.totalUnits || 0, units.length);
-      for (let i = 1; i <= targetCount; i++) {
-        if (!units.some((u) => u.unitNumber === i)) {
-          units.push({
-            id: `placeholder_unit_${i}`,
-            unitNumber: i,
-            title: `Chapter ${i}`,
-            exams: [],
-            hasExam: false,
-            hasAttempted: false,
-          });
-        }
-      }
-
-      // Remaining unassigned exams
+      // Keep exams that are not assigned to an admin-defined chapter accessible
       const unassignedExams = currentSubjectExams.filter((e) => !assignedExamIds.has(e.id));
       if (unassignedExams.length > 0) {
-        units.push({
-          id: "general_subject_assessments",
-          unitNumber: units.length + 1,
-          title: "Comprehensive Curriculum Assessment",
-          description: "Curriculum assessment examination",
-          exams: unassignedExams,
-          hasExam: true,
-          hasAttempted: unassignedExams.some((e) => attemptedExamIds.has(e.id)),
-        });
+        // If Chapter 1 has no exams, prioritize assigning unassigned subject exams to Chapter 1
+        const chapterOne = units.find((u) => u.unitNumber === 1);
+        if (chapterOne && chapterOne.exams.length === 0) {
+          chapterOne.exams = unassignedExams;
+          chapterOne.hasExam = true;
+          chapterOne.hasAttempted = unassignedExams.some((e) => attemptedExamIds.has(e.id));
+          unassignedExams.forEach((e) => assignedExamIds.add(e.id));
+        } else {
+          units.push({
+            id: "general_subject_assessments",
+            unitNumber: units.length + 1,
+            title: "Comprehensive Curriculum Assessment",
+            description: "Curriculum assessment examination",
+            exams: unassignedExams,
+            hasExam: true,
+            hasAttempted: unassignedExams.some((e) => attemptedExamIds.has(e.id)),
+            isGeneralAssessment: true,
+          });
+        }
       }
 
       return units.sort((a, b) => a.unitNumber - b.unitNumber);
@@ -462,12 +454,13 @@ const StudentExams = () => {
   }, [displayUnits, searchQuery]);
 
   const readyUnitsCount = useMemo(() => {
-    return displayUnits.filter((u) => u.hasExam).length;
+    return displayUnits.filter((u) => !u.isGeneralAssessment && u.hasExam).length;
   }, [displayUnits]);
 
   const totalUnitsCount = useMemo(() => {
+    if (subjectChapters.length > 0) return subjectChapters.length;
     return Math.max(displayUnits.length, activeSubject?.totalUnits || 0, 1);
-  }, [displayUnits, activeSubject]);
+  }, [displayUnits, activeSubject, subjectChapters]);
 
   const gradeText = useMemo(() => {
     return activeSubject?.description?.match(/Grade\s*\d+/i)?.[0] || 'Grade 9';
@@ -503,18 +496,6 @@ const StudentExams = () => {
   return (
     <DashboardLayout contentClassName={activeSubject ? "p-2.5 sm:p-4 lg:p-8" : "px-2 pt-3 pb-6 lg:p-8"}>
       <div className={cn("animate-fade-in mx-auto", activeSubject ? "max-w-3xl pb-6" : "space-y-8 pb-16 max-w-7xl")}>
-        {/* Offline Banner notice */}
-        {!isOnline && (
-          <div className={cn("flex items-center gap-3 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-sm font-medium", activeSubject && "mb-3")}>
-            <WifiOff className="h-5 w-5 text-amber-600 shrink-0" />
-            <div className="flex-1">
-              <span>You are currently offline. Showing exams and subject chapters stored on your device.</span>
-            </div>
-            <Badge variant="outline" className="border-amber-500/40 text-amber-700 dark:text-amber-300">
-              Offline Mode
-            </Badge>
-          </div>
-        )}
         {/* ==================================================================== */}
         {/* VIEW A: SPECIFIC SUBJECT SELECTED (Horizontal Chapters Cards View)   */}
         {/* ==================================================================== */}
@@ -575,14 +556,19 @@ const StudentExams = () => {
                 {filteredUnits.map((unit) => {
                   const hasExam = unit.hasExam;
                   const primaryExam = unit.exams[0];
+                  const isUnitLocked = paymentAccess.paymentsEnabled && !hasLifetime && !isStaff && unit.unitNumber !== 1;
 
                   return (
                     <div
                       key={unit.id}
                       onClick={() => {
+                        if (isUnitLocked) {
+                          setUpgradeModalUnit(unit);
+                          return;
+                        }
                         if (hasExam) {
                           if (unit.exams.length === 1) {
-                            navigate(`/exam/${primaryExam.id}`);
+                            navigate(`/exam/${primaryExam.id}?chapter=${unit.unitNumber}`);
                           } else {
                             setSelectedMultiExamUnit(unit);
                           }
@@ -598,20 +584,26 @@ const StudentExams = () => {
                       }`}
                     >
                       {/* Left Curved Purple Accent Ribbon */}
-                      <div className="absolute left-0 top-3 bottom-3 w-1.5 sm:w-2 bg-[#7c3aed] rounded-r-full" />
+                      <div className={`absolute left-0 top-3 bottom-3 w-1.5 sm:w-2 rounded-r-full ${isUnitLocked ? "bg-amber-500" : "bg-[#7c3aed]"}`} />
 
                       {/* Squircle Icon Badge + Title & Status */}
                       <div className="flex items-center gap-3.5 sm:gap-4 pl-2 min-w-0 flex-1">
                         {/* Purple Squircle Icon Badge */}
-                        <div className="w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-[#7c3aed] text-white flex items-center justify-center shrink-0 shadow-sm transition-transform group-hover:scale-105">
-                          <GraduationCap className="w-6 h-6 sm:w-6.5 sm:h-6.5 text-white stroke-[2]" />
+                        <div className={`w-12 h-12 sm:w-13 sm:h-13 rounded-2xl flex items-center justify-center shrink-0 shadow-sm transition-transform group-hover:scale-105 ${isUnitLocked ? "bg-amber-500 text-white" : "bg-[#7c3aed] text-white"}`}>
+                          {isUnitLocked ? (
+                            <Lock className="w-6 h-6 sm:w-6.5 sm:h-6.5 text-white stroke-[2]" />
+                          ) : (
+                            <GraduationCap className="w-6 h-6 sm:w-6.5 sm:h-6.5 text-white stroke-[2]" />
+                          )}
                         </div>
 
                         {/* Title & Metadata */}
                         <div className="min-w-0 flex-1 space-y-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <h4 className="text-base sm:text-lg font-bold text-[#1e293b] dark:text-foreground group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors leading-snug">
-                              Chapter {unit.unitNumber}: {unit.title}
+                              {unit.isGeneralAssessment
+                                ? unit.title
+                                : `Chapter ${unit.unitNumber}: ${unit.title}`}
                             </h4>
 
                             {unit.hasAttempted && (
@@ -621,6 +613,12 @@ const StudentExams = () => {
                               </span>
                             )}
 
+                            {isUnitLocked && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 border border-amber-200/80 shrink-0">
+                                <Lock className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                                Locked · Upgrade
+                              </span>
+                            )}
                             {paymentAccess.chapterOneTrial && unit.unitNumber === 1 && (
                               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100 text-purple-800 dark:bg-purple-950/70 dark:text-purple-300 border border-purple-200/80 shrink-0">
                                 <Sparkles className="w-3 h-3 text-purple-600 dark:text-purple-400" />
@@ -631,7 +629,12 @@ const StudentExams = () => {
 
                           {/* Status Line */}
                           <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium flex-wrap">
-                            {hasExam ? (
+                            {isUnitLocked ? (
+                              <span className="inline-flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-medium">
+                                <Lock className="w-3.5 h-3.5" />
+                                <span>Requires Lifetime Access</span>
+                              </span>
+                            ) : hasExam ? (
                               <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold">
                                 <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
                                 <span>
@@ -662,7 +665,11 @@ const StudentExams = () => {
 
                       {/* Right: Round Action Button / Chevron */}
                       <div className="shrink-0 flex items-center gap-2">
-                        {hasExam ? (
+                        {isUnitLocked ? (
+                          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-amber-50 dark:bg-amber-950/50 text-amber-600 flex items-center justify-center group-hover:bg-amber-500 group-hover:text-white transition-colors shadow-2xs">
+                            <Lock className="w-4 h-4 stroke-[2.5]" />
+                          </div>
+                        ) : hasExam ? (
                           <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-purple-50 dark:bg-purple-950/50 text-[#7c3aed] flex items-center justify-center group-hover:bg-[#7c3aed] group-hover:text-white transition-colors shadow-2xs">
                             <ChevronRight className="w-5 h-5 stroke-[2.5]" />
                           </div>
@@ -714,7 +721,7 @@ const StudentExams = () => {
                       key={exam.id}
                       onClick={() => {
                         setSelectedMultiExamUnit(null);
-                        navigate(`/exam/${exam.id}`);
+                        navigate(`/exam/${exam.id}?chapter=${selectedMultiExamUnit?.unitNumber || 1}`);
                       }}
                       className="p-4 rounded-2xl border bg-card hover:border-[#7c3aed] hover:shadow-md cursor-pointer transition-all flex items-center justify-between gap-3"
                     >
@@ -729,6 +736,42 @@ const StudentExams = () => {
                       </Button>
                     </div>
                   ))}
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            {/* Locked Chapter Upgrade Dialog */}
+            <Dialog open={Boolean(upgradeModalUnit)} onOpenChange={() => setUpgradeModalUnit(null)}>
+              <DialogContent className="max-w-md rounded-3xl p-6">
+                <DialogHeader className="space-y-3">
+                  <div className="mx-auto w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-950/70 text-amber-600 flex items-center justify-center">
+                    <Lock className="w-6 h-6" />
+                  </div>
+                  <DialogTitle className="text-xl font-bold font-display text-center">
+                    Chapter {upgradeModalUnit?.unitNumber} is Locked
+                  </DialogTitle>
+                  <DialogDescription className="text-center text-sm">
+                    Under the Free Trial, you can practice <strong>Chapter 1</strong> exams for free. Upgrade to permanent Lifetime Access to unlock Chapter {upgradeModalUnit?.unitNumber} and all subsequent assessments!
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="mt-4 space-y-2.5">
+                  <Button
+                    className="w-full btn-primary font-bold h-11"
+                    onClick={() => {
+                      setUpgradeModalUnit(null);
+                      navigate("/dashboard/payment");
+                    }}
+                  >
+                    <Sparkles className="mr-2 h-4 w-4" /> Upgrade to Lifetime Access
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="w-full text-muted-foreground"
+                    onClick={() => setUpgradeModalUnit(null)}
+                  >
+                    Continue Free Trial
+                  </Button>
                 </div>
               </DialogContent>
             </Dialog>

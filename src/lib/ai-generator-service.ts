@@ -66,31 +66,33 @@ export function getClientProviderKeys(): ProviderKeys {
     }
   } catch {}
 
+  // Environment variables (.env) take top priority so generation runs directly without requiring admin UI setup
   return {
     gemini:
-      settingsKeys.gemini ||
       meta.VITE_GEMINI_API_KEY ||
       meta.GEMINI_API_KEY ||
+      settingsKeys.gemini ||
       getStorage('gemini_api_key') ||
       getStorage('GEMINI_API_KEY') ||
       getStorage('google_ai_api_key'),
     groq:
-      settingsKeys.groq ||
       meta.VITE_GROQ_API_KEY ||
       meta.GROQ_API_KEY ||
+      settingsKeys.groq ||
       getStorage('groq_api_key') ||
       getStorage('GROQ_API_KEY'),
     openrouter:
-      settingsKeys.openrouter ||
       meta.VITE_OPENROUTER_API_KEY ||
       meta.OPENROUTER_API_KEY ||
+      settingsKeys.openrouter ||
       getStorage('openrouter_api_key') ||
       getStorage('OPENROUTER_API_KEY'),
     huggingface:
-      settingsKeys.huggingface ||
-      meta.VITE_HUGGINGFACE_API_KEY ||
       meta.VITE_HUGGING_FACE_API_KEY ||
+      meta.VITE_HUGGINGFACE_API_KEY ||
       meta.HUGGING_FACE_API_KEY ||
+      meta.HUGGINGFACE_API_KEY ||
+      settingsKeys.huggingface ||
       getStorage('huggingface_api_key') ||
       getStorage('HUGGING_FACE_API_KEY'),
   };

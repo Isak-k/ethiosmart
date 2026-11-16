@@ -7,7 +7,7 @@ describe('Groq model fallback', () => {
     vi.unstubAllGlobals();
   });
 
-  it('skips the retired configured model and falls back when a model is unavailable', async () => {
+  it('falls back to secondary model when the requested model is unavailable', async () => {
     const models: string[] = [];
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
       const body = JSON.parse(String(init?.body));
@@ -38,12 +38,12 @@ describe('Groq model fallback', () => {
       prompt: 'Generate one astronomy question',
       count: 1,
       questionTypes: ['mcq'],
-      providerModels: { groq: 'llama-3.1-8b-instant' },
+      providerModels: { groq: 'nonexistent-model' },
     };
 
     const questions = await callGroq(request, 'test-key');
 
-    expect(models).toEqual(['openai/gpt-oss-20b', 'qwen/qwen3.8-27b']);
+    expect(models).toEqual(['nonexistent-model', 'openai/gpt-oss-120b']);
     expect(questions).toHaveLength(1);
   });
 });

@@ -31,8 +31,7 @@ import {
   Layers,
   CheckCircle2,
   Trophy,
-  LogIn,
-  WifiOff
+  LogIn
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -44,21 +43,11 @@ export default function StudentSubjects() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [progressMap, setProgressMap] = useState<Record<string, StudentSubjectProgress>>({});
   const [loading, setLoading] = useState(true);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true);
-      fetchSubjectsAndProgress();
-    };
-    const handleOffline = () => setIsOnline(false);
-
+    const handleOnline = () => fetchSubjectsAndProgress();
     window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
-    return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
-    };
+    return () => window.removeEventListener("online", handleOnline);
   }, []);
 
   // Guest subject preview dialog
@@ -165,19 +154,6 @@ export default function StudentSubjects() {
 
   const content = (
     <div className="space-y-8 animate-fade-in pb-12">
-      {/* Offline Banner notice */}
-      {!isOnline && (
-        <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-sm font-medium">
-          <WifiOff className="h-5 w-5 text-amber-600 shrink-0" />
-          <div className="flex-1">
-            <span>You are currently offline. Showing curriculum subjects stored on your device.</span>
-          </div>
-          <Badge variant="outline" className="border-amber-500/40 text-amber-700 dark:text-amber-300">
-            Offline Mode
-          </Badge>
-        </div>
-      )}
-
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>

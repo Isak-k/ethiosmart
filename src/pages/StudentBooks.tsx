@@ -57,7 +57,6 @@ import {
   ArrowRight,
   ArrowLeft,
   HardDrive,
-  WifiOff,
   CheckCircle2,
   Trash2,
   GraduationCap,
@@ -90,6 +89,7 @@ export default function StudentBooks() {
   const [availableExams, setAvailableExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
   const [quickSummaryNote, setQuickSummaryNote] = useState<Book | null>(null);
+  const [upgradeModalUnit, setUpgradeModalUnit] = useState<any>(null);
 
   // Offline state
   const [offlineRecords, setOfflineRecords] = useState<OfflineBookRecord[]>([]);
@@ -331,6 +331,11 @@ export default function StudentBooks() {
   // Download button on a book: save it to the user's device (and keep it offline in-app too).
   const handleDownloadToDevice = async (book: Book) => {
     if (downloadingBookId) return;
+    const hasLifetime = Boolean(profile?.paymentAccess?.lifetime);
+    if (paymentAccess.paymentsEnabled && !hasLifetime && role !== 'admin') {
+      setUpgradeModalUnit({ unitNumber: 'Full Book', title: book.title });
+      return;
+    }
     setDownloadingBookId(book.id);
     try {
       if (!offlineBookIds.has(book.id)) {
@@ -383,15 +388,23 @@ export default function StudentBooks() {
   // instantly from the local copy (no loading screen). Notes without a Google Drive file
   // (AI text-only) open directly. Notes already cached on the device open instantly with
   // no download at all — they stay stored on the user's device between sessions.
-  const handleReadChapter = async (note: Book) => {
+  const handleReadChapter = async (note: Book, chapterNum?: number) => {
     if (preparingNoteId) return;
+
+    if (!isOnline && !offlineBookIds.has(note.id)) {
+      toast({
+        title: 'Download for offline first',
+        description: 'Connect to the internet and download this study note before opening it offline.',
+      });
+      return;
+    }
 
     const driveId = note.driveFileId || extractDriveFileId(note.driveUrl || '');
 
     // No Drive document → nothing to download, open directly.
     // Already downloaded once → open instantly from device storage (no re-download).
     if (!driveId || offlineBookIds.has(note.id)) {
-      navigate(`/dashboard/books/${note.id}/read`);
+      navigate(`/dashboard/books/${note.id}/read${chapterNum ? `?chapter=${chapterNum}` : ''}`);
       return;
     }
 
@@ -405,6 +418,7 @@ export default function StudentBooks() {
           : prev
       );
     }, 180);
+    let shouldOpenReader = true;
     try {
       await downloadAndSaveBookOffline(note, undefined, (pct) => {
         setNoteDownloadProgress((prev) =>
@@ -414,16 +428,26 @@ export default function StudentBooks() {
       await loadOfflineData();
       setNoteDownloadProgress({ id: note.id, percent: 100 });
     } catch (err: any) {
-      toast({
-        title: 'Opening in online mode',
-        description: err.message || 'Could not download for offline reading.',
-        variant: 'destructive',
-      });
+      if (!navigator.onLine) {
+        shouldOpenReader = false;
+        toast({
+          title: 'Download for offline first',
+          description: 'Connect to the internet and download this study note before opening it offline.',
+        });
+      } else {
+        toast({
+          title: 'Opening in online mode',
+          description: err.message || 'Could not download for offline reading.',
+          variant: 'destructive',
+        });
+      }
     } finally {
       window.clearInterval(creep);
       setPreparingNoteId(null);
       setNoteDownloadProgress(null);
-      navigate(`/dashboard/books/${note.id}/read`);
+      if (shouldOpenReader) {
+        navigate(`/dashboard/books/${note.id}/read${chapterNum ? `?chapter=${chapterNum}` : ''}`);
+      }
     }
   };
 
@@ -431,6 +455,11 @@ export default function StudentBooks() {
   // instantly from the local copy. Books without a Google Drive file open directly.
   const handleReadBook = async (book: Book) => {
     if (preparingBookId) return;
+    const hasLifetime = Boolean(profile?.paymentAccess?.lifetime);
+    if (paymentAccess.paymentsEnabled && !hasLifetime && role !== 'admin') {
+      setUpgradeModalUnit({ unitNumber: 'Full Book', title: book.title });
+      return;
+    }
 
     const driveId = book.driveFileId || extractDriveFileId(book.driveUrl || '');
 
@@ -683,22 +712,23 @@ export default function StudentBooks() {
 
   // Resolve whether a note is gated by the payment setting for the current student.
   // Chapter 1 notes stay free whenever the default free trial is switched on.
+  // All other chapters (Chapter 2, 3, 4...) are locked unless paid.
   const resolveNoteLocked = useCallback(
     (note: Book, isChapterOne: boolean) => {
+      if (isAdmin || Boolean(profile?.paymentAccess?.lifetime)) return false;
+      if (!paymentAccess.paymentsEnabled) return false;
+
       const free = paymentAccess.freeAccess;
-      const chapterId = note.chapterId;
-      return isContentLocked({
-        paymentsEnabled: paymentAccess.paymentsEnabled,
-        freeAccess: free,
-        isStaff: isAdmin,
-        hasLifetime: Boolean((profile as any)?.isPremium),
-        isPremium: Boolean((note as any)?.isPremium),
-        isChapterOne,
-        isExplicitlyFree:
-          free.enabled &&
-          (free.freeNoteIds.includes(note.id) ||
-            (!!chapterId && free.freeChapterIds.includes(chapterId))),
-      });
+      if (free.enabled) {
+        if (isChapterOne && free.freeChaptersPerSubject >= 1) return false;
+        const chapterId = note.chapterId;
+        if (free.freeNoteIds?.includes(note.id) || (chapterId && free.freeChapterIds?.includes(chapterId))) {
+          return false;
+        }
+      }
+
+      // Lock all notes except the free trial one
+      return true;
     },
     [paymentAccess.freeAccess, paymentAccess.paymentsEnabled, isAdmin, profile],
   );
@@ -712,15 +742,34 @@ export default function StudentBooks() {
       const sortedChapters = [...subjectCurriculumChapters].sort(
         (a, b) => (a.chapterNumber ?? 0) - (b.chapterNumber ?? 0)
       );
+      const chapterIds = new Set(sortedChapters.map((chapter) => chapter.id));
+      const matchedNoteIds = new Set<string>();
+      const normalizeChapterTitle = (title: string) =>
+        title
+          .toLowerCase()
+          .trim()
+          .replace(/^(chapter|unit)\s*\d+\s*[:.-]?\s*/i, '')
+          .replace(/\s+/g, ' ');
 
       const mapped = sortedChapters.map((ch, idx) => {
         const unitNum = ch.chapterNumber ?? idx + 1;
-        const note = currentSubjectChapterNotes.find(
-          (n) =>
-            n.chapterId === ch.id ||
-            n.chapterNumber === unitNum ||
-            (n.chapterTitle && ch.title && n.chapterTitle.toLowerCase().trim() === ch.title.toLowerCase().trim())
-        );
+        const availableNotes = currentSubjectChapterNotes.filter((note) => !matchedNoteIds.has(note.id));
+        const note =
+          availableNotes.find((candidate) => candidate.chapterId === ch.id) ||
+          availableNotes.find(
+            (candidate) =>
+              candidate.chapterTitle &&
+              (!candidate.chapterId || !chapterIds.has(candidate.chapterId)) &&
+              normalizeChapterTitle(candidate.chapterTitle) === normalizeChapterTitle(ch.title)
+          ) ||
+          availableNotes.find(
+            (candidate) =>
+              !candidate.chapterId &&
+              !candidate.chapterTitle &&
+              candidate.chapterNumber === unitNum
+          );
+
+        if (note) matchedNoteIds.add(note.id);
 
         // Locked if the note has not been uploaded yet, or if the payment setting
         // gates it and it is not covered by the Chapter 1 free trial / free access.
@@ -734,22 +783,6 @@ export default function StudentBooks() {
           isLocked,
           matchedExam: note ? findExamForNote(note) : undefined,
         };
-      });
-
-      // Include any notes that might not have a matching curriculum chapter in subcollection
-      const extraNotes = currentSubjectChapterNotes.filter(
-        (n) => !mapped.some((m) => m.note?.id === n.id)
-      );
-      extraNotes.forEach((n, idx) => {
-        const unitNum = n.chapterNumber ?? mapped.length + idx + 1;
-        mapped.push({
-          id: n.id,
-          unitNumber: unitNum,
-          title: n.chapterTitle || n.title,
-          note: n,
-          isLocked: false,
-          matchedExam: findExamForNote(n),
-        });
       });
 
       return mapped.sort((a, b) => a.unitNumber - b.unitNumber);
@@ -803,19 +836,6 @@ export default function StudentBooks() {
   return (
     <DashboardLayout>
       <div className="space-y-8 animate-fade-in max-w-7xl mx-auto pb-16">
-        {/* Offline Banner notice */}
-        {!isOnline && (
-          <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-sm font-medium">
-            <WifiOff className="h-5 w-5 text-amber-600 shrink-0" />
-            <div className="flex-1">
-              <span>You are currently offline. Showing textbooks and chapter study notes downloaded to this device.</span>
-            </div>
-            <Badge variant="outline" className="border-amber-500/40 text-amber-700 dark:text-amber-300">
-              Offline Mode
-            </Badge>
-          </div>
-        )}
-
         {/* LOADING STATE */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-28 gap-3">
@@ -1412,7 +1432,11 @@ export default function StudentBooks() {
                                 key={unit.id}
                                 onClick={() => {
                                   if (unit.note) {
-                                    handleReadChapter(unit.note);
+                                    if (unit.isLocked) {
+                                      setUpgradeModalUnit(unit);
+                                      return;
+                                    }
+                                    handleReadChapter(unit.note, unit.unitNumber);
                                   } else {
                                     toast({
                                       title: 'Study guide in preparation',
@@ -1424,21 +1448,21 @@ export default function StudentBooks() {
                                   !unit.note ? 'opacity-70 bg-muted/20' : ''
                                 }`}
                               >
-                                {/* Left Curved Purple Accent Ribbon */}
-                                <div className="absolute left-0 top-3 bottom-3 w-1.5 sm:w-2 bg-[#7c3aed] rounded-r-full" />
+                                {/* Left Curved Accent Ribbon */}
+                                <div className={`absolute left-0 top-3 bottom-3 w-1.5 sm:w-2 rounded-r-full ${unit.isLocked ? 'bg-amber-500' : 'bg-[#7c3aed]'}`} />
 
                                 {/* Squircle Icon + Title & Metadata */}
                                 <div className="flex items-center gap-3.5 sm:gap-4 pl-2 min-w-0 flex-1">
-                                  {/* Purple Squircle Icon Badge */}
+                                  {/* Squircle Icon Badge */}
                                   <div
                                     className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-sm transition-transform group-hover:scale-105 ${
                                       unit.isLocked
-                                        ? 'bg-[#8b5cf6] text-amber-300'
+                                        ? 'bg-amber-500 text-white'
                                         : 'bg-[#7c3aed] text-white'
                                     }`}
                                   >
                                     {unit.isLocked ? (
-                                      <Lock className="w-5 h-5 sm:w-6 sm:h-6 text-amber-300 drop-shadow-xs" />
+                                      <Lock className="w-5 h-5 sm:w-6 sm:h-6 text-white stroke-[2]" />
                                     ) : (
                                       <Compass className="w-6 h-6 sm:w-6 sm:h-6 text-white stroke-[2]" />
                                     )}
@@ -1450,6 +1474,15 @@ export default function StudentBooks() {
                                       <h4 className="text-base sm:text-lg font-bold text-[#1e293b] dark:text-foreground group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors leading-snug">
                                         Chapter {unit.unitNumber}: {unit.title}
                                       </h4>
+                                      {unit.isLocked ? (
+                                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-[11px] font-bold text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                                          <Lock className="h-3 w-3" /> Locked · Upgrade
+                                        </span>
+                                      ) : unit.unitNumber === 1 && !isAdmin && !profile?.paymentAccess?.lifetime ? (
+                                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
+                                          <Sparkles className="h-3 w-3" /> Free Trial
+                                        </span>
+                                      ) : null}
                                     </div>
 
                                     <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium flex-wrap">
@@ -1484,7 +1517,11 @@ export default function StudentBooks() {
                                       type="button"
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        navigate(`/exam/${unit.matchedExam.examId}`);
+                                        if (unit.isLocked) {
+                                          setUpgradeModalUnit(unit);
+                                          return;
+                                        }
+                                        navigate(`/exam/${unit.matchedExam.examId}?chapter=${unit.unitNumber}`);
                                       }}
                                       title="Practice Exam for this Chapter"
                                       className="h-8 px-2.5 rounded-xl bg-purple-50 hover:bg-purple-600 hover:text-white text-purple-700 dark:bg-purple-950/50 dark:text-purple-300 text-xs font-bold flex items-center gap-1 transition-all"
@@ -1683,6 +1720,44 @@ export default function StudentBooks() {
                 </div>
               );
             })()}
+          </DialogContent>
+        </Dialog>
+
+        {/* Locked Material Upgrade Dialog */}
+        <Dialog open={Boolean(upgradeModalUnit)} onOpenChange={() => setUpgradeModalUnit(null)}>
+          <DialogContent className="max-w-md rounded-3xl p-6">
+            <DialogHeader className="space-y-3">
+              <div className="mx-auto w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-950/70 text-amber-600 flex items-center justify-center">
+                <Lock className="w-6 h-6" />
+              </div>
+              <DialogTitle className="text-xl font-bold font-display text-center">
+                {typeof upgradeModalUnit?.unitNumber === "number"
+                  ? `Chapter ${upgradeModalUnit.unitNumber} is Locked`
+                  : "Full Resource is Locked"}
+              </DialogTitle>
+              <DialogDescription className="text-center text-sm">
+                Under the Free Trial, you can study <strong>Chapter 1</strong> notes of all subjects for free. Upgrade to permanent Lifetime Access to unlock this resource and all curriculum chapters!
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="mt-4 space-y-2.5">
+              <Button
+                className="w-full btn-primary font-bold h-11"
+                onClick={() => {
+                  setUpgradeModalUnit(null);
+                  navigate("/dashboard/payment");
+                }}
+              >
+                <Sparkles className="mr-2 h-4 w-4" /> Upgrade to Lifetime Access
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full text-muted-foreground"
+                onClick={() => setUpgradeModalUnit(null)}
+              >
+                Continue Free Trial
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
       </div>

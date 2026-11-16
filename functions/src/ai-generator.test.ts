@@ -206,7 +206,7 @@ describe('AI Generator - Orchestrator and Cooldowns', () => {
         questionTypes: ['mcq']
       }, 'valid-test-key');
 
-      expect(calls).toEqual(['openai/gpt-oss-20b', 'qwen/qwen3.8-27b']);
+      expect(calls).toEqual(['openai/gpt-oss-120b', 'openai/gpt-oss-20b']);
       expect(result).toHaveLength(1);
     });
 
@@ -246,7 +246,7 @@ describe('AI Generator - Orchestrator and Cooldowns', () => {
       expect(result.success).toBe(false);
       expect(result.attempts[0].error).toContain('does not exist');
       expect(getProviderCooldown('groq').inCooldown).toBe(false);
-      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(fetchMock).toHaveBeenCalledTimes(5);
     });
   });
 

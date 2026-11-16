@@ -44,6 +44,7 @@ interface Profile {
   departmentId?: string;
   sectionPermissions?: any; // Add section permissions
   permissions?: UserPermissions | null;
+  paymentAccess?: { lifetime?: boolean; source?: string; grantedAt?: unknown } | null;
   isGuest?: boolean;
 }
 

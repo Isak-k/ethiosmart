@@ -13,6 +13,7 @@ import {
   OfflineBookRecord,
 } from '@/lib/offline-books';
 import { buildDrivePreviewUrl, buildDriveViewUrl, buildDriveDownloadUrl, extractDriveFileId } from '@/lib/google-drive';
+import { usePaymentAccess } from '@/lib/payment-access';
 import { MobileVerticalReader } from '@/components/book/MobileVerticalReader';
 import { InteractiveShortNoteReader } from '@/components/book/InteractiveShortNoteReader';
 import { Button } from '@/components/ui/button';
@@ -44,7 +45,9 @@ import {
 export default function BookReader() {
   const { bookId } = useParams<{ bookId: string }>();
   const [searchParams] = useSearchParams();
-  const { user, role } = useAuth();
+  const { user, role, profile } = useAuth();
+  const paymentAccess = usePaymentAccess();
+  const [isLockedResource, setIsLockedResource] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -175,6 +178,38 @@ export default function BookReader() {
       const saved = await isBookSavedOffline(id);
       setIsSavedOffline(saved);
       incrementBookView(id);
+
+      // Check payment access: Chapter 1 is free under trial; Chapter 2+ requires lifetime access
+      const hasLifetime = Boolean(profile?.paymentAccess?.lifetime);
+      const isStaff = role === 'admin' || role === 'examiner' || role === 'teacher';
+
+      if (paymentAccess.paymentsEnabled && !hasLifetime && !isStaff) {
+        const chapterParam = searchParams.get('chapter');
+        const freeNoteIds: string[] = paymentAccess.freeAccess?.freeNoteIds || [];
+
+        let isChapterOne = false;
+        if (chapterParam === "1") {
+          isChapterOne = true;
+        } else if (chapterParam && parseInt(chapterParam, 10) > 1) {
+          isChapterOne = false;
+        } else if (freeNoteIds.includes(normalizedBook.id)) {
+          isChapterOne = true;
+        } else if (Number(normalizedBook.chapterNumber) === 1 || Number((normalizedBook as any).unitNumber) === 1) {
+          isChapterOne = true;
+        } else {
+          const titleText = String(normalizedBook.title || (normalizedBook as any).chapterTitle || '');
+          const match = titleText.match(/(?:chapter|unit|ch)\s*(\d+)/i);
+          if (match) {
+            isChapterOne = parseInt(match[1], 10) === 1;
+          }
+        }
+
+        if (!isChapterOne) {
+          setIsLockedResource(true);
+          setLoading(false);
+          return;
+        }
+      }
 
       // Pre-fetch through the authenticated, entitlement-checking document proxy.
       if ((normalizedBook.storagePath || normalizedBook.driveFileId) && user) {
@@ -336,6 +371,31 @@ export default function BookReader() {
         <div className="flex flex-col items-center justify-center min-h-[70vh] gap-3">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <p className="text-sm text-muted-foreground">Opening document reader...</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (isLockedResource) {
+    return (
+      <DashboardLayout>
+        <div className="text-center py-20 max-w-md mx-auto space-y-5">
+          <div className="h-16 w-16 mx-auto rounded-3xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
+            <Lock className="h-8 w-8" />
+          </div>
+          <h2 className="text-2xl font-bold font-display">Lifetime Access Required</h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            This learning material belongs to an advanced chapter. Under the <strong>Free Trial</strong>, Chapter 1 of each subject is completely free. Upgrade to permanent Lifetime Access to unlock all chapters!
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+            <Button onClick={() => navigate('/dashboard/payment')} className="btn-primary rounded-xl w-full sm:w-auto font-bold">
+              <Sparkles className="h-4 w-4 mr-2" />
+              Upgrade to Lifetime Access
+            </Button>
+            <Button variant="outline" onClick={() => navigate('/dashboard/books')} className="rounded-xl w-full sm:w-auto">
+              Back to Library
+            </Button>
+          </div>
         </div>
       </DashboardLayout>
     );

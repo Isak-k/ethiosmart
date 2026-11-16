@@ -16,11 +16,15 @@ export async function callOpenRouter(
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
+  const requestedModel = req.providerModels?.openrouter;
   const modelsToTry = [
+    ...(requestedModel ? [requestedModel] : []),
     'meta-llama/llama-3.3-70b-instruct',
+    'openai/gpt-4o',
+    'openai/gpt-4o-mini',
     'google/gemini-2.0-flash-exp:free',
     'mistralai/mistral-small-24b-instruct-2501'
-  ];
+  ].filter((m, idx, arr) => arr.indexOf(m) === idx);
 
   let lastError: any = null;
 

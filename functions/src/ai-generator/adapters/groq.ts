@@ -16,7 +16,21 @@ export async function callGroq(
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-  const modelsToTry = ['openai/gpt-oss-20b', 'qwen/qwen3.8-27b', 'openai/gpt-oss-120b'];
+  const requestedModel = req.providerModels?.groq;
+  const decommissionedGroqModels = new Set([
+    'gemma2-9b-it',
+    'mixtral-8x7b-32768',
+    'gemma-7b-it',
+    'llama2-70b-4096',
+  ]);
+  const modelsToTry = [
+    ...(requestedModel && !decommissionedGroqModels.has(requestedModel) ? [requestedModel] : []),
+    'openai/gpt-oss-120b',
+    'openai/gpt-oss-20b',
+    'qwen/qwen3.8-27b',
+    'llama-3.3-70b-versatile',
+    'llama-3.1-8b-instant'
+  ].filter((m, idx, arr) => arr.indexOf(m) === idx);
   let lastError: any = null;
 
   for (const model of modelsToTry) {
@@ -53,7 +67,8 @@ export async function callGroq(
           (res.status === 400 &&
             (responseBody?.error?.code === 'model_not_found' ||
               normalizedError.includes('model') ||
-              normalizedError.includes('deprecated'))) ||
+              normalizedError.includes('deprecated') ||
+              normalizedError.includes('decommissioned'))) ||
           (res.status === 403 &&
             normalizedError.includes('model') &&
             (normalizedError.includes('does not exist') ||

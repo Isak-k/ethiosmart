@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { loginSchema, signupSchema, getLoginSchema, getSignupSchema } from "@/lib/validations";
 import { ForgotPasswordForm } from "./ForgotPasswordForm";
 import { GoogleProfileSetup } from "./GoogleProfileSetup";
-import { GraduationCap, Loader2, Mail, Lock, User, Eye, EyeOff, Building, WifiOff, ArrowRight, Sparkles, Check, BookOpen } from "lucide-react";
+import { GraduationCap, Loader2, Mail, Lock, User, Eye, EyeOff, Building, ArrowRight, Sparkles, Check, BookOpen } from "lucide-react";
 import { getDepartments } from "@/lib/departments";
 import { getCachedDefaultDepartmentId, getCachedHideDepartmentOnSignup, subscribeToSystemSettings } from "@/lib/system-settings";
 import { Department } from "@/integrations/firebase/types";
@@ -52,19 +52,6 @@ export function AuthForm() {
   const [loadingDepts, setLoadingDepts] = useState(true);
   const [selectedDept, setSelectedDept] = useState<string>("");
   const [hideDeptOnSignup, setHideDeptOnSignup] = useState<boolean>(getCachedHideDepartmentOnSignup());
-  const [isOnline, setIsOnline] = useState(() => (typeof navigator !== "undefined" ? navigator.onLine : true));
-
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
-    return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
-    };
-  }, []);
-
   useEffect(() => {
     const fetchDepts = async () => {
       try {
@@ -252,7 +239,7 @@ export function AuthForm() {
         title: "Account created!",
         description: "Welcome to EthioSmart!",
       });
-      navigate(signupRole === "admin" ? "/dashboard" : "/dashboard/exams");
+      navigate(signupRole === "admin" ? "/dashboard" : "/dashboard/payment?welcome=true");
     } catch (error: any) {
       const friendly = getFriendlyAuthErrorMessage(error, 'signup');
       toast({
@@ -343,7 +330,7 @@ export function AuthForm() {
         title: "Profile completed!",
         description: "Welcome to EthioSmart!",
       });
-      navigate("/dashboard/exams");
+      navigate("/dashboard/payment?welcome=true");
     } catch (error: any) {
       const friendly = getFriendlyAuthErrorMessage(error, 'signup');
       toast({
@@ -366,7 +353,7 @@ export function AuthForm() {
         title: "Welcome, Guest Student!",
         description: "Entering learning dashboard. No account required.",
       });
-      navigate("/dashboard/exams");
+      navigate("/dashboard/payment?welcome=true");
     } catch (error: any) {
       toast({
         title: "Guest Access Error",
@@ -449,13 +436,6 @@ export function AuthForm() {
             </TabsTrigger>
           </TabsList>
         </div>
-
-        {!isOnline && (
-          <div className="mx-4 sm:mx-6 mt-2 p-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center gap-2 text-amber-800 dark:text-amber-300 text-xs animate-fade-in">
-            <WifiOff className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-            <span>You are offline.</span>
-          </div>
-        )}
 
         <div className="p-3.5 sm:p-5 pt-3">
           <TabsContent value="login" className="mt-0">

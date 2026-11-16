@@ -40,6 +40,8 @@ import {
   BookOpen,
   Loader2,
   ChevronDown,
+  ChevronUp,
+  RotateCcw,
   SlidersHorizontal,
   Search,
   Target,
@@ -49,7 +51,8 @@ import {
 } from 'lucide-react';
 import { AIProviderSettingsSection } from '@/components/admin/AIProviderSettingsSection';
 import { EthioAccentBar } from '@/components/ui/EthioAccentBar';
-import { getEffectiveProviderKeys } from '@/lib/ai-settings';
+import { getEffectiveProviderKeys, getAISettings } from '@/lib/ai-settings';
+import { clearAllProviderCooldowns } from '@/lib/ai-engine/orchestrator';
 import { cn } from '@/lib/utils';
 import { getOfflineBook } from '@/lib/offline-books';
 import {
@@ -276,6 +279,10 @@ export default function AdminAIGenerator() {
     try {
       const statuses = await getAIProviderStatuses();
       setProviderStatuses(statuses);
+      const settings = await getAISettings().catch(() => null);
+      if (settings?.providerPriority && Array.isArray(settings.providerPriority) && settings.providerPriority.length > 0) {
+        setProviderPriority(settings.providerPriority);
+      }
     } catch (err: any) {
       console.warn('Could not refresh statuses:', err);
     } finally {
@@ -827,6 +834,7 @@ export default function AdminAIGenerator() {
     setCurrentJobId(jobId);
     setTotalBatches(numBatches);
     setFallbackBanner(null);
+    clearAllProviderCooldowns();
     setIsGenerating(true);
     setIsPaused(false);
     isPausedRef.current = false;
@@ -880,7 +888,7 @@ export default function AdminAIGenerator() {
       console.warn('Failed to initialize job document:', e);
     }
 
-    // Run Batches Sequentially with precise question type distribution
+    // Run Batches Sequentially with dynamic deficit calculation and resilient retries
     const providerCounts: Record<AIProviderId, number> = {
       gemini: 0,
       groq: 0,
@@ -888,51 +896,68 @@ export default function AdminAIGenerator() {
       huggingface: 0
     };
 
-    const alreadyMcqs = allAcceptedQuestions.filter(q => q.questionType === 'mcq').length;
-    const alreadyTfs = allAcceptedQuestions.filter(q => q.questionType === 'truefalse').length;
-    const alreadyShorts = allAcceptedQuestions.filter(q => q.questionType === 'shortanswer').length;
+    const estimatedBatches = Math.max(1, Math.ceil(totalCount / BATCH_SIZE));
+    setTotalBatches(estimatedBatches);
 
-    let remainingMcqs = Math.max(0, mcqCount - alreadyMcqs);
-    let remainingTfs = Math.max(0, tfCount - alreadyTfs);
-    let remainingShorts = Math.max(0, shortCount - alreadyShorts);
+    let batchIteration = Math.floor(allAcceptedQuestions.length / BATCH_SIZE);
+    let consecutiveErrors = 0;
+    const MAX_CONSECUTIVE_ERRORS = 5;
+    const MAX_TOTAL_ITERATIONS = Math.max(15, estimatedBatches * 4);
 
-    const startBatchIdx = Math.floor(allAcceptedQuestions.length / BATCH_SIZE);
-
-    for (let batchIdx = startBatchIdx; batchIdx < numBatches; batchIdx++) {
+    while (allAcceptedQuestions.length < totalCount && batchIteration < MAX_TOTAL_ITERATIONS) {
       if (isPausedRef.current) {
-        setGenerationLogs(prev => [...prev, `[Paused] Generation paused by user after batch ${batchIdx}.`]);
+        setGenerationLogs(prev => [...prev, `[Paused] Generation paused by user.`]);
         break;
       }
 
-      setCurrentBatchIndex(batchIdx + 1);
-      const remainingCount = totalCount - allAcceptedQuestions.length;
-      const countForThisBatch = Math.min(BATCH_SIZE, remainingCount);
+      batchIteration++;
+      const currentBatchNumber = Math.min(
+        estimatedBatches,
+        Math.floor(allAcceptedQuestions.length / BATCH_SIZE) + 1
+      );
+      setCurrentBatchIndex(currentBatchNumber);
 
-      if (countForThisBatch <= 0) break;
+      const remainingTotal = totalCount - allAcceptedQuestions.length;
+      if (remainingTotal <= 0) break;
 
-      // Allocate question type distribution for this batch
+      const countForThisBatch = Math.min(BATCH_SIZE, remainingTotal);
+
+      // Dynamically calculate what question types are still needed based on already accepted questions
+      const currentMcqs = allAcceptedQuestions.filter(q => q.questionType === 'mcq').length;
+      const currentTfs = allAcceptedQuestions.filter(q => q.questionType === 'truefalse').length;
+      const currentShorts = allAcceptedQuestions.filter(q => q.questionType === 'shortanswer').length;
+
+      let neededMcqs = Math.max(0, mcqCount - currentMcqs);
+      let neededTfs = Math.max(0, tfCount - currentTfs);
+      let neededShorts = Math.max(0, shortCount - currentShorts);
+
       let batchTf = 0;
       let batchMcq = 0;
       let batchShort = 0;
       let needed = countForThisBatch;
 
-      if (remainingTfs > 0 && needed > 0) {
-        const take = Math.min(remainingTfs, needed);
+      // Allocate according to type deficit
+      if (neededTfs > 0 && needed > 0) {
+        const take = Math.min(neededTfs, needed);
         batchTf = take;
-        remainingTfs -= take;
         needed -= take;
       }
-      if (remainingMcqs > 0 && needed > 0) {
-        const take = Math.min(remainingMcqs, needed);
+      if (neededMcqs > 0 && needed > 0) {
+        const take = Math.min(neededMcqs, needed);
         batchMcq = take;
-        remainingMcqs -= take;
         needed -= take;
       }
-      if (remainingShorts > 0 && needed > 0) {
-        const take = Math.min(remainingShorts, needed);
+      if (neededShorts > 0 && needed > 0) {
+        const take = Math.min(neededShorts, needed);
         batchShort = take;
-        remainingShorts -= take;
         needed -= take;
+      }
+      // If individual type quotas are met but remaining total still needs questions, fill with selected types
+      if (needed > 0) {
+        if (selectedTypes.includes('mcq')) batchMcq += needed;
+        else if (selectedTypes.includes('truefalse')) batchTf += needed;
+        else if (selectedTypes.includes('shortanswer')) batchShort += needed;
+        else batchMcq += needed;
       }
 
       const batchTypes: QuestionType[] = [];
@@ -948,7 +973,7 @@ export default function AdminAIGenerator() {
 
       setGenerationLogs(prev => [
         ...prev,
-        `[Batch ${batchIdx + 1}/${numBatches}] Requesting ${countForThisBatch} questions (${typeSummary || selectedTypes.join(', ')})...`
+        `[Batch ${currentBatchNumber}/${estimatedBatches}] Requesting ${countForThisBatch} questions (${typeSummary || selectedTypes.join(', ')})...`
       ]);
 
       try {
@@ -968,17 +993,18 @@ export default function AdminAIGenerator() {
           difficulty,
           language,
           providerPriority,
-          batchIndex: batchIdx + 1,
-          totalBatches: numBatches
+          batchIndex: batchIteration,
+          totalBatches: estimatedBatches
         });
 
         if (batchRes.success && batchRes.questions.length > 0) {
+          consecutiveErrors = 0;
           const providerUsed = batchRes.providerUsed || 'gemini';
           setActiveProvider(providerUsed);
           providerCounts[providerUsed] = (providerCounts[providerUsed] || 0) + batchRes.questions.length;
 
           if (batchRes.fallbackOccurred) {
-            const banner = `Fallback triggered: Successfully generated using ${providerUsed.toUpperCase()} after earlier provider(s) experienced issues.`;
+            const banner = `Fallback active: Generated via ${providerUsed.toUpperCase()} after previous provider encountered issues.`;
             setFallbackBanner(banner);
             setGenerationLogs(prev => [...prev, `⚠️ ${banner}`]);
           }
@@ -998,12 +1024,25 @@ export default function AdminAIGenerator() {
             } : undefined,
           }));
 
-          allAcceptedQuestions = [...allAcceptedQuestions, ...questionsWithSource];
+          // Deduplicate against already accepted questions
+          const existingTexts = new Set(allAcceptedQuestions.map(q => q.questionText.trim().toLowerCase()));
+          const newUniqueQuestions = questionsWithSource.filter(q => {
+            const t = q.questionText.trim().toLowerCase();
+            if (existingTexts.has(t)) return false;
+            existingTexts.add(t);
+            return true;
+          });
+
+          // Accept only up to remaining needed so we strictly match totalCount
+          const slotsRemaining = totalCount - allAcceptedQuestions.length;
+          const questionsToAccept = newUniqueQuestions.slice(0, slotsRemaining);
+
+          allAcceptedQuestions = [...allAcceptedQuestions, ...questionsToAccept];
           setGeneratedQuestions([...allAcceptedQuestions]);
 
           setGenerationLogs(prev => [
             ...prev,
-            `✓ [Batch ${batchIdx + 1}/${numBatches}] Success via ${providerUsed.toUpperCase()} (+${batchRes.questions.length} questions, total: ${allAcceptedQuestions.length}/${totalCount})`
+            `✓ [Batch ${currentBatchNumber}/${estimatedBatches}] Success via ${providerUsed.toUpperCase()} (+${questionsToAccept.length} questions, total: ${allAcceptedQuestions.length}/${totalCount})`
           ]);
 
           // Save incremental progress to Firestore without letting persistence errors interrupt execution
@@ -1011,7 +1050,7 @@ export default function AdminAIGenerator() {
             await saveJobToFirestore({
               ...initialJob,
               totalGenerated: allAcceptedQuestions.length,
-              completedBatches: batchIdx + 1,
+              completedBatches: currentBatchNumber,
               status: allAcceptedQuestions.length >= totalCount ? 'completed' : 'generating',
               questions: allAcceptedQuestions,
               providerUsedCounts: providerCounts
@@ -1020,32 +1059,53 @@ export default function AdminAIGenerator() {
             console.warn('Failed to update job audit record in Firestore:', jobErr);
           }
         } else {
-          lastBatchErrorMessage = batchRes.error || '';
+          consecutiveErrors++;
+          lastBatchErrorMessage = batchRes.error || 'Batch failed to generate questions';
           setGenerationLogs(prev => [
             ...prev,
-            `❌ [Batch ${batchIdx + 1}/${numBatches}] Batch failed: ${batchRes.error || 'Unknown error'}`
+            `⚠️ [Batch attempt ${currentBatchNumber}] Provider issue: ${lastBatchErrorMessage}. (Attempt ${consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS})`
           ]);
-          try {
-            await saveJobToFirestore({
-              ...initialJob,
-              totalGenerated: allAcceptedQuestions.length,
-              completedBatches: batchIdx,
-              status: allAcceptedQuestions.length > 0 ? 'partially_completed' : 'failed',
-              questions: allAcceptedQuestions,
-              providerUsedCounts: providerCounts
-            });
-          } catch (jobErr) {
-            console.warn('Failed to mark partial job state in Firestore:', jobErr);
+
+          if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+            setGenerationLogs(prev => [
+              ...prev,
+              `❌ Pausing generation: ${MAX_CONSECUTIVE_ERRORS} consecutive attempts failed across configured AI providers. You can resume anytime.`
+            ]);
+            try {
+              await saveJobToFirestore({
+                ...initialJob,
+                totalGenerated: allAcceptedQuestions.length,
+                completedBatches: currentBatchNumber,
+                status: allAcceptedQuestions.length > 0 ? 'partially_completed' : 'failed',
+                questions: allAcceptedQuestions,
+                providerUsedCounts: providerCounts
+              });
+            } catch (jobErr) {
+              console.warn('Failed to mark partial job state in Firestore:', jobErr);
+            }
+            break;
           }
-          break;
+
+          // Brief delay before retrying with fallback provider
+          await new Promise(r => setTimeout(r, 1500));
         }
       } catch (batchErr: any) {
-        lastBatchErrorMessage = batchErr.message || '';
+        consecutiveErrors++;
+        lastBatchErrorMessage = batchErr.message || 'Exception during batch';
         setGenerationLogs(prev => [
           ...prev,
-          `❌ [Batch ${batchIdx + 1}/${numBatches}] Exception: ${batchErr.message}`
+          `⚠️ [Batch attempt ${currentBatchNumber}] Exception: ${lastBatchErrorMessage}. (Attempt ${consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS})`
         ]);
-        break;
+
+        if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+          setGenerationLogs(prev => [
+            ...prev,
+            `❌ Pausing generation: ${MAX_CONSECUTIVE_ERRORS} consecutive exceptions occurred. You can resume anytime.`
+          ]);
+          break;
+        }
+
+        await new Promise(r => setTimeout(r, 1500));
       }
     }
 
@@ -2219,21 +2279,114 @@ export default function AdminAIGenerator() {
                             </div>
                           </div>
 
-                          <div className="p-2.5 rounded-xl border bg-muted/30 space-y-1 text-xs">
-                            <div className="flex items-center justify-between">
-                              <span className="font-semibold text-muted-foreground text-[11px]">Automatic Engine Fallback Order:</span>
-                              <button
-                                type="button"
-                                onClick={() => setActiveTab('settings')}
-                                className="text-[11px] text-primary hover:underline font-semibold flex items-center gap-1 cursor-pointer"
-                              >
-                                <Settings className="h-3 w-3" />
-                                Configure Engines & Keys
-                              </button>
+                          {/* Engine Priority & Failover Sequence (Optional) */}
+                          <div className="p-3 rounded-xl border bg-card space-y-2.5">
+                            <div className="flex items-center justify-between flex-wrap gap-2">
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-xs">Engine Priority & Failover Sequence</span>
+                                  <Badge variant="outline" className="text-[9.5px] px-1.5 py-0 text-muted-foreground font-normal">
+                                    Optional
+                                  </Badge>
+                                </div>
+                                <p className="text-[11px] text-muted-foreground mt-0.5">
+                                  Engine #1 generates first. If an engine encounters issues, lower engines act as automatic fallbacks.
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setProviderPriority(['gemini', 'groq', 'openrouter', 'huggingface'])}
+                                  className="h-7 px-2 text-[10.5px] text-muted-foreground hover:text-foreground"
+                                  title="Reset to default priority sequence"
+                                >
+                                  <RotateCcw className="h-3 w-3 mr-1" />
+                                  Reset
+                                </Button>
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveTab('settings')}
+                                  className="text-[11px] text-primary hover:underline font-medium flex items-center gap-1 cursor-pointer"
+                                >
+                                  <Settings className="h-3 w-3" />
+                                  Manage Keys
+                                </button>
+                              </div>
                             </div>
-                            <p className="text-muted-foreground text-[11px]">
-                              1. Gemini 2.5 Flash → 2. Groq (Qwen/GPT) → 3. OpenRouter → 4. HuggingFace
-                            </p>
+
+                            {/* Reorderable Provider Cards */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                              {providerPriority.map((providerId, idx) => {
+                                const names: Record<AIProviderId, string> = {
+                                  gemini: 'Google Gemini (2.5 Flash)',
+                                  groq: 'Groq (Ultra-Fast LPU)',
+                                  openrouter: 'OpenRouter Gateway',
+                                  huggingface: 'Hugging Face Inference',
+                                };
+                                const status = providerStatuses.find(s => s.id === providerId);
+                                const isReady = status?.status === 'ready';
+
+                                return (
+                                  <div
+                                    key={providerId}
+                                    className={cn(
+                                      "flex items-center justify-between p-2 rounded-lg border text-xs transition-all",
+                                      idx === 0
+                                        ? "bg-primary/5 border-primary/40 font-semibold"
+                                        : "bg-muted/30 border-border"
+                                    )}
+                                  >
+                                    <div className="flex items-center gap-2 truncate mr-2">
+                                      <div className={cn(
+                                        "h-5 w-5 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0",
+                                        idx === 0
+                                          ? "bg-primary text-primary-foreground shadow-2xs"
+                                          : "bg-muted text-muted-foreground"
+                                      )}>
+                                        {idx + 1}
+                                      </div>
+                                      <div className="truncate">
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="truncate">{names[providerId]}</span>
+                                          {idx === 0 && (
+                                            <Badge variant="outline" className="text-[9px] px-1 py-0 border-primary/40 text-primary bg-primary/10">
+                                              Primary
+                                            </Badge>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-0.5 shrink-0">
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 rounded-md hover:bg-muted"
+                                        disabled={idx === 0}
+                                        onClick={() => movePriority(idx, 'up')}
+                                        title="Move up in priority"
+                                      >
+                                        <ChevronUp className="h-3.5 w-3.5" />
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 rounded-md hover:bg-muted"
+                                        disabled={idx === providerPriority.length - 1}
+                                        onClick={() => movePriority(idx, 'down')}
+                                        title="Move down in priority"
+                                      >
+                                        <ChevronDown className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
                         </div>
                       )}

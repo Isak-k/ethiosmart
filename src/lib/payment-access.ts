@@ -114,7 +114,8 @@ export function isContentLocked(input: ContentAccessInput): boolean {
     if (input.isChapterOne && input.freeAccess.freeChaptersPerSubject >= 1) return false;
   }
 
-  return input.isPremium === true;
+  if (input.isPremium === false) return false;
+  return true;
 }
 
 /** Convenience wrapper: is a note free because of the Chapter 1 label? */
@@ -138,7 +139,22 @@ export async function fetchPaymentAccessSettings(force = false): Promise<Payment
     const snapshot = await getDoc(
       doc(db, PAYMENT_SETTINGS_COLLECTION, PAYMENT_SETTINGS_CONFIG_DOC),
     );
-    cachedAccess = derivePaymentAccess(snapshot.exists() ? snapshot.data() : {});
+    if (snapshot.exists()) {
+      cachedAccess = derivePaymentAccess(snapshot.data());
+      return cachedAccess;
+    }
+  } catch {
+    // Continue to backend fallback
+  }
+  try {
+    const { callBackend } = await import("@/lib/api/backend");
+    const settings = await callBackend('/api/payments/getPaymentSettings', {}, { optionalAuth: true });
+    if (settings) {
+      cachedAccess = derivePaymentAccess(settings);
+      return cachedAccess;
+    }
+  } catch {}
+  try {
   } catch {
     // Offline / permission errors resolve to the safe default (no free trial).
     cachedAccess = derivePaymentAccess({});

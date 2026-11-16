@@ -169,9 +169,10 @@ export function organizeChapterNotesLocal(
       const num = parseInt(numMatch[1], 10);
       const titlePart = numMatch[2].trim();
 
-      if (/^(identify|compute|find|substitute|use|state|solve|verify|let|where|since|because|calculate|praise|reinforce|be specific)\b/i.test(titlePart)) {
+      if (/^(identify|compute|find|substitute|use|state|solve|verify|let|where|since|because|calculate|rearrange|set up|simplify|evaluate|express|draw|plug in|write|recall|divide|multiply|add|subtract|praise|reinforce|be specific)\b/i.test(titlePart)) {
         return false;
       }
+      if (titlePart.includes('=') || titlePart.includes('$')) return false;
       if (/[.?!]\s+[A-Z]/.test(titlePart)) return false;
       if (titlePart.includes(':') && (titlePart.endsWith('.') || titlePart.split(/\s+/).length > 8)) return false;
 
@@ -371,6 +372,9 @@ export function organizeChapterNotesLocal(
 
     for (let lineIdx = 0; lineIdx < rawSec.lines.length; lineIdx++) {
       const line = rawSec.lines[lineIdx];
+      if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test' && rawSec.title.includes('Second Law')) {
+        console.log(`[TRACE] sec1 line[${lineIdx}]="${line.slice(0,70)}" currentWorkedEx=${!!currentWorkedExample} currentEx=${!!currentExercise}`);
+      }
 
       // Code block start / end
       if (line.startsWith('```')) {
@@ -442,6 +446,9 @@ export function organizeChapterNotesLocal(
       // Worked Example detection - only for Mathematics & Physics calculations
       const isMathOrPhys = profile.discipline === 'mathematics' || profile.discipline === 'physics';
       if (isMathOrPhys && /^(Worked Example|Sample Problem|Calculation Example)\s*(\d+)?[:.]/i.test(line) && !currentExercise) {
+        if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test') {
+          console.log(`[DEBUG-WEX-START] "${line.slice(0,80)}"`);
+        }
         flushTable();
         flushWorkedExample();
         flushExercise();
@@ -484,6 +491,9 @@ export function organizeChapterNotesLocal(
           continue;
         }
         if (!/^(Exercise|Review Question|Practice Problem|Definition|Formula|Important|Key Fact|Tip)/i.test(line)) {
+          if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test' && rawSec.title.includes('Second Law')) {
+            console.log(`[TRACE-WEX-PROSE] "${line.slice(0,60)}" step_check=${/^(Step\s*\d+|[0-9]+[\.\]])/.test(line)} sol_check=${/^Solution[:.]?/.test(line)} prob_check=${/^Problem[:]/.test(line)}`);
+          }
           if (line.trim()) {
             if (!currentWorkedExample.content) {
               currentWorkedExample.content = line.trim();
@@ -497,6 +507,9 @@ export function organizeChapterNotesLocal(
           }
           continue;
         } else {
+          if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test') {
+            console.log(`[DEBUG-WEX] Flushing worked example, next line="${line.slice(0,80)}"`);
+          }
           flushWorkedExample();
         }
       }
@@ -668,6 +681,11 @@ export function organizeChapterNotesLocal(
     // Flush any pending table or exercise
     flushTable();
     flushExercise();
+    // DEBUG: log exercise count per section
+    if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test') {
+      console.log(`[DEBUG] Section "${rawSec.title}" exercises: ${exercises.length}, isMathOrPhys: ${profile.discipline}`);
+      exercises.forEach((e, i) => console.log(`  ex[${i}]: "${String(e.question).slice(0, 60)}..."`));
+    }
 
     const finalBlocks = synthesizeSectionBlocks(
       {
@@ -746,7 +764,7 @@ async function callAIForNotes(prompt: string, effectiveKeys: ReturnType<typeof g
   // 1. Try Google Gemini (Fastest high-throughput models with realistic 45s timeout)
   const geminiKey = userKey || effectiveKeys.gemini;
   if (geminiKey) {
-    const models = ['gemini-flash-lite-latest', 'gemini-3.5-flash-lite', 'gemini-3-flash-preview', 'gemini-flash-latest', 'gemini-2.5-flash'];
+    const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
     for (const model of models) {
       try {
         const response = await fetch(
@@ -780,7 +798,7 @@ async function callAIForNotes(prompt: string, effectiveKeys: ReturnType<typeof g
   // 2. Try Groq (Ultra-fast failover with 35s timeout)
   const groqKey = effectiveKeys.groq;
   if (groqKey) {
-    const models = ['qwen/qwen3.8-27b', 'openai/gpt-oss-120b', 'openai/gpt-oss-20b'];
+    const models = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3.8-27b', 'llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
     for (const model of models) {
       try {
         const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {

@@ -16,7 +16,9 @@ import {
   getAISettings,
   saveAISettings,
   testAIProviderConnection,
+  getPreconfiguredEnvKeys,
 } from '@/lib/ai-settings';
+import { clearProviderCooldown, clearAllProviderCooldowns } from '@/lib/ai-engine/orchestrator';
 import type { AIProviderId } from '@/lib/ai-engine/types.ts';
 import {
   Sparkles,
@@ -31,6 +33,8 @@ import {
   Save,
   RotateCcw,
   Zap,
+  ChevronUp,
+  ChevronDown,
   SlidersHorizontal,
   ClipboardPaste,
   X,
@@ -89,6 +93,7 @@ export function AIProviderSettingsSection({
     Record<string, { testing: boolean; success?: boolean; message?: string; latencyMs?: number }>
   >({});
   const [testingAll, setTestingAll] = useState(false);
+  const envKeys = getPreconfiguredEnvKeys();
 
   // Load active AI settings
   useEffect(() => {
@@ -162,6 +167,50 @@ export function AIProviderSettingsSection({
     }
   };
 
+  const movePriority = (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= settings.providerPriority.length) return;
+    setHasUnsavedChanges(true);
+    setSettings((prev) => {
+      const updated = [...prev.providerPriority];
+      const [moved] = updated.splice(index, 1);
+      updated.splice(targetIndex, 0, moved);
+      return {
+        ...prev,
+        defaultProvider: updated[0],
+        providerPriority: updated,
+        providers: {
+          ...prev.providers,
+          gemini: { ...prev.providers.gemini, priority: updated.indexOf('gemini') + 1 },
+          groq: { ...prev.providers.groq, priority: updated.indexOf('groq') + 1 },
+          openrouter: { ...prev.providers.openrouter, priority: updated.indexOf('openrouter') + 1 },
+          huggingface: { ...prev.providers.huggingface, priority: updated.indexOf('huggingface') + 1 },
+        },
+      };
+    });
+  };
+
+  const handleSetProviderPriorityOrder = (providerId: AIProviderId, targetPriority: number) => {
+    const targetIdx = Math.max(0, Math.min(3, targetPriority - 1));
+    setHasUnsavedChanges(true);
+    setSettings((prev) => {
+      const filtered = prev.providerPriority.filter((p) => p !== providerId);
+      filtered.splice(targetIdx, 0, providerId);
+      return {
+        ...prev,
+        defaultProvider: filtered[0],
+        providerPriority: filtered,
+        providers: {
+          ...prev.providers,
+          gemini: { ...prev.providers.gemini, priority: filtered.indexOf('gemini') + 1 },
+          groq: { ...prev.providers.groq, priority: filtered.indexOf('groq') + 1 },
+          openrouter: { ...prev.providers.openrouter, priority: filtered.indexOf('openrouter') + 1 },
+          huggingface: { ...prev.providers.huggingface, priority: filtered.indexOf('huggingface') + 1 },
+        },
+      };
+    });
+  };
+
   const handleClearKey = (providerId: AIProviderId) => {
     updateProviderField(providerId, 'apiKey', '');
     setTestResults((prev) => ({
@@ -171,11 +220,13 @@ export function AIProviderSettingsSection({
   };
 
   const handleTestKey = async (providerId: AIProviderId) => {
+    clearProviderCooldown(providerId);
     const config = settings.providers[providerId];
-    if (!config.apiKey || !config.apiKey.trim()) {
+    const keyToTest = (config.apiKey && config.apiKey.trim()) || envKeys[providerId] || '';
+    if (!keyToTest) {
       toast({
         title: 'API Key Required',
-        description: `Please enter an API key for ${config.name} before testing.`,
+        description: `Please enter an API key for ${config.name} or configure it in .env before testing.`,
         variant: 'destructive',
       });
       return;
@@ -187,7 +238,7 @@ export function AIProviderSettingsSection({
     }));
 
     try {
-      const result = await testAIProviderConnection(providerId, config.apiKey, config.model);
+      const result = await testAIProviderConnection(providerId, keyToTest, config.model);
       setTestResults((prev) => ({
         ...prev,
         [providerId]: {
@@ -223,11 +274,13 @@ export function AIProviderSettingsSection({
   };
 
   const handleTestAll = async () => {
+    clearAllProviderCooldowns();
     setTestingAll(true);
     const providers: AIProviderId[] = ['gemini', 'groq', 'openrouter', 'huggingface'];
 
     for (const p of providers) {
-      if (settings.providers[p].apiKey && settings.providers[p].apiKey.trim()) {
+      const k = (settings.providers[p].apiKey && settings.providers[p].apiKey.trim()) || envKeys[p];
+      if (k) {
         await handleTestKey(p);
       }
     }
@@ -257,6 +310,7 @@ export function AIProviderSettingsSection({
 
   const handleResetDefaults = () => {
     if (confirm('Reset all AI provider models, fallback rules, and defaults? (Existing API keys will be preserved)')) {
+      clearAllProviderCooldowns();
       setSettings((prev) => ({
         ...DEFAULT_AI_SETTINGS,
         providers: {
@@ -290,7 +344,7 @@ export function AIProviderSettingsSection({
     settings.providers.huggingface,
   ];
 
-  const configuredCount = providerList.filter(p => Boolean(p.apiKey && p.apiKey.trim().length > 5)).length;
+  const configuredCount = providerList.filter(p => Boolean((p.apiKey && p.apiKey.trim().length > 5) || envKeys[p.id])).length;
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -413,7 +467,8 @@ export function AIProviderSettingsSection({
           const isKeyVisible = showKeys[provider.id] || false;
           const isCustomModel = customModelInputs[provider.id] || false;
           const test = testResults[provider.id];
-          const hasKey = Boolean(provider.apiKey && provider.apiKey.trim().length > 0);
+          const isEnv = Boolean(envKeys[provider.id]);
+          const hasKey = Boolean((provider.apiKey && provider.apiKey.trim().length > 0) || isEnv);
           const formatHint = getApiKeyFormatHint(provider.id, provider.apiKey);
 
           return (
@@ -456,10 +511,17 @@ export function AIProviderSettingsSection({
                 {/* API Key Input */}
                 <div className="space-y-1">
                   <div className="flex items-center justify-between text-xs">
-                    <Label className="text-xs font-semibold flex items-center gap-1">
-                      <KeyRound className="h-3.5 w-3.5 text-primary" />
-                      API Key
-                    </Label>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <Label className="text-xs font-semibold flex items-center gap-1">
+                        <KeyRound className="h-3.5 w-3.5 text-primary" />
+                        API Key
+                      </Label>
+                      {isEnv && (
+                        <Badge variant="outline" className="text-[9.5px] px-1.5 py-0 border-emerald-500/40 text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 font-normal">
+                          Configured via .env (Optional to edit)
+                        </Badge>
+                      )}
+                    </div>
                     <a
                       href={provider.consoleUrl}
                       target="_blank"
@@ -475,7 +537,7 @@ export function AIProviderSettingsSection({
                       type={isKeyVisible ? 'text' : 'password'}
                       value={provider.apiKey}
                       onChange={(e) => updateProviderField(provider.id, 'apiKey', e.target.value)}
-                      placeholder={`Paste your ${provider.name} key...`}
+                      placeholder={isEnv ? "Configured via .env (Optional to override)" : `Paste your ${provider.name} key...`}
                       className={cn(
                         "pr-24 text-xs font-mono h-9 rounded-xl",
                         formatHint?.type === 'warning' && "border-amber-500/60 focus-visible:ring-amber-500"
@@ -577,7 +639,7 @@ export function AIProviderSettingsSection({
                     <Label className="text-[11px] text-muted-foreground font-medium">Fallback Priority</Label>
                     <Select
                       value={String(provider.priority)}
-                      onValueChange={(val) => updateProviderField(provider.id, 'priority', Number(val))}
+                      onValueChange={(val) => handleSetProviderPriorityOrder(provider.id, Number(val))}
                     >
                       <SelectTrigger className="h-8 rounded-xl text-xs bg-background">
                         <SelectValue />
@@ -655,6 +717,102 @@ export function AIProviderSettingsSection({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 px-4 sm:px-5 pb-5">
+          {/* Priority Sequence Reorder Section */}
+          <div className="p-3 sm:p-4 rounded-xl border bg-muted/20 space-y-2.5">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-xs sm:text-sm">Failover Priority Sequence</span>
+                  <Badge variant="outline" className="text-[9.5px] px-1.5 py-0 text-muted-foreground font-normal">
+                    Optional
+                  </Badge>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Order in which AI engines are tried during exam generation batches. Click arrows to re-order.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setHasUnsavedChanges(true);
+                  setSettings((prev) => ({
+                    ...prev,
+                    defaultProvider: 'gemini',
+                    providerPriority: ['gemini', 'groq', 'openrouter', 'huggingface'],
+                    providers: {
+                      ...prev.providers,
+                      gemini: { ...prev.providers.gemini, priority: 1 },
+                      groq: { ...prev.providers.groq, priority: 2 },
+                      openrouter: { ...prev.providers.openrouter, priority: 3 },
+                      huggingface: { ...prev.providers.huggingface, priority: 4 },
+                    },
+                  }));
+                }}
+                className="h-7 px-2 text-[10.5px] text-muted-foreground hover:text-foreground"
+              >
+                <RotateCcw className="h-3 w-3 mr-1" />
+                Reset Order
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
+              {settings.providerPriority.map((providerId, idx) => {
+                const p = settings.providers[providerId];
+                return (
+                  <div
+                    key={providerId}
+                    className={cn(
+                      "flex items-center justify-between p-2 rounded-xl border text-xs bg-background transition-all",
+                      idx === 0 ? "border-primary/50 shadow-2xs" : "border-border"
+                    )}
+                  >
+                    <div className="flex items-center gap-2 truncate mr-1.5">
+                      <div className={cn(
+                        "h-5 w-5 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0",
+                        idx === 0 ? "bg-primary text-primary-foreground shadow-2xs" : "bg-muted text-muted-foreground"
+                      )}>
+                        {idx + 1}
+                      </div>
+                      <span className="font-semibold truncate text-[11px]">{p.name.split(' ')[0]}</span>
+                      {idx === 0 && (
+                        <Badge variant="outline" className="text-[8.5px] px-1 py-0 border-primary/40 text-primary bg-primary/10 shrink-0">
+                          Primary
+                        </Badge>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 rounded-md hover:bg-muted"
+                        disabled={idx === 0}
+                        onClick={() => movePriority(idx, 'up')}
+                        title="Increase priority"
+                      >
+                        <ChevronUp className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 rounded-md hover:bg-muted"
+                        disabled={idx === settings.providerPriority.length - 1}
+                        onClick={() => movePriority(idx, 'down')}
+                        title="Decrease priority"
+                      >
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4">
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Preferred Primary Engine</Label>
@@ -662,7 +820,21 @@ export function AIProviderSettingsSection({
                 value={settings.defaultProvider}
                 onValueChange={(val: AIProviderId) => {
                   setHasUnsavedChanges(true);
-                  setSettings((prev) => ({ ...prev, defaultProvider: val }));
+                  setSettings((prev) => {
+                    const newPriority = [val, ...prev.providerPriority.filter(p => p !== val)];
+                    return {
+                      ...prev,
+                      defaultProvider: val,
+                      providerPriority: newPriority,
+                      providers: {
+                        ...prev.providers,
+                        gemini: { ...prev.providers.gemini, priority: newPriority.indexOf('gemini') + 1 },
+                        groq: { ...prev.providers.groq, priority: newPriority.indexOf('groq') + 1 },
+                        openrouter: { ...prev.providers.openrouter, priority: newPriority.indexOf('openrouter') + 1 },
+                        huggingface: { ...prev.providers.huggingface, priority: newPriority.indexOf('huggingface') + 1 },
+                      },
+                    };
+                  });
                 }}
               >
                 <SelectTrigger className="h-9 rounded-xl text-xs bg-background">

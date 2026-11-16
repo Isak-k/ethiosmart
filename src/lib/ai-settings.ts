@@ -1,6 +1,7 @@
 import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/integrations/firebase/client';
 import type { AIProviderId, ProviderKeys } from './ai-engine/types.ts';
+import { clearAllProviderCooldowns } from './ai-engine/orchestrator.ts';
 
 export interface AIProviderConfig {
   id: AIProviderId;
@@ -50,16 +51,15 @@ export const DEFAULT_AI_SETTINGS: AISystemSettings = {
       name: 'Google Gemini',
       apiKey: '',
       enabled: true,
-      model: 'gemini-flash-lite-latest',
+      model: 'gemini-2.5-flash',
       priority: 1,
       description: 'Ultra-fast, high-accuracy model with huge context window and native JSON formatting.',
       consoleUrl: 'https://aistudio.google.com/app/apikey',
       recommendedModels: [
-        'gemini-flash-lite-latest',
-        'gemini-3.5-flash-lite',
-        'gemini-3-flash-preview',
-        'gemini-flash-latest',
         'gemini-2.5-flash',
+        'gemini-2.0-flash',
+        'gemini-1.5-flash',
+        'gemini-1.5-pro',
       ],
     },
     groq: {
@@ -67,14 +67,16 @@ export const DEFAULT_AI_SETTINGS: AISystemSettings = {
       name: 'Groq (LPU Inference)',
       apiKey: '',
       enabled: true,
-      model: 'openai/gpt-oss-20b',
+      model: 'openai/gpt-oss-120b',
       priority: 2,
       description: 'Extremely fast inference on custom LPU chips, ideal for high-throughput batch generation.',
       consoleUrl: 'https://console.groq.com/keys',
       recommendedModels: [
-        'openai/gpt-oss-20b',
         'openai/gpt-oss-120b',
+        'openai/gpt-oss-20b',
         'qwen/qwen3.8-27b',
+        'llama-3.3-70b-versatile',
+        'llama-3.1-8b-instant',
       ],
     },
     openrouter: {
@@ -88,6 +90,8 @@ export const DEFAULT_AI_SETTINGS: AISystemSettings = {
       consoleUrl: 'https://openrouter.ai/keys',
       recommendedModels: [
         'meta-llama/llama-3.3-70b-instruct',
+        'openai/gpt-4o',
+        'openai/gpt-4o-mini',
         'google/gemini-2.0-flash-exp:free',
         'deepseek/deepseek-chat',
         'mistralai/mistral-small-24b-instruct-2501',
@@ -121,43 +125,19 @@ export const DEFAULT_AI_SETTINGS: AISystemSettings = {
  * Load initial keys from environment variables and local storage
  * (built-in default keys were removed — see DEFAULT_AI_SETTINGS note)
  */
-function getPreconfiguredEnvKeys(): ProviderKeys {
+export function getPreconfiguredEnvKeys(): ProviderKeys {
   const meta: Record<string, string | undefined> = (import.meta as any).env || {};
-  const getStorage = (key: string): string | undefined => {
-    try {
-      if (typeof localStorage !== 'undefined') {
-        const val = localStorage.getItem(key);
-        return val && val.trim() ? val.trim() : undefined;
-      }
-    } catch {
-      return undefined;
-    }
-    return undefined;
-  };
-
   return {
-    gemini:
-      meta.VITE_GEMINI_API_KEY ||
-      meta.GEMINI_API_KEY ||
-      getStorage('gemini_api_key') ||
-      getStorage('GEMINI_API_KEY') ||
-      getStorage('google_ai_api_key'),
-    groq:
-      meta.VITE_GROQ_API_KEY ||
-      meta.GROQ_API_KEY ||
-      getStorage('groq_api_key') ||
-      getStorage('GROQ_API_KEY'),
-    openrouter:
-      meta.VITE_OPENROUTER_API_KEY ||
-      meta.OPENROUTER_API_KEY ||
-      getStorage('openrouter_api_key') ||
-      getStorage('OPENROUTER_API_KEY'),
-    huggingface:
-      meta.VITE_HUGGINGFACE_API_KEY ||
+    gemini: (meta.VITE_GEMINI_API_KEY || meta.GEMINI_API_KEY || '').trim() || undefined,
+    groq: (meta.VITE_GROQ_API_KEY || meta.GROQ_API_KEY || '').trim() || undefined,
+    openrouter: (meta.VITE_OPENROUTER_API_KEY || meta.OPENROUTER_API_KEY || '').trim() || undefined,
+    huggingface: (
       meta.VITE_HUGGING_FACE_API_KEY ||
+      meta.VITE_HUGGINGFACE_API_KEY ||
       meta.HUGGING_FACE_API_KEY ||
-      getStorage('huggingface_api_key') ||
-      getStorage('HUGGING_FACE_API_KEY'),
+      meta.HUGGINGFACE_API_KEY ||
+      ''
+    ).trim() || undefined,
   };
 }
 
@@ -225,8 +205,12 @@ function mergeWithDefaults(data: Partial<AISystemSettings>): AISystemSettings {
   const envKeys = getPreconfiguredEnvKeys();
 
   const getEffectiveKey = (userKey: string | undefined, provider: AIProviderId): string => {
+    // Environment key (.env) is the primary source; user override in admin settings is optional
+    if (envKeys[provider] && envKeys[provider]!.trim().length > 0) {
+      return envKeys[provider]!.trim();
+    }
     if (userKey && userKey.trim().length > 0) return userKey.trim();
-    return envKeys[provider] || '';
+    return '';
   };
 
   const merged: AISystemSettings = {
@@ -254,28 +238,61 @@ function mergeWithDefaults(data: Partial<AISystemSettings>): AISystemSettings {
         apiKey: getEffectiveKey(data.providers?.huggingface?.apiKey, 'huggingface'),
       },
     },
-    providerPriority: data.providerPriority || base.providerPriority,
-    defaultProvider: data.defaultProvider || base.defaultProvider,
+    providerPriority: (() => {
+      const validProviders: AIProviderId[] = ['gemini', 'groq', 'openrouter', 'huggingface'];
+      let pList = Array.isArray(data.providerPriority)
+        ? data.providerPriority.filter((p): p is AIProviderId => validProviders.includes(p))
+        : [...base.providerPriority];
+      for (const vp of validProviders) {
+        if (!pList.includes(vp)) pList.push(vp);
+      }
+      return pList;
+    })(),
+    defaultProvider: data.defaultProvider || (data.providerPriority && data.providerPriority[0]) || base.defaultProvider,
     autoFallback: data.autoFallback ?? base.autoFallback,
     temperature: data.temperature ?? base.temperature,
     maxBatchSize: data.maxBatchSize ?? base.maxBatchSize,
   };
 
-  // Auto-migrate legacy or deprecated models from older saved configs
-  if (
-    merged.providers.groq.model === 'llama-3.3-70b-versatile' ||
-    merged.providers.groq.model === 'llama-3.1-8b-instant' ||
-    !merged.providers.groq.model
-  ) {
-    merged.providers.groq.model = 'openai/gpt-oss-20b';
+  // Keep provider.priority numbers (1, 2, 3, 4) strictly synchronized with providerPriority list
+  merged.providers.gemini.priority = merged.providerPriority.indexOf('gemini') + 1;
+  merged.providers.groq.priority = merged.providerPriority.indexOf('groq') + 1;
+  merged.providers.openrouter.priority = merged.providerPriority.indexOf('openrouter') + 1;
+  merged.providers.huggingface.priority = merged.providerPriority.indexOf('huggingface') + 1;
+
+  // Keep provider.priority numbers (1, 2, 3, 4) strictly synchronized with providerPriority list
+  merged.providers.gemini.priority = merged.providerPriority.indexOf('gemini') + 1;
+  merged.providers.groq.priority = merged.providerPriority.indexOf('groq') + 1;
+  merged.providers.openrouter.priority = merged.providerPriority.indexOf('openrouter') + 1;
+  merged.providers.huggingface.priority = merged.providerPriority.indexOf('huggingface') + 1;
+
+  // Ensure recommended models are always populated with current valid models
+  merged.providers.gemini.recommendedModels = base.providers.gemini.recommendedModels;
+  merged.providers.groq.recommendedModels = base.providers.groq.recommendedModels;
+  merged.providers.openrouter.recommendedModels = base.providers.openrouter.recommendedModels;
+  merged.providers.huggingface.recommendedModels = base.providers.huggingface.recommendedModels;
+
+  // Auto-migrate decommissioned or unavailable Groq models from older saved configs
+  const decommissionedGroqModels = new Set([
+    'gemma2-9b-it',
+    'mixtral-8x7b-32768',
+    'gemma-7b-it',
+    'llama2-70b-4096',
+  ]);
+  if (decommissionedGroqModels.has(merged.providers.groq.model) || !merged.providers.groq.model) {
+    merged.providers.groq.model = 'openai/gpt-oss-120b';
   }
-  if (
-    merged.providers.gemini.model === 'gemini-1.5-flash' ||
-    merged.providers.gemini.model === 'gemini-2.5-flash' ||
-    !merged.providers.gemini.model
-  ) {
-    merged.providers.gemini.model = 'gemini-flash-lite-latest';
+
+  const invalidGeminiModels = new Set([
+    'gemini-flash-lite-latest',
+    'gemini-3.5-flash-lite',
+    'gemini-3-flash-preview',
+    'gemini-flash-latest',
+  ]);
+  if (invalidGeminiModels.has(merged.providers.gemini.model) || !merged.providers.gemini.model) {
+    merged.providers.gemini.model = 'gemini-2.5-flash';
   }
+
   if (merged.providers.openrouter.model === 'google/gemini-flash-1.5' || !merged.providers.openrouter.model) {
     merged.providers.openrouter.model = 'meta-llama/llama-3.3-70b-instruct';
   }
@@ -332,6 +349,7 @@ export async function saveAISettings(
 
   inMemorySettings = toSave;
   syncToLocalStorage(toSave);
+  clearAllProviderCooldowns();
 
   // Dispatch a custom event so open components (like AdminAIGenerator) refresh instantly
   if (typeof window !== 'undefined') {
@@ -343,20 +361,30 @@ export async function saveAISettings(
  * Get effective provider keys dictionary for generation calls
  */
 export async function getEffectiveProviderKeys(): Promise<ProviderKeys> {
-  const settings = await getAISettings();
+  const envKeys = getPreconfiguredEnvKeys();
+  const settings = await getAISettings().catch(() => null);
+
   return {
-    gemini: settings.providers.gemini.enabled && settings.providers.gemini.apiKey
-      ? settings.providers.gemini.apiKey
-      : undefined,
-    groq: settings.providers.groq.enabled && settings.providers.groq.apiKey
-      ? settings.providers.groq.apiKey
-      : undefined,
-    openrouter: settings.providers.openrouter.enabled && settings.providers.openrouter.apiKey
-      ? settings.providers.openrouter.apiKey
-      : undefined,
-    huggingface: settings.providers.huggingface.enabled && settings.providers.huggingface.apiKey
-      ? settings.providers.huggingface.apiKey
-      : undefined,
+    gemini:
+      envKeys.gemini ||
+      (settings?.providers.gemini.enabled && settings.providers.gemini.apiKey
+        ? settings.providers.gemini.apiKey
+        : undefined),
+    groq:
+      envKeys.groq ||
+      (settings?.providers.groq.enabled && settings.providers.groq.apiKey
+        ? settings.providers.groq.apiKey
+        : undefined),
+    openrouter:
+      envKeys.openrouter ||
+      (settings?.providers.openrouter.enabled && settings.providers.openrouter.apiKey
+        ? settings.providers.openrouter.apiKey
+        : undefined),
+    huggingface:
+      envKeys.huggingface ||
+      (settings?.providers.huggingface.enabled && settings.providers.huggingface.apiKey
+        ? settings.providers.huggingface.apiKey
+        : undefined),
   };
 }
 
@@ -382,7 +410,7 @@ export async function testAIProviderConnection(
   try {
     switch (provider) {
       case 'gemini': {
-        const targetModel = model || 'gemini-flash-lite-latest';
+        const targetModel = model || 'gemini-2.5-flash';
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${encodeURIComponent(cleanKey)}`;
         const res = await fetch(url, {
           method: 'POST',
@@ -398,8 +426,8 @@ export async function testAIProviderConnection(
 
         if (!res.ok) {
           const errMsg = data?.error?.message || `HTTP ${res.status}: ${res.statusText}`;
-          if ((res.status === 404 || res.status === 429) && targetModel !== 'gemini-3.5-flash-lite') {
-            const retryUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${encodeURIComponent(cleanKey)}`;
+          if ((res.status === 404 || res.status === 429) && targetModel !== 'gemini-1.5-flash') {
+            const retryUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(cleanKey)}`;
             const retryRes = await fetch(retryUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -412,7 +440,7 @@ export async function testAIProviderConnection(
               return {
                 success: true,
                 latencyMs: Date.now() - startTime,
-                message: `Connected successfully to Google Gemini (verified via gemini-3.5-flash-lite) in ${Date.now() - startTime}ms!`,
+                message: `Connected successfully to Google Gemini (verified via gemini-1.5-flash) in ${Date.now() - startTime}ms!`,
               };
             }
           }
@@ -432,7 +460,7 @@ export async function testAIProviderConnection(
       }
 
       case 'groq': {
-        const targetModel = model || 'openai/gpt-oss-20b';
+        const targetModel = model || 'openai/gpt-oss-120b';
         const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -452,27 +480,26 @@ export async function testAIProviderConnection(
 
         if (!res.ok) {
           const errMsg = data?.error?.message || `HTTP ${res.status}: ${res.statusText}`;
-          if ((res.status === 404 || res.status === 400) && targetModel !== 'openai/gpt-oss-120b') {
-            const retryRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-              method: 'POST',
-              headers: {
-                Authorization: `Bearer ${cleanKey}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                model: 'openai/gpt-oss-120b',
-                messages: [{ role: 'user', content: 'Ping' }],
-                max_tokens: 5,
-                temperature: 0.1,
-              }),
-            });
-            if (retryRes.ok) {
-              return {
-                success: true,
-                latencyMs: Date.now() - startTime,
-                message: `Connected successfully to Groq (verified via openai/gpt-oss-120b) in ${Date.now() - startTime}ms!`,
-              };
-            }
+          const fallbackModel = targetModel === 'openai/gpt-oss-120b' ? 'openai/gpt-oss-20b' : 'openai/gpt-oss-120b';
+          const retryRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${cleanKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: fallbackModel,
+              messages: [{ role: 'user', content: 'Ping' }],
+              max_tokens: 5,
+              temperature: 0.1,
+            }),
+          });
+          if (retryRes.ok) {
+            return {
+              success: true,
+              latencyMs: Date.now() - startTime,
+              message: `Connected successfully to Groq (verified via ${fallbackModel}) in ${Date.now() - startTime}ms!`,
+            };
           }
           return {
             success: false,

@@ -4,6 +4,8 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import StudentBooks from './StudentBooks';
+import { getBooks } from '@/lib/books';
+import { getChapters } from '@/lib/subjects';
 
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({
@@ -146,5 +148,72 @@ describe('StudentBooks component', () => {
     await waitFor(() => {
       expect(screen.getByText(/Back to All Subjects/i)).toBeInTheDocument();
     });
+  });
+
+  it('shows only admin-defined chapters when a subject has chapters and preserves their assigned notes', async () => {
+    vi.mocked(getBooks).mockResolvedValue([
+      {
+        id: 'note-vectors',
+        title: 'Vectors notes',
+        resourceType: 'short_note',
+        departmentId: 'dept-1',
+        subjectId: 'sub-physics',
+        chapterId: 'chapter-vectors',
+        chapterTitle: 'Vectors',
+        chapterNumber: 1,
+        driveUrl: '',
+        driveFileId: '',
+        language: 'English',
+        status: 'published',
+        allowDownload: false,
+        createdBy: 'admin',
+      },
+      {
+        id: 'note-mechanics',
+        title: 'Mechanics notes',
+        resourceType: 'short_note',
+        departmentId: 'dept-1',
+        subjectId: 'sub-physics',
+        chapterId: 'chapter-mechanics',
+        chapterTitle: 'Mechanics',
+        chapterNumber: 2,
+        driveUrl: '',
+        driveFileId: '',
+        language: 'English',
+        status: 'published',
+        allowDownload: false,
+        createdBy: 'admin',
+      },
+      {
+        id: 'note-extra',
+        title: 'Unassigned extra notes',
+        resourceType: 'short_note',
+        departmentId: 'dept-1',
+        subjectId: 'sub-physics',
+        chapterId: 'unknown-chapter',
+        chapterTitle: 'Unassigned extra',
+        chapterNumber: 9,
+        driveUrl: '',
+        driveFileId: '',
+        language: 'English',
+        status: 'published',
+        allowDownload: false,
+        createdBy: 'admin',
+      },
+    ]);
+    vi.mocked(getChapters).mockResolvedValue([
+      { id: 'chapter-vectors', subjectId: 'sub-physics', title: 'Vectors', chapterNumber: 1 },
+      { id: 'chapter-mechanics', subjectId: 'sub-physics', title: 'Mechanics', chapterNumber: 2 },
+    ]);
+
+    render(
+      <MemoryRouter initialEntries={['/dashboard/books?tab=notes&subjectId=sub-physics']}>
+        <StudentBooks />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Chapter 1: Vectors' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Chapter 2: Mechanics' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /Unassigned extra/i })).not.toBeInTheDocument();
   });
 });
