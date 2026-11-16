@@ -10,7 +10,7 @@
  *   CHATBOT_ENABLED  - set to "false" to disable the assistant (kill switch)
  */
 
-import { handleChatbotAsk, resolveIpKey } from '../../src/server/chatbot.js';
+import { handleChatbotAsk, resolveIpKey } from '../../src/server/chatbot';
 
 const UNAVAILABLE_MESSAGE =
   'The EthioSmart AI Assistant is temporarily unavailable. Please try again in a moment — or sign up and explore the app!';

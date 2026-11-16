@@ -1,4 +1,4 @@
-import { validateGoogleDriveFile } from '../../src/server/drive-bridge.js';
+import { validateGoogleDriveFile } from '../../src/server/drive-bridge';
 
 function parseRequestBody(req: any): Promise<any> {
   if (req.body && typeof req.body === 'object') {

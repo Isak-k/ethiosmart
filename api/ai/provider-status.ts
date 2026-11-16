@@ -1,5 +1,5 @@
-import { getProviderStatus } from '../../src/lib/ai-engine/orchestrator.js';
-import type { ProviderKeys } from '../../src/lib/ai-engine/types.js';
+import { getProviderStatus } from '../../src/lib/ai-engine/orchestrator';
+import type { ProviderKeys } from '../../src/lib/ai-engine/types';
 
 function loadEnvKeys(): ProviderKeys {
   // Server-side environment configuration only — no hardcoded or committed
