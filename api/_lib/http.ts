@@ -1,5 +1,5 @@
-import { getAuth, getDb, admin } from './firebase-admin.js';
-import { ApiError, err, MAIN_ADMIN_EMAIL } from './payment-shared.js';
+﻿import { getAuth, getDb, admin } from '';
+import { ApiError, err, MAIN_ADMIN_EMAIL } from '';
 
 type Handler = (
   req: any,

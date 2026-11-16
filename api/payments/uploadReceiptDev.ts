@@ -1,7 +1,7 @@
-import fs from 'fs';
+﻿import fs from 'fs';
 import path from 'path';
-import { createHandler } from '../_lib/http.js';
-import { cleanString, err, RECEIPT_FOLDER } from '../_lib/payment-shared.js';
+import { createHandler } from '';
+import { cleanString, err, RECEIPT_FOLDER } from '';
 
 export default createHandler(
   async (req, _res, ctx) => {

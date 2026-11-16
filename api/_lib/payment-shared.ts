@@ -1,4 +1,4 @@
-import * as crypto from 'crypto';
+﻿import * as crypto from 'crypto';
 
 export const SETTINGS_PATH = 'paymentSettings/config';
 export const MAIN_ADMIN_EMAIL = 'isak@gmail.com';

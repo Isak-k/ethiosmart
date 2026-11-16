@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Vercel serverless function: EthioSmart homepage promotional assistant.
  *
  * Same handler as the local dev bridge (src/server/chatbot.ts), reusing the
@@ -13,7 +13,7 @@
 import { handleChatbotAsk, resolveIpKey } from '../../src/server/chatbot';
 
 const UNAVAILABLE_MESSAGE =
-  'The EthioSmart AI Assistant is temporarily unavailable. Please try again in a moment — or sign up and explore the app!';
+  'The EthioSmart AI Assistant is temporarily unavailable. Please try again in a moment â€” or sign up and explore the app!';
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Content-Type', 'application/json');

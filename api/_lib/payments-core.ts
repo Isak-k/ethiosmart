@@ -1,5 +1,5 @@
-import * as crypto from 'crypto';
-import type { admin as AdminNS } from './firebase-admin.js';
+﻿import * as crypto from 'crypto';
+import type { admin as AdminNS } from '';
 import {
   ApiError,
   err,
@@ -10,8 +10,8 @@ import {
   RECEIPT_FOLDER,
   MAIN_ADMIN_EMAIL,
   PaymentStatus,
-} from './payment-shared.js';
-import { calculatePaymentDiscount, getPaymentStorageCollections } from './payment-discounts.js';
+} from '';
+import { calculatePaymentDiscount, getPaymentStorageCollections } from '';
 import {
   getLocalPaymentSettings,
   saveLocalPaymentSettings,
@@ -19,7 +19,7 @@ import {
   saveLocalPayments,
   getLocalAccounts,
   saveLocalAccounts,
-} from './local-store.js';
+} from '';
 
 export async function getProfile(db: FirebaseFirestore.Firestore, uid: string): Promise<FirebaseFirestore.DocumentData> {
   try {
@@ -78,7 +78,7 @@ function validateDiscountSettings(raw: any): any {
   const cleanCodes = codes.map((item: any) => {
     const code = cleanString(item?.code, 40).toUpperCase();
     if (!/^[A-Z0-9_-]{3,40}$/.test(code) || seenCodes.has(code)) {
-      throw err('invalid-argument', 'Discount codes must be unique and contain 3–40 letters, numbers, underscores or hyphens.');
+      throw err('invalid-argument', 'Discount codes must be unique and contain 3â€“40 letters, numbers, underscores or hyphens.');
     }
     seenCodes.add(code);
     return { code, kind: item.kind, value: validateValue(item.kind, item.value), enabled: item.enabled === true };

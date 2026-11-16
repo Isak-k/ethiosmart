@@ -1,4 +1,4 @@
-export function getPaymentStorageCollections(mode: 'production' | 'sandbox') {
+﻿export function getPaymentStorageCollections(mode: 'production' | 'sandbox') {
   return mode === 'sandbox'
     ? { payments: 'sandboxPayments', accounts: 'sandboxPaymentAccounts', fingerprints: 'sandboxReceiptFingerprints' }
     : { payments: 'payments', accounts: 'paymentAccounts', fingerprints: 'receiptFingerprints' };

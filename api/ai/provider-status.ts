@@ -1,8 +1,8 @@
-import { getProviderStatus } from '../../src/lib/ai-engine/orchestrator';
+﻿import { getProviderStatus } from '../../src/lib/ai-engine/orchestrator';
 import type { ProviderKeys } from '../../src/lib/ai-engine/types';
 
 function loadEnvKeys(): ProviderKeys {
-  // Server-side environment configuration only — no hardcoded or committed
+  // Server-side environment configuration only â€” no hardcoded or committed
   // fallback keys. Private keys must be set in the host's env (Vercel env vars).
   return {
     gemini: process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || '',

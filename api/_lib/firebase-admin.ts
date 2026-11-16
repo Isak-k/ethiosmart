@@ -1,4 +1,4 @@
-import adminModule from 'firebase-admin';
+﻿import adminModule from 'firebase-admin';
 
 const admin: typeof adminModule = (adminModule as any).default || adminModule;
 

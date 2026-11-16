@@ -1,5 +1,5 @@
-import type { admin as AdminNS } from './firebase-admin.js';
-import { err, cleanString, SETTINGS_PATH } from './payment-shared.js';
+﻿import type { admin as AdminNS } from '';
+import { err, cleanString, SETTINGS_PATH } from '';
 
 type BookData = FirebaseFirestore.DocumentData & { id: string };
 

@@ -1,6 +1,6 @@
-import fs from 'fs';
+﻿import fs from 'fs';
 import path from 'path';
-import { defaultSettings } from './payment-shared.js';
+import { defaultSettings } from '';
 
 const DATA_DIR = path.resolve(process.cwd(), '.data');
 
