@@ -1,6 +1,6 @@
-import * as ca from '../_lib/content-access-core';
-import { admin } from '../_lib/firebase-admin';
-import { createHandler } from '../_lib/http';
+import * as ca from '../_lib/content-access-core.js';
+import { admin } from '../_lib/firebase-admin.js';
+import { createHandler } from '../_lib/http.js';
 
 export default createHandler(async (req, _res, ctx) => {
   return await ca.getStudentExamQuestions(ctx.db, ctx.uid, req.body);

@@ -1,4 +1,4 @@
-import type { GenerateBatchRequest, NormalizedQuestion, AIProviderId, QuestionType } from './types.ts';
+import type { GenerateBatchRequest, NormalizedQuestion, AIProviderId, QuestionType } from './types.js';
 
 export function buildSystemPrompt(): string {
   return [

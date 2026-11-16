@@ -1,5 +1,5 @@
-import type { admin as AdminNS } from './firebase-admin';
-import { err, cleanString, SETTINGS_PATH } from './payment-shared';
+import type { admin as AdminNS } from './firebase-admin.js';
+import { err, cleanString, SETTINGS_PATH } from './payment-shared.js';
 
 type BookData = FirebaseFirestore.DocumentData & { id: string };
 
@@ -331,7 +331,7 @@ export async function submitStudentExamAttempt(db: FirebaseFirestore.Firestore, 
   if (!attemptSnap.exists) throw err('not-found', 'Exam attempt not found.', 404);
   const attempt = attemptSnap.data() || {};
   if (attempt.studentId !== uid) {
-    throw err('permission-denied', 'You cannot submit another student's attempt.', 403);
+    throw err('permission-denied', "You cannot submit another student's attempt.", 403);
   }
   if (attempt.isSubmitted === true) {
     throw err('failed-precondition', 'This attempt has already been submitted.', 412);

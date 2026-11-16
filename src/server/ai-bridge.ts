@@ -1,10 +1,10 @@
 import type { Plugin, ViteDevServer } from 'vite';
 import { IncomingMessage, ServerResponse } from 'http';
-import { orchestrateGenerationBatch, getProviderStatus } from '../lib/ai-engine/orchestrator.ts';
-import type { GenerateBatchRequest, ProviderKeys } from '../lib/ai-engine/types.ts';
-import { validateGoogleDriveFile, extractGoogleDriveContent, downloadGoogleDriveBuffer } from './drive-bridge';
-import { handleChatbotAsk, resolveIpKey } from './chatbot';
-import { loadServerEnv } from './env';
+import { orchestrateGenerationBatch, getProviderStatus } from '../lib/ai-engine/orchestrator.js';
+import type { GenerateBatchRequest, ProviderKeys } from '../lib/ai-engine/types.js';
+import { validateGoogleDriveFile, extractGoogleDriveContent, downloadGoogleDriveBuffer } from './drive-bridge.js';
+import { handleChatbotAsk, resolveIpKey } from './chatbot.js';
+import { loadServerEnv } from './env.js';
 
 loadServerEnv();
 

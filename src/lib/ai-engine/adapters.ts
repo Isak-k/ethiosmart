@@ -1,5 +1,5 @@
-import type { GenerateBatchRequest, NormalizedQuestion } from './types.ts';
-import { buildSystemPrompt, buildUserPrompt, extractJsonFromText, normalizeQuestions } from './normalizer.ts';
+import type { GenerateBatchRequest, NormalizedQuestion } from './types.js';
+import { buildSystemPrompt, buildUserPrompt, extractJsonFromText, normalizeQuestions } from './normalizer.js';
 
 // -------------------------------------------------------------
 // Google Gemini Adapter

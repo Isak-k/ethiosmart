@@ -29,7 +29,7 @@ import {
   isIpLiteral,
   rateLimitVerdict,
   type ChatHistoryTurn,
-} from '../../functions/src/chatbot/core.ts';
+} from '../../functions/src/chatbot/core.js';
 
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 const REQUEST_TIMEOUT_MS = 15_000;

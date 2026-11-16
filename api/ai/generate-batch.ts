@@ -1,5 +1,5 @@
-import { orchestrateGenerationBatch } from '../../src/lib/ai-engine/orchestrator.ts';
-import type { GenerateBatchRequest, ProviderKeys } from '../../src/lib/ai-engine/types.ts';
+import { orchestrateGenerationBatch } from '../../src/lib/ai-engine/orchestrator.js';
+import type { GenerateBatchRequest, ProviderKeys } from '../../src/lib/ai-engine/types.js';
 
 function parseRequestBody(req: any): Promise<any> {
   if (req.body && typeof req.body === 'object') {

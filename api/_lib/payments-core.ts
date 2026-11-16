@@ -1,6 +1,7 @@
 import * as crypto from 'crypto';
-import type { admin as AdminNS } from './firebase-admin';
+import type { admin as AdminNS } from './firebase-admin.js';
 import {
+  ApiError,
   err,
   cleanString,
   defaultSettings,
@@ -9,8 +10,8 @@ import {
   RECEIPT_FOLDER,
   MAIN_ADMIN_EMAIL,
   PaymentStatus,
-} from './payment-shared';
-import { calculatePaymentDiscount, getPaymentStorageCollections } from './payment-discounts';
+} from './payment-shared.js';
+import { calculatePaymentDiscount, getPaymentStorageCollections } from './payment-discounts.js';
 import {
   getLocalPaymentSettings,
   saveLocalPaymentSettings,
@@ -18,7 +19,7 @@ import {
   saveLocalPayments,
   getLocalAccounts,
   saveLocalAccounts,
-} from './local-store';
+} from './local-store.js';
 
 export async function getProfile(db: FirebaseFirestore.Firestore, uid: string): Promise<FirebaseFirestore.DocumentData> {
   try {
@@ -345,7 +346,7 @@ export async function submitPayment(
 }
 
 export async function getMyPayment(db: FirebaseFirestore.Firestore, uid: string) {
-  let settings = defaultSettings();
+  let settings: FirebaseFirestore.DocumentData = defaultSettings();
   try {
     if (db) {
       const settingsSnap = await db.doc(SETTINGS_PATH).get();
@@ -421,7 +422,7 @@ export async function getPaymentAdminData(
   const limit = Math.min(Math.max(Number(data?.limit) || 100, 1), 300);
   const status = cleanString(data?.status, 20);
 
-  let liveSettings = getLocalPaymentSettings();
+  let liveSettings: FirebaseFirestore.DocumentData = getLocalPaymentSettings();
   try {
     if (db) {
       const settingsSnap = await db.doc(SETTINGS_PATH).get();
@@ -608,7 +609,7 @@ export async function savePaymentSettings(
     throw err('invalid-argument', 'Enter a valid ETB price.');
   }
 
-  let existing = getLocalPaymentSettings();
+  let existing: FirebaseFirestore.DocumentData = getLocalPaymentSettings();
   try {
     if (db) {
       const existingSnap = await db.doc(SETTINGS_PATH).get();

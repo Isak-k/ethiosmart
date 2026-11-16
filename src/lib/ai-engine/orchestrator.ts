@@ -6,9 +6,9 @@ import type {
   ProviderAttemptLog,
   ProviderStatusInfo,
   ProviderKeys
-} from './types.ts';
-import { callGemini, callGroq, callOpenRouter, callHuggingFace } from './adapters.ts';
-import { validateGeneratedQuestionBatch, validateNormalizedQuestion } from './normalizer.ts';
+} from './types.js';
+import { callGemini, callGroq, callOpenRouter, callHuggingFace } from './adapters.js';
+import { validateGeneratedQuestionBatch, validateNormalizedQuestion } from './normalizer.js';
 
 export type { ProviderKeys };
 
