@@ -18,6 +18,7 @@ import { initializeApp, deleteApp, getApp, getApps } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword, signOut, setPersistence, inMemoryPersistence } from "firebase/auth";
 import { RESTRICTED_PERMISSIONS } from "@/types/permissions";
 
+// Fixed: Static import to resolve Vercel deployment issue
 export interface StudentWithStats extends UserProfile {
   examsCompleted: number;
   averageScore: number;
