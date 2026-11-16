@@ -16,6 +16,7 @@ import {
 import { UserProfile, Exam, ExamAttempt } from "@/integrations/firebase/types";
 import { initializeApp, deleteApp, getApp, getApps } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword, signOut, setPersistence, inMemoryPersistence } from "firebase/auth";
+import { RESTRICTED_PERMISSIONS } from "@/types/permissions";
 
 export interface StudentWithStats extends UserProfile {
   examsCompleted: number;
@@ -478,9 +479,6 @@ export async function createExaminerAccount(email: string, password: string, nam
   try {
     const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
     const user = userCredential.user;
-
-    // Import RESTRICTED_PERMISSIONS to initialize new examiners with no permissions
-    const { RESTRICTED_PERMISSIONS } = await import('@/types/permissions');
 
     // Create user profile in Firestore (using main app's db instance)
     const userProfile = {
